@@ -1,0 +1,106 @@
+:root {
+  /* Brand */
+  --text-brand-size: 22px;
+  --text-brand-weight: 700;
+  --text-brand-line-height: 30px;
+  --text-brand-letter-spacing: 0px;
+
+  /* Headline */
+  --text-h1-size: 32px;
+  --text-h1-weight: 700;
+  --text-h1-line-height: 38px;
+  --text-h1-letter-spacing: 0px;
+
+  --text-h2-size: 28px;
+  --text-h2-weight: 700;
+  --text-h2-line-height: 38px;
+  --text-h2-letter-spacing: 3px;
+
+  --text-h3-size: 24px;
+  --text-h3-weight: 700;
+  --text-h3-line-height: 38px;
+  --text-h3-letter-spacing: 3px;
+
+  --text-h4-size: 20px;
+  --text-h4-weight: 600;
+  --text-h4-line-height: 28px;
+  --text-h4-letter-spacing: 0px;
+
+  /* Body */
+  --text-body1-size: 15px;
+  --text-body1-weight: 600;
+  --text-body1-line-height: 20px;
+  --text-body1-letter-spacing: 0px;
+
+  --text-body2-size: 15px;
+  --text-body2-weight: 500;
+  --text-body2-line-height: 20px;
+  --text-body2-letter-spacing: 0px;
+
+  --text-body3-size: 12px;
+  --text-body3-weight: 400;
+  --text-body3-line-height: 18px;
+  --text-body3-letter-spacing: 0px;
+
+  --text-body4-size: 10px;
+  --text-body4-weight: 700;
+  --text-body4-line-height: 12px;
+  --text-body4-letter-spacing: 0px;
+
+  --text-body5-size: 10px;
+  --text-body5-weight: 500;
+  --text-body5-line-height: 12px;
+  --text-body5-letter-spacing: 0px;
+
+  /* Label */
+  --text-label1-size: 18px;
+  --text-label1-weight: 700;
+  --text-label1-line-height: 20px;
+  --text-label1-letter-spacing: 0px;
+
+  --text-label2-size: 18px;
+  --text-label2-weight: 600;
+  --text-label2-line-height: 20px;
+  --text-label2-letter-spacing: 0px;
+
+  --text-label3-size: 18px;
+  --text-label3-weight: 400;
+  --text-label3-line-height: 20px;
+  --text-label3-letter-spacing: 0px;
+
+  --text-label4-size: 7px;
+  --text-label4-weight: 600;
+  --text-label4-line-height: 10px;
+  --text-label4-letter-spacing: 0px;
+
+  /* Caption */
+    --text-caption1-size: 14px;
+    --text-caption1-weight: 500;
+    --text-caption1-line-height: 20px;
+    --text-caption1-letter-spacing: 0px;
+
+    --text-caption2-size: 12px;
+    --text-caption2-weight: 500;
+    --text-caption2-line-height: 18px;
+    --text-caption2-letter-spacing: 0px;
+
+    --text-caption3-size: 12px;
+    --text-caption3-weight: 600;
+    --text-caption3-line-height: 18px;
+    --text-caption3-letter-spacing: 0px;
+
+    --text-caption4-size: 8px;
+    --text-caption4-weight: 500;
+    --text-caption4-line-height: 10px;
+    --text-caption4-letter-spacing: 0px;
+
+    --text-caption5-size: 6px;
+    --text-caption5-weight: 600;
+    --text-caption5-line-height: 10px;
+    --text-caption5-letter-spacing: 0px;
+
+    --text-caption6-size: 5px;
+    --text-caption6-weight: 500;
+    --text-caption6-line-height: 6px;
+    --text-caption6-letter-spacing: 5px;
+}
