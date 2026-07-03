@@ -30,27 +30,27 @@ const sizeClassNames: Record<ButtonSize, string> = {
 const variantClassNames: Record<ButtonTone, Record<ButtonVariant, string>> = {
   pink: {
     solid:
-      'border-[var(--color-primary-400)] bg-[var(--color-primary-400)] text-[var(--color-neutral-0)] focus-visible:ring-[var(--color-primary-400)]',
+      'border-primary-400 bg-primary-400 text-neutral-0 focus-visible:ring-primary-400',
     outline:
-      'border-[var(--color-primary-400)] bg-[var(--color-neutral-0)] text-[var(--color-primary-400)] focus-visible:ring-[var(--color-primary-400)]',
+      'border-primary-400 bg-neutral-0 text-primary-400 focus-visible:ring-primary-400',
     soft:
-      'border-[var(--color-primary-100)] bg-[var(--color-primary-100)] text-[var(--color-primary-400)] focus-visible:ring-[var(--color-primary-400)]',
+      'border-primary-100 bg-primary-100 text-primary-400 focus-visible:ring-primary-400',
   },
   orange: {
     solid:
-      'border-[var(--color-secondary-500)] bg-[var(--color-secondary-500)] text-[var(--color-neutral-0)] focus-visible:ring-[var(--color-secondary-500)]',
+      'border-secondary-500 bg-secondary-500 text-neutral-0 focus-visible:ring-secondary-500',
     outline:
-      'border-[var(--color-secondary-500)] bg-[var(--color-neutral-0)] text-[var(--color-secondary-500)] focus-visible:ring-[var(--color-secondary-500)]',
+      'border-secondary-500 bg-neutral-0 text-secondary-500 focus-visible:ring-secondary-500',
     soft:
-      'border-[var(--color-secondary-100)] bg-[var(--color-secondary-100)] text-[var(--color-secondary-500)] focus-visible:ring-[var(--color-secondary-500)]',
+      'border-secondary-100 bg-secondary-100 text-secondary-500 focus-visible:ring-secondary-500',
   },
   gray: {
     solid:
-      'border-[var(--color-neutral-300)] bg-[var(--color-neutral-300)] text-[var(--color-neutral-600)] focus-visible:ring-[var(--color-neutral-600)]',
+      'border-neutral-300 bg-neutral-300 text-neutral-600 focus-visible:ring-neutral-600',
     outline:
-      'border-[var(--color-neutral-300)] bg-[var(--color-neutral-0)] text-[var(--color-neutral-600)] focus-visible:ring-[var(--color-neutral-600)]',
+      'border-neutral-300 bg-neutral-0 text-neutral-600 focus-visible:ring-neutral-600',
     soft:
-      'border-[var(--color-neutral-300)] bg-[var(--color-neutral-300)] text-[var(--color-neutral-600)] focus-visible:ring-[var(--color-neutral-600)]',
+      'border-neutral-300 bg-neutral-300 text-neutral-600 focus-visible:ring-neutral-600',
   },
 }
 

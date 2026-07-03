@@ -26,24 +26,24 @@ const BandCard = ({
       />
 
       <div className="h-[62px] w-[165px] min-w-0 shrink-0">
-        <h3 className="font-body text-body1 m-0 truncate text-[var(--color-neutral-900)]">
+        <h3 className="font-body text-body1 m-0 truncate text-neutral-900">
           {title}
         </h3>
-        <p className="font-body text-caption2 m-0 mt-[2px] truncate text-[var(--color-neutral-700)]">
+        <p className="font-body text-caption2 m-0 mt-[2px] truncate text-neutral-700">
           {subtitle}
         </p>
 
-        <p className="font-body text-caption2 m-0 mt-[4px] truncate text-[var(--color-primary-400)]">
+        <p className="font-body text-caption2 m-0 mt-[4px] truncate text-primary-400">
           {description}
         </p>
       </div>
 
       <button
         className={[
-          'font-body text-caption3 inline-flex h-[32px] w-[69px] shrink-0 cursor-pointer items-center justify-center rounded-[8px] border-[1px] transition duration-150 ease-out active:translate-y-px focus-visible:outline-0 focus-visible:ring-4 focus-visible:ring-[var(--color-primary-400)]',
+          'font-body text-caption3 inline-flex h-[32px] w-[69px] shrink-0 cursor-pointer items-center justify-center rounded-[8px] border-[1px] transition duration-150 ease-out active:translate-y-px focus-visible:outline-0 focus-visible:ring-4 focus-visible:ring-primary-400',
           following
-            ? 'border-[var(--color-primary-50)] bg-[var(--color-primary-50)] text-[var(--color-primary-400)]'
-            : 'border-[var(--color-primary-400)] bg-[var(--color-neutral-0)] text-[var(--color-primary-400)]',
+            ? 'border-primary-50 bg-primary-50 text-primary-400'
+            : 'border-primary-400 bg-neutral-0 text-primary-400',
         ].join(' ')}
         type="button"
       >

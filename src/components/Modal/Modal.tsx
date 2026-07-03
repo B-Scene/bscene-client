@@ -18,15 +18,15 @@ type ModalActionVariant = 'outline' | 'solid'
 const toneClassNames: Record<ModalTone, Record<ModalActionVariant, string>> = {
   pink: {
     outline:
-      'border-[var(--color-primary-400)] bg-[var(--color-neutral-0)] text-[var(--color-primary-400)] focus-visible:ring-[var(--color-primary-400)]',
+      'border-primary-400 bg-neutral-0 text-primary-400 focus-visible:ring-primary-400',
     solid:
-      'border-[var(--color-primary-400)] bg-[var(--color-primary-400)] text-[var(--color-neutral-0)] focus-visible:ring-[var(--color-primary-400)]',
+      'border-primary-400 bg-primary-400 text-neutral-0 focus-visible:ring-primary-400',
   },
   orange: {
     outline:
-      'border-[var(--color-secondary-500)] bg-[var(--color-neutral-0)] text-[var(--color-secondary-500)] focus-visible:ring-[var(--color-secondary-500)]',
+      'border-secondary-500 bg-neutral-0 text-secondary-500 focus-visible:ring-secondary-500',
     solid:
-      'border-[var(--color-secondary-500)] bg-[var(--color-secondary-500)] text-[var(--color-neutral-0)] focus-visible:ring-[var(--color-secondary-500)]',
+      'border-secondary-500 bg-secondary-500 text-neutral-0 focus-visible:ring-secondary-500',
   },
 }
 
@@ -52,15 +52,15 @@ const Modal = ({
   return (
     <section
       aria-modal="true"
-      className="box-border flex h-[184px] w-[313px] max-w-full flex-col items-center bg-[var(--color-neutral-0)] px-[32px] py-[24px] text-center"
+      className="box-border flex h-[184px] w-[313px] max-w-full flex-col items-center bg-neutral-0 px-[32px] py-[24px] text-center"
       role="dialog"
     >
       <div className="flex flex-col items-center gap-[10px]">
-        <h3 className="font-body text-label1 m-0 text-[var(--color-neutral-900)]">
+        <h3 className="font-body text-label1 m-0 text-neutral-900">
           {title}
         </h3>
 
-        <p className="font-body text-caption1 m-0 text-[var(--color-neutral-600)]">
+        <p className="font-body text-caption1 m-0 text-neutral-600">
           {description}
         </p>
       </div>

@@ -16,7 +16,7 @@ type ConcertCardProps = {
 }
 
 const cardClassName =
-  'box-border flex h-[86px] w-[348px] max-w-full items-center rounded-[16px] bg-[var(--color-neutral-0)] px-[16px] py-[12px] text-left shadow-[0_4px_8px_color-mix(in_srgb,var(--color-neutral-900)_10%,transparent)]'
+  'box-border flex h-[86px] w-[348px] max-w-full items-center rounded-[16px] bg-neutral-0 px-[16px] py-[12px] text-left shadow-[0_4px_8px_rgb(20_20_20_/10%)]'
 
 const ConcertCard = ({
   month = 'MAY',
@@ -32,16 +32,16 @@ const ConcertCard = ({
 }: ConcertCardProps) => {
   return (
     <article className={cardClassName}>
-      <div className="font-body flex h-[62px] w-[50px] shrink-0 flex-col items-center justify-center rounded-[8px] bg-[var(--color-primary-300)] text-[var(--color-neutral-0)]">
+      <div className="font-body flex h-[62px] w-[50px] shrink-0 flex-col items-center justify-center rounded-[8px] bg-primary-300 text-neutral-0">
         <span className="text-body1">{month}</span>
         <span className="text-brand mt-[4px]">{day}</span>
       </div>
 
       <div className="ml-[10px] min-w-0 flex-1">
-        <h3 className="font-body text-body1 m-0 truncate text-[var(--color-neutral-900)]">
+        <h3 className="font-body text-body1 m-0 truncate text-neutral-900">
           {title}
         </h3>
-        <p className="font-body text-caption2 m-0 mt-[3px] flex items-center gap-[4px] truncate text-[var(--color-neutral-700)]">
+        <p className="font-body text-caption2 m-0 mt-[3px] flex items-center gap-[4px] truncate text-neutral-700">
           {locationIconSrc ? (
             <img
               alt={locationIconAlt}
@@ -51,10 +51,10 @@ const ConcertCard = ({
           ) : null}
           {location}
         </p>
-        <p className="font-body text-body5 m-0 mt-[5px] truncate text-[var(--color-neutral-500)]">
+        <p className="font-body text-body5 m-0 mt-[5px] truncate text-neutral-500">
           {dateTime}
-          <span className="mx-[6px] text-[var(--color-neutral-500)]">|</span>
-          <span className="text-[var(--color-primary-400)]">{dDay}</span>
+          <span className="mx-[6px] text-neutral-500">|</span>
+          <span className="text-primary-400">{dDay}</span>
         </p>
       </div>
 
@@ -65,7 +65,7 @@ const ConcertCard = ({
           src={arrowIconSrc}
         />
       ) : (
-        <span className="font-body text-h2 ml-[10px] shrink-0 text-[var(--color-neutral-600)]">
+        <span className="font-body text-h2 ml-[10px] shrink-0 text-neutral-600">
           ›
         </span>
       )}

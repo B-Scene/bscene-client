@@ -8,7 +8,7 @@ type SessionNoticeCardProps = {
 }
 
 const cardClassName =
-  'box-border flex h-[86px] w-[348px] max-w-full items-center rounded-[16px] bg-[var(--color-neutral-0)] px-[16px] py-[12px] text-left shadow-[0_4px_8px_color-mix(in_srgb,var(--color-neutral-900)_10%,transparent)]'
+  'box-border flex h-[86px] w-[348px] max-w-full items-center rounded-[16px] bg-neutral-0 px-[16px] py-[12px] text-left shadow-[0_4px_8px_rgb(20_20_20_/10%)]'
 
 const SessionNoticeCard = ({
   title = '세션 모집 공고',
@@ -19,18 +19,18 @@ const SessionNoticeCard = ({
   return (
     <article className={`${cardClassName} relative`}>
       <div className="min-w-0 pr-[66px]">
-        <h3 className="font-body text-body1 m-0 truncate text-[var(--color-neutral-900)]">
+        <h3 className="font-body text-body1 m-0 truncate text-neutral-900">
           {title}
         </h3>
-        <p className="font-body text-caption2 m-0 mt-[2px] truncate text-[var(--color-neutral-700)]">
+        <p className="font-body text-caption2 m-0 mt-[2px] truncate text-neutral-700">
           {bandName}
         </p>
-        <p className="font-body text-caption2 m-0 mt-[4px] truncate text-[var(--color-secondary-500)]">
+        <p className="font-body text-caption2 m-0 mt-[4px] truncate text-secondary-500">
           {categories}
         </p>
       </div>
 
-      <span className="font-body text-caption3 absolute right-[16px] bottom-[12px] inline-flex h-[22px] w-[51px] shrink-0 items-center justify-center rounded-full border-[1px] border-[var(--color-secondary-500)] text-[var(--color-secondary-500)]">
+      <span className="font-body text-caption3 absolute right-[16px] bottom-[12px] inline-flex h-[22px] w-[51px] shrink-0 items-center justify-center rounded-full border-[1px] border-secondary-500 text-secondary-500">
         {dDay}
       </span>
     </article>

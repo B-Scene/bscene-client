@@ -33,20 +33,20 @@ const BandLiveCard = ({
       />
 
       <div className="h-[62px] w-[165px] min-w-0 shrink-0">
-        <h3 className="font-body text-body1 m-0 truncate text-[var(--color-neutral-900)]">
+        <h3 className="font-body text-body1 m-0 truncate text-neutral-900">
           {title}
         </h3>
-        <p className="font-body text-caption2 m-0 mt-[2px] truncate text-[var(--color-neutral-700)]">
+        <p className="font-body text-caption2 m-0 mt-[2px] truncate text-neutral-700">
           {subtitle}
         </p>
-        <p className="font-body text-caption2 m-0 mt-[4px] truncate text-[var(--color-primary-300)]">
+        <p className="font-body text-caption2 m-0 mt-[4px] truncate text-primary-300">
           {description}
         </p>
       </div>
 
       {showNotificationButton ? (
         <button
-          className="font-body text-caption3 inline-flex h-[32px] w-[81px] shrink-0 cursor-pointer items-center justify-center gap-[4px] rounded-[100px] border-0 bg-[var(--color-primary-50)] px-[8px] text-[var(--color-primary-400)] transition duration-150 ease-out active:translate-y-px focus-visible:outline-0 focus-visible:ring-4 focus-visible:ring-[var(--color-primary-400)]"
+          className="font-body text-caption3 inline-flex h-[32px] w-[81px] shrink-0 cursor-pointer items-center justify-center gap-[4px] rounded-[100px] border-0 bg-primary-50 px-[8px] text-primary-400 transition duration-150 ease-out active:translate-y-px focus-visible:outline-0 focus-visible:ring-4 focus-visible:ring-primary-400"
           type="button"
         >
           {notificationIconSrc ? (
