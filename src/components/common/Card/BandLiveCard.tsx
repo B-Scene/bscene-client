@@ -1,6 +1,6 @@
 import type { CompactBandCardBaseProps } from './shared'
 import { compactBandCardClassName } from './shared'
-import notificationIcon from '../../assets/Notification.svg'
+import notificationIcon from '../../../assets/Notification.svg'
 
 type BandLiveCardProps = CompactBandCardBaseProps & {
   bandName?: CompactBandCardBaseProps['subtitle']
@@ -52,7 +52,7 @@ const BandLiveCard = ({
           {notificationIconSrc ? (
             <img
               alt={notificationIconAlt}
-              className="h-[13px] w-[13px] shrink-0 object-contain"
+              className="h-[18px] w-[18px] shrink-0 object-contain"
               src={notificationIconSrc}
             />
           ) : null}

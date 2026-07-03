@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import headsetIcon from '../../assets/Headset.svg'
+import headsetIcon from '../../../assets/Headset.svg'
 
 type LiveNowCardProps = {
   imageSrc: string

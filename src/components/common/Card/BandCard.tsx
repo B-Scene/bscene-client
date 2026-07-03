@@ -25,15 +25,15 @@ const BandCard = ({
         src={imageSrc}
       />
 
-      <div className="grid h-[62px] w-[165px] min-w-0 shrink-0 content-center gap-[3px]">
-        <h3 className="font-body text-body1 m-0 h-[20px] truncate text-[var(--color-neutral-900)]">
+      <div className="h-[62px] w-[165px] min-w-0 shrink-0">
+        <h3 className="font-body text-body1 m-0 truncate text-[var(--color-neutral-900)]">
           {title}
         </h3>
-        <p className="font-body text-body5 m-0 h-[12px] truncate text-[var(--color-neutral-700)]">
+        <p className="font-body text-caption2 m-0 mt-[2px] truncate text-[var(--color-neutral-700)]">
           {subtitle}
         </p>
 
-        <p className="font-body text-body5 m-0 h-[12px] truncate text-[var(--color-primary-400)]">
+        <p className="font-body text-caption2 m-0 mt-[4px] truncate text-[var(--color-primary-400)]">
           {description}
         </p>
       </div>

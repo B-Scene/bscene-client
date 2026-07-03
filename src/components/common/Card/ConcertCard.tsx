@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
-import arrowIcon from '../../assets/Arrow.svg'
-import locationIcon from '../../assets/location.svg'
+import arrowIcon from '../../../assets/Arrow.svg'
+import locationIcon from '../../../assets/location.svg'
 
 type ConcertCardProps = {
   month?: ReactNode
