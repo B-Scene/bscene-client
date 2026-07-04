@@ -14,12 +14,10 @@
   --text-h2-size: 28px;
   --text-h2-weight: 700;
   --text-h2-line-height: 38px;
-  --text-h2-letter-spacing: 3px;
 
   --text-h3-size: 24px;
   --text-h3-weight: 700;
   --text-h3-line-height: 38px;
-  --text-h3-letter-spacing: 3px;
 
   --text-h4-size: 20px;
   --text-h4-weight: 600;
@@ -102,5 +100,4 @@
     --text-caption6-size: 5px;
     --text-caption6-weight: 500;
     --text-caption6-line-height: 6px;
-    --text-caption6-letter-spacing: 5px;
 }

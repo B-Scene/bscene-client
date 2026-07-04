@@ -3,6 +3,7 @@ import type { ButtonHTMLAttributes, ReactNode } from 'react'
 type ButtonSize =
   | 'large'
   | 'small'
+  | 'medium'
   | 'modal'
   | 'chipLarge'
   | 'chipSmall'
@@ -25,6 +26,8 @@ const sizeClassNames: Record<ButtonSize, string> = {
     'text-label1 h-[52px] w-[353px] rounded-[12px] py-[14px] not-italic',
   small:
     'text-label2 h-[48px] w-[87px] rounded-[10px] px-[12px] py-[8px] not-italic',
+  medium:
+    'text-body1 h-[46px] w-[126px] rounded-[8px] px-[12px] py-[8px] not-italic',
   modal:
     'text-label2 h-[42px] w-[120px] rounded-[12px] px-[12px] not-italic',
   chipLarge:
