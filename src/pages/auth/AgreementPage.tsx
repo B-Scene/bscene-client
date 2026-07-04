@@ -64,7 +64,7 @@ const AgreementPage = () => {
 
   const handleNext = () => {
     if (!isRequiredChecked) return;
-    navigate("/onboarding");
+    navigate("/onboarding/mode");
   };
 
   return (

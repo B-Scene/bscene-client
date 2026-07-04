@@ -42,7 +42,7 @@ const ModeSelectPage = () => {
     }
 
     if (selectedMode === "band") {
-      navigate("/onboarding/band-nickname");
+      navigate("/onboarding/fan-nickname");
       return;
     }
 

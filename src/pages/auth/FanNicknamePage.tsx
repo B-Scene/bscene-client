@@ -21,10 +21,6 @@ const FanNicknamePage = () => {
     setIsDuplicate(false);
   };
 
-  const handleNext = () => {
-    if (!isValidNickname) return;
-    navigate("/onboarding/complete");
-  };
 
   return (
     <main className="relative min-h-dvh bg-neutral-0 px-5 pb-[96px]">

@@ -1,4 +1,4 @@
-import { createBrowserRouter, Route } from "react-router-dom";
+import { createBrowserRouter} from "react-router-dom";
 import Splash from "../pages/auth/Splash";
 import Login from "../pages/auth/LoginPage";
 import AgreementPage from "../pages/auth/AgreementPage";
