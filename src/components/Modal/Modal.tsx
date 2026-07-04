@@ -1,4 +1,5 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
+import Button from '../common/Button/Button'
 
 type ModalTone = 'pink' | 'orange'
 
@@ -12,26 +13,6 @@ type ModalProps = {
   onCancel?: ButtonHTMLAttributes<HTMLButtonElement>['onClick']
   onConfirm?: ButtonHTMLAttributes<HTMLButtonElement>['onClick']
 }
-
-type ModalActionVariant = 'outline' | 'solid'
-
-const toneClassNames: Record<ModalTone, Record<ModalActionVariant, string>> = {
-  pink: {
-    outline:
-      'border-primary-400 bg-neutral-0 text-primary-400 focus-visible:ring-primary-400',
-    solid:
-      'border-primary-400 bg-primary-400 text-neutral-0 focus-visible:ring-primary-400',
-  },
-  orange: {
-    outline:
-      'border-secondary-500 bg-neutral-0 text-secondary-500 focus-visible:ring-secondary-500',
-    solid:
-      'border-secondary-500 bg-secondary-500 text-neutral-0 focus-visible:ring-secondary-500',
-  },
-}
-
-const actionClassName =
-  'font-body text-label2 inline-flex h-[42px] w-[120px] cursor-pointer items-center justify-center rounded-[12px] border-[1.5px] transition duration-150 ease-out active:enabled:translate-y-px disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-0 focus-visible:ring-4'
 
 const Modal = ({
   tone = 'pink',
@@ -52,7 +33,7 @@ const Modal = ({
   return (
     <section
       aria-modal="true"
-      className="box-border flex h-[184px] w-[313px] max-w-full flex-col items-center bg-neutral-0 px-[32px] py-[24px] text-center"
+      className="box-border flex min-h-[184px] w-[313px] max-w-full flex-col items-center bg-neutral-0 px-[32px] py-[24px] text-center"
       role="dialog"
     >
       <div className="flex flex-col items-center gap-[10px]">
@@ -67,21 +48,23 @@ const Modal = ({
 
       <div className="mt-[20px] flex w-[249px] items-center justify-center gap-[8px]">
         {showCancel ? (
-          <button
-            className={`${actionClassName} ${toneClassNames[tone].outline}`}
+          <Button
             onClick={onCancel}
-            type="button"
+            size="modal"
+            tone={tone}
+            variant="outline"
           >
             {cancelLabel}
-          </button>
+          </Button>
         ) : null}
-        <button
-          className={`${actionClassName} ${toneClassNames[tone].solid}`}
+        <Button
           onClick={onConfirm}
-          type="button"
+          size="modal"
+          tone={tone}
+          variant="solid"
         >
           {confirmLabel}
-        </button>
+        </Button>
       </div>
     </section>
   )

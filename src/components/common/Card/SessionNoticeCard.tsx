@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { listCardClassName } from './shared'
 
 type SessionNoticeCardProps = {
   title?: ReactNode
@@ -7,9 +8,6 @@ type SessionNoticeCardProps = {
   dDay?: ReactNode
 }
 
-const cardClassName =
-  'box-border flex h-[86px] w-[348px] max-w-full items-center rounded-[16px] bg-neutral-0 px-[16px] py-[12px] text-left shadow-[0_4px_8px_rgb(20_20_20_/10%)]'
-
 const SessionNoticeCard = ({
   title = '세션 모집 공고',
   bandName = '밴드명',
@@ -17,7 +15,7 @@ const SessionNoticeCard = ({
   dDay = 'D-18',
 }: SessionNoticeCardProps) => {
   return (
-    <article className={`${cardClassName} relative`}>
+    <article className={`${listCardClassName} relative`}>
       <div className="min-w-0 pr-[66px]">
         <h3 className="font-body text-body1 m-0 truncate text-neutral-900">
           {title}

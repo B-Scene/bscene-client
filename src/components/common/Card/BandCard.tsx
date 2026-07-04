@@ -1,42 +1,30 @@
+import type { ButtonHTMLAttributes } from 'react'
 import type { CompactBandCardBaseProps } from './shared'
-import { compactBandCardClassName } from './shared'
+import { CompactBandCardContent, compactBandCardClassName } from './shared'
 
 type BandCardProps = CompactBandCardBaseProps & {
-  name?: CompactBandCardBaseProps['title']
-  location?: CompactBandCardBaseProps['subtitle']
   following?: boolean
+  onToggleFollow?: ButtonHTMLAttributes<HTMLButtonElement>['onClick']
 }
 
 const BandCard = ({
   imageSrc,
   imageAlt = '',
-  name,
-  title = name ?? 'WAVY',
-  location,
-  subtitle = location ?? '인디 · 서울',
-  description = '몽환적인 사운드와 감각적인 스타일로 주목받는 3인조 밴드',
+  title = '밴드명',
+  subtitle = '장르 · 지역',
+  description = '',
   following = false,
+  onToggleFollow,
 }: BandCardProps) => {
   return (
     <article className={compactBandCardClassName}>
-      <img
-        alt={imageAlt}
-        className="h-[62px] w-[62px] shrink-0 rounded-full object-cover"
-        src={imageSrc}
+      <CompactBandCardContent
+        description={description}
+        imageAlt={imageAlt}
+        imageSrc={imageSrc}
+        subtitle={subtitle}
+        title={title}
       />
-
-      <div className="h-[62px] w-[165px] min-w-0 shrink-0">
-        <h3 className="font-body text-body1 m-0 truncate text-neutral-900">
-          {title}
-        </h3>
-        <p className="font-body text-caption2 m-0 mt-[2px] truncate text-neutral-700">
-          {subtitle}
-        </p>
-
-        <p className="font-body text-caption2 m-0 mt-[4px] truncate text-primary-400">
-          {description}
-        </p>
-      </div>
 
       <button
         className={[
@@ -45,6 +33,7 @@ const BandCard = ({
             ? 'border-primary-50 bg-primary-50 text-primary-400'
             : 'border-primary-400 bg-neutral-0 text-primary-400',
         ].join(' ')}
+        onClick={onToggleFollow}
         type="button"
       >
         {following ? '팔로잉' : '팔로우'}

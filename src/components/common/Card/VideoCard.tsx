@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { listCardClassName } from './shared'
 
 type VideoCardProps = {
   imageSrc: string
@@ -8,9 +9,6 @@ type VideoCardProps = {
   timeAgo?: ReactNode
 }
 
-const cardClassName =
-  'box-border flex h-[86px] w-[348px] max-w-full items-center rounded-[16px] bg-neutral-0 px-[16px] py-[12px] text-left shadow-[0_4px_8px_rgb(20_20_20_/10%)]'
-
 const VideoCard = ({
   imageSrc,
   imageAlt = '',
@@ -19,7 +17,7 @@ const VideoCard = ({
   timeAgo = '5시간 전',
 }: VideoCardProps) => {
   return (
-    <article className={cardClassName}>
+    <article className={listCardClassName}>
       <img
         alt={imageAlt}
         className="h-[62px] w-[88px] shrink-0 rounded-[8px] object-cover"

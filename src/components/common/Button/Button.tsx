@@ -1,6 +1,12 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
 
-type ButtonSize = 'large' | 'small' | 'chipLarge' | 'chipSmall' | 'chipRectangle'
+type ButtonSize =
+  | 'large'
+  | 'small'
+  | 'modal'
+  | 'chipLarge'
+  | 'chipSmall'
+  | 'chipRectangle'
 type ButtonVariant = 'solid' | 'outline' | 'soft'
 type ButtonTone = 'pink' | 'orange' | 'gray'
 
@@ -16,9 +22,11 @@ const baseClassName =
 
 const sizeClassNames: Record<ButtonSize, string> = {
   large:
-    'text-label1 h-[52px] w-[353px] rounded-[12px] px-[159px] py-[14px] not-italic',
+    'text-label1 h-[52px] w-[353px] rounded-[12px] py-[14px] not-italic',
   small:
     'text-label2 h-[48px] w-[87px] rounded-[10px] px-[12px] py-[8px] not-italic',
+  modal:
+    'text-label2 h-[42px] w-[120px] rounded-[12px] px-[12px] not-italic',
   chipLarge:
     'text-body1 h-[30px] w-[62px] rounded-[100px] text-center align-middle not-italic',
   chipSmall:

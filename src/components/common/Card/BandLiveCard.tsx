@@ -1,5 +1,5 @@
 import type { CompactBandCardBaseProps } from './shared'
-import { compactBandCardClassName } from './shared'
+import { CompactBandCardContent, compactBandCardClassName } from './shared'
 import notificationIcon from '../../../assets/Notification.svg'
 
 type BandLiveCardProps = CompactBandCardBaseProps & {
@@ -26,23 +26,14 @@ const BandLiveCard = ({
 }: BandLiveCardProps) => {
   return (
     <article className={compactBandCardClassName}>
-      <img
-        alt={imageAlt}
-        className="h-[62px] w-[62px] shrink-0 rounded-full object-cover"
-        src={imageSrc}
+      <CompactBandCardContent
+        description={description}
+        descriptionClassName="text-primary-300"
+        imageAlt={imageAlt}
+        imageSrc={imageSrc}
+        subtitle={subtitle}
+        title={title}
       />
-
-      <div className="h-[62px] w-[165px] min-w-0 shrink-0">
-        <h3 className="font-body text-body1 m-0 truncate text-neutral-900">
-          {title}
-        </h3>
-        <p className="font-body text-caption2 m-0 mt-[2px] truncate text-neutral-700">
-          {subtitle}
-        </p>
-        <p className="font-body text-caption2 m-0 mt-[4px] truncate text-primary-300">
-          {description}
-        </p>
-      </div>
 
       {showNotificationButton ? (
         <button

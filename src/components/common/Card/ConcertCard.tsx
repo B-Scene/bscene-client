@@ -1,6 +1,7 @@
-import type { ReactNode } from 'react'
+import type { KeyboardEvent, MouseEventHandler, ReactNode } from 'react'
 import arrowIcon from '../../../assets/Arrow.svg'
 import locationIcon from '../../../assets/location.svg'
+import { listCardClassName } from './shared'
 
 type ConcertCardProps = {
   month?: ReactNode
@@ -13,10 +14,9 @@ type ConcertCardProps = {
   dDay?: ReactNode
   arrowIconSrc?: string
   arrowIconAlt?: string
+  onClick?: MouseEventHandler<HTMLElement>
+  ariaLabel?: string
 }
-
-const cardClassName =
-  'box-border flex h-[86px] w-[348px] max-w-full items-center rounded-[16px] bg-neutral-0 px-[16px] py-[12px] text-left shadow-[0_4px_8px_rgb(20_20_20_/10%)]'
 
 const ConcertCard = ({
   month = 'MAY',
@@ -29,9 +29,27 @@ const ConcertCard = ({
   dDay = 'D-7',
   arrowIconSrc = arrowIcon,
   arrowIconAlt = '',
+  onClick,
+  ariaLabel,
 }: ConcertCardProps) => {
+  const handleKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+    if (!onClick || (event.key !== 'Enter' && event.key !== ' ')) {
+      return
+    }
+
+    event.preventDefault()
+    event.currentTarget.click()
+  }
+
   return (
-    <article className={cardClassName}>
+    <article
+      aria-label={ariaLabel}
+      className={`${listCardClassName}${onClick ? ' cursor-pointer' : ''}`}
+      onClick={onClick}
+      onKeyDown={handleKeyDown}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+    >
       <div className="font-body flex h-[62px] w-[50px] shrink-0 flex-col items-center justify-center rounded-[8px] bg-primary-300 text-neutral-0">
         <span className="text-body1">{month}</span>
         <span className="text-brand mt-[4px]">{day}</span>

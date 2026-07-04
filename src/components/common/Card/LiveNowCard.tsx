@@ -1,5 +1,6 @@
-import type { ReactNode } from 'react'
+import type { ButtonHTMLAttributes, ReactNode } from 'react'
 import headsetIcon from '../../../assets/Headset.svg'
+import { listCardClassName } from './shared'
 
 type LiveNowCardProps = {
   imageSrc: string
@@ -11,10 +12,8 @@ type LiveNowCardProps = {
   listenerIconAlt?: string
   liveBadgeSrc?: string
   liveBadgeAlt?: string
+  onClick?: ButtonHTMLAttributes<HTMLButtonElement>['onClick']
 }
-
-const cardClassName =
-  'box-border flex h-[86px] w-[348px] max-w-full items-center rounded-[16px] bg-neutral-0 px-[16px] py-[12px] text-left shadow-[0_4px_8px_rgb(20_20_20_/10%)]'
 
 const LiveNowCard = ({
   imageSrc,
@@ -26,9 +25,10 @@ const LiveNowCard = ({
   listenerIconAlt = '',
   liveBadgeSrc,
   liveBadgeAlt = '',
+  onClick,
 }: LiveNowCardProps) => {
   return (
-    <article className={`${cardClassName} relative`}>
+    <article className={`${listCardClassName} relative`}>
       <div className="relative h-[62px] w-[62px] shrink-0 rounded-full shadow-[0_0_18px_rgb(240_69_121_/80%)]">
         <img
           alt={imageAlt}
@@ -69,6 +69,7 @@ const LiveNowCard = ({
 
       <button
         className="font-body text-caption3 absolute right-[16px] bottom-[12px] inline-flex h-[22px] w-[51px] shrink-0 cursor-pointer items-center justify-center rounded-full border-[1px] border-primary-400 bg-neutral-0 text-primary-400 transition duration-150 ease-out active:translate-y-px focus-visible:outline-0 focus-visible:ring-4 focus-visible:ring-primary-400"
+        onClick={onClick}
         type="button"
       >
         입장
