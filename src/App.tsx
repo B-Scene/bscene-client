@@ -2,7 +2,7 @@ import { useState } from "react";
 import reactLogo from "./assets/react.svg";
 import viteLogo from "./assets/vite.svg";
 import heroImg from "./assets/hero.png";
-import { BottomNavBar } from "./components/layout/BottomNavBar";
+import { MobileLayout } from "./components/layout/MobileLayout";
 import { useModeStore } from "./stores/useModeStore";
 import "./App.css";
 
@@ -11,7 +11,7 @@ function App() {
   const toggleMode = useModeStore((state) => state.toggleMode);
 
   return (
-    <>
+    <MobileLayout>
       <button
         type="button"
         onClick={toggleMode}
@@ -19,7 +19,6 @@ function App() {
       >
         모드 전환
       </button>
-      <BottomNavBar />
       <section id="center">
         <div className="hero">
           <img src={heroImg} className="base" width="170" height="179" alt="" />
@@ -126,7 +125,7 @@ function App() {
 
       <div className="ticks"></div>
       <section id="spacer"></section>
-    </>
+    </MobileLayout>
   );
 }
 

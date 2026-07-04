@@ -19,7 +19,7 @@ export const BottomNavBar = () => {
   }
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 flex h-20 border-t border-neutral-200 bg-neutral-0">
+    <nav className="absolute inset-x-0 bottom-0 flex h-(--bottom-nav-height) border-t border-neutral-200 bg-neutral-0 py-4">
       {tabs.map((tab) => {
         const isActive = tab.id === activeTabId;
         const Icon = isActive ? tab.ActiveIcon : tab.Icon;
@@ -29,12 +29,12 @@ export const BottomNavBar = () => {
             key={tab.id}
             type="button"
             onClick={() => setActiveTabId(tab.id)}
-            className={`flex flex-1 flex-col items-center justify-center gap-2 ${
+            className={`flex-1 text-center ${
               isActive ? ACTIVE_COLOR_CLASS[mode] : "text-neutral-900"
             }`}
           >
-            <Icon className="h-6 w-6" aria-hidden="true" />
-            <span className="text-caption2">{tab.label}</span>
+            <Icon className="mx-auto h-6 w-6" aria-hidden="true" />
+            <span className="mt-2 block text-caption2">{tab.label}</span>
           </button>
         );
       })}
