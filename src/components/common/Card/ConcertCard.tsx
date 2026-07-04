@@ -33,7 +33,7 @@ const ConcertCard = ({
   ariaLabel,
 }: ConcertCardProps) => {
   const handleKeyDown = (event: KeyboardEvent<HTMLElement>) => {
-    if (!onClick || (event.key !== 'Enter' && event.key !== ' ')) {
+    if (!onClick || event.repeat || (event.key !== 'Enter' && event.key !== ' ')) {
       return
     }
 
