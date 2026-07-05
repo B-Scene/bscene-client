@@ -8,8 +8,8 @@ export default function Login() {
   const navigate = useNavigate();
 
   return (
-    <main className="flex min-h-screen justify-center bg-neutral-800">
-      <section className="min-h-screen w-full max-w-[393px] bg-neutral-0 px-[30px] pt-[104px]">
+    <main className="h-full w-full bg-neutral-0 px-[30px] pt-[104px]">
+      <section className="w-full">
         <div className="flex justify-center">
           <img src={logoSignature} alt="B:Scene" className="h-auto w-[151px]" />
         </div>

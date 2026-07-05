@@ -14,15 +14,13 @@ export default function Splash() {
   }, [navigate]);
 
   return (
-    <main className="flex min-h-screen justify-center bg-neutral-800">
-      <section
-        className="flex min-h-screen w-full max-w-[393px] items-center justify-center"
-        style={{
-          background: "linear-gradient(168deg, #FFE031 0%, #F04579 100%)",
-        }}
-      >
-        <img src={logo} alt="B:Scene" className="w-[74px]" />
-      </section>
+    <main
+      className="flex h-full w-full items-center justify-center"
+      style={{
+        background: "linear-gradient(168deg, #FFE031 0%, #F04579 100%)",
+      }}
+    >
+      <img src={logo} alt="B:Scene" className="w-[74px]" />
     </main>
   );
 }

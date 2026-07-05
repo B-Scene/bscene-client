@@ -133,7 +133,7 @@ const AgreementPage = () => {
         </ul>
       </section>
 
-      <div className="fixed bottom-7 left-1/2 w-full max-w-[430px] -translate-x-1/2 px-5">
+      <div className="fixed inset-x-0 bottom-7 px-5">
         <Button
           type="button"
           size="large"
