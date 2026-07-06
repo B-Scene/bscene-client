@@ -14,7 +14,7 @@ export const BottomNavBar = () => {
   const location = useLocation();
 
   return (
-    <nav className="absolute inset-x-0 bottom-0 flex h-(--bottom-nav-height) border-t border-neutral-200 bg-neutral-0 py-4">
+    <nav className="absolute inset-x-0 bottom-0 flex h-(--bottom-nav-height) items-center justify-between bg-neutral-0 px-7.5 py-4 shadow-[0_-5px_20px_0_rgba(0,0,0,0.03)]">
       {tabs.map((tab) => {
         const isActive = location.pathname.startsWith(tab.path);
         const Icon = isActive ? tab.ActiveIcon : tab.Icon;
@@ -24,12 +24,12 @@ export const BottomNavBar = () => {
             key={tab.id}
             type="button"
             onClick={() => navigate(tab.path)}
-            className={`flex-1 text-center ${
+            className={`flex flex-col items-center gap-2 ${
               isActive ? ACTIVE_COLOR_CLASS[mode] : "text-neutral-900"
             }`}
           >
-            <Icon className="mx-auto h-6 w-6" aria-hidden="true" />
-            <span className="mt-2 block text-caption2">{tab.label}</span>
+            <Icon className="h-6 w-6" aria-hidden="true" />
+            <span className="text-caption2">{tab.label}</span>
           </button>
         );
       })}
