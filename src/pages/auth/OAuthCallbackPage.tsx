@@ -24,7 +24,6 @@ const OAuthCallbackPage = () => {
       try {
         const data = await mutateAsync(code);
 
-        console.log("OAuth exchange response:", data);
 
         if (data.isNewUser) {
           sessionStorage.setItem("signupToken", data.signupToken ?? "");

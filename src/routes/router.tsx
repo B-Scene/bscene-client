@@ -3,7 +3,7 @@ import { MobileLayout } from "@/components/layout/MobileLayout";
 import Splash from "../pages/auth/Splash";
 import Login from "../pages/auth/LoginPage";
 import AgreementPage from "../pages/onboarding/AgreementPage";
-import SignupPage from "../pages/onboarding/SingupPage";
+import SignupPage from "../pages/onboarding/SignupPage";
 import ModeSelecPage from "../pages/onboarding/ModeSelectPage";
 import FanNicknamePage from "../pages/onboarding/FanNicknamePage";
 import GenreSelectPage from "../pages/onboarding/GenreSelectPage";

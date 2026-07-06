@@ -4,6 +4,8 @@ import ArrowLeftIcon from "@/assets/icons/arrow-left.svg";
 import CheckIcon from "@/assets/icons/check.svg";
 import CheckActiveIcon from "@/assets/icons/check-active.svg";
 import Button from "@/components/common/Button/Button";
+import { SignupField, FieldLabel } from "@/features/onboarding/SignupField";
+import SignupPhoneVerification from "@/features/onboarding/SignupPhoneVerification";
 import {
   useOAuthSignup,
   useSendPhoneVerification,
@@ -20,13 +22,6 @@ type SignupForm = {
   code: string;
   birth: string;
   gender: string;
-};
-
-const formatTime = (seconds: number) => {
-  const minutes = Math.floor(seconds / 60);
-  const remainSeconds = seconds % 60;
-
-  return `${String(minutes).padStart(2, "0")}:${String(remainSeconds).padStart(2, "0")}`;
 };
 
 const SignupPage = () => {
@@ -122,6 +117,14 @@ const SignupPage = () => {
 
   const handleOnlyNumberChange = (key: keyof SignupForm, value: string) => {
     handleChange(key, value.replace(/\D/g, ""));
+  };
+
+  const handlePhoneChange = (value: string) => {
+    handleOnlyNumberChange("phone", value);
+    setIsCodeSent(false);
+    setIsPhoneVerified(false);
+    setTimeLeft(180);
+    handleChange("code", "");
   };
 
   const handleSendCode = () => {
@@ -260,7 +263,7 @@ const SignupPage = () => {
       </header>
 
       <form className="mt-5 flex flex-col gap-4">
-        <TextField
+        <SignupField
           label="아이디"
           required
           value={form.email}
@@ -275,7 +278,7 @@ const SignupPage = () => {
         {!isSocialSignup && (
           <>
             <div>
-              <TextField
+              <SignupField
                 label="비밀번호"
                 required
                 type="password"
@@ -299,7 +302,7 @@ const SignupPage = () => {
             </div>
 
             <div>
-              <TextField
+              <SignupField
                 label="비밀번호 확인"
                 required
                 type="password"
@@ -324,7 +327,7 @@ const SignupPage = () => {
           </>
         )}
 
-        <TextField
+        <SignupField
           label="이름"
           required
           value={form.name}
@@ -333,76 +336,18 @@ const SignupPage = () => {
           onChange={(value) => handleChange("name", value)}
         />
 
-        <div>
-          <FieldLabel required>휴대폰</FieldLabel>
-
-          <div className="flex gap-2">
-            <input
-              value={form.phone}
-              onChange={(e) => {
-                handleOnlyNumberChange("phone", e.target.value);
-                setIsCodeSent(false);
-                setIsPhoneVerified(false);
-                setTimeLeft(180);
-                handleChange("code", "");
-              }}
-              placeholder="숫자만 입력해주세요"
-              inputMode="numeric"
-              className="h-[46px] min-w-0 flex-1 rounded-lg border border-neutral-400 bg-neutral-0 px-4 text-body2 font-medium text-neutral-900 outline-none placeholder:text-neutral-400 focus:border-primary-500"
-            />
-
-            <Button
-              type="button"
-              size="medium"
-              tone={form.phone ? "pink" : "gray"}
-              disabled={!form.phone || isSendingCode}
-              onClick={handleSendCode}
-              className="h-[46px] w-[126px] shrink-0 rounded-lg text-body1"
-            >
-              {isSendingCode
-                ? "발송 중..."
-                : isCodeSent
-                  ? "인증번호 재전송"
-                  : "인증번호 받기"}
-            </Button>
-          </div>
-
-          {isCodeSent && (
-            <>
-              <div className="mt-2 flex h-[46px] items-center rounded-lg border border-neutral-400 bg-neutral-0 px-4">
-                <input
-                  value={form.code}
-                  onChange={(e) => handleCodeChange(e.target.value)}
-                  placeholder="인증번호를 입력해주세요"
-                  inputMode="numeric"
-                  maxLength={6}
-                  disabled={timeLeft <= 0 || isPhoneVerified}
-                  className="min-w-0 flex-1 bg-transparent text-body2 font-medium text-neutral-900 outline-none placeholder:text-neutral-400 disabled:text-neutral-400"
-                />
-
-                <span className="text-body2 text-neutral-500">
-                  {formatTime(timeLeft)}
-                </span>
-              </div>
-
-              {isVerifyingPhone && (
-                <p className="mt-1 text-body5 text-neutral-500">
-                  인증번호 확인 중...
-                </p>
-              )}
-
-              {isPhoneVerified && (
-                <HelperText active>인증이 완료되었습니다.</HelperText>
-              )}
-
-              {!isPhoneVerified && timeLeft <= 0 && (
-                <p className="mt-1 text-body5 text-error">
-                  인증 시간이 만료되었습니다. 인증번호를 다시 받아주세요.
-                </p>
-              )}
-            </>
-          )}
-        </div>
+        <SignupPhoneVerification
+          phone={form.phone}
+          code={form.code}
+          isCodeSent={isCodeSent}
+          isPhoneVerified={isPhoneVerified}
+          isSendingCode={isSendingCode}
+          isVerifyingPhone={isVerifyingPhone}
+          timeLeft={timeLeft}
+          onPhoneChange={handlePhoneChange}
+          onSendCode={handleSendCode}
+          onCodeChange={handleCodeChange}
+        />
 
         <div>
           <FieldLabel required>생년월일/성별</FieldLabel>
@@ -458,82 +403,3 @@ const SignupPage = () => {
 };
 
 export default SignupPage;
-
-type TextFieldProps = {
-  label: string;
-  required?: boolean;
-  description?: string;
-  placeholder: string;
-  value: string;
-  type?: string;
-  disabled?: boolean;
-  onChange: (value: string) => void;
-};
-
-const TextField = ({
-  label,
-  required = false,
-  description,
-  placeholder,
-  value,
-  type = "text",
-  disabled = false,
-  onChange,
-}: TextFieldProps) => {
-  return (
-    <div>
-      <FieldLabel required={required}>{label}</FieldLabel>
-
-      {description && (
-        <p className="mb-2 text-caption2 text-neutral-500">{description}</p>
-      )}
-
-      <input
-        type={type}
-        value={value}
-        placeholder={placeholder}
-        disabled={disabled}
-        onChange={(e) => onChange(e.target.value)}
-        className={`h-[46px] w-full rounded-lg border border-neutral-400 px-4 text-body2 font-medium outline-none placeholder:text-neutral-400 focus:border-primary-500 ${
-          disabled
-            ? "cursor-not-allowed bg-neutral-100 text-neutral-500"
-            : "bg-neutral-0 text-neutral-900"
-        }`}
-      />
-    </div>
-  );
-};
-
-const FieldLabel = ({
-  children,
-  required = false,
-}: {
-  children: string;
-  required?: boolean;
-}) => {
-  return (
-    <label className="mb-2 block text-body1 font-semibold text-neutral-900">
-      {children}
-      {required && <span className="text-error">*</span>}
-    </label>
-  );
-};
-
-const HelperText = ({
-  children,
-  active = false,
-}: {
-  children: string;
-  active?: boolean;
-}) => {
-  return (
-    <p
-      className={`mt-1 flex items-center gap-1 text-body5 ${
-        active ? "text-primary-400" : "text-neutral-400"
-      }`}
-    >
-      <img src={CheckIcon} alt="" className="h-[6px] w-[9px]" />
-      {children}
-    </p>
-  );
-};
