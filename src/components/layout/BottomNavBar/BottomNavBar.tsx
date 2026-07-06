@@ -8,15 +8,23 @@ const ACTIVE_COLOR_CLASS = {
 } as const;
 
 export const BottomNavBar = () => {
-  const mode = useModeStore((state) => state.mode);
-  const tabs = mode === "fan" ? FAN_NAV_TABS : BAND_NAV_TABS;
+  const storeMode = useModeStore((state) => state.mode);
   const navigate = useNavigate();
   const location = useLocation();
+
+  const mode = location.pathname.startsWith("/band")
+    ? "band"
+    : location.pathname.startsWith("/fan")
+      ? "fan"
+      : storeMode;
+  const tabs = mode === "fan" ? FAN_NAV_TABS : BAND_NAV_TABS;
 
   return (
     <nav className="absolute inset-x-0 bottom-0 flex h-(--bottom-nav-height) items-center justify-between bg-neutral-0 px-7.5 py-4 shadow-[0_-5px_20px_0_rgba(0,0,0,0.03)]">
       {tabs.map((tab) => {
-        const isActive = location.pathname.startsWith(tab.path);
+        const isActive = (tab.activePrefixes ?? [tab.path]).some((prefix) =>
+          location.pathname.startsWith(prefix),
+        );
         const Icon = isActive ? tab.ActiveIcon : tab.Icon;
 
         return (

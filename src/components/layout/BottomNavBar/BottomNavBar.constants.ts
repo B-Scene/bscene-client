@@ -19,6 +19,7 @@ export interface BottomNavTab {
   path: string;
   Icon: NavIcon;
   ActiveIcon: NavIcon;
+  activePrefixes?: string[];
 }
 
 export const FAN_NAV_TABS: BottomNavTab[] = [
@@ -29,7 +30,14 @@ export const FAN_NAV_TABS: BottomNavTab[] = [
 ];
 
 export const BAND_NAV_TABS: BottomNavTab[] = [
-  { id: 'band', label: '내 밴드', path: '/band/home', Icon: BandIcon, ActiveIcon: BandActiveIcon },
+  {
+    id: 'band',
+    label: '내 밴드',
+    path: '/band/home',
+    Icon: BandIcon,
+    ActiveIcon: BandActiveIcon,
+    activePrefixes: ['/band/home', '/band/profile'],
+  },
   { id: 'session', label: '세션', path: '/band/session', Icon: SessionIcon, ActiveIcon: SessionActiveIcon },
   { id: 'live', label: '라이브', path: '/band/live', Icon: LiveIcon, ActiveIcon: LiveIcon },
   { id: 'my', label: '마이', path: '/band/my', Icon: MyIcon, ActiveIcon: MyActiveIcon },
