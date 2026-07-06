@@ -9,6 +9,8 @@ import FanNicknamePage from "../pages/auth/FanNicknamePage";
 import GenreSelectPage from "../pages/auth/GenreSelectPage";
 import RegionSelectPage from "../pages/auth/RegionSelectPage";
 import OnboardingCompletePage from "../pages/auth/OnboardingCompletePage";
+import BandHomePage from "../pages/band/home/BandHomePage";
+import EditProfilePage from "../pages/band/home/EditProfilePage";
 
 export const router = createBrowserRouter([
   {
@@ -54,6 +56,24 @@ export const router = createBrowserRouter([
       {
         path: "/onboarding/complete",
         element: <OnboardingCompletePage />,
+      },
+    ],
+  },
+  {
+    element: (
+      <MobileLayout showBottomNav={true}>
+        <Outlet />
+      </MobileLayout>
+    ),
+    children: [
+      //band
+      {
+        path: "/band/home",
+        element: <BandHomePage />,
+      },
+      {
+        path: "/band/profile/edit",
+        element: <EditProfilePage />,
       },
     ],
   },
