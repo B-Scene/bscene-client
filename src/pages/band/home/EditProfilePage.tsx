@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import ArrowLeftIcon from "@/assets/icons/arrow-left.svg";
 import DefaultAvatar from "@/assets/images/IMG_my.svg";
+import { Header } from "@/components/band/home/Header";
 import { Input, Textarea } from "@/components/common/Input/Input";
 import { useBandProfileStore } from "@/stores/useBandProfileStore";
 
@@ -23,21 +23,10 @@ const EditProfilePage = () => {
   };
 
   return (
-    <main className="relative min-h-dvh bg-neutral-0 px-5 pb-24">
-      <header className="relative flex h-12 items-center justify-center">
-        <button
-          type="button"
-          onClick={() => navigate(-1)}
-          className="absolute left-0 flex size-6 items-center justify-center"
-          aria-label="뒤로가기"
-        >
-          <img src={ArrowLeftIcon} alt="" className="size-6" />
-        </button>
+    <main className="relative min-h-dvh bg-neutral-0 pb-24">
+      <Header title="프로필 편집" />
 
-        <h1 className="text-label2 text-neutral-900">프로필 편집</h1>
-      </header>
-
-      <section className="flex flex-col gap-8 pt-5.5">
+      <section className="flex flex-col gap-8 px-5 pt-5.5">
         <div className="flex flex-col items-center gap-3">
           <img
             src={profile.avatarUrl || DefaultAvatar}

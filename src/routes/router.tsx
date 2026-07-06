@@ -11,6 +11,7 @@ import RegionSelectPage from "../pages/auth/RegionSelectPage";
 import OnboardingCompletePage from "../pages/auth/OnboardingCompletePage";
 import BandHomePage from "../pages/band/home/BandHomePage";
 import EditProfilePage from "../pages/band/home/EditProfilePage";
+import InviteMemberPage from "../pages/band/home/InviteMemberPage";
 
 export const router = createBrowserRouter([
   {
@@ -74,6 +75,10 @@ export const router = createBrowserRouter([
       {
         path: "/band/profile/edit",
         element: <EditProfilePage />,
+      },
+      {
+        path: "/band/profile/invite",
+        element: <InviteMemberPage />,
       },
     ],
   },

@@ -4,9 +4,9 @@ import BSceneLogo from "@/assets/bscene-logo.svg";
 import HamburgerIcon from "@/assets/icons/hamburger.svg";
 import ArrowDownIcon from "@/assets/icons/arrow-down.svg";
 import { useBandProfileStore } from "@/stores/useBandProfileStore";
-import { BandProfileCard } from "@/components/band/BandProfileCard/BandProfileCard";
-import { StatRow } from "@/components/band/StatRow/StatRow";
-import { Tabs } from "@/components/band/Tabs/Tabs";
+import { BandProfileCard } from "@/components/band/home/BandProfileCard";
+import { StatRow } from "@/components/band/home/StatRow";
+import { Tabs } from "@/components/band/home/Tabs";
 import { EmptyState } from "@/components/common/EmptyState/EmptyState";
 import { ModalOverlay } from "@/components/common/Modal/ModalOverlay";
 import Modal from "@/components/Modal/Modal";
@@ -18,7 +18,6 @@ const HOME_TABS = [
   { id: "music", label: "음원" },
 ];
 
-// TODO: API 연동 후 실제 공연 목록으로 교체
 const MOCK_CONCERTS = [
   {
     id: "1",
@@ -122,68 +121,68 @@ const BandHomePage = () => {
           />
 
           <div className="flex flex-1 flex-col">
-          {activeTab === "content" ? (
-            <EmptyState
-              title="등록된 콘텐츠가 없어요"
-              description={
-                <>
-                  콘텐츠를 등록하면 팬들이
-                  <br />
-                  소식을 받아볼 수 있어요
-                </>
-              }
-              actionLabel="등록하기"
-              onAction={() => navigate("/band/videos/new")}
-            />
-          ) : null}
+            {activeTab === "content" ? (
+              <EmptyState
+                title="등록된 콘텐츠가 없어요"
+                description={
+                  <>
+                    콘텐츠를 등록하면 팬들이
+                    <br />
+                    소식을 받아볼 수 있어요
+                  </>
+                }
+                actionLabel="등록하기"
+                onAction={() => navigate("/band/videos/new")}
+              />
+            ) : null}
 
-          {activeTab === "schedule" ? (
-            <div className="flex flex-col gap-3">
-              {MOCK_CONCERTS.map((concert) => (
-                <ConcertCard
-                  key={concert.id}
-                  month={concert.month}
-                  day={concert.day}
-                  title={concert.title}
-                  location={concert.location}
-                  dateTime={concert.dateTime}
-                  status={concert.status}
-                  actions={
-                    <>
-                      <button
-                        type="button"
-                        className="flex h-6.5 items-center justify-center gap-2.5 rounded-lg bg-[#FFF6E5] px-3.75 py-1.75 text-caption3 text-secondary-500"
-                      >
-                        수정
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setDeleteTargetId(concert.id)}
-                        className="flex h-6.5 items-center justify-center gap-2.5 rounded-lg bg-neutral-300 px-3.75 py-1.75 text-caption3 text-neutral-600"
-                      >
-                        삭제
-                      </button>
-                    </>
-                  }
-                />
-              ))}
-            </div>
-          ) : null}
+            {activeTab === "schedule" ? (
+              <div className="flex flex-col gap-3">
+                {MOCK_CONCERTS.map((concert) => (
+                  <ConcertCard
+                    key={concert.id}
+                    month={concert.month}
+                    day={concert.day}
+                    title={concert.title}
+                    location={concert.location}
+                    dateTime={concert.dateTime}
+                    status={concert.status}
+                    actions={
+                      <>
+                        <button
+                          type="button"
+                          className="flex h-6.5 items-center justify-center gap-2.5 rounded-lg bg-[#FFF6E5] px-3.75 py-1.75 text-caption3 text-secondary-500"
+                        >
+                          수정
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDeleteTargetId(concert.id)}
+                          className="flex h-6.5 items-center justify-center gap-2.5 rounded-lg bg-neutral-300 px-3.75 py-1.75 text-caption3 text-neutral-600"
+                        >
+                          삭제
+                        </button>
+                      </>
+                    }
+                  />
+                ))}
+              </div>
+            ) : null}
 
-          {activeTab === "music" ? (
-            <EmptyState
-              title="등록된 음원이 없어요"
-              description={
-                <>
-                  음원 링크를 등록하면 팬들이
-                  <br />
-                  바로 들으러 갈 수 있어요
-                </>
-              }
-              actionLabel="음원 연결하기"
-              onAction={() => navigate("/band/music/new")}
-            />
-          ) : null}
+            {activeTab === "music" ? (
+              <EmptyState
+                title="등록된 음원이 없어요"
+                description={
+                  <>
+                    음원 링크를 등록하면 팬들이
+                    <br />
+                    바로 들으러 갈 수 있어요
+                  </>
+                }
+                actionLabel="음원 연결하기"
+                onAction={() => navigate("/band/music/new")}
+              />
+            ) : null}
           </div>
         </div>
       </section>
@@ -199,7 +198,6 @@ const BandHomePage = () => {
           confirmLabel="삭제"
           onCancel={() => setDeleteTargetId(null)}
           onConfirm={() => {
-            // TODO: API 연동 후 실제 삭제 처리
             setDeleteTargetId(null);
           }}
         />
