@@ -16,6 +16,9 @@
   height: 100dvh;
   overflow: hidden;
   background-color: var(--color-neutral-0);
+  /* establishes a containing block so fixed-position children (e.g. bottom action buttons)
+     anchor to the frame instead of the browser viewport */
+  transform: translateZ(0);
 
   @media (min-width: 768px), (hover: hover) and (pointer: fine) {
     width: 393px;

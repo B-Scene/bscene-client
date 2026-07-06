@@ -1,0 +1,399 @@
+import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import BSceneLogo from "@/assets/bscene-logo.svg";
+import ArrowLeftIcon from "@/assets/icons/arrow-left.svg";
+import CheckCircleIcon from "@/assets/icons/check-circle.svg";
+import CheckCircleActiveIcon from "@/assets/icons/check-circle-active.svg";
+import CheckIcon from "@/assets/icons/check.svg";
+import CheckActiveIcon from "@/assets/icons/check-active.svg";
+import Button from "@/components/common/Button/Button";
+
+type AgreementKey = "age" | "service" | "privacy" | "marketing";
+
+const AGREEMENTS: {
+  key: AgreementKey;
+  label: string;
+  required: boolean;
+}[] = [
+  { key: "age", label: "만 14세 이상입니다.", required: true },
+  { key: "service", label: "서비스 이용약관에 동의", required: true },
+  { key: "privacy", label: "개인정보 수집 및 이용에 동의", required: true },
+  {
+    key: "marketing",
+    label: "광고성 정보 수신 및 마케팅 활용에 동의",
+    required: false,
+  },
+];
+
+const AGREEMENT_DETAILS: Record<
+  AgreementKey,
+  {
+    title: string;
+    content: string;
+  }
+> = {
+  service: {
+    title: "[필수] 서비스 이용약관",
+    content: `제1장 총칙
+
+제1조 (목적)
+이 약관은 B:Scene(대표: 구민정, 이하 "회사")이 제공하는 밴드·세션·팬 커뮤니티 플랫폼 "B:Scene"(웹 및 관련 제반 서비스, 이하 "서비스")의 이용과 관련하여 회사와 회원 간의 권리, 의무 및 책임사항, 기타 필요한 사항을 규정함을 목적으로 합니다.
+
+제2조 (용어의 정의)
+1. "회원"이란 이 약관에 동의하고 서비스에 가입하여 회사가 제공하는 서비스를 이용하는 자를 말합니다.
+2. "팬 계정"이란 공연 정보 팔로우, 콘텐츠 탐색, 라이브 감상 등 팬 활동을 목적으로 이용되는 계정 유형을 말합니다.
+3. "밴드 계정"이란 밴드·아티스트 프로필 운영, 공연·영상 게시, 세션 모집, 라이브 방송 진행 등을 목적으로 이용되는 계정 유형을 말합니다.
+4. "게시물"이란 회원이 서비스를 이용함에 있어 서비스 내에 게시한 문자, 이미지, 영상 및 각종 파일과 링크 등을 말합니다.
+5. "라이브"란 회원이 실시간 음성으로 진행하는 오디오 스트리밍 방송을 말합니다.
+6. "세션 모집"이란 밴드 계정이 공연 또는 활동에 필요한 세션 연주자를 구하기 위해 게시하는 모집 정보를 말합니다.
+
+제3조 (약관의 게시 및 개정)
+1. 회사는 이 약관의 내용을 회원이 쉽게 알 수 있도록 서비스 초기 화면 또는 연결화면에 게시합니다.
+2. 회사는 「약관의 규제에 관한 법률」, 「정보통신망 이용촉진 및 정보보호 등에 관한 법률」 등 관계 법령을 위배하지 않는 범위에서 이 약관을 개정할 수 있습니다.
+3. 회사가 약관을 개정할 경우 적용일자 및 개정사유를 명시하여 적용일자 7일 전(이용자에게 불리한 개정의 경우 30일 전)부터 서비스 내 공지사항을 통해 공지합니다.
+4. 회원이 개정약관의 적용에 동의하지 않는 경우 회원은 이용계약을 해지할 수 있으며, 공지 후 개정약관의 적용일까지 거부의사를 표시하지 않으면 개정약관에 동의한 것으로 봅니다.
+
+제4조 (약관 외 준칙)
+이 약관에서 정하지 않은 사항은 관계 법령 및 회사가 정한 개별 서비스의 운영정책 및 세부 이용지침에 따릅니다.
+
+제2장 이용계약의 체결
+
+제5조 (이용계약의 성립)
+이용계약은 회원이 되고자 하는 자(이하 "가입신청자")가 약관 내용에 동의하고 회사가 정한 가입 양식에 따라 회원정보를 기입하여 가입을 신청하고, 회사가 이러한 신청에 승낙함으로써 성립합니다.
+
+제6조 (회원가입)
+1. 가입신청자는 만 14세 이상이어야 하며, 회사는 만 14세 미만인 자의 가입 신청에 대해 승낙하지 않을 수 있습니다.
+2. 회사는 다음 각 호에 해당하는 신청에 대해서는 승낙을 하지 않거나 사후에 이용계약을 해지할 수 있습니다.
+    - 실명이 아니거나 타인의 명의를 이용한 경우
+    - 허위 정보를 기재하거나 회사가 요구하는 내용을 기재하지 않은 경우
+    - 이전에 이 약관 위반 등의 사유로 이용제한을 받은 사실이 있는 경우
+    - 기타 회원으로 등록하는 것이 서비스 운영상 현저히 지장이 있다고 판단되는 경우
+
+제7조 (계정 유형 및 전환)
+1. 회원은 팬 계정과 밴드 계정 중 하나 이상의 이용 형태를 선택하여 서비스를 이용할 수 있으며, 서비스 내 제공되는 방법에 따라 계정 유형을 전환할 수 있습니다.
+2. 밴드 계정으로 활동하고자 하는 회원은 회사가 정한 절차에 따라 밴드 정보를 등록하여야 하며, 등록 정보의 진위에 대한 책임은 회원 본인에게 있습니다.
+
+제3장 서비스의 이용
+
+제8조 (서비스의 내용)
+회사가 제공하는 서비스는 다음과 같습니다.
+1. 밴드 프로필 서비스(공연 정보, 영상·사진 게시물, 세션 모집 게시)
+2. 팔로우 기반 공연 알림 및 일정 모아보기 서비스
+3. 실시간 채팅 및 오디오 라이브 스트리밍 서비스
+4. 기타 회사가 추가로 개발하거나 제휴를 통해 회원에게 제공하는 일체의 서비스
+
+제9조 (서비스 이용시간)
+서비스는 회사의 업무상 또는 기술상 특별한 지장이 없는 한 연중무휴, 1일 24시간 제공함을 원칙으로 합니다. 다만, 정기점검 등 필요한 경우 회사가 정한 날이나 시간은 예외로 합니다.
+
+제10조 (서비스의 변경 및 중단)
+1. 회사는 운영상, 기술상의 필요에 따라 제공하고 있는 서비스의 전부 또는 일부를 변경할 수 있습니다.
+2. 회사는 천재지변, 비상사태, 서비스 설비의 장애 또는 이용 폭주 등 정상적인 서비스 제공이 불가능한 경우 서비스의 전부 또는 일부를 제한하거나 중단할 수 있습니다.
+
+제11조 (게시물의 관리)
+1. 회원이 서비스 내에 게시한 게시물의 저작권은 해당 게시물을 작성한 회원에게 귀속됩니다.
+2. 회원은 텍스트, 사진, 영상 등 자유로운 형식으로 게시물을 등록할 수 있으며, 타인의 권리를 침해하거나 관계 법령 및 이 약관에 위반되는 게시물을 등록해서는 안 됩니다.
+3. 회사는 게시물이 다음 각 호에 해당한다고 판단되는 경우 회원에게 사전 통지 없이 삭제하거나 게시 중단 조치를 할 수 있습니다.
+    - 타인의 명예를 훼손하거나 저작권 등 권리를 침해하는 경우
+    - 공공질서 및 미풍양속에 위반되는 내용인 경우
+    - 범죄행위와 관련된다고 인정되는 내용인 경우
+    - 회사 또는 제3자의 저작권 등 지식재산권을 침해하는 내용인 경우
+4. 라이브 방송은 회원이 방송을 실제로 시작한 시점에 개설되며, 방송 예약만으로는 라이브 룸이 생성되지 않습니다.
+
+제12조 (지식재산권)
+1. 서비스 내에서 회사가 제작한 저작물에 대한 지식재산권은 회사에 귀속됩니다.
+2. 회원은 서비스를 이용함으로써 얻은 정보 중 회사에게 지식재산권이 귀속된 정보를 회사의 사전 승낙 없이 복제, 송신, 출판, 배포, 방송 등의 방법으로 이용하거나 제3자에게 이용하게 하여서는 안 됩니다.
+
+제4장 계약당사자의 의무
+
+제13조 (회사의 의무)
+1. 회사는 관계 법령과 이 약관이 금지하거나 미풍양속에 반하는 행위를 하지 않으며, 계속적이고 안정적으로 서비스를 제공하기 위해 노력합니다.
+2. 회사는 회원이 안전하게 서비스를 이용할 수 있도록 개인정보보호를 위한 보안시스템을 갖추어야 하며, 개인정보처리방침을 공시하고 준수합니다.
+
+제14조 (회원의 의무)
+회원은 다음 행위를 하여서는 안 됩니다.
+
+1. 신청 또는 변경 시 허위내용의 등록
+2. 타인의 정보 도용
+3. 회사가 게시한 정보의 변경
+4. 회사와 기타 제3자의 저작권 등 지식재산권에 대한 침해
+5. 회사 및 기타 제3자의 명예를 손상시키거나 업무를 방해하는 행위
+6. 외설 또는 폭력적인 메시지, 화상, 음성, 기타 공공질서 및 미풍양속에 반하는 정보를 서비스에 공개 또는 게시하는 행위
+7. 세션 모집 등 서비스 목적과 무관한 영리 목적의 광고성 게시물을 등록하는 행위
+
+제5장 계약해지 및 이용제한
+
+제15조 (계약해지 및 이용제한)
+1. 회원은 언제든지 서비스 내 회원탈퇴 메뉴를 통해 이용계약 해지를 신청할 수 있으며, 회사는 관계 법령이 정하는 바에 따라 이를 즉시 처리합니다.
+2. 회사는 회원이 이 약관의 의무를 위반하거나 서비스의 정상적인 운영을 방해한 경우, 경고, 일시정지, 영구이용정지 등으로 서비스 이용을 단계적으로 제한할 수 있습니다.
+
+제6장 손해배상 및 면책
+
+제16조 (손해배상)
+회사 또는 회원은 서비스 이용과 관련하여 고의 또는 과실로 상대방에게 손해를 끼친 경우 이를 배상할 책임이 있습니다.
+
+제17조 (면책조항)
+1. 회사는 천재지변 또는 이에 준하는 불가항력으로 인하여 서비스를 제공할 수 없는 경우 서비스 제공에 관한 책임이 면제됩니다.
+2. 회사는 회원의 귀책사유로 인한 서비스 이용의 장애에 대하여는 책임을 지지 않습니다.
+3. 회사는 회원이 서비스를 이용하여 기대하는 수익을 상실한 것에 대하여 책임을 지지 않으며, 회원이 서비스에 게재한 정보, 자료, 사실의 신뢰도, 정확성 등에 대해서는 책임을 지지 않습니다.
+4. 회사는 회원 간 또는 회원과 제3자 간에 서비스를 매개로 발생한 분쟁에 대해 개입할 의무가 없으며, 이로 인한 손해를 배상할 책임이 없습니다.
+
+제7장 기타
+
+제18조 (준거법 및 관할법원)
+1. 회사와 회원 간 제기된 소송은 대한민국법을 준거법으로 합니다.
+2. 회사와 회원 간 발생한 분쟁에 관한 소송은 민사소송법상의 관할법원에 제소합니다.
+
+부칙
+이 약관은 서비스 정식 오픈일(____년 __월 __일)부터 적용됩니다.`,
+  },
+  privacy: {
+    title: "[필수] 개인정보 수집 및 이용에 동의",
+    content: `B:Scene은 서비스 제공을 위해 아래와 같이 개인정보를 수집·이용하며, 회원은 아래 내용에 대해 동의 여부를 선택할 수 있습니다. (단, 필수 항목에 동의하지 않을 경우 서비스 이용이 제한될 수 있습니다.)
+
+1. 회원가입 및 관리
+- 수집 항목: 이름, 이메일, 비밀번호, 휴대폰번호
+- 보유 기간: 회원 탈퇴 시까지
+
+2. 밴드/세션 프로필 운영
+- 수집 항목: 밴드명, 소속 멤버 정보, 담당 파트, 활동 경력, 프로필 이미지
+- 보유 기간: 회원 탈퇴 또는 프로필 삭제 시까지
+
+3. 공연·라이브 서비스 제공
+- 수집 항목: 팔로우 정보, 공연 예약/알림 신청 내역, 라이브 참여 기록
+- 보유 기간: 회원 탈퇴 시까지
+
+4. 채팅 및 커뮤니티 운영
+- 수집 항목: 채팅 메시지, 게시물 및 댓글 내용
+- 보유 기간: 회원 탈퇴 또는 게시물 삭제 시까지
+
+5. 서비스 부정이용 방지
+- 수집 항목: 접속 IP, 접속 기기 정보, 서비스 이용기록
+- 보유 기간: 수집일로부터 3개월
+
+회원은 개인정보 수집·이용 동의를 거부할 권리가 있으나, 필수 항목 동의 거부 시 서비스 이용이 제한될 수 있습니다.`,
+  },
+  marketing: {
+    title: "[선택] 광고성 정보 수신 및 마케팅 활용 동의",
+    content: `B:Scene은 회원에게 유용한 공연 정보, 이벤트, 신규 기능 등을 안내하기 위해 광고성 정보를 발송할 수 있습니다.
+
+1. 수집 및 이용 목적
+팔로우한 밴드의 이벤트 및 공연 추천, 신규 기능·업데이트 안내, 프로모션 및 이벤트 정보 제공, 서비스 관련 마케팅 활용
+
+2. 수신 방법
+앱 푸시(FCM), 이메일, 문자메시지
+
+3. 보유 및 이용 기간
+동의일로부터 회원 탈퇴 시 또는 수신 동의 철회 시까지
+
+4. 동의 철회
+회원은 언제든지 서비스 내 [설정 > 알림 설정] 메뉴 또는 수신 거부(옵트아웃) 절차를 통해 동의를 철회할 수 있으며, 철회 이후에는 광고성 정보를 발송하지 않습니다.
+
+5. 본 항목은 선택사항이며, 동의하지 않아도 서비스 이용에 제한이 없습니다.`,
+  },
+  age: {
+    title: "[필수] 만 14세 이상 확인",
+    content: `B:Scene은 만 14세 미만 아동의 개인정보를 수집하지 않으며, 서비스 가입 대상을 만 14세 이상으로 제한합니다.
+
+1. 본인은 만 14세 이상임을 확인합니다.
+2. 허위로 확인한 사실이 밝혀질 경우 회사는 사전 통지 없이 이용계약을 해지하거나 서비스 이용을 제한할 수 있습니다.
+3. 만 14세 미만인 것으로 확인된 회원의 계정은 즉시 이용 제한되며, 수집된 개인정보는 지체 없이 파기됩니다.`,
+  },
+};
+
+const AgreementPage = () => {
+  const navigate = useNavigate();
+
+  const [checked, setChecked] = useState<Record<AgreementKey, boolean>>({
+    age: false,
+    service: false,
+    privacy: false,
+    marketing: false,
+  });
+
+  const [selectedAgreement, setSelectedAgreement] =
+    useState<AgreementKey | null>(null);
+
+  const isAllChecked = useMemo(
+    () => Object.values(checked).every(Boolean),
+    [checked],
+  );
+
+  const isRequiredChecked = useMemo(
+    () =>
+      AGREEMENTS.filter((item) => item.required).every(
+        (item) => checked[item.key],
+      ),
+    [checked],
+  );
+
+  const handleToggleAll = () => {
+    const nextChecked = !isAllChecked;
+
+    setChecked({
+      age: nextChecked,
+      service: nextChecked,
+      privacy: nextChecked,
+      marketing: nextChecked,
+    });
+  };
+
+  const handleToggleItem = (key: AgreementKey) => {
+    setChecked((prev) => ({
+      ...prev,
+      [key]: !prev[key],
+    }));
+  };
+
+  const handleNext = () => {
+    if (!isRequiredChecked) return;
+    navigate("/onboarding/mode");
+  };
+
+  return (
+    <main className="relative min-h-dvh bg-neutral-0 px-5 pb-[96px]">
+      <header className="flex h-12 items-center justify-between">
+        <button
+          type="button"
+          onClick={() => navigate(-1)}
+          className="flex size-6 items-center justify-center"
+          aria-label="뒤로가기"
+        >
+          <img src={ArrowLeftIcon} alt="" className="size-5" />
+        </button>
+
+        <h1 className="text-label2 text-neutral-900">약관 동의</h1>
+
+        <div className="size-6" />
+      </header>
+
+      <section className="pt-10">
+        <div className="flex flex-col items-start gap-1">
+          <img src={BSceneLogo} alt="B : Scene" className="h-5 w-auto" />
+          <h2 className="text-h3 text-neutral-900">서비스 이용약관</h2>
+        </div>
+
+        <button
+          type="button"
+          onClick={handleToggleAll}
+          className="mt-7 flex w-full items-center gap-2 border-b border-neutral-200 pb-4"
+        >
+          <AgreementCheckIcon checked={isAllChecked} type="circle" />
+
+          <span className="text-body1 text-neutral-900">
+            모두 동의 (선택 정보 포함)
+          </span>
+        </button>
+
+        <ul className="mt-4 flex flex-col gap-3">
+          {AGREEMENTS.map((item) => (
+            <li key={item.key} className="flex items-center">
+              <button
+                type="button"
+                onClick={() => handleToggleItem(item.key)}
+                className="flex flex-1 items-center gap-2 text-left"
+              >
+                <AgreementCheckIcon checked={checked[item.key]} />
+
+                <span className="text-caption1 text-neutral-900">
+                  [{item.required ? "필수" : "선택"}] {item.label}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                className="text-caption2 text-neutral-500"
+                onClick={() => setSelectedAgreement(item.key)}
+              >
+                보기
+              </button>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <div className="fixed inset-x-0 bottom-7 px-5">
+        <Button
+          type="button"
+          size="large"
+          tone={isRequiredChecked ? "pink" : "gray"}
+          disabled={!isRequiredChecked}
+          onClick={handleNext}
+          className="w-full"
+        >
+          다음
+        </Button>
+      </div>
+
+      {selectedAgreement && (
+        <TermModal
+          title={AGREEMENT_DETAILS[selectedAgreement].title}
+          content={AGREEMENT_DETAILS[selectedAgreement].content}
+          onClose={() => setSelectedAgreement(null)}
+        />
+      )}
+    </main>
+  );
+};
+
+export default AgreementPage;
+
+type AgreementCheckIconProps = {
+  checked: boolean;
+  type?: "circle" | "check";
+};
+
+const AgreementCheckIcon = ({
+  checked,
+  type = "check",
+}: AgreementCheckIconProps) => {
+  const icon =
+    type === "circle"
+      ? checked
+        ? CheckCircleActiveIcon
+        : CheckCircleIcon
+      : checked
+        ? CheckActiveIcon
+        : CheckIcon;
+
+  return (
+    <img
+      src={icon}
+      alt=""
+      className={`${type === "circle" ? "size-6" : "size-5"} shrink-0`}
+    />
+  );
+};
+
+const TermModal = ({
+  title,
+  content,
+  onClose,
+}: {
+  title: string;
+  content: string;
+  onClose: () => void;
+}) => {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end bg-black/40"
+    onClick={onClose}>
+      <div className="w-full rounded-t-2xl bg-neutral-0 px-5 pb-7 pt-5"
+      onClick={(e) => e.stopPropagation()}>
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-label1 text-neutral-900">{title}</h2>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-caption1 text-neutral-500"
+          >
+            닫기
+          </button>
+        </div>
+
+        <div className="max-h-[60dvh] overflow-y-auto whitespace-pre-line text-body5 leading-[1.6] text-neutral-700">
+          {content}
+        </div>
+      </div>
+    </div>
+  );
+};

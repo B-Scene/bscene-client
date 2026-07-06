@@ -1,26 +1,56 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ArrowLeftIcon from "@/assets/icons/arrow-left.svg";
 import ErrorIcon from "@/assets/icons/error.svg";
 import Button from "@/components/common/Button/Button";
+import { useCheckFanNickname } from "@/hooks/api/onboarding/useOnboarding";
 
 const FanNicknamePage = () => {
   const navigate = useNavigate();
+  const { mutate: checkNicknameMutate, isPending } = useCheckFanNickname();
 
   const [nickname, setNickname] = useState("");
   const [isDuplicate, setIsDuplicate] = useState(false);
+  const [isChecked, setIsChecked] = useState(false);
 
-  const isValidNickname = nickname.trim().length > 0 && !isDuplicate;
+  const trimmedNickname = nickname.trim();
+  const isValidNickname =
+    trimmedNickname.length > 0 && isChecked && !isDuplicate && !isPending;
+
+  useEffect(() => {
+    if (!trimmedNickname) return;
+
+    const timer = setTimeout(() => {
+      checkNicknameMutate(trimmedNickname, {
+        onSuccess: (data) => {
+          setIsChecked(true);
+          setIsDuplicate(!data.available);
+        },
+        onError: (error) => {
+          console.error(error);
+          setIsChecked(false);
+          setIsDuplicate(false);
+        },
+      });
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [trimmedNickname, checkNicknameMutate]);
 
   const handleChangeNickname = (value: string) => {
     const nextValue = value.slice(0, 8);
-    setNickname(nextValue);
 
-    // TODO: 닉네임 중복 확인 API 연결 후,
-    // 중복일 때만 setIsDuplicate(true)
+    setNickname(nextValue);
     setIsDuplicate(false);
+    setIsChecked(false);
   };
 
+  const handleNext = () => {
+    if (!isValidNickname) return;
+
+    sessionStorage.setItem("onboardingFanNickname", trimmedNickname);
+    navigate("/onboarding/genre");
+  };
 
   return (
     <main className="relative min-h-dvh bg-neutral-0 px-5 pb-[96px]">
@@ -67,14 +97,14 @@ const FanNicknamePage = () => {
         </div>
       </section>
 
-      <div className="fixed bottom-9 left-1/2 w-full max-w-[430px] -translate-x-1/2 px-5">
+      <div className="fixed inset-x-0 bottom-9 px-5">
         <Button
           size="large"
           type="button"
           disabled={!isValidNickname}
           tone={isValidNickname ? "pink" : "gray"}
           className="w-full"
-          onClick={() => navigate("/onboarding/genre")}
+          onClick={handleNext}
         >
           다음
         </Button>
