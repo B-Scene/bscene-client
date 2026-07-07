@@ -2,7 +2,11 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import BSceneLogo from "@/assets/bscene-logo.svg";
 import HamburgerIcon from "@/assets/icons/hamburger.svg";
-import ArrowDownIcon from "@/assets/icons/arrow-down.svg";
+import RefreshIcon from "@/assets/icons/menu-reload.svg";
+import MembersIcon from "@/assets/icons/menu-members.svg";
+import ContentIcon from "@/assets/icons/menu-content.svg";
+import ScheduleIcon from "@/assets/icons/menu-schedule.svg";
+import MusicIcon from "@/assets/icons/menu-music.svg";
 import { useBandProfileStore } from "@/stores/useBandProfileStore";
 import { BandProfileCard } from "@/components/band/home/BandProfileCard";
 import { StatRow } from "@/components/band/home/StatRow";
@@ -45,29 +49,105 @@ const BandHomePage = () => {
 
   const [activeTab, setActiveTab] = useState("content");
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const subtitle = `${profile.genre} · ${profile.regions.join(", ")} · 멤버 ${profile.memberCount}명`;
 
   return (
     <main className="relative flex min-h-dvh flex-col bg-neutral-0 px-5 pb-24">
-      <header className="relative flex h-12 items-center justify-between">
-        <button
-          type="button"
-          className="flex items-center gap-2 rounded-full bg-secondary-500 px-2.25 py-1.5 text-caption1 font-semibold text-white"
-        >
-          밴드 모드
-          <img src={ArrowDownIcon} />
-        </button>
-
+      <header className="relative flex h-12 items-center justify-end">
         <img
           src={BSceneLogo}
           alt="B:Scene"
           className="absolute left-1/2 h-7.5 w-24 -translate-x-1/2"
         />
 
-        <button type="button" aria-label="메뉴">
-          <img src={HamburgerIcon} alt="" className="size-6" />
-        </button>
+        <div className="relative">
+          <button
+            type="button"
+            aria-label="메뉴"
+            onClick={() => setIsMenuOpen((prev) => !prev)}
+          >
+            <img src={HamburgerIcon} alt="" className="size-6" />
+          </button>
+
+          {isMenuOpen ? (
+            <>
+              <div
+                className="fixed inset-0 z-40"
+                onClick={() => setIsMenuOpen(false)}
+              />
+
+              <div className="absolute right-0 top-full z-50 mt-2 flex flex-col gap-4 rounded-2xl bg-neutral-0 p-4 shadow-[0_4px_20px_0_rgba(0,0,0,0.12)]">
+                <button
+                  type="button"
+                  onClick={() => setIsMenuOpen(false)}
+                  className="flex w-full items-start gap-2 text-left"
+                >
+                  <img src={RefreshIcon} alt="" />
+                  <span className="flex flex-col items-start gap-1.5">
+                    <span className="text-body1 text-neutral-900">
+                      모드 및 밴드 전환
+                    </span>
+                    <span className="text-caption4 text-neutral-600">
+                      현재 : 밴드모드 · {profile.name}
+                    </span>
+                  </span>
+                </button>
+
+                <div className="h-px w-32.5 bg-neutral-400" />
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    navigate("/band/profile/invite");
+                  }}
+                  className="flex w-full items-center gap-2 text-left text-body1 text-neutral-900"
+                >
+                  <img src={MembersIcon} alt="" />
+                  멤버 관리
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    setActiveTab("content");
+                  }}
+                  className="flex w-full items-center gap-2 text-left text-body1 text-neutral-900"
+                >
+                  <img src={ContentIcon} alt="" />
+                  콘텐츠 관리
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    setActiveTab("schedule");
+                  }}
+                  className="flex w-full items-center gap-2 text-left text-body1 text-neutral-900"
+                >
+                  <img src={ScheduleIcon} alt="" />
+                  일정 관리
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    setActiveTab("music");
+                  }}
+                  className="flex w-full items-center gap-2 text-left text-body1 text-neutral-900"
+                >
+                  <img src={MusicIcon} alt="" />
+                  음원 관리
+                </button>
+              </div>
+            </>
+          ) : null}
+        </div>
       </header>
 
       <section className="mt-6 flex flex-1 flex-col">
@@ -99,7 +179,7 @@ const BandHomePage = () => {
           </button>
           <button
             type="button"
-            onClick={() => navigate("/band/concerts/new/step1")}
+            onClick={() => navigate("/band/concerts/new")}
             className="flex h-9.5 flex-1 items-center justify-center rounded-lg bg-secondary-400 px-3 py-2 text-body1 text-white"
           >
             일정 등록

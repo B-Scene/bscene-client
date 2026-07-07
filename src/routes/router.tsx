@@ -12,6 +12,7 @@ import OnboardingCompletePage from "../pages/auth/OnboardingCompletePage";
 import BandHomePage from "../pages/band/home/BandHomePage";
 import EditProfilePage from "../pages/band/home/EditProfilePage";
 import InviteMemberPage from "../pages/band/home/InviteMemberPage";
+import ConcertRegisterPage from "../pages/band/home/ConcertRegisterPage";
 
 export const router = createBrowserRouter([
   {
@@ -79,6 +80,10 @@ export const router = createBrowserRouter([
       {
         path: "/band/profile/invite",
         element: <InviteMemberPage />,
+      },
+      {
+        path: "/band/concerts/new",
+        element: <ConcertRegisterPage />,
       },
     ],
   },
