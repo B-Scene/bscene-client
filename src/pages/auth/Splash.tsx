@@ -14,7 +14,7 @@ export default function Splash() {
   }, [navigate]);
 
   return (
-     <main
+    <main
       className="flex h-full w-full items-center justify-center"
       style={{
         background: "linear-gradient(168deg, #FFE031 0%, #F04579 100%)",
