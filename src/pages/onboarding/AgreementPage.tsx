@@ -7,19 +7,11 @@ import CheckCircleActiveIcon from "@/assets/icons/check-circle-active.svg";
 import CheckIcon from "@/assets/icons/check.svg";
 import CheckActiveIcon from "@/assets/icons/check-active.svg";
 import Button from "@/components/common/Button/Button";
-
-type AgreementKey = "age" | "service" | "privacy" | "marketing";
-
-const AGREEMENTS: {
-  key: AgreementKey;
-  label: string;
-  required: boolean;
-}[] = [
-  { key: "age", label: "만 14세 이상입니다.", required: true },
-  { key: "service", label: "서비스 이용약관에 동의", required: true },
-  { key: "privacy", label: "개인정보 수집 및 이용에 동의", required: true },
-  { key: "marketing", label: "광고성 정보 수신 및 마케팅 활용에 동의", required: false },
-];
+import {
+  AGREEMENTS,
+  AGREEMENT_DETAILS,
+  type AgreementKey,
+} from "@/features/onboarding/agreementData";
 
 const AgreementPage = () => {
   const navigate = useNavigate();
@@ -30,6 +22,9 @@ const AgreementPage = () => {
     privacy: false,
     marketing: false,
   });
+
+  const [selectedAgreement, setSelectedAgreement] =
+    useState<AgreementKey | null>(null);
 
   const isAllChecked = useMemo(
     () => Object.values(checked).every(Boolean),
@@ -79,9 +74,7 @@ const AgreementPage = () => {
           <img src={ArrowLeftIcon} alt="" className="size-5" />
         </button>
 
-        <h1 className="text-label2 text-neutral-900">
-          약관 동의
-        </h1>
+        <h1 className="text-label2 text-neutral-900">약관 동의</h1>
 
         <div className="size-6" />
       </header>
@@ -122,9 +115,7 @@ const AgreementPage = () => {
               <button
                 type="button"
                 className="text-caption2 text-neutral-500"
-                onClick={() => {
-                  // TODO: 약관 상세 연결
-                }}
+                onClick={() => setSelectedAgreement(item.key)}
               >
                 보기
               </button>
@@ -145,6 +136,14 @@ const AgreementPage = () => {
           다음
         </Button>
       </div>
+
+      {selectedAgreement && (
+        <TermModal
+          title={AGREEMENT_DETAILS[selectedAgreement].title}
+          content={AGREEMENT_DETAILS[selectedAgreement].content}
+          onClose={() => setSelectedAgreement(null)}
+        />
+      )}
     </main>
   );
 };
@@ -175,5 +174,39 @@ const AgreementCheckIcon = ({
       alt=""
       className={`${type === "circle" ? "size-6" : "size-5"} shrink-0`}
     />
+  );
+};
+
+const TermModal = ({
+  title,
+  content,
+  onClose,
+}: {
+  title: string;
+  content: string;
+  onClose: () => void;
+}) => {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end bg-black/40"
+    onClick={onClose}>
+      <div className="w-full rounded-t-2xl bg-neutral-0 px-5 pb-7 pt-5"
+      onClick={(e) => e.stopPropagation()}>
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-label1 text-neutral-900">{title}</h2>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-caption1 text-neutral-500"
+          >
+            닫기
+          </button>
+        </div>
+
+        <div className="max-h-[60dvh] overflow-y-auto whitespace-pre-line text-body5 leading-[1.6] text-neutral-700">
+          {content}
+        </div>
+      </div>
+    </div>
   );
 };
