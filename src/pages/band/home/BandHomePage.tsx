@@ -11,6 +11,7 @@ import { useBandProfileStore } from "@/stores/useBandProfileStore";
 import { BandProfileCard } from "@/components/band/home/BandProfileCard";
 import { StatRow } from "@/components/band/home/StatRow";
 import { Tabs } from "@/components/band/home/Tabs";
+import { ModeSwitchSheet } from "@/components/band/home/ModeSwitchSheet";
 import { EmptyState } from "@/components/common/EmptyState/EmptyState";
 import { ModalOverlay } from "@/components/common/Modal/ModalOverlay";
 import Modal from "@/components/Modal/Modal";
@@ -50,6 +51,7 @@ const BandHomePage = () => {
   const [activeTab, setActiveTab] = useState("content");
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isModeSwitchOpen, setIsModeSwitchOpen] = useState(false);
 
   const subtitle = `${profile.genre} · ${profile.regions.join(", ")} · 멤버 ${profile.memberCount}명`;
 
@@ -81,7 +83,10 @@ const BandHomePage = () => {
               <div className="absolute right-0 top-full z-50 mt-2 flex flex-col gap-4 rounded-2xl bg-neutral-0 p-4 shadow-[0_4px_20px_0_rgba(0,0,0,0.12)]">
                 <button
                   type="button"
-                  onClick={() => setIsMenuOpen(false)}
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    setIsModeSwitchOpen(true);
+                  }}
                   className="flex w-full items-start gap-2 text-left"
                 >
                   <img src={RefreshIcon} alt="" />
@@ -282,6 +287,11 @@ const BandHomePage = () => {
           }}
         />
       </ModalOverlay>
+
+      <ModeSwitchSheet
+        open={isModeSwitchOpen}
+        onClose={() => setIsModeSwitchOpen(false)}
+      />
     </main>
   );
 };

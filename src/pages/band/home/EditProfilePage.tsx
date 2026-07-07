@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import DefaultAvatar from "@/assets/images/IMG_my.svg";
+import DefaultAvatar from "@/assets/icons/band-default-profile.svg";
 import { Header } from "@/components/band/home/Header";
 import { Input, Textarea } from "@/components/common/Input/Input";
 import { Select } from "@/components/common/Select/Select";
@@ -45,7 +45,10 @@ const EditProfilePage = () => {
   const [region, setRegion] = useState(profile.regions[0] ?? "");
   const [bio, setBio] = useState(profile.bio);
 
+  const isValid = Boolean(name.trim() && genre && region);
+
   const handleSave = () => {
+    if (!isValid) return;
     setProfile({ name, genre, regions: [region], bio });
     navigate("/band/home");
   };
@@ -121,16 +124,12 @@ const EditProfilePage = () => {
           <div className="flex w-full flex-col gap-3">
             <button
               type="button"
-              onClick={() => navigate("/band/profile/invite")}
-              className="flex h-13 w-full items-center justify-center rounded-xl border-[1.5px] border-secondary-500 bg-neutral-0 text-label1 text-secondary-500"
-            >
-              멤버 관리
-            </button>
-
-            <button
-              type="button"
               onClick={handleSave}
-              className="flex h-13 w-full items-center justify-center gap-2.5 rounded-xl bg-secondary-500 text-label1 text-white"
+              className={`flex h-13 w-full items-center justify-center gap-2.5 rounded-xl text-label1 ${
+                isValid
+                  ? "bg-secondary-500 text-neutral-0"
+                  : "bg-neutral-300 text-neutral-600"
+              }`}
             >
               프로필 저장
             </button>

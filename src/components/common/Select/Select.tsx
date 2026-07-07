@@ -8,6 +8,7 @@ interface SelectProps {
   options: string[];
   placeholder: string;
   className?: string;
+  error?: boolean;
 }
 
 export const Select = ({
@@ -16,6 +17,7 @@ export const Select = ({
   options,
   placeholder,
   className = "",
+  error = false,
 }: SelectProps) => {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -25,7 +27,7 @@ export const Select = ({
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
         className={`flex w-full items-center justify-between rounded-[5px] border px-4 py-1.25 text-caption2 ${
-          isOpen ? "border-secondary-500" : "border-neutral-400"
+          isOpen ? "border-secondary-500" : error ? "border-error" : "border-neutral-400"
         } ${value ? "text-neutral-900" : "text-neutral-500"}`}
       >
         <span>{value || placeholder}</span>

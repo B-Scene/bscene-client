@@ -1,6 +1,6 @@
 import { Fragment, useState, type ReactNode } from "react";
 import SearchIcon from "@/assets/icons/search.svg";
-import DefaultAvatar from "@/assets/images/IMG_my.svg";
+import DefaultAvatar from "@/assets/icons/user-default-profile.svg";
 import { Header } from "@/components/band/home/Header";
 import { Toast } from "@/components/common/Toast/Toast";
 import { ModalOverlay } from "@/components/common/Modal/ModalOverlay";
@@ -19,8 +19,8 @@ interface PendingInvite {
 }
 
 const INITIAL_MEMBERS: Member[] = [
-  { id: "1", nickname: "닉네임 (나)", role: "파트", isSelf: true },
-  { id: "2", nickname: "닉네임", role: "파트", isSelf: false },
+  { id: "1", nickname: "이름", role: "파트", isSelf: true },
+  { id: "2", nickname: "이름", role: "파트", isSelf: false },
 ];
 
 interface MemberRowProps {
@@ -76,7 +76,7 @@ const InviteMemberPage = () => {
   const [search, setSearch] = useState("");
   const [members, setMembers] = useState(INITIAL_MEMBERS);
   const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>([
-    { id: "3", nickname: "닉네임" },
+    { id: "3", nickname: "이름" },
   ]);
   const [toastOpen, setToastOpen] = useState(false);
   const [removeTargetId, setRemoveTargetId] = useState<string | null>(null);

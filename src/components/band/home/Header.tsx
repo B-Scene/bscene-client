@@ -10,7 +10,7 @@ export const Header = ({ title }: HeaderProps) => {
   const navigate = useNavigate();
 
   return (
-    <header className="relative flex h-12 items-center justify-center px-3.75">
+    <header className="relative flex h-12 items-center justify-center bg-neutral-0 px-3.75">
       <button
         type="button"
         onClick={() => navigate(-1)}
