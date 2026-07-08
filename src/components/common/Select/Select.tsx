@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import ArrowDownGrayIcon from "@/assets/icons/band/arrow-down-gray.svg";
 import ArrowDownYellowIcon from "@/assets/icons/band/arrow-down-yellow.svg";
 
@@ -20,9 +20,23 @@ export const Select = ({
   error = false,
 }: SelectProps) => {
   const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isOpen]);
 
   return (
-    <div className={`relative flex flex-col gap-2 ${className}`}>
+    <div ref={containerRef} className={`relative flex flex-col gap-2 ${className}`}>
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
