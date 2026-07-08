@@ -23,7 +23,7 @@ const HOME_TABS = [
   { id: "music", label: "음원" },
 ];
 
-const MOCK_CONCERTS = [
+const INITIAL_CONCERTS = [
   {
     id: "1",
     month: "MAY",
@@ -49,6 +49,7 @@ const BandHomePage = () => {
   const profile = useBandProfileStore((state) => state.profile);
 
   const [activeTab, setActiveTab] = useState("content");
+  const [concerts, setConcerts] = useState(INITIAL_CONCERTS);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isModeSwitchOpen, setIsModeSwitchOpen] = useState(false);
@@ -223,7 +224,7 @@ const BandHomePage = () => {
 
             {activeTab === "schedule" ? (
               <div className="flex flex-col gap-3">
-                {MOCK_CONCERTS.map((concert) => (
+                {concerts.map((concert) => (
                   <ConcertCard
                     key={concert.id}
                     month={concert.month}
@@ -283,6 +284,7 @@ const BandHomePage = () => {
           confirmLabel="삭제"
           onCancel={() => setDeleteTargetId(null)}
           onConfirm={() => {
+            setConcerts((prev) => prev.filter((concert) => concert.id !== deleteTargetId));
             setDeleteTargetId(null);
           }}
         />
