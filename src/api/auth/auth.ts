@@ -1,4 +1,4 @@
-import { axiosInstance } from "../axiosInstance";
+import { axiosInstance } from "@/api/axiosInstance";
 import type {
   ApiResponse,
   CheckLoginIdResponse,
@@ -13,7 +13,7 @@ import type {
   ReissueResponse,
   OAuthSignupRequest,
   OAuthExchangeResponse,
-} from "../../types/auth/auth";
+} from "@/types/auth/auth";
 
 export const checkLoginId = async (loginId: string) => {
   const { data } = await axiosInstance.get<ApiResponse<CheckLoginIdResponse>>(
