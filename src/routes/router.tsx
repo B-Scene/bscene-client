@@ -14,6 +14,7 @@ import EditProfilePage from "../pages/band/home/EditProfilePage";
 import InviteMemberPage from "../pages/band/home/InviteMemberPage";
 import ConcertRegisterPage from "../pages/band/home/ConcertRegisterPage";
 import CompletePage from "../pages/band/home/CompletePage";
+import MusicRegisterPage from "../pages/band/home/MusicRegisterPage";
 
 export const router = createBrowserRouter([
   {
@@ -89,6 +90,10 @@ export const router = createBrowserRouter([
       {
         path: "/band/register/complete",
         element: <CompletePage />,
+      },
+      {
+        path: "/band/music/new",
+        element: <MusicRegisterPage />,
       },
     ],
   },

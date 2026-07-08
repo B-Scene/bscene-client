@@ -194,7 +194,7 @@ const BandHomePage = () => {
             onClick={() => navigate("/band/music/new")}
             className="flex h-9.5 flex-1 items-center justify-center rounded-lg bg-secondary-400 px-3 py-2 text-body1 text-white"
           >
-            음원 연결
+            음원 등록
           </button>
         </div>
 
@@ -264,7 +264,7 @@ const BandHomePage = () => {
                     바로 들으러 갈 수 있어요
                   </>
                 }
-                actionLabel="음원 연결하기"
+                actionLabel="등록하기"
                 onAction={() => navigate("/band/music/new")}
               />
             ) : null}
