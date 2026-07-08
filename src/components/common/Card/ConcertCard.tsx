@@ -1,6 +1,6 @@
 import type { KeyboardEvent, MouseEventHandler, ReactNode } from "react";
 import arrowIcon from "@/assets/Arrow.svg";
-import locationIcon from "@/assets/icons/ic_location.svg";
+import locationIcon from "@/assets/icons/band/ic_location.svg";
 
 type ConcertCardProps = {
   month?: ReactNode;

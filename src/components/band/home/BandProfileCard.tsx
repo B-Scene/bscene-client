@@ -1,4 +1,4 @@
-import OfficialIcon from "@/assets/icons/official-icon.svg";
+import OfficialIcon from "@/assets/icons/band/official-icon.svg";
 import DefaultAvatar from "@/assets/images/IMG_my.svg";
 
 interface BandProfileCardProps {
@@ -29,7 +29,11 @@ export const BandProfileCard = ({
           <div className="flex items-center gap-2">
             <h2 className="truncate text-label1 text-neutral-900">{name}</h2>
             {verified ? (
-              <img src={OfficialIcon} alt="인증됨" className="size-4 shrink-0" />
+              <img
+                src={OfficialIcon}
+                alt="인증됨"
+                className="size-4 shrink-0"
+              />
             ) : null}
           </div>
           <p className="truncate text-caption2 text-neutral-700">{subtitle}</p>

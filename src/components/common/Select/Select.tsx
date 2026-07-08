@@ -1,6 +1,6 @@
 import { useState } from "react";
-import ArrowDownGrayIcon from "@/assets/icons/arrow-down-gray.svg";
-import ArrowDownYellowIcon from "@/assets/icons/arrow-down-yellow.svg";
+import ArrowDownGrayIcon from "@/assets/icons/band/arrow-down-gray.svg";
+import ArrowDownYellowIcon from "@/assets/icons/band/arrow-down-yellow.svg";
 
 interface SelectProps {
   value: string;

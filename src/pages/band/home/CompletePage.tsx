@@ -1,6 +1,6 @@
 import { Fragment } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
-import CheckCircleIcon from "@/assets/icons/check-circle-complete.svg";
+import CheckCircleIcon from "@/assets/icons/band/check-circle-complete.svg";
 
 interface CompleteRow {
   label: string;

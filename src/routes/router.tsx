@@ -15,6 +15,7 @@ import InviteMemberPage from "../pages/band/home/InviteMemberPage";
 import ConcertRegisterPage from "../pages/band/home/ConcertRegisterPage";
 import CompletePage from "../pages/band/home/CompletePage";
 import MusicRegisterPage from "../pages/band/home/MusicRegisterPage";
+import ContentRegisterPage from "../pages/band/home/ContentRegisterPage";
 
 export const router = createBrowserRouter([
   {
@@ -94,6 +95,10 @@ export const router = createBrowserRouter([
       {
         path: "/band/music/new",
         element: <MusicRegisterPage />,
+      },
+      {
+        path: "/band/videos/new",
+        element: <ContentRegisterPage />,
       },
     ],
   },

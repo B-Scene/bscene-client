@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import DefaultAvatar from "@/assets/icons/band-default-profile.svg";
+import DefaultAvatar from "@/assets/icons/band/band-default-profile.svg";
 import { Header } from "@/components/band/home/Header";
 import { Input, Textarea } from "@/components/common/Input/Input";
 import { Select } from "@/components/common/Select/Select";

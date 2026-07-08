@@ -1,6 +1,6 @@
 import { Fragment, useState, type ReactNode } from "react";
-import SearchIcon from "@/assets/icons/search.svg";
-import DefaultAvatar from "@/assets/icons/user-default-profile.svg";
+import SearchIcon from "@/assets/icons/band/search.svg";
+import DefaultAvatar from "@/assets/icons/band/user-default-profile.svg";
 import { Header } from "@/components/band/home/Header";
 import { Toast } from "@/components/common/Toast/Toast";
 import { ModalOverlay } from "@/components/common/Modal/ModalOverlay";

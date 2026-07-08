@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { useBandProfileStore } from "@/stores/useBandProfileStore";
 import BandAvatar from "@/assets/images/IMG_my.svg";
-import FanAvatar from "@/assets/icons/user-default-profile.svg";
-import CheckCircleYellowIcon from "@/assets/icons/check-circle-yellow.svg";
-import CheckApproveIcon from "@/assets/icons/check-approve.svg";
+import FanAvatar from "@/assets/icons/band/user-default-profile.svg";
+import CheckCircleYellowIcon from "@/assets/icons/band/check-circle-yellow.svg";
+import CheckApproveIcon from "@/assets/icons/band/check-approve.svg";
 
 interface ModeSwitchSheetProps {
   open: boolean;

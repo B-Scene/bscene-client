@@ -3,14 +3,14 @@ import { useNavigate } from "react-router-dom";
 import { Header } from "@/components/band/home/Header";
 import { Input } from "@/components/common/Input/Input";
 import { Select } from "@/components/common/Select/Select";
-import CalendarIcon from "@/assets/icons/data-range.svg";
-import ClockIcon from "@/assets/icons/clock-band.svg";
-import UploadIcon from "@/assets/icons/add-image.svg";
-import TrashIcon from "@/assets/icons/delete.svg";
-import Number1CircleIcon from "@/assets/icons/number1-circle.svg";
-import Number2CircleIcon from "@/assets/icons/number2-circle.svg";
-import Number2CircleActiveIcon from "@/assets/icons/number2-circle-active.svg";
-import CheckCircleYellowIcon from "@/assets/icons/check-circle-yellow.svg";
+import CalendarIcon from "@/assets/icons/band/data-range.svg";
+import ClockIcon from "@/assets/icons/band/clock-band.svg";
+import UploadIcon from "@/assets/icons/band/add-image.svg";
+import TrashIcon from "@/assets/icons/band/delete.svg";
+import Number1CircleIcon from "@/assets/icons/band/number1-circle.svg";
+import Number2CircleIcon from "@/assets/icons/band/number2-circle.svg";
+import Number2CircleActiveIcon from "@/assets/icons/band/number2-circle-active.svg";
+import CheckCircleYellowIcon from "@/assets/icons/band/check-circle-yellow.svg";
 
 const GENRE_OPTIONS = [
   "록",

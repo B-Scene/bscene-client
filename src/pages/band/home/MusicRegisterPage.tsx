@@ -2,19 +2,21 @@ import { useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { Header } from "@/components/band/home/Header";
 import { Input } from "@/components/common/Input/Input";
-import TrashIcon from "@/assets/icons/delete.svg";
+import TrashIcon from "@/assets/icons/band/delete.svg";
 
 const STORE_PLATFORMS = ["Melon", "genie", "Bugs", "Apple Music"];
 
 interface FieldProps {
   label: string;
+  error?: ReactNode;
   children: ReactNode;
 }
 
-const Field = ({ label, children }: FieldProps) => (
+const Field = ({ label, error, children }: FieldProps) => (
   <div className="flex flex-col gap-2">
     <label className="text-body1 text-neutral-900">{label}</label>
     {children}
+    {error ? <span className="text-body5 text-error">{error}</span> : null}
   </div>
 );
 
@@ -29,6 +31,8 @@ const MusicRegisterPage = () => {
   const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
   const [platformLinks, setPlatformLinks] = useState<string[]>([""]);
 
+  const [showErrors, setShowErrors] = useState(false);
+
   const isValid = Boolean(
     spotifyUrl.trim() ||
     youtubeUrl.trim() ||
@@ -36,6 +40,8 @@ const MusicRegisterPage = () => {
     otherUrl.trim() ||
     (selectedPlatform && platformLinks.some((link) => link.trim())),
   );
+
+  const linksError = showErrors && !isValid;
 
   const handleSelectPlatform = (platform: string) => {
     setSelectedPlatform((prev) => (prev === platform ? null : platform));
@@ -58,7 +64,10 @@ const MusicRegisterPage = () => {
   };
 
   const handleSubmit = () => {
-    if (!isValid) return;
+    if (!isValid) {
+      setShowErrors(true);
+      return;
+    }
     navigate("/band/home");
   };
 
@@ -66,7 +75,7 @@ const MusicRegisterPage = () => {
     <main className="relative min-h-dvh bg-neutral-0 pb-40">
       <Header title="음원 등록" />
 
-      <section className="flex flex-col gap-6 px-5 pt-6">
+      <section className="flex flex-col gap-6 px-8 pt-6">
         <p className="text-caption3 text-neutral-600">
           팬들이 음악을 들을 수 있도록 음원 플랫폼 링크를 등록해 주세요
         </p>
@@ -77,6 +86,7 @@ const MusicRegisterPage = () => {
               value={spotifyUrl}
               onChange={(event) => setSpotifyUrl(event.target.value)}
               placeholder="open.spotify.com/artist/..."
+              error={linksError}
               className="w-full rounded-[5px] px-4 py-1.25"
             />
           </Field>
@@ -86,6 +96,7 @@ const MusicRegisterPage = () => {
               value={youtubeUrl}
               onChange={(event) => setYoutubeUrl(event.target.value)}
               placeholder="youtube.com/@..."
+              error={linksError}
               className="w-full rounded-[5px] px-4 py-1.25"
             />
           </Field>
@@ -95,6 +106,7 @@ const MusicRegisterPage = () => {
               value={soundcloudUrl}
               onChange={(event) => setSoundcloudUrl(event.target.value)}
               placeholder="soundcloud.com/..."
+              error={linksError}
               className="w-full rounded-[5px] px-4 py-1.25"
             />
           </Field>
@@ -128,6 +140,7 @@ const MusicRegisterPage = () => {
                           handlePlatformLinkChange(index, event.target.value)
                         }
                         placeholder="예매 링크 또는 관련 게시글 링크를 첨부해주세요"
+                        error={linksError}
                         className="w-full rounded-[5px] px-4 py-1.25"
                       />
                       <button
@@ -153,11 +166,15 @@ const MusicRegisterPage = () => {
             </div>
           </Field>
 
-          <Field label="기타 링크">
+          <Field
+            label="기타 링크"
+            error={linksError ? "최소 하나의 음원 링크를 입력해주세요" : null}
+          >
             <Input
               value={otherUrl}
               onChange={(event) => setOtherUrl(event.target.value)}
               placeholder="기타 음원 플랫폼 링크"
+              error={linksError}
               className="w-full rounded-[5px] px-4 py-1.25"
             />
           </Field>
