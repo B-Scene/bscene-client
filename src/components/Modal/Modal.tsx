@@ -1,5 +1,5 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
-import Button from "../common/Button/Button";
+import Button from "@/components/common/Button/Button";
 
 type ModalTone = "pink" | "orange";
 
