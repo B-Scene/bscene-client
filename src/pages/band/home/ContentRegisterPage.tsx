@@ -93,10 +93,13 @@ const ContentRegisterPage = () => {
 
     if (isVideo) {
       const file = files[0];
-      setVideo({
-        name: file.name,
-        size: formatFileSize(file.size),
-        url: URL.createObjectURL(file),
+      setVideo((prev) => {
+        if (prev) URL.revokeObjectURL(prev.url);
+        return {
+          name: file.name,
+          size: formatFileSize(file.size),
+          url: URL.createObjectURL(file),
+        };
       });
       setContentType("영상");
     } else {
@@ -114,7 +117,11 @@ const ContentRegisterPage = () => {
   };
 
   const handleRemoveImage = (id: string) => {
-    setImages((prev) => prev.filter((image) => image.id !== id));
+    setImages((prev) => {
+      const target = prev.find((image) => image.id === id);
+      if (target) URL.revokeObjectURL(target.url);
+      return prev.filter((image) => image.id !== id);
+    });
   };
 
   const handleRemoveVideo = () => {
