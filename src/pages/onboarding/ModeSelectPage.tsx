@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ArrowLeftIcon from "@/assets/icons/arrow-left.svg";
 import Button from "@/components/common/Button/Button";
+import type { ModeCode } from "@/types/onboarding/onboarding";
 
 type Mode = "fan" | "band" | "both";
 
@@ -27,6 +28,17 @@ const MODE_OPTIONS: {
   },
 ];
 
+const getSelectedModes = (mode: Mode): ModeCode[] => {
+  if (mode === "fan") return ["FAN"];
+  if (mode === "band") return ["BAND"];
+  return ["FAN", "BAND"];
+};
+
+const getInitialMode = (mode: Mode): ModeCode => {
+  if (mode === "band") return "BAND";
+  return "FAN";
+};
+
 const ModeSelectPage = () => {
   const navigate = useNavigate();
   const [selectedMode, setSelectedMode] = useState<Mode | null>("fan");
@@ -36,15 +48,11 @@ const ModeSelectPage = () => {
   const handleNext = () => {
     if (!selectedMode) return;
 
-    if (selectedMode === "fan") {
-      navigate("/onboarding/fan-nickname");
-      return;
-    }
-
-    if (selectedMode === "band") {
-      navigate("/onboarding/fan-nickname");
-      return;
-    }
+    sessionStorage.setItem(
+      "onboardingSelectedModes",
+      JSON.stringify(getSelectedModes(selectedMode)),
+    );
+    sessionStorage.setItem("onboardingInitialMode", getInitialMode(selectedMode));
 
     navigate("/onboarding/fan-nickname");
   };
@@ -116,7 +124,7 @@ const ModeSelectPage = () => {
           disabled={!isNextEnabled}
           tone={isNextEnabled ? "pink" : "gray"}
           className="w-full"
-          onClick={() => navigate("/onboarding/fan-nickname")}
+          onClick={handleNext}
         >
           다음
         </Button>

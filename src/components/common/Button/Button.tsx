@@ -9,7 +9,7 @@ type ButtonSize =
   | 'chipSmall'
   | 'chipRectangle'
 type ButtonVariant = 'solid' | 'outline' | 'soft'
-type ButtonTone = 'pink' | 'orange' | 'gray'
+type ButtonTone = 'pink' | 'orange' | 'gray' 
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   children: ReactNode
