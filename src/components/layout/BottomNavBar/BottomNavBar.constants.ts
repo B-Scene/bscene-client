@@ -16,20 +16,29 @@ type NavIcon = FunctionComponent<SVGProps<SVGSVGElement>>;
 export interface BottomNavTab {
   id: string;
   label: string;
+  path: string;
   Icon: NavIcon;
   ActiveIcon: NavIcon;
+  activePrefixes?: string[];
 }
 
 export const FAN_NAV_TABS: BottomNavTab[] = [
-  { id: 'home', label: '홈', Icon: HomeIcon, ActiveIcon: HomeActiveIcon },
-  { id: 'explore', label: '탐색', Icon: ExploreIcon, ActiveIcon: ExploreActiveIcon },
-  { id: 'live', label: '라이브', Icon: LiveIcon, ActiveIcon: LiveIcon },
-  { id: 'my', label: '마이', Icon: MyIcon, ActiveIcon: MyActiveIcon },
+  { id: 'home', label: '홈', path: '/fan/home', Icon: HomeIcon, ActiveIcon: HomeActiveIcon },
+  { id: 'explore', label: '탐색', path: '/fan/explore', Icon: ExploreIcon, ActiveIcon: ExploreActiveIcon },
+  { id: 'live', label: '라이브', path: '/fan/live', Icon: LiveIcon, ActiveIcon: LiveIcon },
+  { id: 'my', label: '마이', path: '/fan/my', Icon: MyIcon, ActiveIcon: MyActiveIcon },
 ];
 
 export const BAND_NAV_TABS: BottomNavTab[] = [
-  { id: 'band', label: '내 밴드', Icon: BandIcon, ActiveIcon: BandActiveIcon },
-  { id: 'session', label: '세션', Icon: SessionIcon, ActiveIcon: SessionActiveIcon },
-  { id: 'live', label: '라이브', Icon: LiveIcon, ActiveIcon: LiveIcon },
-  { id: 'my', label: '마이', Icon: MyIcon, ActiveIcon: MyActiveIcon },
+  {
+    id: 'band',
+    label: '내 밴드',
+    path: '/band/home',
+    Icon: BandIcon,
+    ActiveIcon: BandActiveIcon,
+    activePrefixes: ['/band/home', '/band/profile', '/band/concerts', '/band/videos', '/band/music', '/band/register'],
+  },
+  { id: 'session', label: '세션', path: '/band/session', Icon: SessionIcon, ActiveIcon: SessionActiveIcon },
+  { id: 'live', label: '라이브', path: '/band/live', Icon: LiveIcon, ActiveIcon: LiveIcon },
+  { id: 'my', label: '마이', path: '/band/my', Icon: MyIcon, ActiveIcon: MyActiveIcon },
 ];

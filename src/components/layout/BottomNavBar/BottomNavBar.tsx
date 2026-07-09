@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useModeStore } from "@/stores/useModeStore";
 import { BAND_NAV_TABS, FAN_NAV_TABS } from "./BottomNavBar.constants";
 
@@ -8,33 +8,36 @@ const ACTIVE_COLOR_CLASS = {
 } as const;
 
 export const BottomNavBar = () => {
-  const mode = useModeStore((state) => state.mode);
-  const tabs = mode === "fan" ? FAN_NAV_TABS : BAND_NAV_TABS;
-  const [activeTabId, setActiveTabId] = useState(tabs[0].id);
-  const [prevMode, setPrevMode] = useState(mode);
+  const storeMode = useModeStore((state) => state.mode);
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  if (mode !== prevMode) {
-    setPrevMode(mode);
-    setActiveTabId(tabs[0].id);
-  }
+  const mode = location.pathname.startsWith("/band")
+    ? "band"
+    : location.pathname.startsWith("/fan")
+      ? "fan"
+      : storeMode;
+  const tabs = mode === "fan" ? FAN_NAV_TABS : BAND_NAV_TABS;
 
   return (
-    <nav className="absolute inset-x-0 bottom-0 flex h-(--bottom-nav-height) border-t border-neutral-200 bg-neutral-0 py-4">
+    <nav className="absolute inset-x-0 bottom-0 flex h-(--bottom-nav-height) items-center justify-between bg-neutral-0 px-7.5 py-4 shadow-[0_-5px_20px_0_rgba(0,0,0,0.03)]">
       {tabs.map((tab) => {
-        const isActive = tab.id === activeTabId;
+        const isActive = (tab.activePrefixes ?? [tab.path]).some((prefix) =>
+          location.pathname.startsWith(prefix),
+        );
         const Icon = isActive ? tab.ActiveIcon : tab.Icon;
 
         return (
           <button
             key={tab.id}
             type="button"
-            onClick={() => setActiveTabId(tab.id)}
-            className={`flex-1 text-center ${
+            onClick={() => navigate(tab.path)}
+            className={`flex flex-col items-center gap-2 ${
               isActive ? ACTIVE_COLOR_CLASS[mode] : "text-neutral-900"
             }`}
           >
-            <Icon className="mx-auto h-6 w-6" aria-hidden="true" />
-            <span className="mt-2 block text-caption2">{tab.label}</span>
+            <Icon className="h-6 w-6" aria-hidden="true" />
+            <span className="text-caption2">{tab.label}</span>
           </button>
         );
       })}

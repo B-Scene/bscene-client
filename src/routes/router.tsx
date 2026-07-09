@@ -1,18 +1,28 @@
 import { createBrowserRouter, Outlet } from "react-router-dom";
 import { MobileLayout } from "@/components/layout/MobileLayout";
-import Splash from "../pages/auth/Splash";
-import Login from "../pages/auth/LoginPage";
-import AgreementPage from "../pages/onboarding/AgreementPage";
-import SignupPage from "../pages/onboarding/SignupPage";
-import ModeSelecPage from "../pages/onboarding/ModeSelectPage";
-import FanNicknamePage from "../pages/onboarding/FanNicknamePage";
-import GenreSelectPage from "../pages/onboarding/GenreSelectPage";
-import RegionSelectPage from "../pages/onboarding/RegionSelectPage";
-import OnboardingCompletePage from "../pages/onboarding/OnboardingCompletePage";
+import Splash from "@/pages/auth/Splash";
+import Login from "@/pages/auth/LoginPage";
+import AgreementPage from "@/pages/onboarding/AgreementPage";
+import SignupPage from "@/pages/onboarding/SignupPage";
+import ModeSelecPage from "@/pages/onboarding/ModeSelectPage";
+import FanNicknamePage from "@/pages/onboarding/FanNicknamePage";
+import GenreSelectPage from "@/pages/onboarding/GenreSelectPage";
+import RegionSelectPage from "@/pages/onboarding/RegionSelectPage";
+import OnboardingCompletePage from "@/pages/onboarding/OnboardingCompletePage";
 import OAuthCallbackPage from "@/pages/auth/OAuthCallbackPage";
 import HomePage from "@/pages/band/home/HomePage";
+<<<<<<< HEAD
 import { BandLivePage } from "@/pages/band/live";
 
+=======
+import BandHomePage from "@/pages/band/home/BandHomePage";
+import EditProfilePage from "@/pages/band/home/EditProfilePage";
+import InviteMemberPage from "@/pages/band/home/InviteMemberPage";
+import ConcertRegisterPage from "@/pages/band/home/ConcertRegisterPage";
+import CompletePage from "@/pages/band/home/CompletePage";
+import MusicRegisterPage from "@/pages/band/home/MusicRegisterPage";
+import ContentRegisterPage from "@/pages/band/home/ContentRegisterPage";
+>>>>>>> develop
 
 export const router = createBrowserRouter([
   {
@@ -78,6 +88,44 @@ export const router = createBrowserRouter([
       {
         path: "/band/live",
         element: <BandLivePage />,
+      },
+    ],
+  },
+  {
+    element: (
+      <MobileLayout showBottomNav={true}>
+        <Outlet />
+      </MobileLayout>
+    ),
+    children: [
+      //band
+      {
+        path: "/band/home",
+        element: <BandHomePage />,
+      },
+      {
+        path: "/band/profile/edit",
+        element: <EditProfilePage />,
+      },
+      {
+        path: "/band/profile/invite",
+        element: <InviteMemberPage />,
+      },
+      {
+        path: "/band/concerts/new",
+        element: <ConcertRegisterPage />,
+      },
+      {
+        path: "/band/register/complete",
+        element: <CompletePage />,
+      },
+      {
+        path: "/band/music/new",
+        element: <MusicRegisterPage />,
+      },
+      {
+        path: "/band/videos/new",
+        element: <ContentRegisterPage />,
       },
     ],
   },
