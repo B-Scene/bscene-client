@@ -102,20 +102,27 @@ function TopBar({
   right,
   onBack,
   onClose,
+  align = "center",
 }: {
   title: string;
   right?: "notification";
   onBack?: () => void;
   onClose?: () => void;
+  align?: "left" | "center";
 }) {
   return (
-    <header className="relative flex h-16 items-center justify-center px-5">
+    <header
+      className={cx(
+        "relative flex h-16 items-center",
+        align === "center" ? "justify-center px-5" : "justify-start px-9",
+      )}
+    >
       {onBack ? (
         <button
           type="button"
           aria-label="뒤로가기"
           onClick={onBack}
-          className="absolute left-5 flex size-8 items-center justify-center"
+          className="absolute right-9 flex size-8 items-center justify-center"
         >
           <img src={ArrowLeftIcon} alt="" className="size-6" />
         </button>
@@ -257,7 +264,7 @@ function ScheduledLiveCard({ onEdit }: { onEdit: () => void }) {
 function BandLiveHome({ go }: { go: (screen: BandLiveScreen) => void }) {
   return (
     <main className="relative min-h-dvh bg-neutral-0 pb-[calc(var(--bottom-nav-height)+24px)] text-neutral-900">
-      <TopBar title="라이브" right="notification" />
+      <TopBar title="라이브" right="notification" align="left" />
       <div className="px-5">
         <section className="mt-6 flex h-[164px] w-full items-center justify-between rounded-xl bg-secondary-0 px-[18px] shadow-[0_4px_15px_rgba(20,20,20,0.10)]">
           <div className="min-w-0">
