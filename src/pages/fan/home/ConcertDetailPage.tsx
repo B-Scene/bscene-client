@@ -20,6 +20,28 @@ const SUMMARY_INFO = CONCERT_INFO.slice(0, 3);
 const TABS = ["공연정보", "공연소개", "캐스팅"] as const;
 
 type ConcertDetailTab = (typeof TABS)[number];
+type KakaoSharePayload = {
+  objectType: "text";
+  text: string;
+  link: {
+    mobileWebUrl: string;
+    webUrl: string;
+  };
+  buttonTitle: string;
+};
+
+type KakaoShareApi = {
+  sendDefault: (payload: KakaoSharePayload) => void;
+};
+
+declare global {
+  interface Window {
+    Kakao?: {
+      Share?: KakaoShareApi;
+      Link?: KakaoShareApi;
+    };
+  }
+}
 
 const ImagePlaceholderIcon = () => (
   <svg
@@ -175,27 +197,29 @@ const ConcertDetailPage = () => {
   const [selectedTab, setSelectedTab] =
     useState<ConcertDetailTab>("공연정보");
   const [isLiked, setIsLiked] = useState(true);
-  const [showUnlikeToast, setShowUnlikeToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isShareSheetOpen, setIsShareSheetOpen] = useState(false);
   const [isNotificationModalOpen, setIsNotificationModalOpen] =
     useState(false);
   const [isNotificationEnabled, setIsNotificationEnabled] = useState(false);
 
   useEffect(() => {
-    if (!showUnlikeToast) return;
+    if (!toastMessage) return;
 
     const timerId = window.setTimeout(() => {
-      setShowUnlikeToast(false);
+      setToastMessage(null);
     }, 2500);
 
     return () => window.clearTimeout(timerId);
-  }, [showUnlikeToast]);
+  }, [toastMessage]);
 
   const handleLikeClick = () => {
     const nextLiked = !isLiked;
 
     setIsLiked(nextLiked);
-    setShowUnlikeToast(!nextLiked);
+    if (!nextLiked) {
+      setToastMessage("관심 공연을 해제했어요");
+    }
   };
 
   const handleTabClick = (tab: ConcertDetailTab) => {
@@ -221,6 +245,62 @@ const ConcertDetailPage = () => {
 
     setIsNotificationEnabled(true);
     setIsNotificationModalOpen(true);
+  };
+
+  const getConcertLink = () => window.location.href;
+
+  const handleKakaoShareClick = () => {
+    const concertLink = getConcertLink();
+    const kakaoShareApi = window.Kakao?.Share ?? window.Kakao?.Link;
+
+    if (kakaoShareApi) {
+      try {
+        kakaoShareApi.sendDefault({
+          objectType: "text",
+          text: "WAVY 단독 공연",
+          link: {
+            mobileWebUrl: concertLink,
+            webUrl: concertLink,
+          },
+          buttonTitle: "공연 보러가기",
+        });
+        setIsShareSheetOpen(false);
+        setToastMessage("카카오톡 공유 화면을 열었어요");
+      } catch {
+        setToastMessage("카카오톡 공유를 시작하지 못했어요");
+      }
+
+      return;
+    }
+
+    const shareUrl = `https://sharer.kakao.com/talk/friends/picker/link?url=${encodeURIComponent(
+      concertLink,
+    )}&text=${encodeURIComponent("WAVY 단독 공연")}`;
+    const shareWindow = window.open(shareUrl, "_blank");
+
+    if (!shareWindow) {
+      setToastMessage("카카오톡 공유를 시작하지 못했어요");
+      return;
+    }
+
+    shareWindow.opener = null;
+    setIsShareSheetOpen(false);
+    setToastMessage("카카오톡 공유 화면을 열었어요");
+  };
+
+  const handleCopyLinkClick = async () => {
+    if (!window.isSecureContext || !navigator.clipboard) {
+      setToastMessage("보안 연결에서만 링크를 복사할 수 있어요");
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(getConcertLink());
+      setIsShareSheetOpen(false);
+      setToastMessage("링크를 복사했어요");
+    } catch {
+      setToastMessage("링크 복사에 실패했어요");
+    }
   };
 
   return (
@@ -389,7 +469,7 @@ const ConcertDetailPage = () => {
         </article>
       </section>
 
-      {showUnlikeToast ? (
+      {toastMessage ? (
         <div
           role="status"
           aria-live="polite"
@@ -417,12 +497,12 @@ const ConcertDetailPage = () => {
               </svg>
             </span>
             <p className="m-0 flex-1 font-body text-body1 leading-5 text-neutral-0">
-              관심 공연을 해제했어요
+              {toastMessage}
             </p>
             <button
               type="button"
               aria-label="토스트 닫기"
-              onClick={() => setShowUnlikeToast(false)}
+              onClick={() => setToastMessage(null)}
               className="flex size-5 shrink-0 items-center justify-center"
             >
               <img
@@ -456,6 +536,7 @@ const ConcertDetailPage = () => {
             <div className="mt-6 flex flex-col gap-6">
               <button
                 type="button"
+                onClick={handleKakaoShareClick}
                 className="flex items-center gap-6 text-left font-body text-body1 text-neutral-900"
               >
                 <KakaoTalkIcon />
@@ -463,6 +544,7 @@ const ConcertDetailPage = () => {
               </button>
               <button
                 type="button"
+                onClick={handleCopyLinkClick}
                 className="flex items-center gap-6 text-left font-body text-body1 text-neutral-900"
               >
                 <LinkCopyIcon />

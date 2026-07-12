@@ -7,6 +7,7 @@ const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 
 type CalendarDay = {
   date: Date;
+  dateKey: string;
   label: string;
   muted: boolean;
   sunday: boolean;
@@ -14,37 +15,159 @@ type CalendarDay = {
   hasEvent: boolean;
 };
 
-const EVENT_DAYS_BY_MONTH: Record<string, number[]> = {
-  "2026-05": [2, 11, 17, 24],
-  "2026-06": [3, 14, 19, 26],
-  "2026-07": [5, 17, 22, 29],
+type CalendarPerformance = {
+  id: string;
+  title: string;
+  location: string;
+  dateTime: string;
+  status: string;
 };
 
-const getMonthKey = (date: Date) =>
-  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+const PERFORMANCES_BY_DATE: Record<string, CalendarPerformance[]> = {
+  "2026-05-02": [
+    {
+      id: "calendar-20260502-1",
+      title: "WAVY 단독 공연",
+      location: "홍대 롤링홀",
+      dateTime: "2026.05.02. 18:00",
+      status: "D-22",
+    },
+  ],
+  "2026-05-11": [
+    {
+      id: "calendar-20260511-1",
+      title: "WAVY 단독 공연",
+      location: "홍대 롤링홀",
+      dateTime: "2026.05.11. 18:00",
+      status: "D-13",
+    },
+  ],
+  "2026-05-17": Array.from({ length: 4 }, (_, index) => ({
+    id: `calendar-20260517-${index + 1}`,
+    title: "WAVY 단독 공연",
+    location: "홍대 롤링홀",
+    dateTime: "2026.05.17. 18:00",
+    status: "D-7",
+  })),
+  "2026-05-24": [
+    {
+      id: "calendar-20260524-1",
+      title: "WAVY 단독 공연",
+      location: "홍대 롤링홀",
+      dateTime: "2026.05.24. 18:00",
+      status: "D-DAY",
+    },
+  ],
+  "2026-06-03": [
+    {
+      id: "calendar-20260603-1",
+      title: "WAVY 단독 공연",
+      location: "홍대 롤링홀",
+      dateTime: "2026.06.03. 18:00",
+      status: "D-7",
+    },
+  ],
+  "2026-06-14": [
+    {
+      id: "calendar-20260614-1",
+      title: "WAVY 단독 공연",
+      location: "홍대 롤링홀",
+      dateTime: "2026.06.14. 18:00",
+      status: "D-7",
+    },
+  ],
+  "2026-06-19": [
+    {
+      id: "calendar-20260619-1",
+      title: "WAVY 단독 공연",
+      location: "홍대 롤링홀",
+      dateTime: "2026.06.19. 18:00",
+      status: "D-7",
+    },
+  ],
+  "2026-06-26": [
+    {
+      id: "calendar-20260626-1",
+      title: "WAVY 단독 공연",
+      location: "홍대 롤링홀",
+      dateTime: "2026.06.26. 18:00",
+      status: "D-7",
+    },
+  ],
+  "2026-07-05": [
+    {
+      id: "calendar-20260705-1",
+      title: "WAVY 단독 공연",
+      location: "홍대 롤링홀",
+      dateTime: "2026.07.05. 18:00",
+      status: "D-7",
+    },
+  ],
+  "2026-07-17": [
+    {
+      id: "calendar-20260717-1",
+      title: "WAVY 단독 공연",
+      location: "홍대 롤링홀",
+      dateTime: "2026.07.17. 18:00",
+      status: "D-7",
+    },
+  ],
+  "2026-07-22": [
+    {
+      id: "calendar-20260722-1",
+      title: "WAVY 단독 공연",
+      location: "홍대 롤링홀",
+      dateTime: "2026.07.22. 18:00",
+      status: "D-7",
+    },
+  ],
+  "2026-07-29": [
+    {
+      id: "calendar-20260729-1",
+      title: "WAVY 단독 공연",
+      location: "홍대 롤링홀",
+      dateTime: "2026.07.29. 18:00",
+      status: "D-7",
+    },
+  ],
+};
 
-const getCalendarDays = (displayedMonth: Date): CalendarDay[] => {
+const formatDateKey = (date: Date) =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
+    date.getDate(),
+  ).padStart(2, "0")}`;
+
+const parseDateKey = (dateKey: string) => {
+  const [year, month, day] = dateKey.split("-").map(Number);
+
+  return new Date(year, month - 1, day);
+};
+
+const getCalendarDays = (
+  displayedMonth: Date,
+  selectedDateKey: string | null,
+): CalendarDay[] => {
   const year = displayedMonth.getFullYear();
   const month = displayedMonth.getMonth();
   const firstDate = new Date(year, month, 1);
   const lastDate = new Date(year, month + 1, 0);
   const startOffset = firstDate.getDay();
   const cellCount = Math.ceil((startOffset + lastDate.getDate()) / 7) * 7;
-  const eventDays = EVENT_DAYS_BY_MONTH[getMonthKey(displayedMonth)] ?? [
-    3, 14, 19, 26,
-  ];
 
   return Array.from({ length: cellCount }, (_, index) => {
     const date = new Date(year, month, index - startOffset + 1);
+    const dateKey = formatDateKey(date);
     const muted = date.getMonth() !== month;
+    const hasEvent = (PERFORMANCES_BY_DATE[dateKey]?.length ?? 0) > 0;
 
     return {
       date,
+      dateKey,
       label: String(date.getDate()),
       muted,
       sunday: !muted && date.getDay() === 0,
-      selected: !muted && date.getDate() === 11,
-      hasEvent: !muted && eventDays.includes(date.getDate()),
+      selected: !muted && dateKey === selectedDateKey,
+      hasEvent: !muted && hasEvent,
     };
   });
 };
@@ -69,14 +192,17 @@ const ChevronIcon = ({ direction }: { direction: "left" | "right" }) => (
 
 const ConcertCalendarPage = () => {
   const navigate = useNavigate();
-  const [selectedEventDate, setSelectedEventDate] = useState<Date | null>(null);
+  const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null);
   const [displayedMonth, setDisplayedMonth] = useState(
     () => new Date(2026, 5, 1),
   );
   const calendarDays = useMemo(
-    () => getCalendarDays(displayedMonth),
-    [displayedMonth],
+    () => getCalendarDays(displayedMonth, selectedDateKey),
+    [displayedMonth, selectedDateKey],
   );
+  const selectedEvents = selectedDateKey
+    ? (PERFORMANCES_BY_DATE[selectedDateKey] ?? [])
+    : [];
   const monthLabel = `${displayedMonth.getFullYear()}.${String(
     displayedMonth.getMonth() + 1,
   ).padStart(2, "0")}`;
@@ -85,11 +211,12 @@ const ConcertCalendarPage = () => {
     setDisplayedMonth(
       (current) => new Date(current.getFullYear(), current.getMonth() + amount, 1),
     );
-    setSelectedEventDate(null);
+    setSelectedDateKey(null);
   };
 
-  const selectedDateLabel = selectedEventDate
-    ? `${selectedEventDate.getMonth() + 1}월 ${selectedEventDate.getDate()}일 (${WEEKDAYS[selectedEventDate.getDay()]})`
+  const selectedDate = selectedDateKey ? parseDateKey(selectedDateKey) : null;
+  const selectedDateLabel = selectedDate
+    ? `${selectedDate.getMonth() + 1}월 ${selectedDate.getDate()}일 (${WEEKDAYS[selectedDate.getDay()]})`
     : "";
 
   return (
@@ -156,7 +283,7 @@ const ConcertCalendarPage = () => {
               <button
                 type="button"
                 disabled={day.muted || !day.hasEvent}
-                onClick={() => setSelectedEventDate(day.date)}
+                onClick={() => setSelectedDateKey(day.dateKey)}
                 className={`relative flex size-7 items-center justify-center rounded-full font-body text-caption3 ${
                   day.selected ? "bg-neutral-300" : ""
                 } ${
@@ -177,7 +304,7 @@ const ConcertCalendarPage = () => {
         </div>
       </section>
 
-      {selectedEventDate ? (
+      {selectedDateKey ? (
         <section className="fixed inset-x-0 bottom-0 z-30 h-[488px] rounded-t-[24px] bg-neutral-0 px-[22.5px] pt-3 shadow-[0_-5px_10px_0_rgba(0,0,0,0.10)]">
           <div className="mx-auto h-1 w-11 rounded-full bg-neutral-300" />
 
@@ -186,23 +313,21 @@ const ConcertCalendarPage = () => {
               {selectedDateLabel}
             </h2>
             <span className="font-body text-caption3 text-neutral-600">
-              총 4개
+              총 {selectedEvents.length}개
             </span>
           </header>
 
           <div className="mt-4 flex flex-col gap-3">
-            {Array.from({ length: 4 }).map((_, index) => (
+            {selectedEvents.map((event) => (
               <ConcertCard
-                key={index}
-                title="WAVY 단독 공연"
-                location="홍대 롤링홀"
-                dateTime="2026.05.17. 18:00"
-                status={<span className="text-primary-500">D-7</span>}
+                key={event.id}
+                title={event.title}
+                location={event.location}
+                dateTime={event.dateTime}
+                status={<span className="text-primary-500">{event.status}</span>}
                 showThumbnail
-                onClick={() =>
-                  navigate(`/fan/home/concerts/calendar-${index + 1}`)
-                }
-                ariaLabel="WAVY 단독 공연 상세보기"
+                onClick={() => navigate(`/fan/home/concerts/${event.id}`)}
+                ariaLabel={`${event.title} 상세보기`}
               />
             ))}
           </div>

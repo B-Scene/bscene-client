@@ -233,6 +233,7 @@ const BandHomePage = () => {
                     location={concert.location}
                     dateTime={concert.dateTime}
                     status={concert.status}
+                    isPending={concert.status === "준비중"}
                     actions={
                       <>
                         <button

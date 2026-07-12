@@ -17,6 +17,7 @@ type ConcertCardProps = {
   ariaLabel?: string;
   actions?: ReactNode;
   dateBadgeClassName?: string;
+  isPending?: boolean;
   thumbnailSrc?: string;
   thumbnailAlt?: string;
   showThumbnail?: boolean;
@@ -64,12 +65,11 @@ const ConcertCard = ({
   ariaLabel,
   actions,
   dateBadgeClassName = "bg-secondary-300",
+  isPending = false,
   thumbnailSrc,
   thumbnailAlt = "",
   showThumbnail = false,
 }: ConcertCardProps) => {
-  const isPending = status === "준비중";
-
   const dateBadgeColorClassName = isPending
     ? "bg-neutral-300"
     : dateBadgeClassName;
@@ -90,7 +90,7 @@ const ConcertCard = ({
   return (
     <article
       aria-label={ariaLabel}
-      className={`box-border flex h-[86px] w-[348px] items-center gap-16 rounded-xl bg-neutral-0 px-4 py-3 text-left shadow-[0_0_8px_0_rgba(0,0,0,0.10)]${
+      className={`box-border flex h-[86px] w-full max-w-[348px] items-center gap-16 rounded-xl bg-neutral-0 px-4 py-3 text-left shadow-[0_0_8px_0_rgba(0,0,0,0.10)]${
         onClick ? " cursor-pointer" : ""
       }`}
       onClick={onClick}

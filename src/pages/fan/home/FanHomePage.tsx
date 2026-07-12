@@ -114,7 +114,7 @@ const SectionHeader = ({
         ) : null}
       </div>
 
-      {showMore ? (
+      {showMore && onMoreClick ? (
         <button
           type="button"
           onClick={onMoreClick}
@@ -265,6 +265,7 @@ const ConcertList = ({ count = 4 }: { count?: number }) => {
           dateTime={concert.dateTime}
           status={<span className="text-primary-500">{concert.status}</span>}
           dateBadgeClassName="bg-primary-300"
+          isPending={concert.status === "준비중"}
           onClick={() => navigate(`/fan/home/concerts/${concert.id}`)}
           ariaLabel={`${concert.title} 상세보기`}
         />

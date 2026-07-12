@@ -99,10 +99,10 @@ export const FollowedNewsCard = ({
       {variant === "gallery" ? (
         <div className="mt-4">
           <div className="grid grid-cols-2 gap-1">
-            <Placeholder className="h-[92px] w-[156px]">
+            <Placeholder className="h-[92px] w-full">
               <ImagePlaceholderIcon />
             </Placeholder>
-            <Placeholder className="h-[92px] w-[156px]">
+            <Placeholder className="h-[92px] w-full">
               <ImagePlaceholderIcon />
             </Placeholder>
           </div>

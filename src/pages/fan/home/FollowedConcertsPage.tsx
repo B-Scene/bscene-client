@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ArrowLeftIcon from "@/assets/icons/arrow-left.svg";
 import ConcertCard from "@/components/common/Card/ConcertCard";
@@ -11,6 +11,9 @@ const INTEREST_CONCERTS = Array.from({ length: 7 }, (_, index) => ({
   location: "홍대 롤링홀",
   dateTime: "2026.05.17. 18:00",
   status: "D-7",
+  startsAt: `2026-05-${String(17 + index).padStart(2, "0")}T18:00:00`,
+  createdAt: `2026-04-${String(20 + index).padStart(2, "0")}T12:00:00`,
+  popularity: [78, 124, 63, 205, 91, 147, 110][index],
   showThumbnail: index !== 1,
 }));
 
@@ -76,6 +79,19 @@ const FollowedConcertsPage = () => {
   const navigate = useNavigate();
   const [selectedSort, setSelectedSort] = useState<SortOption>("공연임박순");
   const [isSortSheetOpen, setIsSortSheetOpen] = useState(false);
+  const sortedConcerts = useMemo(() => {
+    return [...INTEREST_CONCERTS].sort((a, b) => {
+      if (selectedSort === "최신순") {
+        return b.createdAt.localeCompare(a.createdAt);
+      }
+
+      if (selectedSort === "인기순") {
+        return b.popularity - a.popularity;
+      }
+
+      return a.startsAt.localeCompare(b.startsAt);
+    });
+  }, [selectedSort]);
 
   return (
     <main className="min-h-dvh bg-neutral-0 px-[15px] pb-[calc(var(--bottom-nav-height)+24px)] pt-7">
@@ -119,7 +135,7 @@ const FollowedConcertsPage = () => {
       </div>
 
       <section className="mt-2 flex flex-col items-center gap-3">
-        {INTEREST_CONCERTS.map((concert) => (
+        {sortedConcerts.map((concert) => (
           <ConcertCard
             key={concert.id}
             month={concert.month}
@@ -129,6 +145,7 @@ const FollowedConcertsPage = () => {
             dateTime={concert.dateTime}
             status={<span className="text-primary-500">{concert.status}</span>}
             dateBadgeClassName="bg-primary-300"
+            isPending={concert.status === "준비중"}
             showThumbnail={concert.showThumbnail}
             onClick={() => navigate(`/fan/home/concerts/${concert.id}`)}
             ariaLabel={`${concert.title} 상세보기`}
