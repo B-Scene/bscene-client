@@ -64,7 +64,7 @@ const getVariant = (value: string | null): HomeVariant => {
   return "main";
 };
 
-const NotificationBellIcon = () => (
+const NotificationBellIcon = ({ hasUnread }: { hasUnread: boolean }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
     width="25"
@@ -88,7 +88,9 @@ const NotificationBellIcon = () => (
       strokeLinejoin="round"
     />
     <circle cx="12" cy="4" r="1" stroke="currentColor" strokeWidth="2" />
-    <circle cx="23" cy="2" r="2" fill="var(--color-primary-400)" />
+    {hasUnread ? (
+      <circle cx="23" cy="2" r="2" fill="var(--color-primary-400)" />
+    ) : null}
   </svg>
 );
 
@@ -278,6 +280,7 @@ const FanHomePage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const variant = getVariant(searchParams.get("variant"));
+  const hasNotifications = searchParams.get("notifications") !== "empty";
 
   const content = useMemo(() => {
     if (variant === "new") {
@@ -359,9 +362,16 @@ const FanHomePage = () => {
           <button
             type="button"
             aria-label="알림"
+            onClick={() =>
+              navigate(
+                `/fan/home/notifications?status=${
+                  hasNotifications ? "has" : "empty"
+                }`,
+              )
+            }
             className="flex size-6 items-center justify-center text-neutral-900"
           >
-            <NotificationBellIcon />
+            <NotificationBellIcon hasUnread={hasNotifications} />
           </button>
         }
       />
