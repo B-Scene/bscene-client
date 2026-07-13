@@ -12,10 +12,6 @@ interface ModeSwitchSheetProps {
   onClose: () => void;
 }
 
-const MOCK_OTHER_BANDS = [
-  { id: "band-2", name: "밴드명", subtitle: "인디록 · 서울" },
-];
-
 const MOCK_FAN_ACCOUNTS = [
   { id: "fan-1", nickname: "닉네임", email: "bethescene12@gmail.com" },
 ];
@@ -65,9 +61,13 @@ const AccountRow = ({
 
 export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
   const navigate = useNavigate();
-  const profile = useBandProfileStore((state) => state.profile);
-  const [selectedId, setSelectedId] = useState("band-1");
+  const bands = useBandProfileStore((state) => state.bands);
+  const activeBandId = useBandProfileStore((state) => state.activeBandId);
+  const setActiveBandId = useBandProfileStore((state) => state.setActiveBandId);
+  const [selectedId, setSelectedId] = useState(activeBandId);
   const { rendered, isVisible, handleTransitionEnd } = useSlideUpSheet(open);
+
+  const registeredBands = bands.filter((band) => band.name.trim());
 
   if (!rendered) return null;
 
@@ -100,22 +100,17 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
               <span className="text-label2 text-secondary-500">밴드 모드</span>
 
               <div className="flex w-full flex-col gap-3">
-                <AccountRow
-                  avatar={profile.avatarUrl || BandAvatar}
-                  name={profile.name}
-                  subtitle={`${profile.genre} · ${profile.regions.join(", ")}`}
-                  selected={selectedId === "band-1"}
-                  onSelect={() => setSelectedId("band-1")}
-                />
-
-                {MOCK_OTHER_BANDS.map((band) => (
+                {registeredBands.map((band) => (
                   <AccountRow
                     key={band.id}
-                    avatar={BandAvatar}
+                    avatar={band.avatarUrl || BandAvatar}
                     name={band.name}
-                    subtitle={band.subtitle}
+                    subtitle={`${band.genre} · ${band.regions.join(", ")}`}
                     selected={selectedId === band.id}
-                    onSelect={() => setSelectedId(band.id)}
+                    onSelect={() => {
+                      setSelectedId(band.id);
+                      setActiveBandId(band.id);
+                    }}
                   />
                 ))}
               </div>

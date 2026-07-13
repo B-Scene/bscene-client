@@ -45,6 +45,7 @@ const ProfileFormPage = ({ mode }: ProfileFormPageProps) => {
   const navigate = useNavigate();
   const profile = useBandProfileStore((state) => state.profile);
   const setProfile = useBandProfileStore((state) => state.setProfile);
+  const addBand = useBandProfileStore((state) => state.addBand);
 
   const galleryInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -84,7 +85,14 @@ const ProfileFormPage = ({ mode }: ProfileFormPageProps) => {
 
   const handleSubmit = () => {
     if (!isValid) return;
-    setProfile({ name, genre, regions: [region], bio, avatarUrl });
+    const profileData = { name, genre, regions: [region], bio, avatarUrl };
+
+    if (isEditMode) {
+      setProfile(profileData);
+    } else {
+      addBand(profileData);
+    }
+
     navigate("/band/home");
   };
 
