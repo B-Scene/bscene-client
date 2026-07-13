@@ -33,7 +33,7 @@ export function LiveRoom({
       {overlay === "endConfirm" ? (
         <ConfirmDialog
           title="라이브를 종료할까요?"
-          description="라이브를 종료하면 청취자들이\n자동으로 퇴장해요"
+          description="라이브를 종료하면 청취자들이 자동으로 퇴장해요"
           cancelLabel="취소"
           confirmLabel="종료"
           onCancel={() => go("room")}
