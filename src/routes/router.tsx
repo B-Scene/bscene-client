@@ -11,8 +11,7 @@ import RegionSelectPage from "@/pages/onboarding/RegionSelectPage";
 import OnboardingCompletePage from "@/pages/onboarding/OnboardingCompletePage";
 import OAuthCallbackPage from "@/pages/auth/OAuthCallbackPage";
 import BandHomePage from "@/pages/band/home/BandHomePage";
-import EditProfilePage from "@/pages/band/home/EditProfilePage";
-import CreateProfilePage from "@/pages/band/home/CreateProfilePage";
+import ProfileFormPage from "@/pages/band/home/ProfileFormPage";
 import BandNotificationPage from "@/pages/band/home/NotificationPage";
 import InviteMemberPage from "@/pages/band/home/InviteMemberPage";
 import ConcertRegisterPage from "@/pages/band/home/ConcertRegisterPage";
@@ -136,11 +135,11 @@ export const router = createBrowserRouter([
       },
       {
         path: "/band/profile/edit",
-        element: <EditProfilePage />,
+        element: <ProfileFormPage mode="edit" />,
       },
       {
         path: "/band/profile/new",
-        element: <CreateProfilePage />,
+        element: <ProfileFormPage mode="create" />,
       },
       {
         path: "/band/profile/invite",

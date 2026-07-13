@@ -36,20 +36,30 @@ const REGION_OPTIONS = [
   "제주",
 ];
 
-const CreateProfilePage = () => {
+interface ProfileFormPageProps {
+  mode: "create" | "edit";
+}
+
+const ProfileFormPage = ({ mode }: ProfileFormPageProps) => {
+  const isEditMode = mode === "edit";
   const navigate = useNavigate();
+  const profile = useBandProfileStore((state) => state.profile);
   const setProfile = useBandProfileStore((state) => state.setProfile);
 
   const galleryInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
-  const [avatarUrl, setAvatarUrl] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState(
+    isEditMode ? profile.avatarUrl : "",
+  );
   const [isImageMenuOpen, setIsImageMenuOpen] = useState(false);
 
-  const [name, setName] = useState("");
-  const [genre, setGenre] = useState("");
-  const [region, setRegion] = useState("");
-  const [bio, setBio] = useState("");
+  const [name, setName] = useState(isEditMode ? profile.name : "");
+  const [genre, setGenre] = useState(isEditMode ? profile.genre : "");
+  const [region, setRegion] = useState(
+    isEditMode ? (profile.regions[0] ?? "") : "",
+  );
+  const [bio, setBio] = useState(isEditMode ? profile.bio : "");
 
   const isValid = Boolean(name.trim() && genre && region);
 
@@ -72,7 +82,7 @@ const CreateProfilePage = () => {
     });
   };
 
-  const handleCreate = () => {
+  const handleSubmit = () => {
     if (!isValid) return;
     setProfile({ name, genre, regions: [region], bio, avatarUrl });
     navigate("/band/home");
@@ -80,14 +90,14 @@ const CreateProfilePage = () => {
 
   return (
     <main className="relative min-h-dvh bg-neutral-0 pb-40">
-      <Header title="프로필 생성" />
+      <Header title={isEditMode ? "프로필 편집" : "프로필 생성"} />
 
       <section className="flex flex-col gap-6 px-5 pt-6">
         <div className="flex flex-col items-center gap-3">
           <div className="relative">
             <img
               src={avatarUrl || DefaultBandAvatar}
-              alt=""
+              alt={name}
               className="size-18 rounded-full object-cover"
             />
 
@@ -111,7 +121,7 @@ const CreateProfilePage = () => {
             onClick={() => setIsImageMenuOpen((prev) => !prev)}
             className="text-caption2 text-secondary-500"
           >
-            프로필 이미지 등록
+            {isEditMode ? "프로필 이미지 변경" : "프로필 이미지 등록"}
           </button>
 
           <input
@@ -139,7 +149,7 @@ const CreateProfilePage = () => {
             <Input
               value={name}
               onChange={(event) => setName(event.target.value)}
-              placeholder="밴드 이름을 입력하세요"
+              placeholder="밴드 이름을 입력해주세요"
               className="pl-4 py-1.25 w-82.5 max-w-full rounded-[5px]"
             />
           </div>
@@ -175,7 +185,7 @@ const CreateProfilePage = () => {
             <Textarea
               value={bio}
               onChange={(event) => setBio(event.target.value)}
-              placeholder="밴드 소개글을입력하세요"
+              placeholder="밴드 소개글을 입력해주세요"
               maxLength={60}
               className="h-15 w-82.5 max-w-full overflow-hidden rounded-[5px] pt-2.25 pr-6.5 pb-8.25 pl-4"
             />
@@ -186,18 +196,18 @@ const CreateProfilePage = () => {
       <div className="fixed inset-x-0 bottom-[calc(var(--bottom-nav-height)+16px)] px-5">
         <button
           type="button"
-          onClick={handleCreate}
+          onClick={handleSubmit}
           className={`flex h-13 w-full items-center justify-center gap-2.5 rounded-xl text-label1 ${
             isValid
               ? "bg-secondary-500 text-neutral-0"
               : "bg-neutral-300 text-neutral-600"
           }`}
         >
-          프로필 생성
+          {isEditMode ? "프로필 저장" : "프로필 생성"}
         </button>
       </div>
     </main>
   );
 };
 
-export default CreateProfilePage;
+export default ProfileFormPage;
