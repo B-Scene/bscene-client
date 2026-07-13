@@ -23,6 +23,7 @@ import FollowedConcertsPage from "@/pages/fan/home/FollowedConcertsPage";
 import ConcertCalendarPage from "@/pages/fan/home/ConcertCalendarPage";
 import ConcertDetailPage from "@/pages/fan/home/ConcertDetailPage";
 import NotificationPage from "@/pages/fan/home/NotificationPage";
+import { BandLivePage } from "@/pages/band/live/BandLivePage";
 
 export const router = createBrowserRouter([
   {
@@ -92,6 +93,10 @@ export const router = createBrowserRouter([
       {
         path: "/fan/home/notifications",
         element: <NotificationPage />,
+      },
+      {
+        path: "/band/live",
+        element: <BandLivePage />,
       },
     ],
   },

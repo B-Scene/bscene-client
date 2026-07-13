@@ -1,7 +1,7 @@
-import './App.css'
+import { BandLivePage } from "@/pages/band/live";
 
 function App() {
-  return null;
+  return <BandLivePage />;
 }
 
 export default App;
