@@ -18,6 +18,7 @@ import ConcertRegisterPage from "@/pages/band/home/ConcertRegisterPage";
 import CompletePage from "@/pages/band/home/CompletePage";
 import MusicRegisterPage from "@/pages/band/home/MusicRegisterPage";
 import ContentRegisterPage from "@/pages/band/home/ContentRegisterPage";
+import BandSessionPage from "@/pages/band/session/BandSessionPage";
 
 export const router = createBrowserRouter([
   {
@@ -117,6 +118,10 @@ export const router = createBrowserRouter([
       {
         path: "/band/videos/new",
         element: <ContentRegisterPage />,
+      },
+      {
+        path: "/band/session",
+        element: <BandSessionPage />,
       },
     ],
   },
