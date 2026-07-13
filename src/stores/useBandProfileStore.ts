@@ -22,17 +22,17 @@ interface BandProfileState {
 
 export const useBandProfileStore = create<BandProfileState>((set) => ({
   profile: {
-    name: "WAVY",
+    name: "",
     avatarUrl: "",
-    verified: true,
-    genre: "인디",
-    regions: ["서울"],
-    memberCount: 5,
+    verified: false,
+    genre: "",
+    regions: [],
+    memberCount: 0,
     bio: "",
     stats: {
-      followers: 128,
-      concerts: 5,
-      videos: 23,
+      followers: 0,
+      concerts: 0,
+      videos: 0,
     },
   },
   setProfile: (profile) =>

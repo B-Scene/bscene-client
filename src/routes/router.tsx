@@ -12,6 +12,8 @@ import OnboardingCompletePage from "@/pages/onboarding/OnboardingCompletePage";
 import OAuthCallbackPage from "@/pages/auth/OAuthCallbackPage";
 import BandHomePage from "@/pages/band/home/BandHomePage";
 import EditProfilePage from "@/pages/band/home/EditProfilePage";
+import CreateProfilePage from "@/pages/band/home/CreateProfilePage";
+import BandNotificationPage from "@/pages/band/home/NotificationPage";
 import InviteMemberPage from "@/pages/band/home/InviteMemberPage";
 import ConcertRegisterPage from "@/pages/band/home/ConcertRegisterPage";
 import CompletePage from "@/pages/band/home/CompletePage";
@@ -98,6 +100,10 @@ export const router = createBrowserRouter([
         path: "/band/live",
         element: <BandLivePage />,
       },
+      {
+        path: "/band/notifications",
+        element: <BandNotificationPage />,
+      },
     ],
   },
   {
@@ -133,11 +139,19 @@ export const router = createBrowserRouter([
         element: <EditProfilePage />,
       },
       {
+        path: "/band/profile/new",
+        element: <CreateProfilePage />,
+      },
+      {
         path: "/band/profile/invite",
         element: <InviteMemberPage />,
       },
       {
         path: "/band/concerts/new",
+        element: <ConcertRegisterPage />,
+      },
+      {
+        path: "/band/concerts/:concertId/edit",
         element: <ConcertRegisterPage />,
       },
       {

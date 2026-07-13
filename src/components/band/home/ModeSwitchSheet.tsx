@@ -1,4 +1,6 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useSlideUpSheet } from "@/hooks/useSlideUpSheet";
 import { useBandProfileStore } from "@/stores/useBandProfileStore";
 import BandAvatar from "@/assets/images/IMG_my.svg";
 import FanAvatar from "@/assets/icons/band/user-default-profile.svg";
@@ -62,25 +64,10 @@ const AccountRow = ({
 );
 
 export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
+  const navigate = useNavigate();
   const profile = useBandProfileStore((state) => state.profile);
   const [selectedId, setSelectedId] = useState("band-1");
-  const [rendered, setRendered] = useState(open);
-  const [isVisible, setIsVisible] = useState(false);
-
-  if (open && !rendered) {
-    setRendered(true);
-  }
-
-  useEffect(() => {
-    if (!rendered) return;
-
-    const frame = requestAnimationFrame(() => setIsVisible(open));
-    return () => cancelAnimationFrame(frame);
-  }, [open, rendered]);
-
-  const handleTransitionEnd = () => {
-    if (!open) setRendered(false);
-  };
+  const { rendered, isVisible, handleTransitionEnd } = useSlideUpSheet(open);
 
   if (!rendered) return null;
 
@@ -157,6 +144,10 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
 
             <button
               type="button"
+              onClick={() => {
+                onClose();
+                navigate("/band/profile/new");
+              }}
               className="flex w-82.5 items-center justify-start gap-2 text-label2 text-[#71717A]"
             >
               + 새 밴드 만들기

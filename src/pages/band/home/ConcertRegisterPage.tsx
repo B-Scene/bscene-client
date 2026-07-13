@@ -1,12 +1,24 @@
-import { useRef, useState, type ChangeEvent, type ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
+import {
+  useRef,
+  useState,
+  type ChangeEvent,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { Header } from "@/components/band/home/Header";
+import { DatePickerSheet } from "@/components/band/home/DatePickerSheet";
+import { TimePickerSheet } from "@/components/band/home/TimePickerSheet";
 import { Input } from "@/components/common/Input/Input";
 import { Select } from "@/components/common/Select/Select";
+import { ModalOverlay } from "@/components/common/Modal/ModalOverlay";
+import Modal from "@/components/Modal/Modal";
+import { useConcertsStore } from "@/stores/useConcertsStore";
 import CalendarIcon from "@/assets/icons/band/data-range.svg";
 import ClockIcon from "@/assets/icons/band/clock-band.svg";
 import UploadIcon from "@/assets/icons/band/add-image.svg";
 import TrashIcon from "@/assets/icons/band/delete.svg";
+import CloseIcon from "@/assets/icons/close.svg";
 import Number1CircleIcon from "@/assets/icons/band/number1-circle.svg";
 import Number2CircleIcon from "@/assets/icons/band/number2-circle.svg";
 import Number2CircleActiveIcon from "@/assets/icons/band/number2-circle-active.svg";
@@ -41,7 +53,22 @@ const REGION_OPTIONS = [
   "제주",
 ];
 
+const AGE_RATING_OPTIONS = [
+  "전체 관람가",
+  "12세 이상",
+  "15세 이상",
+  "19세 이상",
+];
+
 const DESCRIPTION_MAX_LENGTH = 500;
+const MAX_TAGS = 8;
+
+const formatDateRange = (start: string, end: string) => {
+  if (!start) return "";
+  const startLabel = start.replaceAll("-", ".");
+  if (!end || end === start) return startLabel;
+  return `${startLabel} - ${end.replaceAll("-", ".")}`;
+};
 
 const hasBatchim = (text: string) => {
   const lastChar = text.trim().slice(-1);
@@ -116,36 +143,65 @@ const Field = ({ label, required, error, children }: FieldProps) => (
 
 const ConcertRegisterPage = () => {
   const navigate = useNavigate();
+  const { concertId } = useParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const addConcert = useConcertsStore((state) => state.addConcert);
+  const updateConcert = useConcertsStore((state) => state.updateConcert);
+  const existingConcert = useConcertsStore((state) =>
+    concertId
+      ? state.concerts.find((concert) => concert.id === concertId)
+      : undefined,
+  );
+  const isEditMode = Boolean(concertId);
 
   const [step, setStep] = useState<Step>(1);
+  const [isLeaveConfirmOpen, setIsLeaveConfirmOpen] = useState(false);
 
-  const [title, setTitle] = useState("");
-  const [genre, setGenre] = useState("");
-  const [region, setRegion] = useState("");
-  const [description, setDescription] = useState("");
-  const [posterUrl, setPosterUrl] = useState("");
+  const [title, setTitle] = useState(() => existingConcert?.title ?? "");
+  const [genre, setGenre] = useState(() => existingConcert?.genre ?? "");
+  const [region, setRegion] = useState(() => existingConcert?.region ?? "");
+  const [ageRating, setAgeRating] = useState(
+    () => existingConcert?.ageRating ?? "",
+  );
+  const [description, setDescription] = useState(
+    () => existingConcert?.description ?? "",
+  );
+  const [posterUrl, setPosterUrl] = useState(
+    () => existingConcert?.posterUrl ?? "",
+  );
+  const [tags, setTags] = useState<string[]>(() => existingConcert?.tags ?? []);
+  const [tagInput, setTagInput] = useState("");
 
-  const [date, setDate] = useState("");
-  const [time] = useState("");
-  const [location, setLocation] = useState("");
-  const [price, setPrice] = useState("");
-  const [ticketLinks, setTicketLinks] = useState<string[]>([""]);
+  const [startDate, setStartDate] = useState(
+    () => existingConcert?.startDate ?? "",
+  );
+  const [endDate, setEndDate] = useState(() => existingConcert?.endDate ?? "");
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const [time, setTime] = useState(() => existingConcert?.time ?? "");
+  const [isTimePickerOpen, setIsTimePickerOpen] = useState(false);
+  const [location, setLocation] = useState(
+    () => existingConcert?.location ?? "",
+  );
+  const [price, setPrice] = useState(() => existingConcert?.price ?? "");
+  const [ticketLinks, setTicketLinks] = useState<string[]>(
+    () => existingConcert?.ticketLinks ?? [""],
+  );
 
   const [showStep1Errors, setShowStep1Errors] = useState(false);
   const [showStep2Errors, setShowStep2Errors] = useState(false);
 
   const isStep1Valid = Boolean(
-    title.trim() && genre && region && description.trim(),
+    title.trim() && genre && region && ageRating && description.trim(),
   );
-  const isStep2Valid = Boolean(date && location.trim() && price.trim());
+  const isStep2Valid = Boolean(startDate && location.trim() && price.trim());
 
   const titleError = showStep1Errors && !title.trim();
   const genreError = showStep1Errors && !genre;
   const regionError = showStep1Errors && !region;
+  const ageRatingError = showStep1Errors && !ageRating;
   const descriptionError = showStep1Errors && !description.trim();
 
-  const dateError = showStep2Errors && !date;
+  const dateError = showStep2Errors && !startDate;
   const locationError = showStep2Errors && !location.trim();
   const priceError = showStep2Errors && !price.trim();
 
@@ -153,6 +209,21 @@ const ConcertRegisterPage = () => {
     const file = event.target.files?.[0];
     if (!file) return;
     setPosterUrl(URL.createObjectURL(file));
+  };
+
+  const handleTagInputKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+
+    const trimmed = tagInput.trim();
+    if (!trimmed || tags.includes(trimmed) || tags.length >= MAX_TAGS) return;
+
+    setTags((prev) => [...prev, trimmed]);
+    setTagInput("");
+  };
+
+  const handleRemoveTag = (tag: string) => {
+    setTags((prev) => prev.filter((item) => item !== tag));
   };
 
   const handleTicketLinkChange = (index: number, value: string) => {
@@ -171,14 +242,27 @@ const ConcertRegisterPage = () => {
     setTicketLinks((prev) => [...prev, ""]);
   };
 
-  const handleFillTestData = () => {
-    setTitle("테스트 공연");
-    setGenre(GENRE_OPTIONS[0]);
-    setRegion(REGION_OPTIONS[0]);
-    setDescription("테스트용으로 채운 공연 소개입니다.");
-    setDate("2026-05-26");
-    setLocation("테스트 공연장");
-    setPrice("30000");
+  const handleConfirmLeave = () => {
+    if (!isEditMode) {
+      addConcert({
+        id: crypto.randomUUID(),
+        title: title.trim() || "제목 없는 공연",
+        genre,
+        region,
+        ageRating,
+        description,
+        posterUrl,
+        tags,
+        startDate,
+        endDate,
+        time,
+        location,
+        price,
+        ticketLinks: ticketLinks.filter((link) => link.trim()),
+        status: "draft",
+      });
+    }
+    navigate("/band/home");
   };
 
   const handleNext = () => {
@@ -194,13 +278,40 @@ const ConcertRegisterPage = () => {
       setShowStep2Errors(true);
       return;
     }
+
+    const concert = {
+      id: existingConcert?.id ?? crypto.randomUUID(),
+      title,
+      genre,
+      region,
+      ageRating,
+      description,
+      posterUrl,
+      tags,
+      startDate,
+      endDate,
+      time,
+      location,
+      price,
+      ticketLinks: ticketLinks.filter((link) => link.trim()),
+      status: "scheduled" as const,
+    };
+
+    if (isEditMode) {
+      updateConcert(concert.id, concert);
+    } else {
+      addConcert(concert);
+    }
+
     navigate("/band/register/complete", {
       state: {
-        title: "공연이 등록됐어요",
-        description: "팔로워들에게 공연 소식이\n전달됐어요",
+        title: isEditMode ? "공연이 수정됐어요" : "공연이 등록됐어요",
+        description: isEditMode
+          ? "변경사항이 저장됐어요"
+          : "팔로워들에게 공연 소식이\n전달됐어요",
         rows: [
           { label: "공연명", value: title },
-          { label: "날짜", value: `${date.replaceAll("-", ".")}.` },
+          { label: "날짜", value: formatDateRange(startDate, endDate) },
           { label: "장소", value: location },
         ],
         primaryLabel: "공연 상세 보기",
@@ -211,17 +322,20 @@ const ConcertRegisterPage = () => {
 
   return (
     <main className="relative flex min-h-dvh flex-col bg-secondary-0 pb-40">
-      <Header title="공연 등록" />
-
-      {import.meta.env.DEV ? (
-        <button
-          type="button"
-          onClick={handleFillTestData}
-          className="mx-5 mt-2 self-start rounded-full border border-secondary-500 px-3 py-1 text-caption4 text-secondary-500"
-        >
-          테스트 데이터 채우기 (dev only)
-        </button>
-      ) : null}
+      <Header
+        title={isEditMode ? "공연 수정" : "공연 등록"}
+        align="between"
+        onBack={() => setIsLeaveConfirmOpen(true)}
+        rightContent={
+          <button
+            type="button"
+            aria-label="닫기"
+            onClick={() => setIsLeaveConfirmOpen(true)}
+          >
+            <img src={CloseIcon} alt="" className="size-6" />
+          </button>
+        }
+      />
 
       <div className="flex flex-col gap-6">
         <StepIndicator step={step} />
@@ -262,26 +376,24 @@ const ConcertRegisterPage = () => {
                   />
                 </Field>
 
-                <Field label="공연 소개" required error={descriptionError}>
-                  <div
-                    className={`flex h-15 w-full flex-col rounded-[5px] border bg-neutral-0 pt-1.5 pr-3.25 pb-2 pl-4 focus-within:border-secondary-500 ${
-                      descriptionError ? "border-error" : "border-neutral-400"
-                    }`}
-                  >
-                    <textarea
-                      value={description}
-                      onChange={(event) =>
-                        setDescription(
-                          event.target.value.slice(0, DESCRIPTION_MAX_LENGTH),
-                        )
-                      }
-                      placeholder="공연에 대해 소개해주세요"
-                      maxLength={DESCRIPTION_MAX_LENGTH}
-                      className="w-full flex-1 resize-none bg-transparent text-caption2 text-neutral-900 outline-none placeholder:text-caption2 placeholder:text-neutral-500"
-                    />
-                    <span className="self-end text-caption4 text-neutral-400">
-                      {description.length}/{DESCRIPTION_MAX_LENGTH}
-                    </span>
+                <Field label="관람 연령" required error={ageRatingError}>
+                  <div className="flex gap-2">
+                    {AGE_RATING_OPTIONS.map((option) => (
+                      <button
+                        key={option}
+                        type="button"
+                        onClick={() => setAgeRating(option)}
+                        className={`flex h-6.5 min-w-0 flex-1 items-center justify-center rounded-lg text-center text-caption3 ${
+                          ageRating === option
+                            ? "bg-secondary-500 text-neutral-0"
+                            : ageRatingError
+                              ? "border border-error text-error"
+                              : "bg-neutral-300 text-neutral-600"
+                        }`}
+                      >
+                        {option}
+                      </button>
+                    ))}
                   </div>
                 </Field>
 
@@ -314,43 +426,105 @@ const ConcertRegisterPage = () => {
                     className="hidden"
                   />
                 </Field>
+
+                <Field label="공연 소개" required error={descriptionError}>
+                  <div
+                    className={`flex h-15 w-full flex-col rounded-[5px] border bg-neutral-0 pt-1.5 pr-3.25 pb-2 pl-4 focus-within:border-secondary-500 ${
+                      descriptionError ? "border-error" : "border-neutral-400"
+                    }`}
+                  >
+                    <textarea
+                      value={description}
+                      onChange={(event) =>
+                        setDescription(
+                          event.target.value.slice(0, DESCRIPTION_MAX_LENGTH),
+                        )
+                      }
+                      placeholder="공연에 대해 소개해주세요"
+                      maxLength={DESCRIPTION_MAX_LENGTH}
+                      className="w-full flex-1 resize-none bg-transparent text-caption2 text-neutral-900 outline-none placeholder:text-caption2 placeholder:text-neutral-500"
+                    />
+                    <span className="self-end text-caption4 text-neutral-400">
+                      {description.length}/{DESCRIPTION_MAX_LENGTH}
+                    </span>
+                  </div>
+                </Field>
+
+                <Field label={`태그 (최대 ${MAX_TAGS}개)`}>
+                  <div className="flex flex-col gap-2.5">
+                    <Input
+                      value={tagInput}
+                      onChange={(event) => setTagInput(event.target.value)}
+                      onKeyDown={handleTagInputKeyDown}
+                      placeholder="태그를 입력해주세요"
+                      disabled={tags.length >= MAX_TAGS}
+                      className="w-full rounded-[5px] px-4 py-1.25"
+                    />
+
+                    {tags.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {tags.map((tag) => (
+                          <span
+                            key={tag}
+                            className="flex h-6.5 shrink-0 items-center justify-center gap-2 rounded-full bg-secondary-100 px-3.75 py-1.75 text-center text-caption3 text-secondary-500"
+                          >
+                            {tag}
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveTag(tag)}
+                              aria-label={`${tag} 태그 삭제`}
+                            >
+                              <img
+                                src={CloseIcon}
+                                alt=""
+                                className="size-2.5"
+                              />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                </Field>
               </>
             ) : (
               <>
                 <Field label="공연 날짜" required error={dateError}>
-                  <div
-                    className={`relative flex w-full items-center rounded-[5px] border px-4 py-1.25 focus-within:border-secondary-500 ${
+                  <button
+                    type="button"
+                    onClick={() => setIsDatePickerOpen(true)}
+                    className={`flex w-full items-center rounded-[5px] border px-4 py-1.25 ${
                       dateError ? "border-error" : "border-neutral-400"
                     }`}
                   >
                     <span
-                      className={`flex-1 text-caption2 ${date ? "text-neutral-900" : "text-neutral-500"}`}
+                      className={`flex-1 text-left text-caption2 ${startDate ? "text-neutral-900" : "text-neutral-500"}`}
                     >
-                      {date || "날짜 선택"}
+                      {startDate
+                        ? formatDateRange(startDate, endDate)
+                        : "날짜 선택"}
                     </span>
                     <img
                       src={CalendarIcon}
                       alt=""
                       className="size-4 shrink-0"
                     />
-                    <input
-                      type="date"
-                      value={date}
-                      onChange={(event) => setDate(event.target.value)}
-                      className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                    />
-                  </div>
+                  </button>
                 </Field>
 
                 <Field label="공연 시작 시간">
-                  <div className="flex w-full items-center rounded-[5px] border border-neutral-400 px-4 py-1.25">
+                  <button
+                    type="button"
+                    onClick={() => setIsTimePickerOpen(true)}
+                    className="flex w-full items-center rounded-[5px] border border-neutral-400 px-4 py-1.25"
+                  >
                     <span
-                      className={`flex-1 text-caption2 ${time ? "text-neutral-900" : "text-neutral-500"}`}
+                      className={`flex-1 text-left text-caption2 ${time ? "text-neutral-900" : "text-neutral-500"}`}
                     >
                       {time || "시간 선택"}
                     </span>
                     <img src={ClockIcon} alt="" className="size-4 shrink-0" />
-                  </div>
+                  </button>
                 </Field>
 
                 <Field label="공연 장소" required error={locationError}>
@@ -434,10 +608,61 @@ const ConcertRegisterPage = () => {
                 : "bg-neutral-300 text-neutral-600"
             }`}
           >
-            공연 등록
+            {isEditMode ? "수정 완료" : "공연 등록"}
           </button>
         )}
       </div>
+
+      <DatePickerSheet
+        open={isDatePickerOpen}
+        startDate={startDate}
+        endDate={endDate}
+        onClose={() => setIsDatePickerOpen(false)}
+        onSelect={(range) => {
+          setStartDate(range.start);
+          setEndDate(range.end);
+          setIsDatePickerOpen(false);
+        }}
+      />
+
+      <TimePickerSheet
+        open={isTimePickerOpen}
+        value={time}
+        onClose={() => setIsTimePickerOpen(false)}
+        onConfirm={(nextTime) => {
+          setTime(nextTime);
+          setIsTimePickerOpen(false);
+        }}
+      />
+
+      <ModalOverlay
+        open={isLeaveConfirmOpen}
+        onClose={() => setIsLeaveConfirmOpen(false)}
+      >
+        <Modal
+          tone="orange"
+          title={isEditMode ? "수정을 취소할까요?" : "공연 등록을 취소할까요?"}
+          description={
+            isEditMode ? (
+              <>
+                수정한 내용은 저장되지 않고
+                <br />
+                사라집니다.
+              </>
+            ) : (
+              <>
+                입력한 내용은 저장되지 않고
+                <br />
+                사라집니다.
+              </>
+            )
+          }
+          cancelLabel="취소"
+          confirmLabel="확인"
+          onCancel={() => setIsLeaveConfirmOpen(false)}
+          onConfirm={handleConfirmLeave}
+        />
+      </ModalOverlay>
     </main>
   );
 };

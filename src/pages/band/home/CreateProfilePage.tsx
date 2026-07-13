@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useRef, useState, type ChangeEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import DefaultAvatar from "@/assets/icons/band/band-default-profile.svg";
+import DefaultBandAvatar from "@/assets/icons/band/band-default-profile.svg";
 import { Header } from "@/components/band/home/Header";
+import { ImagePickerSheet } from "@/components/band/home/ImagePickerSheet";
 import { Input, Textarea } from "@/components/common/Input/Input";
 import { Select } from "@/components/common/Select/Select";
 import { useBandProfileStore } from "@/stores/useBandProfileStore";
@@ -35,38 +36,99 @@ const REGION_OPTIONS = [
   "제주",
 ];
 
-const EditProfilePage = () => {
+const CreateProfilePage = () => {
   const navigate = useNavigate();
-  const profile = useBandProfileStore((state) => state.profile);
   const setProfile = useBandProfileStore((state) => state.setProfile);
 
-  const [name, setName] = useState(profile.name);
-  const [genre, setGenre] = useState(profile.genre);
-  const [region, setRegion] = useState(profile.regions[0] ?? "");
-  const [bio, setBio] = useState(profile.bio);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+
+  const [avatarUrl, setAvatarUrl] = useState("");
+  const [isImageMenuOpen, setIsImageMenuOpen] = useState(false);
+
+  const [name, setName] = useState("");
+  const [genre, setGenre] = useState("");
+  const [region, setRegion] = useState("");
+  const [bio, setBio] = useState("");
 
   const isValid = Boolean(name.trim() && genre && region);
 
-  const handleSave = () => {
+  const handleFileSelected = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    setAvatarUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return URL.createObjectURL(file);
+    });
+  };
+
+  const handleDeleteImage = () => {
+    setIsImageMenuOpen(false);
+    setAvatarUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return "";
+    });
+  };
+
+  const handleCreate = () => {
     if (!isValid) return;
-    setProfile({ name, genre, regions: [region], bio });
+    setProfile({ name, genre, regions: [region], bio, avatarUrl });
     navigate("/band/home");
   };
 
   return (
     <main className="relative min-h-dvh bg-neutral-0 pb-40">
-      <Header title="프로필 편집" />
+      <Header title="프로필 생성" />
 
       <section className="flex flex-col gap-6 px-5 pt-6">
         <div className="flex flex-col items-center gap-3">
-          <img
-            src={profile.avatarUrl || DefaultAvatar}
-            alt={profile.name}
-            className="size-18 rounded-full object-cover"
-          />
-          <button type="button" className="text-caption2 text-secondary-500">
-            프로필 이미지 변경
+          <div className="relative">
+            <img
+              src={avatarUrl || DefaultBandAvatar}
+              alt=""
+              className="size-18 rounded-full object-cover"
+            />
+
+            <ImagePickerSheet
+              open={isImageMenuOpen}
+              onClose={() => setIsImageMenuOpen(false)}
+              onSelectGallery={() => {
+                setIsImageMenuOpen(false);
+                galleryInputRef.current?.click();
+              }}
+              onSelectCamera={() => {
+                setIsImageMenuOpen(false);
+                cameraInputRef.current?.click();
+              }}
+              onDelete={handleDeleteImage}
+            />
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setIsImageMenuOpen((prev) => !prev)}
+            className="text-caption2 text-secondary-500"
+          >
+            프로필 이미지 등록
           </button>
+
+          <input
+            ref={galleryInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleFileSelected}
+            className="hidden"
+          />
+          <input
+            ref={cameraInputRef}
+            type="file"
+            accept="image/*"
+            capture="user"
+            onChange={handleFileSelected}
+            className="hidden"
+          />
         </div>
 
         <div className="flex flex-col gap-3">
@@ -77,7 +139,7 @@ const EditProfilePage = () => {
             <Input
               value={name}
               onChange={(event) => setName(event.target.value)}
-              placeholder="밴드 이름을 입력해주세요"
+              placeholder="밴드 이름을 입력하세요"
               className="pl-4 py-1.25 w-82.5 max-w-full rounded-[5px]"
             />
           </div>
@@ -113,7 +175,7 @@ const EditProfilePage = () => {
             <Textarea
               value={bio}
               onChange={(event) => setBio(event.target.value)}
-              placeholder="밴드 소개글을 입력해주세요"
+              placeholder="밴드 소개글을입력하세요"
               maxLength={60}
               className="h-15 w-82.5 max-w-full overflow-hidden rounded-[5px] pt-2.25 pr-6.5 pb-8.25 pl-4"
             />
@@ -124,18 +186,18 @@ const EditProfilePage = () => {
       <div className="fixed inset-x-0 bottom-[calc(var(--bottom-nav-height)+16px)] px-5">
         <button
           type="button"
-          onClick={handleSave}
+          onClick={handleCreate}
           className={`flex h-13 w-full items-center justify-center gap-2.5 rounded-xl text-label1 ${
             isValid
               ? "bg-secondary-500 text-neutral-0"
               : "bg-neutral-300 text-neutral-600"
           }`}
         >
-          프로필 저장
+          프로필 생성
         </button>
       </div>
     </main>
   );
 };
 
-export default EditProfilePage;
+export default CreateProfilePage;
