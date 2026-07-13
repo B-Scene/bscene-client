@@ -13,7 +13,7 @@ const FollowedBandNewsPage = () => {
   const navigate = useNavigate();
 
   return (
-    <main className="min-h-dvh bg-neutral-0 px-5 pb-[calc(var(--bottom-nav-height)+24px)] pt-7">
+    <main className="min-h-dvh bg-neutral-0 px-5 pb-[calc(var(--bottom-nav-height)+24px)]">
       <header className="-mx-5 flex h-[60px] items-center justify-between px-[15px]">
         <button
           type="button"

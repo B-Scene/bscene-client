@@ -1,12 +1,12 @@
 import { useMemo, useState, type UIEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import BSceneLogo from "@/assets/bscene-logo.svg";
 import ArrowIcon from "@/assets/Arrow.svg";
 import SpeakerIcon from "@/assets/speaker.svg";
 import BandProfileImage from "@/assets/icons/band/band-default-profile.svg";
 import ContentImage from "@/assets/Img_upload.png";
 import ConcertCard from "@/components/common/Card/ConcertCard";
 import NewsCard from "@/components/common/Card/NewsCard";
+import { HomeHeader } from "@/components/common/Header/HomeHeader";
 
 type HomeVariant = "new" | "recommended" | "main";
 
@@ -353,22 +353,18 @@ const FanHomePage = () => {
   }, [navigate, variant]);
 
   return (
-    <main className="min-h-dvh bg-neutral-0 px-5 pb-[calc(var(--bottom-nav-height)+24px)] pt-7">
-      <header className="relative flex h-12 items-center justify-end">
-        <img
-          src={BSceneLogo}
-          alt="B:Scene"
-          className="absolute left-1/2 h-[22px] w-[119px] -translate-x-1/2"
-        />
-
-        <button
-          type="button"
-          aria-label="알림"
-          className="h-[25px] w-[25px] text-neutral-900"
-        >
-          <NotificationBellIcon />
-        </button>
-      </header>
+    <main className="min-h-dvh bg-neutral-0 px-5 pb-[calc(var(--bottom-nav-height)+24px)]">
+      <HomeHeader
+        rightAction={
+          <button
+            type="button"
+            aria-label="알림"
+            className="flex size-6 items-center justify-center text-neutral-900"
+          >
+            <NotificationBellIcon />
+          </button>
+        }
+      />
 
       <div className="mt-8">{content}</div>
     </main>

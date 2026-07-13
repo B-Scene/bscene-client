@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import Modal from "@/components/Modal/Modal";
 import { ModalOverlay } from "@/components/common/Modal/ModalOverlay";
 import NotificationOffIcon from "@/assets/icons/Notification Off.svg";
@@ -8,6 +8,7 @@ import HeartIcon from "@/assets/icons/Heart.svg";
 import ShareIcon from "@/assets/icons/ic_share.svg";
 import LikedHeartIcon from "@/assets/icons/Union.svg";
 import BandProfileImage from "@/assets/icons/band/band-default-profile.svg";
+import { useConcertLikeStore } from "@/stores/useConcertLikeStore";
 
 const CONCERT_INFO = [
   { label: "공연 일시", value: "2026.04.12. (토) 19:00" },
@@ -191,12 +192,18 @@ const InfoRows = ({
 
 const ConcertDetailPage = () => {
   const navigate = useNavigate();
+  const { concertId = "default-concert" } = useParams();
   const concertInfoRef = useRef<HTMLElement | null>(null);
   const concertIntroRef = useRef<HTMLElement | null>(null);
   const castingRef = useRef<HTMLElement | null>(null);
   const [selectedTab, setSelectedTab] =
     useState<ConcertDetailTab>("공연정보");
-  const [isLiked, setIsLiked] = useState(true);
+  const isLiked = useConcertLikeStore(
+    (state) => state.likedConcertIds[concertId] ?? false,
+  );
+  const toggleConcertLike = useConcertLikeStore(
+    (state) => state.toggleConcertLike,
+  );
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isShareSheetOpen, setIsShareSheetOpen] = useState(false);
   const [isNotificationModalOpen, setIsNotificationModalOpen] =
@@ -214,9 +221,8 @@ const ConcertDetailPage = () => {
   }, [toastMessage]);
 
   const handleLikeClick = () => {
-    const nextLiked = !isLiked;
+    const nextLiked = toggleConcertLike(concertId);
 
-    setIsLiked(nextLiked);
     if (!nextLiked) {
       setToastMessage("관심 공연을 해제했어요");
     }
@@ -391,7 +397,7 @@ const ConcertDetailPage = () => {
 
       <nav
         aria-label="공연 상세 메뉴"
-        className="sticky top-0 z-10 grid h-[43px] grid-cols-3 border-b border-neutral-400 bg-neutral-0"
+        className="sticky top-0 z-10 grid h-[43px] w-full grid-cols-3 bg-neutral-0"
       >
         {TABS.map((tab) => (
           <button
@@ -404,14 +410,17 @@ const ConcertDetailPage = () => {
           >
             {tab}
             {selectedTab === tab ? (
-              <span className="absolute bottom-[-1px] h-[2px] w-full bg-primary-400" />
+              <span className="absolute bottom-0 left-1/2 z-10 h-[2px] w-[114px] -translate-x-1/2 rounded-full bg-primary-400" />
             ) : null}
           </button>
         ))}
+        <span className="pointer-events-none absolute bottom-0 left-1/2 h-[2px] w-[393px] max-w-full -translate-x-1/2 bg-neutral-400" />
       </nav>
 
-      <section ref={concertInfoRef} className="scroll-mt-[43px] px-[29px] py-4">
-        <h2 className="m-0 font-body text-body1 text-neutral-900">공연정보</h2>
+      <section ref={concertInfoRef} className="scroll-mt-[43px] px-[29px] pb-4 py-4">
+        <h2 className="m-0 text-body1 font-bold leading-[38px] text-neutral-900">
+          공연정보
+        </h2>
         <div className="mt-[17px]">
           <InfoRows
             rows={CONCERT_INFO}
@@ -439,7 +448,7 @@ const ConcertDetailPage = () => {
 
       <div className="h-4 bg-primary-0" />
 
-      <section ref={castingRef} className="scroll-mt-[43px] px-[29px] pb-12 pt-[16px]">
+      <section ref={castingRef} className="scroll-mt-[82px] px-[29px] pb-12 pt-[16px]">
         <h2 className="m-0 font-body text-body1 text-neutral-900">캐스팅</h2>
 
         <article className="mt-4 flex h-[60px] items-center justify-between rounded-[8px] bg-neutral-0 px-4 shadow-[0_0_8px_0_rgba(0,0,0,0.10)]">

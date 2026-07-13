@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ArrowLeftIcon from "@/assets/icons/arrow-left.svg";
 import ConcertCard from "@/components/common/Card/ConcertCard";
+import ConcertLikeButton from "@/components/fan/home/ConcertLikeButton";
 
 const INTEREST_CONCERTS = Array.from({ length: 7 }, (_, index) => ({
   id: `interest-concert-${index + 1}`,
@@ -49,7 +50,7 @@ const SortArrowIcon = () => (
   >
     <path
       d="M1 1L6 6L11 1"
-      stroke="var(--color-primary-400)"
+      stroke="currentColor"
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
@@ -78,7 +79,13 @@ const CheckIcon = () => (
 const FollowedConcertsPage = () => {
   const navigate = useNavigate();
   const [selectedSort, setSelectedSort] = useState<SortOption>("공연임박순");
+  const [hasSelectedSort, setHasSelectedSort] = useState(false);
   const [isSortSheetOpen, setIsSortSheetOpen] = useState(false);
+  const sortButtonClassName = `flex shrink-0 flex-col items-center gap-2.5 rounded-full border px-[10px] py-1 font-body text-caption3 ${
+    hasSelectedSort
+      ? "border-primary-400 bg-primary-0 text-primary-400"
+      : "border-neutral-400 bg-neutral-0 text-neutral-600"
+  }`;
   const sortedConcerts = useMemo(() => {
     return [...INTEREST_CONCERTS].sort((a, b) => {
       if (selectedSort === "최신순") {
@@ -94,7 +101,7 @@ const FollowedConcertsPage = () => {
   }, [selectedSort]);
 
   return (
-    <main className="min-h-dvh bg-neutral-0 px-[15px] pb-[calc(var(--bottom-nav-height)+24px)] pt-7">
+    <main className="min-h-dvh bg-neutral-0 px-[15px] pb-[calc(var(--bottom-nav-height)+24px)]">
       <header className="-mx-5 flex h-[60px] items-center justify-between px-[15px]">
         <button
           type="button"
@@ -106,7 +113,7 @@ const FollowedConcertsPage = () => {
         </button>
 
         <h1 className="m-0 font-body text-label2 text-neutral-900">
-          관심 공연
+          공연 일정
         </h1>
 
         <button
@@ -120,17 +127,15 @@ const FollowedConcertsPage = () => {
       </header>
 
       <div className="mt-[11px] flex h-10 items-center justify-between pl-0.5 pr-[3px]">
-        <p className="m-0 font-body text-caption3 text-neutral-600">
-          관심 공연 7개
-        </p>
-
         <button
           type="button"
           onClick={() => setIsSortSheetOpen(true)}
-          className="flex items-center gap-2 font-body text-caption3 text-primary-400"
+          className={sortButtonClassName}
         >
-          {selectedSort}
-          <SortArrowIcon />
+          <span className="flex items-center gap-1">
+            {selectedSort}
+            <SortArrowIcon />
+          </span>
         </button>
       </div>
 
@@ -147,6 +152,12 @@ const FollowedConcertsPage = () => {
             dateBadgeClassName="bg-primary-300"
             isPending={concert.status === "준비중"}
             showThumbnail={concert.showThumbnail}
+            actions={
+              <ConcertLikeButton
+                concertId={concert.id}
+                concertTitle={concert.title}
+              />
+            }
             onClick={() => navigate(`/fan/home/concerts/${concert.id}`)}
             ariaLabel={`${concert.title} 상세보기`}
           />
@@ -176,6 +187,7 @@ const FollowedConcertsPage = () => {
                     type="button"
                     onClick={() => {
                       setSelectedSort(option);
+                      setHasSelectedSort(true);
                       setIsSortSheetOpen(false);
                     }}
                     className={`flex w-full items-center justify-between text-left font-body text-label2 ${

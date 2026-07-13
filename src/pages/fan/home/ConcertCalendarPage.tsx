@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ArrowLeftIcon from "@/assets/icons/arrow-left.svg";
 import ConcertCard from "@/components/common/Card/ConcertCard";
+import ConcertLikeButton from "@/components/fan/home/ConcertLikeButton";
 
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 
@@ -76,15 +77,13 @@ const PERFORMANCES_BY_DATE: Record<string, CalendarPerformance[]> = {
       status: "D-7",
     },
   ],
-  "2026-06-19": [
-    {
-      id: "calendar-20260619-1",
-      title: "WAVY 단독 공연",
-      location: "홍대 롤링홀",
-      dateTime: "2026.06.19. 18:00",
-      status: "D-7",
-    },
-  ],
+  "2026-06-19": Array.from({ length: 4 }, (_, index) => ({
+    id: `calendar-20260619-${index + 1}`,
+    title: "WAVY 단독 공연",
+    location: "홍대 롤링홀",
+    dateTime: "2026.05.17. 18:00",
+    status: "D-7",
+  })),
   "2026-06-26": [
     {
       id: "calendar-20260626-1",
@@ -214,13 +213,19 @@ const ConcertCalendarPage = () => {
     setSelectedDateKey(null);
   };
 
+  const handleDateClick = (dateKey: string) => {
+    setSelectedDateKey((currentDateKey) =>
+      currentDateKey === dateKey ? null : dateKey,
+    );
+  };
+
   const selectedDate = selectedDateKey ? parseDateKey(selectedDateKey) : null;
   const selectedDateLabel = selectedDate
     ? `${selectedDate.getMonth() + 1}월 ${selectedDate.getDate()}일 (${WEEKDAYS[selectedDate.getDay()]})`
     : "";
 
   return (
-    <main className="min-h-dvh bg-neutral-0 px-[15px] pb-[calc(var(--bottom-nav-height)+24px)] pt-7">
+    <main className="min-h-dvh bg-neutral-0 px-[15px] pb-[calc(var(--bottom-nav-height)+24px)]">
       <header className="-mx-[15px] flex h-[60px] items-center justify-between px-[15px]">
         <button
           type="button"
@@ -232,7 +237,7 @@ const ConcertCalendarPage = () => {
         </button>
 
         <h1 className="m-0 font-body text-label2 text-neutral-900">
-          관심 공연
+          공연 일정
         </h1>
 
         <span aria-hidden="true" className="size-6" />
@@ -283,11 +288,11 @@ const ConcertCalendarPage = () => {
               <button
                 type="button"
                 disabled={day.muted || !day.hasEvent}
-                onClick={() => setSelectedDateKey(day.dateKey)}
+                onClick={() => handleDateClick(day.dateKey)}
                 className={`relative flex size-7 items-center justify-center rounded-full font-body text-caption3 ${
-                  day.selected ? "bg-neutral-300" : ""
-                } ${
-                  day.muted
+                  day.selected
+                    ? "bg-primary-50 text-primary-400"
+                    : day.muted
                     ? "text-neutral-500"
                     : day.sunday
                       ? "text-error"
@@ -305,33 +310,50 @@ const ConcertCalendarPage = () => {
       </section>
 
       {selectedDateKey ? (
-        <section className="fixed inset-x-0 bottom-0 z-30 h-[488px] rounded-t-[24px] bg-neutral-0 px-[22.5px] pt-3 shadow-[0_-5px_10px_0_rgba(0,0,0,0.10)]">
-          <div className="mx-auto h-1 w-11 rounded-full bg-neutral-300" />
+        <>
+          <button
+            type="button"
+            aria-label="일정 목록 닫기"
+            className="fixed inset-0 z-20 cursor-default bg-transparent"
+            onClick={() => setSelectedDateKey(null)}
+          />
 
-          <header className="mt-6 flex items-center justify-between">
-            <h2 className="mx-0 font-body text-label1 text-neutral-900">
-              {selectedDateLabel}
-            </h2>
-            <span className="font-body text-caption3 text-neutral-600">
-              총 {selectedEvents.length}개
-            </span>
-          </header>
+          <section className="fixed inset-x-0 bottom-0 z-30 h-[488px] rounded-t-[24px] bg-neutral-0 px-[22.5px] pt-3 shadow-[0_-5px_10px_0_rgba(0,0,0,0.10)]">
+            <div className="mx-auto h-1 w-11 rounded-full bg-neutral-300" />
 
-          <div className="mt-4 flex flex-col gap-3">
-            {selectedEvents.map((event) => (
-              <ConcertCard
-                key={event.id}
-                title={event.title}
-                location={event.location}
-                dateTime={event.dateTime}
-                status={<span className="text-primary-500">{event.status}</span>}
-                showThumbnail
-                onClick={() => navigate(`/fan/home/concerts/${event.id}`)}
-                ariaLabel={`${event.title} 상세보기`}
-              />
-            ))}
-          </div>
-        </section>
+            <header className="mt-6 flex items-center justify-between">
+              <h2 className="mx-0 font-body text-label1 text-neutral-900">
+                {selectedDateLabel}
+              </h2>
+              <span className="font-body text-caption3 text-neutral-600">
+                총 {selectedEvents.length}개
+              </span>
+            </header>
+
+            <div className="mt-4 flex flex-col gap-3">
+              {selectedEvents.map((event) => (
+                <ConcertCard
+                  key={event.id}
+                  title={event.title}
+                  location={event.location}
+                  dateTime={event.dateTime}
+                  status={
+                    <span className="text-primary-500">{event.status}</span>
+                  }
+                  showThumbnail
+                  actions={
+                    <ConcertLikeButton
+                      concertId={event.id}
+                      concertTitle={event.title}
+                    />
+                  }
+                  onClick={() => navigate(`/fan/home/concerts/${event.id}`)}
+                  ariaLabel={`${event.title} 상세보기`}
+                />
+              ))}
+            </div>
+          </section>
+        </>
       ) : null}
     </main>
   );

@@ -90,7 +90,7 @@ const ConcertCard = ({
   return (
     <article
       aria-label={ariaLabel}
-      className={`box-border flex h-[86px] w-full max-w-[348px] items-center gap-16 rounded-xl bg-neutral-0 px-4 py-3 text-left shadow-[0_0_8px_0_rgba(0,0,0,0.10)]${
+      className={`box-border flex h-[86px] w-full max-w-[348px] items-center justify-between gap-4 rounded-xl bg-neutral-0 px-4 py-3 text-left shadow-[0_0_8px_0_rgba(0,0,0,0.10)]${
         onClick ? " cursor-pointer" : ""
       }`}
       onClick={onClick}
@@ -98,7 +98,7 @@ const ConcertCard = ({
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : undefined}
     >
-      <div className="flex flex-1 items-center gap-4">
+      <div className="flex min-w-0 flex-1 items-center gap-4">
         {showThumbnail ? (
           <div className="flex h-[62px] w-[50px] shrink-0 items-center justify-center overflow-hidden rounded-lg bg-neutral-300 text-neutral-700">
             {thumbnailSrc ? (
