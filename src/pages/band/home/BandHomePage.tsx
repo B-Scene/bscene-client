@@ -1,13 +1,11 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import HamburgerIcon from "@/assets/icons/hamburger.svg";
-import RefreshIcon from "@/assets/icons/band/menu-reload.svg";
-import MembersIcon from "@/assets/icons/band/menu-members.svg";
-import ContentIcon from "@/assets/icons/band/menu-content.svg";
-import ScheduleIcon from "@/assets/icons/band/menu-schedule.svg";
-import MusicIcon from "@/assets/icons/band/menu-music.svg";
+import SwapIcon from "@/assets/icons/swap.svg";
+import DefaultBandAvatar from "@/assets/icons/band/band-default-profile.svg";
 import { HomeHeader } from "@/components/common/Header/HomeHeader";
+import { NotificationBellIcon } from "@/components/common/Header/NotificationBellIcon";
 import { useBandProfileStore } from "@/stores/useBandProfileStore";
+import { useConcertsStore, type Concert } from "@/stores/useConcertsStore";
 import { BandProfileCard } from "@/components/band/home/BandProfileCard";
 import { StatRow } from "@/components/band/home/StatRow";
 import { Tabs } from "@/components/band/home/Tabs";
@@ -23,144 +21,105 @@ const HOME_TABS = [
   { id: "music", label: "음원" },
 ];
 
-const INITIAL_CONCERTS = [
-  {
-    id: "1",
-    month: "MAY",
-    day: "17",
-    title: "공연명",
-    location: "공연 정보",
-    dateTime: "2026.05.17. 18:00",
-    status: "등록 완료",
-  },
-  {
-    id: "2",
-    month: "MAY",
-    day: "17",
-    title: "공연명",
-    location: "공연 정보",
-    dateTime: "2026.05.17. 18:00",
-    status: "준비중",
-  },
+const MONTH_ABBREVIATIONS = [
+  "JAN",
+  "FEB",
+  "MAR",
+  "APR",
+  "MAY",
+  "JUN",
+  "JUL",
+  "AUG",
+  "SEP",
+  "OCT",
+  "NOV",
+  "DEC",
 ];
+
+const CONCERT_STATUS_LABELS: Record<Concert["status"], string> = {
+  scheduled: "등록 완료",
+  draft: "준비중",
+};
+
+const getConcertCardProps = (concert: Concert) => {
+  const [, month, day] = concert.startDate.split("-");
+  const dateLabel = `${concert.startDate.replaceAll("-", ".")}.`;
+
+  return {
+    month: MONTH_ABBREVIATIONS[Number(month) - 1] ?? "",
+    day: day ?? "",
+    dateTime: concert.time ? `${dateLabel} ${concert.time}` : dateLabel,
+    statusLabel: CONCERT_STATUS_LABELS[concert.status],
+  };
+};
 
 const BandHomePage = () => {
   const navigate = useNavigate();
   const profile = useBandProfileStore((state) => state.profile);
+  const concerts = useConcertsStore((state) => state.concerts);
+  const removeConcert = useConcertsStore((state) => state.removeConcert);
 
   const [activeTab, setActiveTab] = useState("content");
-  const [concerts, setConcerts] = useState(INITIAL_CONCERTS);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isModeSwitchOpen, setIsModeSwitchOpen] = useState(false);
 
+  const hasBand = Boolean(profile.name.trim());
   const subtitle = `${profile.genre} · ${profile.regions.join(", ")} · 멤버 ${profile.memberCount}명`;
+  const goToCreateBand = () => navigate("/band/profile/new");
 
   return (
     <main className="relative flex min-h-dvh flex-col bg-neutral-0 px-5 pb-24">
       <HomeHeader
         rightAction={
-          <div className="relative">
+          <>
             <button
               type="button"
-              aria-label="메뉴"
-              onClick={() => setIsMenuOpen((prev) => !prev)}
-              className="flex size-6 items-center justify-center"
+              aria-label="알림"
+              onClick={() => navigate("/band/notifications")}
+              className="text-neutral-900"
             >
-              <img src={HamburgerIcon} alt="" className="size-6" />
+              <NotificationBellIcon hasUnread={false} />
             </button>
 
-            {isMenuOpen ? (
-              <>
-                <div
-                  className="fixed inset-0 z-40"
-                  onClick={() => setIsMenuOpen(false)}
-                />
-
-                <div className="absolute right-0 top-full z-50 mt-2 flex flex-col gap-4 rounded-2xl bg-neutral-0 p-4 shadow-[0_4px_20px_0_rgba(0,0,0,0.12)]">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsMenuOpen(false);
-                      setIsModeSwitchOpen(true);
-                    }}
-                    className="flex w-full items-start gap-2 text-left"
-                  >
-                    <img src={RefreshIcon} alt="" />
-                    <span className="flex flex-col items-start gap-1.5">
-                      <span className="text-body1 text-neutral-900">
-                        모드 및 밴드 전환
-                      </span>
-                      <span className="text-caption4 text-neutral-600">
-                        현재 : 밴드모드 · {profile.name}
-                      </span>
-                    </span>
-                  </button>
-
-                  <div className="h-px w-32.5 bg-neutral-400" />
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsMenuOpen(false);
-                      navigate("/band/profile/invite");
-                    }}
-                    className="flex w-full items-center gap-2 text-left text-body1 text-neutral-900"
-                  >
-                    <img src={MembersIcon} alt="" />
-                    멤버 관리
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsMenuOpen(false);
-                      setActiveTab("content");
-                    }}
-                    className="flex w-full items-center gap-2 text-left text-body1 text-neutral-900"
-                  >
-                    <img src={ContentIcon} alt="" />
-                    콘텐츠 관리
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsMenuOpen(false);
-                      setActiveTab("schedule");
-                    }}
-                    className="flex w-full items-center gap-2 text-left text-body1 text-neutral-900"
-                  >
-                    <img src={ScheduleIcon} alt="" />
-                    일정 관리
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsMenuOpen(false);
-                      setActiveTab("music");
-                    }}
-                    className="flex w-full items-center gap-2 text-left text-body1 text-neutral-900"
-                  >
-                    <img src={MusicIcon} alt="" />
-                    음원 관리
-                  </button>
-                </div>
-              </>
-            ) : null}
-          </div>
+            <button
+              type="button"
+              aria-label="모드 전환"
+              onClick={() => setIsModeSwitchOpen(true)}
+            >
+              <img src={SwapIcon} alt="" className="size-6" />
+            </button>
+          </>
         }
       />
 
       <section className="mt-6 flex flex-1 flex-col">
-        <BandProfileCard
-          name={profile.name}
-          avatarUrl={profile.avatarUrl}
-          verified={profile.verified}
-          subtitle={subtitle}
-          onEditProfile={() => navigate("/band/profile/edit")}
-        />
+        {hasBand ? (
+          <BandProfileCard
+            name={profile.name}
+            avatarUrl={profile.avatarUrl}
+            verified={profile.verified}
+            subtitle={subtitle}
+            onEditProfile={() => navigate("/band/profile/edit")}
+          />
+        ) : (
+          <div className="flex items-center gap-3">
+            <img
+              src={DefaultBandAvatar}
+              alt=""
+              className="size-18 shrink-0 rounded-full object-cover"
+            />
+            <div className="flex flex-col gap-2">
+              <h2 className="text-[20px] leading-5 font-bold text-black">
+                등록된 밴드가 없어요
+              </h2>
+              <p className="text-caption1 text-neutral-700">
+                새로운 밴드를 등록하고
+                <br />
+                팬들과 소통해보세요!
+              </p>
+            </div>
+          </div>
+        )}
 
         <div className="mt-4">
           <StatRow
@@ -175,21 +134,27 @@ const BandHomePage = () => {
         <div className="mt-4 flex gap-2.25">
           <button
             type="button"
-            onClick={() => navigate("/band/videos/new")}
+            onClick={
+              hasBand ? () => navigate("/band/videos/new") : goToCreateBand
+            }
             className="flex h-9.5 flex-1 items-center justify-center rounded-lg bg-secondary-400 px-3 py-2 text-body1 text-white"
           >
             콘텐츠 등록
           </button>
           <button
             type="button"
-            onClick={() => navigate("/band/concerts/new")}
+            onClick={
+              hasBand ? () => navigate("/band/concerts/new") : goToCreateBand
+            }
             className="flex h-9.5 flex-1 items-center justify-center rounded-lg bg-secondary-400 px-3 py-2 text-body1 text-white"
           >
             일정 등록
           </button>
           <button
             type="button"
-            onClick={() => navigate("/band/music/new")}
+            onClick={
+              hasBand ? () => navigate("/band/music/new") : goToCreateBand
+            }
             className="flex h-9.5 flex-1 items-center justify-center rounded-lg bg-secondary-400 px-3 py-2 text-body1 text-white"
           >
             음원 등록
@@ -204,7 +169,22 @@ const BandHomePage = () => {
           />
 
           <div className="flex flex-1 flex-col">
-            {activeTab === "content" ? (
+            {!hasBand ? (
+              <EmptyState
+                title="등록된 밴드가 없어요"
+                description={
+                  <>
+                    밴드를 등록하면 콘텐츠, 공연, 라이브 등
+                    <br />
+                    다양한 활동을 관리할 수 있어요
+                  </>
+                }
+                actionLabel="밴드 등록하기"
+                onAction={goToCreateBand}
+              />
+            ) : null}
+
+            {hasBand && activeTab === "content" ? (
               <EmptyState
                 title="등록된 콘텐츠가 없어요"
                 description={
@@ -219,41 +199,63 @@ const BandHomePage = () => {
               />
             ) : null}
 
-            {activeTab === "schedule" ? (
+            {hasBand && activeTab === "schedule" && concerts.length === 0 ? (
+              <EmptyState
+                title="등록된 일정이 없어요"
+                description={
+                  <>
+                    공연 일정을 등록하면 팬들이
+                    <br />
+                    소식을 받아볼 수 있어요
+                  </>
+                }
+                actionLabel="등록하기"
+                onAction={() => navigate("/band/concerts/new")}
+              />
+            ) : null}
+
+            {hasBand && activeTab === "schedule" && concerts.length > 0 ? (
               <div className="flex flex-col gap-3">
-                {concerts.map((concert) => (
-                  <ConcertCard
-                    key={concert.id}
-                    month={concert.month}
-                    day={concert.day}
-                    title={concert.title}
-                    location={concert.location}
-                    dateTime={concert.dateTime}
-                    status={concert.status}
-                    isPending={concert.status === "준비중"}
-                    actions={
-                      <>
-                        <button
-                          type="button"
-                          className="flex h-6.5 items-center justify-center gap-2.5 rounded-lg bg-[#FFF6E5] px-3.75 py-1.75 text-caption3 text-secondary-500"
-                        >
-                          수정
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setDeleteTargetId(concert.id)}
-                          className="flex h-6.5 items-center justify-center gap-2.5 rounded-lg bg-neutral-300 px-3.75 py-1.75 text-caption3 text-neutral-600"
-                        >
-                          삭제
-                        </button>
-                      </>
-                    }
-                  />
-                ))}
+                {concerts.map((concert) => {
+                  const cardProps = getConcertCardProps(concert);
+
+                  return (
+                    <ConcertCard
+                      key={concert.id}
+                      month={cardProps.month}
+                      day={cardProps.day}
+                      title={concert.title}
+                      location={concert.location}
+                      dateTime={cardProps.dateTime}
+                      status={cardProps.statusLabel}
+                      isPending={concert.status === "draft"}
+                      actions={
+                        <>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              navigate(`/band/concerts/${concert.id}/edit`)
+                            }
+                            className="flex h-6.5 items-center justify-center gap-2.5 rounded-lg bg-[#FFF6E5] px-3.75 py-1.75 text-center text-caption3 text-neutral-600"
+                          >
+                            수정
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDeleteTargetId(concert.id)}
+                            className="flex h-6.5 items-center justify-center gap-2.5 rounded-lg bg-neutral-300 px-3.75 py-1.75 text-caption3 text-neutral-600"
+                          >
+                            삭제
+                          </button>
+                        </>
+                      }
+                    />
+                  );
+                })}
               </div>
             ) : null}
 
-            {activeTab === "music" ? (
+            {hasBand && activeTab === "music" ? (
               <EmptyState
                 title="등록된 음원이 없어요"
                 description={
@@ -282,7 +284,7 @@ const BandHomePage = () => {
           confirmLabel="삭제"
           onCancel={() => setDeleteTargetId(null)}
           onConfirm={() => {
-            setConcerts((prev) => prev.filter((concert) => concert.id !== deleteTargetId));
+            if (deleteTargetId) removeConcert(deleteTargetId);
             setDeleteTargetId(null);
           }}
         />

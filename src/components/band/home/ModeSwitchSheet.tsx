@@ -1,4 +1,6 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useSlideUpSheet } from "@/hooks/useSlideUpSheet";
 import { useBandProfileStore } from "@/stores/useBandProfileStore";
 import BandAvatar from "@/assets/images/IMG_my.svg";
 import FanAvatar from "@/assets/icons/band/user-default-profile.svg";
@@ -9,10 +11,6 @@ interface ModeSwitchSheetProps {
   open: boolean;
   onClose: () => void;
 }
-
-const MOCK_OTHER_BANDS = [
-  { id: "band-2", name: "밴드명", subtitle: "인디록 · 서울" },
-];
 
 const MOCK_FAN_ACCOUNTS = [
   { id: "fan-1", nickname: "닉네임", email: "bethescene12@gmail.com" },
@@ -62,25 +60,14 @@ const AccountRow = ({
 );
 
 export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
-  const profile = useBandProfileStore((state) => state.profile);
-  const [selectedId, setSelectedId] = useState("band-1");
-  const [rendered, setRendered] = useState(open);
-  const [isVisible, setIsVisible] = useState(false);
+  const navigate = useNavigate();
+  const bands = useBandProfileStore((state) => state.bands);
+  const activeBandId = useBandProfileStore((state) => state.activeBandId);
+  const setActiveBandId = useBandProfileStore((state) => state.setActiveBandId);
+  const [selectedId, setSelectedId] = useState(activeBandId);
+  const { rendered, isVisible, handleTransitionEnd } = useSlideUpSheet(open);
 
-  if (open && !rendered) {
-    setRendered(true);
-  }
-
-  useEffect(() => {
-    if (!rendered) return;
-
-    const frame = requestAnimationFrame(() => setIsVisible(open));
-    return () => cancelAnimationFrame(frame);
-  }, [open, rendered]);
-
-  const handleTransitionEnd = () => {
-    if (!open) setRendered(false);
-  };
+  const registeredBands = bands.filter((band) => band.name.trim());
 
   if (!rendered) return null;
 
@@ -113,22 +100,17 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
               <span className="text-label2 text-secondary-500">밴드 모드</span>
 
               <div className="flex w-full flex-col gap-3">
-                <AccountRow
-                  avatar={profile.avatarUrl || BandAvatar}
-                  name={profile.name}
-                  subtitle={`${profile.genre} · ${profile.regions.join(", ")}`}
-                  selected={selectedId === "band-1"}
-                  onSelect={() => setSelectedId("band-1")}
-                />
-
-                {MOCK_OTHER_BANDS.map((band) => (
+                {registeredBands.map((band) => (
                   <AccountRow
                     key={band.id}
-                    avatar={BandAvatar}
+                    avatar={band.avatarUrl || BandAvatar}
                     name={band.name}
-                    subtitle={band.subtitle}
+                    subtitle={`${band.genre} · ${band.regions.join(", ")}`}
                     selected={selectedId === band.id}
-                    onSelect={() => setSelectedId(band.id)}
+                    onSelect={() => {
+                      setSelectedId(band.id);
+                      setActiveBandId(band.id);
+                    }}
                   />
                 ))}
               </div>
@@ -157,6 +139,10 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
 
             <button
               type="button"
+              onClick={() => {
+                onClose();
+                navigate("/band/profile/new");
+              }}
               className="flex w-82.5 items-center justify-start gap-2 text-label2 text-[#71717A]"
             >
               + 새 밴드 만들기
