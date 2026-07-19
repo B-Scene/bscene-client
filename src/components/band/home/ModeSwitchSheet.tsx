@@ -146,12 +146,7 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
             name={band.name}
             subtitle={band.subtitle}
             selected={selectedId === band.id}
-            onSelect={() => {
-              setSelectedId(band.id);
-              if (band.storeBandId) {
-                setActiveBandId(band.storeBandId);
-              }
-            }}
+            onSelect={() => setSelectedId(band.id)}
           />
         ))}
       </div>
