@@ -2,12 +2,14 @@ import { useMemo, useState, type UIEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import ArrowIcon from "@/assets/Arrow.svg";
 import SpeakerIcon from "@/assets/speaker.svg";
+import SwapIcon from "@/assets/icons/swap.svg";
 import BandProfileImage from "@/assets/icons/band/band-default-profile.svg";
 import ContentImage from "@/assets/Img_upload.png";
 import ConcertCard from "@/components/common/Card/ConcertCard";
 import NewsCard from "@/components/common/Card/NewsCard";
 import { HomeHeader } from "@/components/common/Header/HomeHeader";
 import { NotificationBellIcon } from "@/components/common/Header/NotificationBellIcon";
+import { ModeSwitchSheet } from "@/components/band/home/ModeSwitchSheet";
 
 type HomeVariant = "new" | "recommended" | "main";
 
@@ -250,6 +252,7 @@ const ConcertList = ({ count = 4 }: { count?: number }) => {
 const FanHomePage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const [isModeSwitchOpen, setIsModeSwitchOpen] = useState(false);
   const variant = getVariant(searchParams.get("variant"));
   const hasNotifications = searchParams.get("notifications") !== "empty";
 
@@ -330,24 +333,39 @@ const FanHomePage = () => {
     <main className="min-h-dvh bg-neutral-0 px-5 pb-[calc(var(--bottom-nav-height)+24px)]">
       <HomeHeader
         rightAction={
-          <button
-            type="button"
-            aria-label="알림"
-            onClick={() =>
-              navigate(
-                `/fan/home/notifications?status=${
-                  hasNotifications ? "has" : "empty"
-                }`,
-              )
-            }
-            className="flex size-6 items-center justify-center text-neutral-900"
-          >
-            <NotificationBellIcon hasUnread={hasNotifications} />
-          </button>
+          <>
+            <button
+              type="button"
+              aria-label="알림"
+              onClick={() =>
+                navigate(
+                  `/fan/home/notifications?status=${
+                    hasNotifications ? "has" : "empty"
+                  }`,
+                )
+              }
+              className="flex size-6 items-center justify-center text-neutral-900"
+            >
+              <NotificationBellIcon hasUnread={hasNotifications} />
+            </button>
+
+            <button
+              type="button"
+              aria-label="모드 전환"
+              onClick={() => setIsModeSwitchOpen(true)}
+            >
+              <img src={SwapIcon} alt="" className="size-6" />
+            </button>
+          </>
         }
       />
 
       <div className="mt-8">{content}</div>
+
+      <ModeSwitchSheet
+        open={isModeSwitchOpen}
+        onClose={() => setIsModeSwitchOpen(false)}
+      />
     </main>
   );
 };
