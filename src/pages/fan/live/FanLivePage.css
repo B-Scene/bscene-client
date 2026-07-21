@@ -1,0 +1,39 @@
+.fan-live-exit-button {
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--color-error) 18%, transparent);
+}
+
+.fan-live-profile-image {
+  filter:
+    drop-shadow(0 0 11px color-mix(in srgb, var(--color-primary-100) 90%, transparent))
+    drop-shadow(0 0 12px color-mix(in srgb, var(--color-primary-400) 45%, transparent));
+}
+
+.fan-live-action-bar {
+  box-shadow: 0 0 8px color-mix(in srgb, var(--color-neutral-900) 10%, transparent);
+}
+
+.fan-live-mic-button {
+  box-shadow: 0 0 20px color-mix(in srgb, var(--color-primary-400) 50%, transparent);
+}
+
+.fan-live-mic-icon path {
+  fill: var(--color-primary-400);
+}
+
+.fan-live-chat-mic-icon path {
+  fill: var(--color-primary-300);
+}
+
+.fan-live-chat-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  overscroll-behavior: contain;
+}
+
+.fan-live-chat-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.fan-live-member-row {
+  box-shadow: 0 0 8px color-mix(in srgb, var(--color-neutral-900) 10%, transparent);
+}

@@ -4,9 +4,15 @@ interface ModalOverlayProps {
   open: boolean;
   onClose?: () => void;
   children: ReactNode;
+  panelClassName?: string;
 }
 
-export const ModalOverlay = ({ open, onClose, children }: ModalOverlayProps) => {
+export const ModalOverlay = ({
+  open,
+  onClose,
+  children,
+  panelClassName = "rounded-2xl",
+}: ModalOverlayProps) => {
   if (!open) return null;
 
   return (
@@ -15,7 +21,7 @@ export const ModalOverlay = ({ open, onClose, children }: ModalOverlayProps) => 
       onClick={onClose}
     >
       <div
-        className="overflow-hidden rounded-2xl bg-neutral-0"
+        className={`overflow-hidden bg-neutral-0 ${panelClassName}`}
         onClick={(event) => event.stopPropagation()}
       >
         {children}
