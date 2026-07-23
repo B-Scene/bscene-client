@@ -19,6 +19,13 @@ import CompletePage from "@/pages/band/home/CompletePage";
 import MusicRegisterPage from "@/pages/band/home/MusicRegisterPage";
 import ContentRegisterPage from "@/pages/band/home/ContentRegisterPage";
 import FanHomePage from "@/pages/fan/home/FanHomePage";
+import FanMyPage from "@/pages/fan/my/MyPage";
+import FollowedBandsPage from "@/pages/fan/my/FollowedBandsPage";
+import InterestedConcertsPage from "@/pages/fan/my/InterestedConcertsPage";
+import AttendedConcertsPage from "@/pages/fan/my/AttendedConcertsPage";
+import ConcertAlertSettingsPage from "@/pages/fan/my/ConcertAlertSettingsPage";
+import FanLiveAlertSettingsPage from "@/pages/fan/my/LiveAlertSettingsPage";
+import ProfileEditPage from "@/pages/fan/my/ProfileEditPage";
 import FollowedBandNewsPage from "@/pages/fan/home/FollowedBandNewsPage";
 import FollowedConcertsPage from "@/pages/fan/home/FollowedConcertsPage";
 import ConcertCalendarPage from "@/pages/fan/home/ConcertCalendarPage";
@@ -138,6 +145,10 @@ export const router = createBrowserRouter([
         path: "/band/profile/postings",
         element: <PostingManagementPage />,
       },
+      {
+        path: "/fan/my/profile/edit",
+        element: <ProfileEditPage />,
+      },
     ],
   },
   {
@@ -163,6 +174,30 @@ export const router = createBrowserRouter([
       {
         path: "/fan/home/concerts/calendar",
         element: <ConcertCalendarPage />,
+      },
+      {
+        path: "/fan/my",
+        element: <FanMyPage />,
+      },
+      {
+        path: "/fan/my/followed-bands",
+        element: <FollowedBandsPage />,
+      },
+      {
+        path: "/fan/my/interested-concerts",
+        element: <InterestedConcertsPage />,
+      },
+      {
+        path: "/fan/my/attended-concerts",
+        element: <AttendedConcertsPage />,
+      },
+      {
+        path: "/fan/my/concert-alert",
+        element: <ConcertAlertSettingsPage />,
+      },
+      {
+        path: "/fan/my/live-alert",
+        element: <FanLiveAlertSettingsPage />,
       },
       {
         path: "/band/home",

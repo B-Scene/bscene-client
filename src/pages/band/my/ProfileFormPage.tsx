@@ -224,7 +224,7 @@ const ProfileFormPage = ({ mode }: ProfileFormPageProps) => {
         </div>
 
         <div className="flex flex-col gap-3">
-          <label className="text-label1 text-neutral-900">관심 장르</label>
+          <label className="text-body1 text-neutral-900">관심 장르</label>
           <ChipGroup
             options={GENRE_OPTIONS}
             value={genre}
@@ -233,7 +233,7 @@ const ProfileFormPage = ({ mode }: ProfileFormPageProps) => {
         </div>
 
         <div className="flex flex-col gap-3">
-          <label className="text-label1 text-neutral-900">활동 지역</label>
+          <label className="text-body1 text-neutral-900">활동 지역</label>
           <ChipGroup
             options={REGION_OPTIONS}
             value={region}
@@ -242,7 +242,7 @@ const ProfileFormPage = ({ mode }: ProfileFormPageProps) => {
         </div>
 
         <div className="flex flex-col gap-2">
-          <label className="text-label1 text-neutral-900">밴드 소개</label>
+          <label className="text-body1 text-neutral-900">밴드 소개</label>
           <Textarea
             value={bio}
             onChange={(event) => setBio(event.target.value)}
@@ -259,7 +259,7 @@ const ProfileFormPage = ({ mode }: ProfileFormPageProps) => {
 
           <section className="flex flex-col gap-4 px-8">
             <div className="flex flex-col gap-1">
-              <h2 className="text-label1 text-neutral-900">내 프로필 수정</h2>
+              <h2 className="text-body6 text-neutral-900">내 프로필 수정</h2>
               <p className="text-caption2 text-neutral-600">
                 이 밴드에서 표시되는 내 활동명과 파트를 수정합니다
               </p>
