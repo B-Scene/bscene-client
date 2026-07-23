@@ -1,0 +1,36 @@
+language: "ko-KR"
+tone_instructions: "한국어로 간결하게 리뷰하고, 사소한 취향보다 버그, 타입 안정성, 에러 처리, 유지보수성 문제를 우선적으로 지적해줘."
+
+reviews:
+  profile: "chill"
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+  review_status: true
+  review_details: false
+
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches:
+      - "develop"
+      - "main"
+
+  path_filters:
+    - "!**/node_modules/**"
+    - "!**/dist/**"
+    - "!**/build/**"
+    - "!**/coverage/**"
+    - "!**/*.min.js"
+    - "!**/.env"
+    - "!**/.env.*"
+
+  path_instructions:
+    - path: "src/**/*"
+      instructions: |
+        B:Scene 프론트엔드 프로젝트 기준으로 리뷰해줘.
+        실제 런타임 버그, 타입 안정성, API 에러 처리, 로딩/빈 상태 처리, 불필요한 리렌더링을 우선적으로 확인해줘.
+        단순 취향 차이, 과한 리팩토링, 데모 일정에 비해 부담이 큰 변경은 낮은 우선순위로 다뤄줘.
+
+chat:
+  auto_reply: true

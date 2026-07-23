@@ -12,7 +12,7 @@ importers:
         specifier: ^5.101.2
         version: 5.101.2(react@19.2.7)
       axios:
-        specifier: 1.18.1
+        specifier: ^1.18.1
         version: 1.18.1
       react:
         specifier: ^19.2.7
@@ -21,7 +21,7 @@ importers:
         specifier: ^19.2.7
         version: 19.2.7(react@19.2.7)
       react-router-dom:
-        specifier: 7.18.1
+        specifier: ^7.18.1
         version: 7.18.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       zod:
         specifier: ^4.4.3
@@ -73,7 +73,7 @@ importers:
         specifier: ^8.1.0
         version: 8.1.0(@types/node@24.13.2)(jiti@2.7.0)
       vite-plugin-svgr:
-        specifier: 5.2.0
+        specifier: ^5.2.0
         version: 5.2.0(typescript@6.0.3)(vite@8.1.0(@types/node@24.13.2)(jiti@2.7.0))
 
 packages:
