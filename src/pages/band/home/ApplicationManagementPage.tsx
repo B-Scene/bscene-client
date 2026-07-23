@@ -1,5 +1,6 @@
 import { Fragment, useState } from "react";
 import ApplyMemberIcon from "@/assets/icons/band/apply-member.svg";
+import ArrowRightIcon from "@/assets/icons/band/arrow-right-my.svg";
 import DefaultAvatar from "@/assets/icons/band/user-default-profile.svg";
 import { Header } from "@/components/band/home/Header";
 import { NotificationBandBanner } from "@/components/band/my/NotificationBandBanner";
@@ -64,18 +65,6 @@ const POSTINGS: Posting[] = [
     ],
   },
 ];
-
-const ChevronRightIcon = () => (
-  <svg width="8" height="14" viewBox="0 0 8 14" fill="none" aria-hidden="true">
-    <path
-      d="M1 1L7 7L1 13"
-      stroke="#A3A3A3"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </svg>
-);
 
 const ApplicationManagementPage = () => {
   const profile = useBandProfileStore((state) => state.profile);
@@ -204,7 +193,7 @@ const ApplicationManagementPage = () => {
 
                         {applicant.status === "pending" ? (
                           <button type="button" className="shrink-0">
-                            <ChevronRightIcon />
+                            <img src={ArrowRightIcon} alt="" />
                           </button>
                         ) : applicant.status === "accepted" ? (
                           <span className="flex py-0.5 px-3.75 shrink-0 items-center justify-center rounded-full bg-secondary-400 text-center text-caption3 text-neutral-0">
