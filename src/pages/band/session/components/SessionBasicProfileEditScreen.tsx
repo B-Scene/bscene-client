@@ -1,18 +1,33 @@
-import { useRef, useState, type ChangeEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type ReactNode,
+} from "react";
+import type { AxiosError } from "axios";
 import ArrowLeftIcon from "@/assets/icons/arrow-left.svg";
+import UserDefaultProfileIcon from "@/assets/icons/band/user-default-profile.svg";
+import {
+  useSessionProfileQuery,
+  useUpdateSessionProfile,
+} from "@/hooks/api/session/useSessionProfile";
+import type {
+  SessionApiResponse,
+  SessionProfileGender,
+} from "@/types/session/sessionProfile";
 
 interface SessionBasicProfileEditScreenProps {
   onBack: () => void;
 }
 
-type Gender = "남성" | "여성";
-
 interface BasicProfileValues {
   name: string;
   phone: string;
   email: string;
-  gender: Gender;
+  gender: SessionProfileGender;
   birthDate: string;
+  profileImageUrl: string | null;
 }
 
 const cx = (...classNames: Array<string | false | null | undefined>) =>
@@ -22,23 +37,42 @@ export const SessionBasicProfileEditScreen = ({
   onBack,
 }: SessionBasicProfileEditScreenProps) => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const [profileImage, setProfileImage] = useState<string | null>(null);
+  const profileQuery = useSessionProfileQuery();
+  const updateProfileMutation = useUpdateSessionProfile();
+
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [saveErrorMessage, setSaveErrorMessage] = useState("");
   const [values, setValues] = useState<BasicProfileValues>({
-    name: "정하람",
-    phone: "01012345678",
-    email: "haramdrums@example.com",
-    gender: "남성",
-    birthDate: "1998.06.06.",
+    name: "",
+    phone: "",
+    email: "",
+    gender: "MALE",
+    birthDate: "",
+    profileImageUrl: null,
   });
+
+  useEffect(() => {
+    if (!profileQuery.data) return;
+
+    setValues({
+      name: profileQuery.data.name,
+      phone: profileQuery.data.phone,
+      email: profileQuery.data.email ?? "",
+      gender: profileQuery.data.gender,
+      birthDate: profileQuery.data.birthDate,
+      profileImageUrl: profileQuery.data.profileImageUrl,
+    });
+  }, [profileQuery.data]);
 
   const handleProfileImageChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
 
-    if (!file) {
-      return;
-    }
+    if (!file) return;
 
-    setProfileImage(URL.createObjectURL(file));
+    setPreviewImage(URL.createObjectURL(file));
+    setSaveErrorMessage(
+      "이미지 저장은 Presigned URL 업로드 API 연결 후 반영돼요. 현재는 미리보기만 가능합니다.",
+    );
   };
 
   const handleEmailChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -46,14 +80,68 @@ export const SessionBasicProfileEditScreen = ({
       ...currentValues,
       email: event.target.value,
     }));
+    setSaveErrorMessage("");
   };
 
-  const handleGenderChange = (gender: Gender) => {
+  const handleGenderChange = (gender: SessionProfileGender) => {
     setValues((currentValues) => ({
       ...currentValues,
       gender,
     }));
+    setSaveErrorMessage("");
   };
+
+  const handleSave = async () => {
+    setSaveErrorMessage("");
+
+    try {
+      await updateProfileMutation.mutateAsync({
+        email: values.email.trim() || undefined,
+        gender: values.gender,
+        profileImageUrl: values.profileImageUrl ?? undefined,
+      });
+
+      onBack();
+    } catch (error) {
+      const apiMessage = (error as AxiosError<SessionApiResponse<null>>).response?.data
+        ?.message;
+
+      setSaveErrorMessage(
+        apiMessage ?? "기본 정보 수정에 실패했어요. 잠시 후 다시 시도해주세요.",
+      );
+    }
+  };
+
+  if (profileQuery.isLoading) {
+    return (
+      <main className="min-h-dvh bg-neutral-0">
+        <EditTopBar onBack={onBack} />
+        <section className="flex min-h-[360px] items-center justify-center text-caption1 text-neutral-500">
+          기본 정보를 불러오고 있어요
+        </section>
+      </main>
+    );
+  }
+
+  if (profileQuery.isError) {
+    return (
+      <main className="min-h-dvh bg-neutral-0">
+        <EditTopBar onBack={onBack} />
+        <section className="flex min-h-[360px] flex-col items-center justify-center px-6 text-center">
+          <p className="text-caption1 text-neutral-500">
+            기본 정보를 불러오지 못했어요
+          </p>
+          <button
+            type="button"
+            onClick={() => profileQuery.refetch()}
+            className="mt-3 rounded-[8px] bg-secondary-500 px-4 py-2 text-caption2 text-neutral-0"
+          >
+            다시 시도
+          </button>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-dvh bg-neutral-0 pb-[calc(var(--bottom-nav-height)+92px)]">
@@ -66,11 +154,11 @@ export const SessionBasicProfileEditScreen = ({
           onClick={() => fileInputRef.current?.click()}
           className="flex size-[72px] items-center justify-center overflow-hidden rounded-full bg-neutral-600"
         >
-          {profileImage ? (
-            <img src={profileImage} alt="" className="size-full object-cover" />
-          ) : (
-            <ProfilePlaceholderIcon />
-          )}
+          <img
+            src={previewImage || values.profileImageUrl || UserDefaultProfileIcon}
+            alt=""
+            className="size-full object-cover"
+          />
         </button>
         <input
           ref={fileInputRef}
@@ -110,13 +198,13 @@ export const SessionBasicProfileEditScreen = ({
             <div className="grid grid-cols-2 gap-6">
               <GenderButton
                 label="남성"
-                selected={values.gender === "남성"}
-                onClick={() => handleGenderChange("남성")}
+                selected={values.gender === "MALE"}
+                onClick={() => handleGenderChange("MALE")}
               />
               <GenderButton
                 label="여성"
-                selected={values.gender === "여성"}
-                onClick={() => handleGenderChange("여성")}
+                selected={values.gender === "FEMALE"}
+                onClick={() => handleGenderChange("FEMALE")}
               />
             </div>
           </ProfileField>
@@ -125,14 +213,20 @@ export const SessionBasicProfileEditScreen = ({
             <ProfileInput value={values.birthDate} readOnly muted />
           </ProfileField>
         </div>
+
+        {saveErrorMessage ? (
+          <p className="mt-5 text-center text-caption2 text-error">{saveErrorMessage}</p>
+        ) : null}
       </section>
 
       <div className="fixed inset-x-0 bottom-[var(--bottom-nav-height)] z-20 bg-neutral-0 px-5 pt-4 pb-5">
         <button
           type="button"
-          className="flex h-[52px] w-full items-center justify-center rounded-[12px] bg-secondary-500 text-label2 text-neutral-0"
+          disabled={updateProfileMutation.isPending}
+          onClick={handleSave}
+          className="flex h-[52px] w-full items-center justify-center rounded-[12px] bg-secondary-500 text-label2 text-neutral-0 disabled:bg-neutral-300 disabled:text-neutral-700"
         >
-          프로필 저장
+          {updateProfileMutation.isPending ? "저장 중" : "프로필 저장"}
         </button>
       </div>
     </main>
@@ -150,33 +244,12 @@ const EditTopBar = ({ onBack }: EditTopBarProps) => {
         type="button"
         aria-label="뒤로가기"
         onClick={onBack}
-        className="absolute left-[15px] top-[5px] flex size-[38px] items-center justify-center"
+        className="absolute top-[5px] left-[15px] flex size-[38px] items-center justify-center"
       >
         <img src={ArrowLeftIcon} alt="" className="size-6" />
       </button>
       <h1 className="text-body1 text-neutral-900">기본 정보 수정</h1>
     </header>
-  );
-};
-
-const ProfilePlaceholderIcon = () => {
-  return (
-    <svg
-      width="42"
-      height="42"
-      viewBox="0 0 42 42"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-hidden="true"
-    >
-      <circle cx="21" cy="14" r="8" stroke="white" strokeWidth="3" />
-      <path
-        d="M6.5 36.5C8.7 28.6 14 25 21 25C28 25 33.3 28.6 35.5 36.5"
-        stroke="white"
-        strokeWidth="3"
-        strokeLinecap="round"
-      />
-    </svg>
   );
 };
 
@@ -229,7 +302,7 @@ const ProfileInput = ({
 };
 
 interface GenderButtonProps {
-  label: Gender;
+  label: "남성" | "여성";
   selected: boolean;
   onClick: () => void;
 }

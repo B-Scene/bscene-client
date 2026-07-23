@@ -1,4 +1,5 @@
 import { useRef, useState, type ChangeEvent } from "react";
+import type { AxiosError } from "axios";
 import Modal from "@/components/Modal/Modal";
 import { ModalOverlay } from "@/components/common/Modal/ModalOverlay";
 import ArrowLeftIcon from "@/assets/icons/arrow-left.svg";
@@ -6,9 +7,14 @@ import CloseIcon from "@/assets/icons/close.svg";
 import ArrowDownGrayIcon from "@/assets/icons/band/arrow-down-gray.svg";
 import CalendarIcon from "@/assets/icons/band/data-range.svg";
 import ClockIcon from "@/assets/icons/band/clock-band.svg";
+import { useCreateSessionRecruitment } from "@/hooks/api/session/useSessionRecruitment";
+import type {
+  CreateSessionRecruitmentResponse,
+  SessionApiResponse,
+} from "@/types/session/sessionRecruitment";
 import { SessionRecruitmentCompleteScreen } from "./SessionRecruitmentCompleteScreen";
 
-const PART_OPTIONS = ["보컬", "기타", "베이스", "키보드", "드럼", "etc."];
+const PART_OPTIONS = ["보컬", "기타", "베이스", "키보드", "드럼", "etc"];
 const SKILL_OPTIONS = ["입문", "중급", "상급"];
 
 type FormStep = 1 | 2;
@@ -16,14 +22,14 @@ type FormStep = 1 | 2;
 interface SessionRecruitmentFormScreenProps {
   onBack: () => void;
   onClose: () => void;
-  onViewCreatedPost?: () => void;
+  onViewCreatedPost?: (sessionRecruitmentId?: number) => void;
 }
 
 interface BasicFormValues {
   title: string;
   summary: string;
   detail: string;
-  parts: string[];
+  part: string;
   skill: string;
   genre: string;
 }
@@ -39,29 +45,70 @@ interface DetailFormValues {
 
 interface FormErrors {
   title?: string;
-  parts?: string;
+  summary?: string;
+  detail?: string;
+  part?: string;
   genre?: string;
   region?: string;
+  practiceSchedule?: string;
+  practiceLocation?: string;
   deadlineDate?: string;
   deadlineTime?: string;
+  qualification?: string;
 }
 
 const cx = (...classNames: Array<string | false | null | undefined>) =>
   classNames.filter(Boolean).join(" ");
+
+const DEFAULT_BAND_MEMBER_ID = 1;
+
+const getBandMemberId = () => {
+  const storedBandMemberId = localStorage.getItem("bandMemberId");
+  const parsedBandMemberId = Number(storedBandMemberId);
+
+  return Number.isFinite(parsedBandMemberId) && parsedBandMemberId > 0
+    ? parsedBandMemberId
+    : DEFAULT_BAND_MEMBER_ID;
+};
+
+const toDeadlineAt = (dateValue: string, timeValue: string) => `${dateValue}T${timeValue}:00`;
+
+const splitDeadlineAt = (deadlineAt?: string) => ({
+  deadlineDate: deadlineAt?.slice(0, 10) ?? "",
+  deadlineTime: deadlineAt?.slice(11, 16) ?? "",
+});
+
+const isFutureDeadline = (dateValue: string, timeValue: string) => {
+  if (!dateValue || !timeValue) {
+    return false;
+  }
+
+  const deadline = new Date(toDeadlineAt(dateValue, timeValue));
+
+  if (Number.isNaN(deadline.getTime())) {
+    return false;
+  }
+
+  return deadline.getTime() > Date.now();
+};
 
 export const SessionRecruitmentFormScreen = ({
   onBack,
   onClose,
   onViewCreatedPost,
 }: SessionRecruitmentFormScreenProps) => {
+  const createRecruitmentMutation = useCreateSessionRecruitment();
   const [currentStep, setCurrentStep] = useState<FormStep>(1);
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [isCompleteScreenOpen, setIsCompleteScreenOpen] = useState(false);
+  const [createdRecruitment, setCreatedRecruitment] =
+    useState<CreateSessionRecruitmentResponse | null>(null);
+  const [submitErrorMessage, setSubmitErrorMessage] = useState("");
   const [basicValues, setBasicValues] = useState<BasicFormValues>({
     title: "",
     summary: "",
     detail: "",
-    parts: [],
+    part: "",
     skill: "중급",
     genre: "",
   });
@@ -79,14 +126,17 @@ export const SessionRecruitmentFormScreen = ({
     basicValues.title.trim().length > 0 &&
     basicValues.summary.trim().length > 0 &&
     basicValues.detail.trim().length > 0 &&
-    basicValues.parts.length > 0 &&
+    basicValues.part.length > 0 &&
     basicValues.skill.length > 0 &&
     basicValues.genre.length > 0;
 
   const isDetailComplete =
     detailValues.region.length > 0 &&
+    detailValues.practiceSchedule.trim().length > 0 &&
+    detailValues.practiceLocation.trim().length > 0 &&
     detailValues.deadlineDate.length > 0 &&
-    detailValues.deadlineTime.length > 0;
+    detailValues.deadlineTime.length > 0 &&
+    detailValues.qualification.trim().length > 0;
 
   const handleBasicFieldChange =
     (field: keyof Pick<BasicFormValues, "title" | "summary" | "detail">) =>
@@ -99,33 +149,40 @@ export const SessionRecruitmentFormScreen = ({
         ...currentErrors,
         [field]: undefined,
       }));
+      setSubmitErrorMessage("");
     };
 
   const handleDetailFieldChange =
-    (field: keyof Pick<DetailFormValues, "practiceSchedule" | "practiceLocation" | "qualification">) =>
+    (
+      field: keyof Pick<
+        DetailFormValues,
+        "practiceSchedule" | "practiceLocation" | "qualification"
+      >,
+    ) =>
     (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
       setDetailValues((currentValues) => ({
         ...currentValues,
         [field]: event.target.value,
       }));
+      setErrors((currentErrors) => ({
+        ...currentErrors,
+        [field]: undefined,
+      }));
+      setSubmitErrorMessage("");
     };
 
   const handlePartClick = (part: string) => {
-    setBasicValues((currentValues) => {
-      const isSelected = currentValues.parts.includes(part);
-
-      return {
-        ...currentValues,
-        parts: isSelected
-          ? currentValues.parts.filter((selectedPart) => selectedPart !== part)
-          : [...currentValues.parts, part],
-      };
-    });
-    setErrors((currentErrors) => ({ ...currentErrors, parts: undefined }));
+    setBasicValues((currentValues) => ({
+      ...currentValues,
+      part,
+    }));
+    setErrors((currentErrors) => ({ ...currentErrors, part: undefined }));
+    setSubmitErrorMessage("");
   };
 
   const handleSkillClick = (skill: string) => {
     setBasicValues((currentValues) => ({ ...currentValues, skill }));
+    setSubmitErrorMessage("");
   };
 
   const handleGenreSelect = () => {
@@ -134,6 +191,7 @@ export const SessionRecruitmentFormScreen = ({
       genre: currentValues.genre || "락",
     }));
     setErrors((currentErrors) => ({ ...currentErrors, genre: undefined }));
+    setSubmitErrorMessage("");
   };
 
   const handleRegionSelect = () => {
@@ -142,6 +200,7 @@ export const SessionRecruitmentFormScreen = ({
       region: currentValues.region || "서울",
     }));
     setErrors((currentErrors) => ({ ...currentErrors, region: undefined }));
+    setSubmitErrorMessage("");
   };
 
   const handleDeadlineDateChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -149,7 +208,12 @@ export const SessionRecruitmentFormScreen = ({
       ...currentValues,
       deadlineDate: event.target.value,
     }));
-    setErrors((currentErrors) => ({ ...currentErrors, deadlineDate: undefined }));
+    setErrors((currentErrors) => ({
+      ...currentErrors,
+      deadlineDate: undefined,
+      deadlineTime: undefined,
+    }));
+    setSubmitErrorMessage("");
   };
 
   const handleDeadlineTimeChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -157,7 +221,12 @@ export const SessionRecruitmentFormScreen = ({
       ...currentValues,
       deadlineTime: event.target.value,
     }));
-    setErrors((currentErrors) => ({ ...currentErrors, deadlineTime: undefined }));
+    setErrors((currentErrors) => ({
+      ...currentErrors,
+      deadlineDate: undefined,
+      deadlineTime: undefined,
+    }));
+    setSubmitErrorMessage("");
   };
 
   const validateBasicForm = () => {
@@ -167,8 +236,16 @@ export const SessionRecruitmentFormScreen = ({
       nextErrors.title = "공고명은 필수 항목이에요";
     }
 
-    if (basicValues.parts.length === 0) {
-      nextErrors.parts = "파트를 선택해주세요";
+    if (!basicValues.summary.trim()) {
+      nextErrors.summary = "공고 한줄 소개는 필수 항목이에요";
+    }
+
+    if (!basicValues.detail.trim()) {
+      nextErrors.detail = "공고 상세 소개는 필수 항목이에요";
+    }
+
+    if (!basicValues.part) {
+      nextErrors.part = "파트를 선택해주세요";
     }
 
     if (!basicValues.genre) {
@@ -186,12 +263,32 @@ export const SessionRecruitmentFormScreen = ({
       nextErrors.region = "활동 지역은 필수 항목이에요";
     }
 
+    if (!detailValues.practiceSchedule.trim()) {
+      nextErrors.practiceSchedule = "연습 일정은 필수 항목이에요";
+    }
+
+    if (!detailValues.practiceLocation.trim()) {
+      nextErrors.practiceLocation = "연습 장소는 필수 항목이에요";
+    }
+
     if (!detailValues.deadlineDate) {
       nextErrors.deadlineDate = "모집 마감 날짜를 선택해주세요";
     }
 
     if (!detailValues.deadlineTime) {
       nextErrors.deadlineTime = "모집 마감 시간을 선택해주세요";
+    }
+
+    if (
+      detailValues.deadlineDate &&
+      detailValues.deadlineTime &&
+      !isFutureDeadline(detailValues.deadlineDate, detailValues.deadlineTime)
+    ) {
+      nextErrors.deadlineTime = "모집 마감일은 현재 시간 이후여야 해요";
+    }
+
+    if (!detailValues.qualification.trim()) {
+      nextErrors.qualification = "지원 자격은 필수 항목이에요";
     }
 
     setErrors(nextErrors);
@@ -205,9 +302,35 @@ export const SessionRecruitmentFormScreen = ({
     }
   };
 
-  const handleSubmit = () => {
-    if (validateDetailForm()) {
+  const handleSubmit = async () => {
+    if (!validateDetailForm()) return;
+
+    setSubmitErrorMessage("");
+
+    try {
+      const result = await createRecruitmentMutation.mutateAsync({
+        bandMemberId: getBandMemberId(),
+        recruitmentTitle: basicValues.title.trim(),
+        summary: basicValues.summary.trim(),
+        content: basicValues.detail.trim(),
+        part: basicValues.part,
+        skillLevel: basicValues.skill,
+        genre: basicValues.genre,
+        region: detailValues.region,
+        practiceSchedule: detailValues.practiceSchedule.trim(),
+        practicePlace: detailValues.practiceLocation.trim(),
+        deadlineAt: toDeadlineAt(detailValues.deadlineDate, detailValues.deadlineTime),
+        qualification: detailValues.qualification.trim(),
+      });
+
+      setCreatedRecruitment(result);
       setIsCompleteScreenOpen(true);
+    } catch (error) {
+      const apiMessage = (error as AxiosError<SessionApiResponse<null>>).response?.data
+        ?.message;
+      setSubmitErrorMessage(
+        apiMessage ?? "모집 공고 등록에 실패했어요. 잠시 후 다시 시도해주세요.",
+      );
     }
   };
 
@@ -224,14 +347,24 @@ export const SessionRecruitmentFormScreen = ({
     onBack();
   };
 
+  const handleConfirmPost = () => {
+    if (onViewCreatedPost) {
+      onViewCreatedPost(createdRecruitment?.sessionRecruitmentId);
+      return;
+    }
+
+    onClose();
+  };
+
+  const deadlineSummary = splitDeadlineAt(createdRecruitment?.deadlineAt);
   const completionSummary = {
-    title: basicValues.title.trim() || "드럼 세션 구해요",
-    part: basicValues.parts[0] ?? "드럼",
-    skill: basicValues.skill || "중급",
-    genre: basicValues.genre || "락",
-    region: detailValues.region || "서울",
-    deadlineDate: detailValues.deadlineDate,
-    deadlineTime: detailValues.deadlineTime,
+    title: createdRecruitment?.recruitmentTitle ?? (basicValues.title.trim() || "드럼 세션 구해요"),
+    part: createdRecruitment?.part ?? (basicValues.part || "드럼"),
+    skill: createdRecruitment?.skillLevel ?? (basicValues.skill || "중급"),
+    genre: createdRecruitment?.genre ?? (basicValues.genre || "락"),
+    region: createdRecruitment?.region ?? (detailValues.region || "서울"),
+    deadlineDate: deadlineSummary.deadlineDate || detailValues.deadlineDate,
+    deadlineTime: deadlineSummary.deadlineTime || detailValues.deadlineTime,
   };
 
   if (isCompleteScreenOpen) {
@@ -239,7 +372,7 @@ export const SessionRecruitmentFormScreen = ({
       <SessionRecruitmentCompleteScreen
         summary={completionSummary}
         onBackToSession={onClose}
-        onConfirmPost={onViewCreatedPost ?? onClose}
+        onConfirmPost={handleConfirmPost}
       />
     );
   }
@@ -265,6 +398,8 @@ export const SessionRecruitmentFormScreen = ({
           values={detailValues}
           errors={errors}
           isComplete={isDetailComplete}
+          submitErrorMessage={submitErrorMessage}
+          isSubmitting={createRecruitmentMutation.isPending}
           onFieldChange={handleDetailFieldChange}
           onRegionSelect={handleRegionSelect}
           onDeadlineDateChange={handleDeadlineDateChange}
@@ -318,19 +453,22 @@ const BasicInfoStep = ({
   onNext,
 }: BasicInfoStepProps) => {
   const hasTitleError = Boolean(errors.title);
+  const hasSummaryError = Boolean(errors.summary);
+  const hasDetailError = Boolean(errors.detail);
   const hasGenreError = Boolean(errors.genre);
 
   return (
     <>
       <section className="pl-5 pr-[19px] pt-0">
         <div className="rounded-[16px] bg-neutral-0 px-[18px] py-4 shadow-[0_0_8px_rgba(0,0,0,0.08)]">
-          <FieldLabel htmlFor="session-recruitment-title" required={hasTitleError}>
+          <FieldLabel htmlFor="session-recruitment-title" required>
             공고 제목
           </FieldLabel>
           <TextInput
             id="session-recruitment-title"
             value={values.title}
             placeholder="공고 제목을 입력해주세요"
+            maxLength={50}
             error={hasTitleError}
             onChange={onFieldChange("title")}
           />
@@ -344,8 +482,11 @@ const BasicInfoStep = ({
               id="session-recruitment-summary"
               value={values.summary}
               placeholder="공고 목록에 표시될 짧은 소개를 입력해주세요. (최대 50자)"
+              maxLength={50}
+              error={hasSummaryError}
               onChange={onFieldChange("summary")}
             />
+            {errors.summary ? <ErrorMessage>{errors.summary}</ErrorMessage> : null}
           </div>
 
           <div className="mt-3">
@@ -359,12 +500,16 @@ const BasicInfoStep = ({
                 maxLength={500}
                 placeholder="모집 공고의 상세 내용을 입력해주세요"
                 onChange={onFieldChange("detail")}
-                className="h-[58px] w-full resize-none rounded-[5px] border border-neutral-400 bg-neutral-0 px-4 py-2 text-caption2 text-neutral-900 outline-none placeholder:text-caption2 placeholder:text-neutral-500 focus:border-secondary-500"
+                className={cx(
+                  "h-[58px] w-full resize-none rounded-[5px] border bg-neutral-0 px-4 py-2 text-caption2 text-neutral-900 outline-none placeholder:text-caption2 placeholder:text-neutral-500",
+                  hasDetailError ? "border-error" : "border-neutral-400 focus:border-secondary-500",
+                )}
               />
               <span className="absolute right-[13px] bottom-2 text-caption4 text-neutral-500">
                 {values.detail.length}/500
               </span>
             </div>
+            {errors.detail ? <ErrorMessage>{errors.detail}</ErrorMessage> : null}
           </div>
 
           <div className="mt-3">
@@ -373,14 +518,14 @@ const BasicInfoStep = ({
               {PART_OPTIONS.map((part) => (
                 <OptionChip
                   key={part}
-                  selected={values.parts.includes(part)}
+                  selected={values.part === part}
                   onClick={() => onPartClick(part)}
                 >
                   {part}
                 </OptionChip>
               ))}
             </div>
-            {errors.parts ? <ErrorMessage>{errors.parts}</ErrorMessage> : null}
+            {errors.part ? <ErrorMessage>{errors.part}</ErrorMessage> : null}
           </div>
 
           <div className="mt-3">
@@ -420,8 +565,13 @@ interface DetailInfoStepProps {
   values: DetailFormValues;
   errors: FormErrors;
   isComplete: boolean;
+  submitErrorMessage: string;
+  isSubmitting: boolean;
   onFieldChange: (
-    field: keyof Pick<DetailFormValues, "practiceSchedule" | "practiceLocation" | "qualification">,
+    field: keyof Pick<
+      DetailFormValues,
+      "practiceSchedule" | "practiceLocation" | "qualification"
+    >,
   ) => (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
   onRegionSelect: () => void;
   onDeadlineDateChange: (event: ChangeEvent<HTMLInputElement>) => void;
@@ -433,6 +583,8 @@ const DetailInfoStep = ({
   values,
   errors,
   isComplete,
+  submitErrorMessage,
+  isSubmitting,
   onFieldChange,
   onRegionSelect,
   onDeadlineDateChange,
@@ -469,23 +621,37 @@ const DetailInfoStep = ({
           {errors.region ? <ErrorMessage>{errors.region}</ErrorMessage> : null}
 
           <div className="mt-3">
-            <FieldLabel htmlFor="session-practice-schedule">연습 일정</FieldLabel>
+            <FieldLabel htmlFor="session-practice-schedule" required>
+              연습 일정
+            </FieldLabel>
             <TextInput
               id="session-practice-schedule"
               value={values.practiceSchedule}
               placeholder="연습 일정을 작성해주세요"
+              maxLength={50}
+              error={Boolean(errors.practiceSchedule)}
               onChange={onFieldChange("practiceSchedule")}
             />
+            {errors.practiceSchedule ? (
+              <ErrorMessage>{errors.practiceSchedule}</ErrorMessage>
+            ) : null}
           </div>
 
           <div className="mt-3">
-            <FieldLabel htmlFor="session-practice-location">연습 장소</FieldLabel>
+            <FieldLabel htmlFor="session-practice-location" required>
+              연습 장소
+            </FieldLabel>
             <TextInput
               id="session-practice-location"
               value={values.practiceLocation}
               placeholder="연습 장소를 작성해주세요"
+              maxLength={50}
+              error={Boolean(errors.practiceLocation)}
               onChange={onFieldChange("practiceLocation")}
             />
+            {errors.practiceLocation ? (
+              <ErrorMessage>{errors.practiceLocation}</ErrorMessage>
+            ) : null}
           </div>
 
           <div className="mt-3">
@@ -506,7 +672,7 @@ const DetailInfoStep = ({
                   tabIndex={-1}
                   aria-hidden="true"
                   onChange={onDeadlineDateChange}
-                  className="pointer-events-none absolute right-0 top-0 h-px w-px opacity-0"
+                  className="pointer-events-none absolute top-0 right-0 h-px w-px opacity-0"
                 />
               </div>
               <div className="relative">
@@ -524,7 +690,7 @@ const DetailInfoStep = ({
                   tabIndex={-1}
                   aria-hidden="true"
                   onChange={onDeadlineTimeChange}
-                  className="pointer-events-none absolute right-0 top-0 h-px w-px opacity-0"
+                  className="pointer-events-none absolute top-0 right-0 h-px w-px opacity-0"
                 />
               </div>
             </div>
@@ -533,19 +699,43 @@ const DetailInfoStep = ({
           </div>
 
           <div className="mt-3">
-            <FieldLabel htmlFor="session-qualification">지원 자격</FieldLabel>
-            <textarea
-              id="session-qualification"
-              value={values.qualification}
-              placeholder="지원 자격을 입력해주세요"
-              onChange={onFieldChange("qualification")}
-              className="h-[58px] w-full resize-none rounded-[5px] border border-neutral-400 bg-neutral-0 px-4 py-2 text-caption2 text-neutral-900 outline-none placeholder:text-caption2 placeholder:text-neutral-500 focus:border-secondary-500"
-            />
+            <FieldLabel htmlFor="session-qualification" required>
+              지원 자격
+            </FieldLabel>
+            <div className="relative">
+              <textarea
+                id="session-qualification"
+                value={values.qualification}
+                maxLength={500}
+                placeholder="지원 자격을 입력해주세요"
+                onChange={onFieldChange("qualification")}
+                className={cx(
+                  "h-[58px] w-full resize-none rounded-[5px] border bg-neutral-0 px-4 py-2 text-caption2 text-neutral-900 outline-none placeholder:text-caption2 placeholder:text-neutral-500",
+                  errors.qualification
+                    ? "border-error"
+                    : "border-neutral-400 focus:border-secondary-500",
+                )}
+              />
+              <span className="absolute right-[13px] bottom-2 text-caption4 text-neutral-500">
+                {values.qualification.length}/500
+              </span>
+            </div>
+            {errors.qualification ? <ErrorMessage>{errors.qualification}</ErrorMessage> : null}
           </div>
         </div>
       </section>
 
-      <BottomActionButton active={isComplete} label="모집 공고 등록" onClick={onSubmit} />
+      {submitErrorMessage ? (
+        <p className="fixed inset-x-0 bottom-[calc(var(--bottom-nav-height)+84px)] z-20 px-5 text-center text-caption2 text-error">
+          {submitErrorMessage}
+        </p>
+      ) : null}
+
+      <BottomActionButton
+        active={isComplete && !isSubmitting}
+        label={isSubmitting ? "등록 중" : "모집 공고 등록"}
+        onClick={onSubmit}
+      />
     </>
   );
 };
@@ -562,7 +752,7 @@ const FormTopBar = ({ onBack, onClose }: FormTopBarProps) => {
         type="button"
         aria-label="뒤로가기"
         onClick={onBack}
-        className="absolute left-[15px] top-[5px] flex size-[38px] items-center justify-center"
+        className="absolute top-[5px] left-[15px] flex size-[38px] items-center justify-center"
       >
         <img src={ArrowLeftIcon} alt="" className="size-6" />
       </button>
@@ -571,7 +761,7 @@ const FormTopBar = ({ onBack, onClose }: FormTopBarProps) => {
         type="button"
         aria-label="닫기"
         onClick={onClose}
-        className="absolute right-[15px] top-[5px] flex size-[38px] items-center justify-center"
+        className="absolute top-[5px] right-[15px] flex size-[38px] items-center justify-center"
       >
         <img src={CloseIcon} alt="" className="size-6" />
       </button>
@@ -650,14 +840,23 @@ interface TextInputProps {
   value: string;
   placeholder: string;
   error?: boolean;
-  onChange: (event: ChangeEvent<HTMLInputElement>) => void;
+  maxLength?: number;
+  onChange: (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
 }
 
-const TextInput = ({ id, value, placeholder, error = false, onChange }: TextInputProps) => {
+const TextInput = ({
+  id,
+  value,
+  placeholder,
+  error = false,
+  maxLength,
+  onChange,
+}: TextInputProps) => {
   return (
     <input
       id={id}
       value={value}
+      maxLength={maxLength}
       placeholder={placeholder}
       onChange={onChange}
       className={cx(
@@ -729,7 +928,9 @@ const formatDeadlineDateLabel = (value: string) => {
   const [year, month, day] = value.split("-").map(Number);
   if (!year || !month || !day) return value;
 
-  const weekDay = ["일", "월", "화", "수", "목", "금", "토"][new Date(year, month - 1, day).getDay()];
+  const weekDay = ["일", "월", "화", "수", "목", "금", "토"][
+    new Date(year, month - 1, day).getDay()
+  ];
   return `${year}.${String(month).padStart(2, "0")}.${String(day).padStart(2, "0")}. (${weekDay})`;
 };
 
@@ -757,7 +958,7 @@ const OptionChip = ({ children, selected, onClick }: OptionChipProps) => {
 interface BottomActionButtonProps {
   active: boolean;
   label: string;
-  onClick: () => void;
+  onClick: () => void | Promise<void>;
 }
 
 const BottomActionButton = ({ active, label, onClick }: BottomActionButtonProps) => {
@@ -766,6 +967,7 @@ const BottomActionButton = ({ active, label, onClick }: BottomActionButtonProps)
       <button
         type="button"
         onClick={onClick}
+        disabled={!active}
         className={cx(
           "flex h-[52px] w-full items-center justify-center rounded-[12px] text-label2",
           active ? "bg-secondary-500 text-neutral-0" : "bg-neutral-300 text-neutral-700",

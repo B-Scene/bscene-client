@@ -1,17 +1,64 @@
-import { useState } from "react";
-import type { SessionFindCandidate } from "../types";
-import { SessionCandidateCard } from "./SessionCandidateCard";
+import { useMemo, useState } from "react";
+import { useSessionApplicationsSearchQuery } from "@/hooks/api/session/useSessionApplication";
+import type { SessionApplicationSearchItem } from "@/types/session/sessionApplication";
+import type { SessionFilterValues } from "../types";
+import {
+  SessionCandidateCard,
+  type SessionCandidateCardData,
+} from "./SessionCandidateCard";
+import { SessionApplicationDetailScreen } from "./SessionApplicationDetailScreen";
 
 interface SessionFindScreenProps {
-  candidates: SessionFindCandidate[];
-  onToggleBookmark: (candidateId: number) => void;
+  values: SessionFilterValues;
 }
 
-export const SessionFindScreen = ({
-  candidates,
-  onToggleBookmark,
-}: SessionFindScreenProps) => {
+const mapApplicationToCandidate = (
+  application: SessionApplicationSearchItem,
+): SessionCandidateCardData => {
+  return {
+    id: application.sessionApplicationId,
+    name: application.nickname,
+    profileImageUrl: application.profileImageUrl,
+    skill: application.skillLevel,
+    part: application.part,
+    genre: application.genre,
+    location: application.region,
+    applicationTitle: application.title,
+    summary: application.oneLineIntro,
+  };
+};
+
+export const SessionFindScreen = ({ values }: SessionFindScreenProps) => {
   const [isNoticeVisible, setIsNoticeVisible] = useState(true);
+  const [selectedApplicationId, setSelectedApplicationId] = useState<number | null>(null);
+
+  const applicationsQuery = useSessionApplicationsSearchQuery({
+    size: 20,
+  });
+
+  const candidates = useMemo(() => {
+    const apiCandidates =
+      applicationsQuery.data?.content.map(mapApplicationToCandidate) ?? [];
+
+    return apiCandidates.filter((candidate) => {
+      const matchesPart = values.part === "전체" || candidate.part === values.part;
+      const matchesSkill = values.skill === "전체" || candidate.skill === values.skill;
+      const matchesGenre = values.genre === "전체" || candidate.genre.includes(values.genre);
+      const matchesRegion =
+        values.region === "전체" || candidate.location.includes(values.region);
+
+      return matchesPart && matchesSkill && matchesGenre && matchesRegion;
+    });
+  }, [applicationsQuery.data, values]);
+
+  if (selectedApplicationId) {
+    return (
+      <SessionApplicationDetailScreen
+        sessionApplicationId={selectedApplicationId}
+        onBack={() => setSelectedApplicationId(null)}
+      />
+    );
+  }
 
   return (
     <>
@@ -25,7 +72,7 @@ export const SessionFindScreen = ({
               type="button"
               aria-label="안내 닫기"
               onClick={() => setIsNoticeVisible(false)}
-              className="absolute right-2 top-2 flex size-4 items-center justify-center text-[18px] leading-none text-neutral-400"
+              className="absolute top-2 right-2 flex size-4 items-center justify-center text-[18px] leading-none text-neutral-400"
             >
               ×
             </button>
@@ -36,12 +83,29 @@ export const SessionFindScreen = ({
       )}
 
       <section className="flex flex-col gap-3 px-6 pt-3">
-        {candidates.length > 0 ? (
+        {applicationsQuery.isLoading ? (
+          <div className="flex min-h-[220px] items-center justify-center rounded-[12px] bg-neutral-0 px-6 text-center text-caption1 text-neutral-500 shadow-[0_0_8px_rgba(0,0,0,0.08)]">
+            세션 뮤지션을 불러오고 있어요
+          </div>
+        ) : applicationsQuery.isError ? (
+          <div className="flex min-h-[220px] flex-col items-center justify-center rounded-[12px] bg-neutral-0 px-6 text-center shadow-[0_0_8px_rgba(0,0,0,0.08)]">
+            <p className="text-caption1 text-neutral-500">
+              세션 뮤지션을 불러오지 못했어요
+            </p>
+            <button
+              type="button"
+              onClick={() => applicationsQuery.refetch()}
+              className="mt-3 rounded-[8px] bg-secondary-500 px-4 py-2 text-caption2 text-neutral-0"
+            >
+              다시 시도
+            </button>
+          </div>
+        ) : candidates.length > 0 ? (
           candidates.map((candidate) => (
             <SessionCandidateCard
               key={candidate.id}
               candidate={candidate}
-              onToggleBookmark={onToggleBookmark}
+              onSelect={setSelectedApplicationId}
             />
           ))
         ) : (

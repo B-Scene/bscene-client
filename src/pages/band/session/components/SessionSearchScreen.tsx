@@ -1,76 +1,111 @@
-import { forwardRef, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import {
+  forwardRef,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
 import ArrowLeftIcon from "@/assets/icons/arrow-left.svg";
 import CloseCircleIcon from "@/assets/icons/band/close-circle.svg";
 import SearchContextIcon from "@/assets/icons/band/searchContext.svg";
+import {
+  useAddSessionRecruitmentInterest,
+  useDeleteSessionSearchHistory,
+  useRemoveSessionRecruitmentInterest,
+  useSessionRecruitmentsQuery,
+  useSessionSearchHistoryQuery,
+} from "@/hooks/api/session/useSessionRecruitment";
+import type { SessionRecruitmentListItem } from "@/types/session/sessionRecruitment";
 import type { SessionFilterValues, SessionRecruitmentPost } from "../types";
 import { RecruitmentPostCard } from "./RecruitmentPostCard";
 import { SessionFilterBar } from "./SessionFilterBar";
 import { SessionFilterBottomSheet } from "./SessionFilterBottomSheet";
 
 interface SessionSearchScreenProps {
-  posts: SessionRecruitmentPost[];
   values: SessionFilterValues;
   onBack: () => void;
   onApplyFilters: (values: SessionFilterValues) => void;
-  onToggleBookmark: (postId: number) => void;
 }
 
+const toDeadlineLabel = (dDay: number) => {
+  if (dDay < 0) return "마감";
+  if (dDay === 0) return "오늘 마감";
+  return `D-${dDay}`;
+};
+
+const mapRecruitmentToPost = (
+  recruitment: SessionRecruitmentListItem,
+): SessionRecruitmentPost => {
+  return {
+    id: recruitment.sessionRecruitmentId,
+    deadline: toDeadlineLabel(recruitment.dDay),
+    title: recruitment.recruitmentTitle,
+    bandName: recruitment.bandName,
+    genre: recruitment.bandGenre,
+    location: recruitment.bandRegion,
+    description: recruitment.summary,
+    tags: [recruitment.part, recruitment.skillLevel].filter(Boolean),
+    bookmarked: recruitment.isInterested,
+  };
+};
+
 export const SessionSearchScreen = ({
-  posts,
   values,
   onBack,
   onApplyFilters,
-  onToggleBookmark,
 }: SessionSearchScreenProps) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const [keyword, setKeyword] = useState("");
   const [submittedKeyword, setSubmittedKeyword] = useState("");
-  const [recentKeywords, setRecentKeywords] = useState<string[]>([]);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [bookmarkOverrides, setBookmarkOverrides] = useState<Record<number, boolean>>({});
+
+  const searchHistoryQuery = useSessionSearchHistoryQuery();
+  const deleteSearchHistoryMutation = useDeleteSessionSearchHistory();
+  const addInterestMutation = useAddSessionRecruitmentInterest();
+  const removeInterestMutation = useRemoveSessionRecruitmentInterest();
 
   const trimmedKeyword = keyword.trim();
   const isSearching = trimmedKeyword.length > 0;
   const isResultMode = submittedKeyword.length > 0;
 
+  const searchResultQuery = useSessionRecruitmentsQuery(
+    {
+      keyword: submittedKeyword,
+      sort: "LATEST",
+      size: 20,
+    },
+    isResultMode,
+  );
+
   const searchedPosts = useMemo(() => {
-    const normalizedKeyword = submittedKeyword.toLowerCase();
+    const apiPosts = searchResultQuery.data?.content.map(mapRecruitmentToPost) ?? [];
 
-    return posts.filter((post) => {
-      const searchableText = [
-        post.title,
-        post.bandName,
-        post.genre,
-        post.location,
-        post.description,
-        ...post.tags,
-      ]
-        .join(" ")
-        .toLowerCase();
+    return apiPosts
+      .map((post) => ({
+        ...post,
+        bookmarked: bookmarkOverrides[post.id] ?? post.bookmarked,
+      }))
+      .filter((post) => {
+        const matchesPart = values.part === "전체" || post.tags.includes(values.part);
+        const matchesSkill = values.skill === "전체" || post.tags.includes(values.skill);
+        const matchesGenre = values.genre === "전체" || post.genre.includes(values.genre);
+        const matchesRegion =
+          values.region === "전체" || post.location.includes(values.region);
 
-      const matchesKeyword = searchableText.includes(normalizedKeyword);
-      const matchesPart = values.part === "전체" || post.tags.includes(values.part);
-      const matchesSkill = values.skill === "전체" || post.tags.includes(values.skill);
-      const matchesGenre = values.genre === "전체" || post.genre.includes(values.genre);
-      const matchesRegion = values.region === "전체" || post.location.includes(values.region);
-
-      return matchesKeyword && matchesPart && matchesSkill && matchesGenre && matchesRegion;
-    });
-  }, [posts, submittedKeyword, values]);
+        return matchesPart && matchesSkill && matchesGenre && matchesRegion;
+      });
+  }, [bookmarkOverrides, searchResultQuery.data, values]);
 
   useEffect(() => {
     inputRef.current?.focus();
   }, [isResultMode]);
 
   const handleSearchKeyword = () => {
-    if (!trimmedKeyword) {
-      return;
-    }
+    if (!trimmedKeyword) return;
 
     setSubmittedKeyword(trimmedKeyword);
-    setRecentKeywords((currentKeywords) => [
-      trimmedKeyword,
-      ...currentKeywords.filter((recentKeyword) => recentKeyword !== trimmedKeyword),
-    ]);
   };
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -84,15 +119,35 @@ export const SessionSearchScreen = ({
     inputRef.current?.focus();
   };
 
-  const handleRemoveKeyword = (keywordToRemove: string) => {
-    setRecentKeywords((currentKeywords) =>
-      currentKeywords.filter((recentKeyword) => recentKeyword !== keywordToRemove),
-    );
+  const handleRemoveKeyword = (keywordId: number) => {
+    deleteSearchHistoryMutation.mutate(keywordId);
   };
 
   const handleRecentKeywordClick = (recentKeyword: string) => {
     setKeyword(recentKeyword);
     setSubmittedKeyword(recentKeyword);
+  };
+
+  const handleToggleBookmark = (postId: number) => {
+    const currentPost = searchedPosts.find((post) => post.id === postId);
+    const currentBookmarked = bookmarkOverrides[postId] ?? currentPost?.bookmarked ?? false;
+    const nextBookmarked = !currentBookmarked;
+
+    setBookmarkOverrides((currentOverrides) => ({
+      ...currentOverrides,
+      [postId]: nextBookmarked,
+    }));
+
+    const mutation = nextBookmarked ? addInterestMutation : removeInterestMutation;
+
+    mutation.mutate(postId, {
+      onError: () => {
+        setBookmarkOverrides((currentOverrides) => ({
+          ...currentOverrides,
+          [postId]: currentBookmarked,
+        }));
+      },
+    });
   };
 
   if (isResultMode) {
@@ -112,15 +167,36 @@ export const SessionSearchScreen = ({
           </form>
         </header>
 
-        <SessionFilterBar values={values} showSelectedValues={false} onOpenFilter={() => setIsFilterOpen(true)} />
+        <SessionFilterBar
+          values={values}
+          showSelectedValues={false}
+          onOpenFilter={() => setIsFilterOpen(true)}
+        />
 
         <section className="flex flex-col gap-4 px-[22px] pt-4">
-          {searchedPosts.length > 0 ? (
+          {searchResultQuery.isLoading ? (
+            <div className="flex min-h-[220px] items-center justify-center rounded-[14px] bg-neutral-0 px-6 text-center text-caption1 text-neutral-500 shadow-[0_0_12px_rgba(0,0,0,0.08)]">
+              검색 결과를 불러오고 있어요
+            </div>
+          ) : searchResultQuery.isError ? (
+            <div className="flex min-h-[220px] flex-col items-center justify-center rounded-[14px] bg-neutral-0 px-6 text-center shadow-[0_0_12px_rgba(0,0,0,0.08)]">
+              <p className="text-caption1 text-neutral-500">
+                검색 결과를 불러오지 못했어요
+              </p>
+              <button
+                type="button"
+                onClick={() => searchResultQuery.refetch()}
+                className="mt-3 rounded-[8px] bg-secondary-500 px-4 py-2 text-caption2 text-neutral-0"
+              >
+                다시 시도
+              </button>
+            </div>
+          ) : searchedPosts.length > 0 ? (
             searchedPosts.map((post) => (
               <RecruitmentPostCard
                 key={post.id}
                 post={post}
-                onToggleBookmark={onToggleBookmark}
+                onToggleBookmark={handleToggleBookmark}
               />
             ))
           ) : (
@@ -161,20 +237,29 @@ export const SessionSearchScreen = ({
       <section className="mt-[26px] px-[38px]">
         <h2 className="text-body1 text-neutral-900">최근 검색어</h2>
 
-        {recentKeywords.length > 0 ? (
+        {searchHistoryQuery.isLoading ? (
+          <p className="mt-4 text-caption2 text-neutral-600">최근 검색어를 불러오고 있어요</p>
+        ) : searchHistoryQuery.isError ? (
+          <p className="mt-4 text-caption2 text-neutral-600">
+            최근 검색어를 불러오지 못했어요
+          </p>
+        ) : searchHistoryQuery.data && searchHistoryQuery.data.length > 0 ? (
           <div className="mt-3 flex flex-wrap gap-2">
-            {recentKeywords.map((recentKeyword) => (
+            {searchHistoryQuery.data.map((recentKeyword) => (
               <span
-                key={recentKeyword}
+                key={recentKeyword.keywordId}
                 className="flex h-6 items-center gap-1 rounded-full border border-neutral-300 bg-neutral-0 px-2 text-caption2 text-neutral-600"
               >
-                <button type="button" onClick={() => handleRecentKeywordClick(recentKeyword)}>
-                  {recentKeyword}
+                <button
+                  type="button"
+                  onClick={() => handleRecentKeywordClick(recentKeyword.keyword)}
+                >
+                  {recentKeyword.keyword}
                 </button>
                 <button
                   type="button"
-                  aria-label={`${recentKeyword} 삭제`}
-                  onClick={() => handleRemoveKeyword(recentKeyword)}
+                  aria-label={`${recentKeyword.keyword} 삭제`}
+                  onClick={() => handleRemoveKeyword(recentKeyword.keywordId)}
                   className="text-neutral-500"
                 >
                   ×
@@ -252,7 +337,7 @@ const SearchField = forwardRef<HTMLInputElement, SearchFieldProps>(
             "relative z-10 h-full min-w-0 flex-1 bg-transparent outline-none",
             isSearching
               ? "ml-2 text-caption2 text-neutral-900"
-              : "pl-[36px] pr-[22px] text-transparent caret-neutral-900",
+              : "pr-[22px] pl-[36px] text-transparent caret-neutral-900",
           ].join(" ")}
         />
 
