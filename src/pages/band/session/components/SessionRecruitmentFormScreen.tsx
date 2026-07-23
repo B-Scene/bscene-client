@@ -17,7 +17,45 @@ import { SessionRecruitmentCompleteScreen } from "./SessionRecruitmentCompleteSc
 const PART_OPTIONS = ["보컬", "기타", "베이스", "키보드", "드럼", "etc"];
 const SKILL_OPTIONS = ["입문", "중급", "상급"];
 
+const GENRE_OPTIONS = [
+  "인디",
+  "팝",
+  "팝록",
+  "재즈",
+  "블루스",
+  "얼터너티브록",
+  "사이키델릭록",
+  "일렉트로닉록",
+  "포크록",
+  "펑크록",
+  "하드록",
+  "메탈",
+  "etc",
+];
+
+const REGION_OPTIONS = [
+  "서울",
+  "경기",
+  "인천",
+  "부산",
+  "대구",
+  "광주",
+  "대전",
+  "울산",
+  "세종",
+  "충남",
+  "충북",
+  "전남",
+  "전북",
+  "경남",
+  "경북",
+  "강원",
+  "제주",
+  "지역 미상",
+];
+
 type FormStep = 1 | 2;
+type SelectBottomSheetType = "genre" | "region" | null;
 
 interface SessionRecruitmentFormScreenProps {
   onBack: () => void;
@@ -60,15 +98,17 @@ interface FormErrors {
 const cx = (...classNames: Array<string | false | null | undefined>) =>
   classNames.filter(Boolean).join(" ");
 
-const DEFAULT_BAND_MEMBER_ID = 1;
-
 const getBandMemberId = () => {
-  const storedBandMemberId = localStorage.getItem("bandMemberId");
+  const storedBandMemberId =
+    localStorage.getItem("bandMemberId") ??
+    localStorage.getItem("currentBandMemberId") ??
+    localStorage.getItem("selectedBandMemberId");
+
   const parsedBandMemberId = Number(storedBandMemberId);
 
   return Number.isFinite(parsedBandMemberId) && parsedBandMemberId > 0
     ? parsedBandMemberId
-    : DEFAULT_BAND_MEMBER_ID;
+    : null;
 };
 
 const toDeadlineAt = (dateValue: string, timeValue: string) => `${dateValue}T${timeValue}:00`;
@@ -79,15 +119,11 @@ const splitDeadlineAt = (deadlineAt?: string) => ({
 });
 
 const isFutureDeadline = (dateValue: string, timeValue: string) => {
-  if (!dateValue || !timeValue) {
-    return false;
-  }
+  if (!dateValue || !timeValue) return false;
 
   const deadline = new Date(toDeadlineAt(dateValue, timeValue));
 
-  if (Number.isNaN(deadline.getTime())) {
-    return false;
-  }
+  if (Number.isNaN(deadline.getTime())) return false;
 
   return deadline.getTime() > Date.now();
 };
@@ -101,9 +137,12 @@ export const SessionRecruitmentFormScreen = ({
   const [currentStep, setCurrentStep] = useState<FormStep>(1);
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [isCompleteScreenOpen, setIsCompleteScreenOpen] = useState(false);
+  const [selectBottomSheetType, setSelectBottomSheetType] =
+    useState<SelectBottomSheetType>(null);
   const [createdRecruitment, setCreatedRecruitment] =
     useState<CreateSessionRecruitmentResponse | null>(null);
   const [submitErrorMessage, setSubmitErrorMessage] = useState("");
+
   const [basicValues, setBasicValues] = useState<BasicFormValues>({
     title: "",
     summary: "",
@@ -112,6 +151,7 @@ export const SessionRecruitmentFormScreen = ({
     skill: "중급",
     genre: "",
   });
+
   const [detailValues, setDetailValues] = useState<DetailFormValues>({
     region: "",
     practiceSchedule: "",
@@ -120,6 +160,7 @@ export const SessionRecruitmentFormScreen = ({
     deadlineTime: "",
     qualification: "",
   });
+
   const [errors, setErrors] = useState<FormErrors>({});
 
   const isBasicComplete =
@@ -185,22 +226,24 @@ export const SessionRecruitmentFormScreen = ({
     setSubmitErrorMessage("");
   };
 
-  const handleGenreSelect = () => {
+  const handleGenreSelect = (genre: string) => {
     setBasicValues((currentValues) => ({
       ...currentValues,
-      genre: currentValues.genre || "락",
+      genre,
     }));
     setErrors((currentErrors) => ({ ...currentErrors, genre: undefined }));
     setSubmitErrorMessage("");
+    setSelectBottomSheetType(null);
   };
 
-  const handleRegionSelect = () => {
+  const handleRegionSelect = (region: string) => {
     setDetailValues((currentValues) => ({
       ...currentValues,
-      region: currentValues.region || "서울",
+      region,
     }));
     setErrors((currentErrors) => ({ ...currentErrors, region: undefined }));
     setSubmitErrorMessage("");
+    setSelectBottomSheetType(null);
   };
 
   const handleDeadlineDateChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -249,7 +292,7 @@ export const SessionRecruitmentFormScreen = ({
     }
 
     if (!basicValues.genre) {
-      nextErrors.genre = "장르는 필수 항목이에요";
+      nextErrors.genre = "장르를 선택해주세요";
     }
 
     setErrors(nextErrors);
@@ -260,7 +303,7 @@ export const SessionRecruitmentFormScreen = ({
     const nextErrors: FormErrors = {};
 
     if (!detailValues.region) {
-      nextErrors.region = "활동 지역은 필수 항목이에요";
+      nextErrors.region = "활동 지역을 선택해주세요";
     }
 
     if (!detailValues.practiceSchedule.trim()) {
@@ -307,31 +350,53 @@ export const SessionRecruitmentFormScreen = ({
 
     setSubmitErrorMessage("");
 
+    const bandMemberId = getBandMemberId();
+
+if (!bandMemberId) {
+  setSubmitErrorMessage(
+    "밴드 정보를 찾을 수 없어요. 밴드 오너 계정으로 로그인했는지 확인해주세요.",
+  );
+  return;
+}
+
+const requestBody = {
+  bandMemberId,
+  recruitmentTitle: basicValues.title.trim(),
+  summary: basicValues.summary.trim(),
+  content: basicValues.detail.trim(),
+  part: basicValues.part,
+  skillLevel: basicValues.skill,
+  genre: basicValues.genre,
+  region: detailValues.region,
+  practiceSchedule: detailValues.practiceSchedule.trim(),
+  practicePlace: detailValues.practiceLocation.trim(),
+  deadlineAt: toDeadlineAt(detailValues.deadlineDate, detailValues.deadlineTime),
+  qualification: detailValues.qualification.trim(),
+};
+
+    console.log("세션 모집 공고 등록 requestBody:", requestBody);
+
     try {
-      const result = await createRecruitmentMutation.mutateAsync({
-        bandMemberId: getBandMemberId(),
-        recruitmentTitle: basicValues.title.trim(),
-        summary: basicValues.summary.trim(),
-        content: basicValues.detail.trim(),
-        part: basicValues.part,
-        skillLevel: basicValues.skill,
-        genre: basicValues.genre,
-        region: detailValues.region,
-        practiceSchedule: detailValues.practiceSchedule.trim(),
-        practicePlace: detailValues.practiceLocation.trim(),
-        deadlineAt: toDeadlineAt(detailValues.deadlineDate, detailValues.deadlineTime),
-        qualification: detailValues.qualification.trim(),
-      });
+      const result = await createRecruitmentMutation.mutateAsync(requestBody);
 
       setCreatedRecruitment(result);
       setIsCompleteScreenOpen(true);
-    } catch (error) {
-      const apiMessage = (error as AxiosError<SessionApiResponse<null>>).response?.data
-        ?.message;
-      setSubmitErrorMessage(
-        apiMessage ?? "모집 공고 등록에 실패했어요. 잠시 후 다시 시도해주세요.",
-      );
-    }
+   } catch (error) {
+  const errorResponse = (error as AxiosError<SessionApiResponse<null>>).response;
+  const apiMessage = errorResponse?.data?.message;
+
+  if (errorResponse?.status === 403) {
+    setSubmitErrorMessage(
+      apiMessage ??
+        "밴드 오너 계정만 세션 모집 공고를 등록할 수 있어요. 현재 선택된 밴드 정보를 확인해주세요.",
+    );
+    return;
+  }
+
+  setSubmitErrorMessage(
+    apiMessage ?? "모집 공고 등록에 실패했어요. 잠시 후 다시 시도해주세요.",
+  );
+}
   };
 
   const handleBack = () => {
@@ -358,11 +423,11 @@ export const SessionRecruitmentFormScreen = ({
 
   const deadlineSummary = splitDeadlineAt(createdRecruitment?.deadlineAt);
   const completionSummary = {
-    title: createdRecruitment?.recruitmentTitle ?? (basicValues.title.trim() || "드럼 세션 구해요"),
-    part: createdRecruitment?.part ?? (basicValues.part || "드럼"),
-    skill: createdRecruitment?.skillLevel ?? (basicValues.skill || "중급"),
-    genre: createdRecruitment?.genre ?? (basicValues.genre || "락"),
-    region: createdRecruitment?.region ?? (detailValues.region || "서울"),
+    title: createdRecruitment?.recruitmentTitle ?? basicValues.title.trim(),
+    part: createdRecruitment?.part ?? basicValues.part,
+    skill: createdRecruitment?.skillLevel ?? basicValues.skill,
+    genre: createdRecruitment?.genre ?? basicValues.genre,
+    region: createdRecruitment?.region ?? detailValues.region,
     deadlineDate: deadlineSummary.deadlineDate || detailValues.deadlineDate,
     deadlineTime: deadlineSummary.deadlineTime || detailValues.deadlineTime,
   };
@@ -390,7 +455,7 @@ export const SessionRecruitmentFormScreen = ({
           onFieldChange={handleBasicFieldChange}
           onPartClick={handlePartClick}
           onSkillClick={handleSkillClick}
-          onGenreSelect={handleGenreSelect}
+          onOpenGenreSelect={() => setSelectBottomSheetType("genre")}
           onNext={handleNext}
         />
       ) : (
@@ -401,7 +466,7 @@ export const SessionRecruitmentFormScreen = ({
           submitErrorMessage={submitErrorMessage}
           isSubmitting={createRecruitmentMutation.isPending}
           onFieldChange={handleDetailFieldChange}
-          onRegionSelect={handleRegionSelect}
+          onOpenRegionSelect={() => setSelectBottomSheetType("region")}
           onDeadlineDateChange={handleDeadlineDateChange}
           onDeadlineTimeChange={handleDeadlineTimeChange}
           onSubmit={handleSubmit}
@@ -425,6 +490,26 @@ export const SessionRecruitmentFormScreen = ({
           onConfirm={handleCancelConfirm}
         />
       </ModalOverlay>
+
+      {selectBottomSheetType === "genre" ? (
+        <SelectBottomSheet
+          title="장르"
+          options={GENRE_OPTIONS}
+          selectedValue={basicValues.genre}
+          onSelect={handleGenreSelect}
+          onClose={() => setSelectBottomSheetType(null)}
+        />
+      ) : null}
+
+      {selectBottomSheetType === "region" ? (
+        <SelectBottomSheet
+          title="지역"
+          options={REGION_OPTIONS}
+          selectedValue={detailValues.region}
+          onSelect={handleRegionSelect}
+          onClose={() => setSelectBottomSheetType(null)}
+        />
+      ) : null}
     </main>
   );
 };
@@ -438,7 +523,7 @@ interface BasicInfoStepProps {
   ) => (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
   onPartClick: (part: string) => void;
   onSkillClick: (skill: string) => void;
-  onGenreSelect: () => void;
+  onOpenGenreSelect: () => void;
   onNext: () => void;
 }
 
@@ -449,17 +534,12 @@ const BasicInfoStep = ({
   onFieldChange,
   onPartClick,
   onSkillClick,
-  onGenreSelect,
+  onOpenGenreSelect,
   onNext,
 }: BasicInfoStepProps) => {
-  const hasTitleError = Boolean(errors.title);
-  const hasSummaryError = Boolean(errors.summary);
-  const hasDetailError = Boolean(errors.detail);
-  const hasGenreError = Boolean(errors.genre);
-
   return (
     <>
-      <section className="pl-5 pr-[19px] pt-0">
+      <section className="px-5 pt-0">
         <div className="rounded-[16px] bg-neutral-0 px-[18px] py-4 shadow-[0_0_8px_rgba(0,0,0,0.08)]">
           <FieldLabel htmlFor="session-recruitment-title" required>
             공고 제목
@@ -469,7 +549,7 @@ const BasicInfoStep = ({
             value={values.title}
             placeholder="공고 제목을 입력해주세요"
             maxLength={50}
-            error={hasTitleError}
+            error={Boolean(errors.title)}
             onChange={onFieldChange("title")}
           />
           {errors.title ? <ErrorMessage>{errors.title}</ErrorMessage> : null}
@@ -483,7 +563,7 @@ const BasicInfoStep = ({
               value={values.summary}
               placeholder="공고 목록에 표시될 짧은 소개를 입력해주세요. (최대 50자)"
               maxLength={50}
-              error={hasSummaryError}
+              error={Boolean(errors.summary)}
               onChange={onFieldChange("summary")}
             />
             {errors.summary ? <ErrorMessage>{errors.summary}</ErrorMessage> : null}
@@ -502,7 +582,7 @@ const BasicInfoStep = ({
                 onChange={onFieldChange("detail")}
                 className={cx(
                   "h-[58px] w-full resize-none rounded-[5px] border bg-neutral-0 px-4 py-2 text-caption2 text-neutral-900 outline-none placeholder:text-caption2 placeholder:text-neutral-500",
-                  hasDetailError ? "border-error" : "border-neutral-400 focus:border-secondary-500",
+                  errors.detail ? "border-error" : "border-neutral-400 focus:border-secondary-500",
                 )}
               />
               <span className="absolute right-[13px] bottom-2 text-caption4 text-neutral-500">
@@ -521,7 +601,7 @@ const BasicInfoStep = ({
                   selected={values.part === part}
                   onClick={() => onPartClick(part)}
                 >
-                  {part}
+                  {part === "etc" ? "etc." : part}
                 </OptionChip>
               ))}
             </div>
@@ -546,10 +626,10 @@ const BasicInfoStep = ({
           <div className="mt-3">
             <FieldLabel required>장르</FieldLabel>
             <SelectButton
-              value={values.genre}
+              value={values.genre === "etc" ? "etc." : values.genre}
               placeholder="장르 선택"
-              error={hasGenreError}
-              onClick={onGenreSelect}
+              error={Boolean(errors.genre)}
+              onClick={onOpenGenreSelect}
             />
             {errors.genre ? <ErrorMessage>{errors.genre}</ErrorMessage> : null}
           </div>
@@ -573,7 +653,7 @@ interface DetailInfoStepProps {
       "practiceSchedule" | "practiceLocation" | "qualification"
     >,
   ) => (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
-  onRegionSelect: () => void;
+  onOpenRegionSelect: () => void;
   onDeadlineDateChange: (event: ChangeEvent<HTMLInputElement>) => void;
   onDeadlineTimeChange: (event: ChangeEvent<HTMLInputElement>) => void;
   onSubmit: () => void;
@@ -586,7 +666,7 @@ const DetailInfoStep = ({
   submitErrorMessage,
   isSubmitting,
   onFieldChange,
-  onRegionSelect,
+  onOpenRegionSelect,
   onDeadlineDateChange,
   onDeadlineTimeChange,
   onSubmit,
@@ -598,6 +678,7 @@ const DetailInfoStep = ({
     if (!input) return;
 
     const pickerInput = input as HTMLInputElement & { showPicker?: () => void };
+
     if (pickerInput.showPicker) {
       pickerInput.showPicker();
       return;
@@ -609,14 +690,14 @@ const DetailInfoStep = ({
 
   return (
     <>
-      <section className="pl-5 pr-[19px] pt-0">
+      <section className="px-5 pt-0">
         <div className="rounded-[16px] bg-neutral-0 px-[18px] py-4 shadow-[0_0_8px_rgba(0,0,0,0.08)]">
           <FieldLabel required>활동 지역</FieldLabel>
           <SelectButton
             value={values.region}
             placeholder="지역 선택"
             error={Boolean(errors.region)}
-            onClick={onRegionSelect}
+            onClick={onOpenRegionSelect}
           />
           {errors.region ? <ErrorMessage>{errors.region}</ErrorMessage> : null}
 
@@ -675,6 +756,7 @@ const DetailInfoStep = ({
                   className="pointer-events-none absolute top-0 right-0 h-px w-px opacity-0"
                 />
               </div>
+
               <div className="relative">
                 <DeadlinePickerButton
                   value={values.deadlineTime}
@@ -725,18 +807,78 @@ const DetailInfoStep = ({
         </div>
       </section>
 
-      {submitErrorMessage ? (
-        <p className="fixed inset-x-0 bottom-[calc(var(--bottom-nav-height)+84px)] z-20 px-5 text-center text-caption2 text-error">
+     {submitErrorMessage ? (
+  <p className="fixed left-1/2 bottom-[calc(var(--bottom-nav-height)+128px)] z-30 w-full max-w-[393px] -translate-x-1/2 px-6 text-center text-caption2 text-error">
           {submitErrorMessage}
         </p>
       ) : null}
-
       <BottomActionButton
         active={isComplete && !isSubmitting}
         label={isSubmitting ? "등록 중" : "모집 공고 등록"}
         onClick={onSubmit}
       />
     </>
+  );
+};
+
+interface SelectBottomSheetProps {
+  title: string;
+  options: string[];
+  selectedValue: string;
+  onSelect: (value: string) => void;
+  onClose: () => void;
+}
+
+const SelectBottomSheet = ({
+  title,
+  options,
+  selectedValue,
+  onSelect,
+  onClose,
+}: SelectBottomSheetProps) => {
+  return (
+    <div
+      role="presentation"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) {
+          onClose();
+        }
+      }}
+      className="fixed inset-0 z-50 flex items-end bg-neutral-900/70"
+    >
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        className="max-h-[70dvh] w-full overflow-y-auto rounded-t-[24px] bg-neutral-0 px-6 pt-3 pb-[calc(var(--bottom-nav-height)+24px)]"
+      >
+        <div className="mx-auto h-1.5 w-14 rounded-full bg-neutral-300" />
+        <h2 className="mt-5 text-h4 text-neutral-900">{title}</h2>
+
+        <div className="mt-5 flex flex-wrap gap-x-3 gap-y-4">
+          {options.map((option) => {
+            const isSelected = selectedValue === option;
+            const label = option === "etc" ? "etc." : option;
+
+            return (
+              <button
+                key={option}
+                type="button"
+                onClick={() => onSelect(option)}
+                className={cx(
+                  "flex h-[54px] min-w-[76px] items-center justify-center rounded-full px-6 text-body1 font-semibold",
+                  isSelected
+                    ? "bg-secondary-500 text-neutral-0"
+                    : "bg-neutral-300 text-neutral-600",
+                )}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      </section>
+    </div>
   );
 };
 
@@ -756,7 +898,9 @@ const FormTopBar = ({ onBack, onClose }: FormTopBarProps) => {
       >
         <img src={ArrowLeftIcon} alt="" className="size-6" />
       </button>
+
       <h1 className="text-[18px] leading-5 font-bold text-neutral-900">세션 모집 공고 등록</h1>
+
       <button
         type="button"
         aria-label="닫기"
@@ -931,6 +1075,7 @@ const formatDeadlineDateLabel = (value: string) => {
   const weekDay = ["일", "월", "화", "수", "목", "금", "토"][
     new Date(year, month - 1, day).getDay()
   ];
+
   return `${year}.${String(month).padStart(2, "0")}.${String(day).padStart(2, "0")}. (${weekDay})`;
 };
 
@@ -946,7 +1091,7 @@ const OptionChip = ({ children, selected, onClick }: OptionChipProps) => {
       type="button"
       onClick={onClick}
       className={cx(
-        "flex h-[26px] w-14 items-center justify-center whitespace-nowrap rounded-[8px] px-1 text-caption2",
+        "flex h-[26px] min-w-14 items-center justify-center whitespace-nowrap rounded-[8px] px-2 text-caption2",
         selected ? "bg-secondary-500 text-neutral-0" : "bg-neutral-300 text-neutral-600",
       )}
     >
