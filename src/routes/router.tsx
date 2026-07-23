@@ -19,6 +19,10 @@ import CompletePage from "@/pages/band/home/CompletePage";
 import MusicRegisterPage from "@/pages/band/home/MusicRegisterPage";
 import ContentRegisterPage from "@/pages/band/home/ContentRegisterPage";
 import FanHomePage from "@/pages/fan/home/FanHomePage";
+import FanExplorePage from "@/pages/fan/explore/FanExplorePage";
+import FanExploreSearchPage from "@/pages/fan/explore/FanExploreSearchPage";
+import FanExploreSearchResultPage from "@/pages/fan/explore/FanExploreSearchResultPage";
+import FanBandProfilePage from "@/pages/fan/explore/FanBandProfilePage";
 import FollowedBandNewsPage from "@/pages/fan/home/FollowedBandNewsPage";
 import FollowedConcertsPage from "@/pages/fan/home/FollowedConcertsPage";
 import ConcertCalendarPage from "@/pages/fan/home/ConcertCalendarPage";
@@ -116,6 +120,22 @@ export const router = createBrowserRouter([
       {
         path: "/fan/home",
         element: <FanHomePage />,
+      },
+      {
+        path: "/fan/explore",
+        element: <FanExplorePage />,
+      },
+      {
+        path: "/fan/explore/search",
+        element: <FanExploreSearchPage />,
+      },
+      {
+        path: "/fan/explore/search/results",
+        element: <FanExploreSearchResultPage />,
+      },
+      {
+        path: "/fan/bands/:bandId",
+        element: <FanBandProfilePage />,
       },
       {
         path: "/fan/home/news",
