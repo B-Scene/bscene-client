@@ -1,8 +1,12 @@
+import { Fragment, useState } from "react";
 import ApplyMemberIcon from "@/assets/icons/band/apply-member.svg";
 import DefaultAvatar from "@/assets/icons/band/user-default-profile.svg";
 import { Header } from "@/components/band/home/Header";
 import { NotificationBandBanner } from "@/components/band/my/NotificationBandBanner";
+import { EmptyState } from "@/components/common/EmptyState/EmptyState";
 import { useBandProfileStore } from "@/stores/useBandProfileStore";
+
+type PostingStatus = "open" | "closed";
 
 type ApplicantStatus = "pending" | "accepted" | "rejected";
 
@@ -77,8 +81,10 @@ const ApplicationManagementPage = () => {
   const profile = useBandProfileStore((state) => state.profile);
   const bandName = profile.name.trim() || "WAVY";
 
+  const [activeTab, setActiveTab] = useState<PostingStatus>("open");
+
   return (
-    <main className="relative min-h-dvh bg-neutral-0 pb-24">
+    <main className="relative min-h-dvh bg-neutral-0">
       <Header title="받은 지원 관리" />
 
       <div className="flex flex-col gap-6 px-6 pt-4">
@@ -108,77 +114,115 @@ const ApplicationManagementPage = () => {
           </span>
         </div>
 
-        <div className="flex flex-col gap-4">
-          {POSTINGS.map((posting) => (
-            <div
-              key={posting.id}
-              className="flex flex-col gap-3 rounded-lg bg-neutral-0 p-4 shadow-[0_0_8px_0_rgba(0,0,0,0.10)]"
-            >
-              <div className="flex flex-col gap-3">
-                <span className="self-start rounded-full border border-secondary-500 px-3 py-0.5 text-center text-caption3 text-secondary-400">
-                  {posting.dDay}
-                </span>
+        <div className="flex rounded-md bg-[#FFF6E5] p-1">
+          <button
+            type="button"
+            onClick={() => setActiveTab("open")}
+            className={`flex flex-1 items-center justify-center gap-2.5 rounded-md border border-transparent px-10.75 py-1.25 text-center text-caption3 text-black ${
+              activeTab === "open"
+                ? "border-black/4 bg-neutral-0 shadow-[0_3px_8px_0_rgba(0,0,0,0.12),0_3px_1px_0_rgba(0,0,0,0.04)]"
+                : ""
+            }`}
+          >
+            진행중인 공고
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("closed")}
+            className={`flex flex-1 items-center justify-center gap-2.5 rounded-md border border-transparent px-10.75 py-1.25 text-center text-caption3 text-black ${
+              activeTab === "closed"
+                ? "border-black/4 bg-neutral-0 shadow-[0_3px_8px_0_rgba(0,0,0,0.12),0_3px_1px_0_rgba(0,0,0,0.04)]"
+                : ""
+            }`}
+          >
+            마감된 공고
+          </button>
+        </div>
 
-                <div className="flex flex-col gap-1">
-                  <h3 className="text-label1 text-neutral-900">
-                    {posting.title}
-                  </h3>
-                  <p className="text-caption3 text-neutral-600">
-                    {posting.tags}
-                    <span className="mx-1.5 text-neutral-300">|</span>
-                    <span className="text-secondary-500">
-                      지원자 {posting.applicants.length}명
-                    </span>
-                  </p>
+        {activeTab === "closed" ? (
+          <EmptyState
+            title="마감된 공고가 없어요"
+            description="마감된 모집 공고가 여기에 표시돼요"
+          />
+        ) : (
+          <div className="flex flex-col gap-4">
+            {POSTINGS.map((posting) => (
+              <div
+                key={posting.id}
+                className="flex flex-col gap-7 rounded-lg bg-neutral-0 px-3.75 py-3 shadow-[0_0_8px_0_rgba(0,0,0,0.10)]"
+              >
+                <div className="flex flex-col gap-3">
+                  <span className="self-start rounded-full border border-secondary-500 px-3 py-0.5 text-center text-caption3 text-secondary-400">
+                    {posting.dDay}
+                  </span>
+
+                  <div className="flex flex-col gap-1">
+                    <h3 className="text-label1 text-neutral-900">
+                      {posting.title}
+                    </h3>
+                    <p className="text-caption3 text-neutral-600">
+                      {posting.tags}
+                      <span className="mx-1.5 text-neutral-300">|</span>
+                      <span className="text-secondary-500">
+                        지원자 {posting.applicants.length}명
+                      </span>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-4">
+                  {posting.applicants.map((applicant, index) => (
+                    <Fragment key={applicant.id}>
+                      {index > 0 ? (
+                        <div className="h-px bg-neutral-400" />
+                      ) : null}
+
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex min-w-0 flex-1 items-center gap-4">
+                          <img
+                            src={DefaultAvatar}
+                            alt=""
+                            className="size-10 shrink-0 rounded-full object-cover"
+                          />
+
+                          <div className="flex min-w-0 flex-col gap-1">
+                            <span className="truncate text-label1 text-black">
+                              {applicant.name}
+                            </span>
+                            <span className="truncate text-caption2 text-neutral-600">
+                              {applicant.detail}{" "}
+                              <span className="mx-1.5 text-neutral-300">|</span>
+                              <button
+                                type="button"
+                                className="text-caption3 text-secondary-500"
+                              >
+                                지원서 확인
+                              </button>
+                            </span>
+                          </div>
+                        </div>
+
+                        {applicant.status === "pending" ? (
+                          <button type="button" className="shrink-0">
+                            <ChevronRightIcon />
+                          </button>
+                        ) : applicant.status === "accepted" ? (
+                          <span className="flex py-0.5 px-3.75 shrink-0 items-center justify-center rounded-full bg-secondary-400 text-center text-caption3 text-neutral-0">
+                            수락
+                          </span>
+                        ) : (
+                          <span className="flex py-0.5 px-3.75 shrink-0 items-center justify-center rounded-full bg-neutral-300 text-center text-caption3 text-neutral-600">
+                            거절
+                          </span>
+                        )}
+                      </div>
+                    </Fragment>
+                  ))}
                 </div>
               </div>
-
-              <div className="flex flex-col gap-4">
-                {posting.applicants.map((applicant) => (
-                  <div
-                    key={applicant.id}
-                    className={`flex items-center justify-between gap-3`}
-                  >
-                    <div className="flex min-w-0 flex-1 items-center gap-3">
-                      <img
-                        src={DefaultAvatar}
-                        alt=""
-                        className="size-10 shrink-0 rounded-full object-cover"
-                      />
-
-                      <div className="flex min-w-0 flex-col gap-1">
-                        <span className="truncate text-label1 text-black">
-                          {applicant.name}
-                        </span>
-                        <span className="truncate text-caption2 text-neutral-600">
-                          {applicant.detail}{" "}
-                          <span className="mx-1.5 text-neutral-300">|</span>
-                          <button type="button" className="text-secondary-500">
-                            지원서 확인
-                          </button>
-                        </span>
-                      </div>
-                    </div>
-
-                    {applicant.status === "pending" ? (
-                      <button type="button" className="shrink-0">
-                        <ChevronRightIcon />
-                      </button>
-                    ) : applicant.status === "accepted" ? (
-                      <span className="flex py-0.5 px-3.75 shrink-0 items-center justify-center rounded-full bg-secondary-400 text-center text-caption3 text-neutral-0">
-                        수락
-                      </span>
-                    ) : (
-                      <span className="flex py-0.5 px-3.75 shrink-0 items-center justify-center rounded-full bg-neutral-300 text-center text-caption3 text-neutral-600">
-                        거절
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </main>
   );
