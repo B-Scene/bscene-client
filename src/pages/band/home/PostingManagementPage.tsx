@@ -1,5 +1,8 @@
+import { useState } from "react";
 import { Header } from "@/components/band/home/Header";
 import { NotificationBandBanner } from "@/components/band/my/NotificationBandBanner";
+import { ModalOverlay } from "@/components/common/Modal/ModalOverlay";
+import Modal from "@/components/Modal/Modal";
 import { useBandProfileStore } from "@/stores/useBandProfileStore";
 
 interface Posting {
@@ -11,7 +14,7 @@ interface Posting {
   description: string;
 }
 
-const POSTINGS: Posting[] = [
+const INITIAL_POSTINGS: Posting[] = [
   {
     id: "1",
     dDay: "D-18",
@@ -36,6 +39,17 @@ const PostingManagementPage = () => {
   const profile = useBandProfileStore((state) => state.profile);
   const bandName = profile.name.trim() || "WAVY";
 
+  const [postings, setPostings] = useState(INITIAL_POSTINGS);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+
+  const handleConfirmDelete = () => {
+    if (!deleteTargetId) return;
+    setPostings((prev) =>
+      prev.filter((posting) => posting.id !== deleteTargetId),
+    );
+    setDeleteTargetId(null);
+  };
+
   return (
     <main className="relative min-h-dvh bg-neutral-0 pb-24">
       <Header title="모집 공고 관리" />
@@ -47,7 +61,7 @@ const PostingManagementPage = () => {
         />
 
         <div className="mt-6 flex flex-col gap-3">
-          {POSTINGS.map((posting) => (
+          {postings.map((posting) => (
             <div
               key={posting.id}
               className="flex flex-col gap-2.5 rounded-lg bg-neutral-0 py-3 px-6 shadow-[0_0_8px_0_rgba(0,0,0,0.10)]"
@@ -85,6 +99,7 @@ const PostingManagementPage = () => {
                 </button>
                 <button
                   type="button"
+                  onClick={() => setDeleteTargetId(posting.id)}
                   className="flex h-7.5 flex-1 items-center justify-center rounded-md bg-neutral-300 text-caption3 text-neutral-600"
                 >
                   삭제
@@ -94,6 +109,28 @@ const PostingManagementPage = () => {
           ))}
         </div>
       </div>
+
+      <ModalOverlay
+        open={deleteTargetId !== null}
+        onClose={() => setDeleteTargetId(null)}
+      >
+        <Modal
+          tone="orange"
+          title="해당 모집 공고를 삭제할까요?"
+          description={
+            <>
+              공고를 삭제하면 더 이상 지원을
+              <br />
+              받을 수 없으며,
+              <br />
+              삭제된 내용은 복구할 수 없어요
+            </>
+          }
+          confirmLabel="확인"
+          onCancel={() => setDeleteTargetId(null)}
+          onConfirm={handleConfirmDelete}
+        />
+      </ModalOverlay>
     </main>
   );
 };
