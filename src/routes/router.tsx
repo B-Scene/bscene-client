@@ -25,6 +25,7 @@ import ConcertCalendarPage from "@/pages/fan/home/ConcertCalendarPage";
 import ConcertDetailPage from "@/pages/fan/home/ConcertDetailPage";
 import NotificationPage from "@/pages/fan/home/NotificationPage";
 import { BandLivePage } from "@/pages/band/live/BandLivePage";
+import BandSessionPage from "@/pages/band/session/BandSessionPage";
 
 export const router = createBrowserRouter([
   {
@@ -164,6 +165,10 @@ export const router = createBrowserRouter([
       {
         path: "/band/videos/new",
         element: <ContentRegisterPage />,
+      },
+      {
+        path: "/band/session",
+        element: <BandSessionPage />,
       },
     ],
   },
