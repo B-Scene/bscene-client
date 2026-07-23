@@ -17,7 +17,7 @@ export const BandProfileCard = ({
   onEditProfile,
 }: BandProfileCardProps) => {
   return (
-    <div className="flex items-center gap-20">
+    <div className="flex items-center justify-between">
       <div className="flex flex-1 items-center gap-3">
         <img
           src={avatarUrl || DefaultAvatar}

@@ -50,6 +50,11 @@
   --text-body5-line-height: 12px;
   --text-body5-letter-spacing: 0px;
 
+  --text-body6-size: 15px;
+  --text-body6-weight: 700;
+  --text-body6-line-height: 20px;
+  --text-body6-letter-spacing: 0px;
+
   /* Label */
   --text-label1-size: 18px;
   --text-label1-weight: 700;

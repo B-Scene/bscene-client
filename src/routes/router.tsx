@@ -11,9 +11,9 @@ import RegionSelectPage from "@/pages/onboarding/RegionSelectPage";
 import OnboardingCompletePage from "@/pages/onboarding/OnboardingCompletePage";
 import OAuthCallbackPage from "@/pages/auth/OAuthCallbackPage";
 import BandHomePage from "@/pages/band/home/BandHomePage";
-import ProfileFormPage from "@/pages/band/home/ProfileFormPage";
+import ProfileFormPage from "@/pages/band/my/ProfileFormPage";
 import BandNotificationPage from "@/pages/band/home/NotificationPage";
-import InviteMemberPage from "@/pages/band/home/InviteMemberPage";
+import InviteMemberPage from "@/pages/band/my/InviteMemberPage";
 import ConcertRegisterPage from "@/pages/band/home/ConcertRegisterPage";
 import CompletePage from "@/pages/band/home/CompletePage";
 import MusicRegisterPage from "@/pages/band/home/MusicRegisterPage";
@@ -26,6 +26,12 @@ import ConcertDetailPage from "@/pages/fan/home/ConcertDetailPage";
 import NotificationPage from "@/pages/fan/home/NotificationPage";
 import { BandLivePage } from "@/pages/band/live/BandLivePage";
 import BandSessionPage from "@/pages/band/session/BandSessionPage";
+import MemberInviteSearchPage from "@/pages/band/home/MemberInviteSearchPage";
+import ApplicationManagementPage from "@/pages/band/my/ApplicationManagementPage";
+import PostingManagementPage from "@/pages/band/my/PostingManagementPage";
+import MyPage from "@/pages/band/my/MyPage";
+import RecruitAlertSettingsPage from "@/pages/band/my/RecruitAlertSettingsPage";
+import LiveAlertSettingsPage from "@/pages/band/my/LiveAlertSettingsPage";
 
 export const router = createBrowserRouter([
   {
@@ -104,6 +110,34 @@ export const router = createBrowserRouter([
         path: "/band/notifications",
         element: <BandNotificationPage />,
       },
+      {
+        path: "/band/my/recruit-alert",
+        element: <RecruitAlertSettingsPage />,
+      },
+      {
+        path: "/band/my/live-alert",
+        element: <LiveAlertSettingsPage />,
+      },
+      {
+        path: "/band/profile/edit",
+        element: <ProfileFormPage mode="edit" />,
+      },
+      {
+        path: "/band/profile/invite",
+        element: <InviteMemberPage />,
+      },
+      {
+        path: "/band/profile/invite/search",
+        element: <MemberInviteSearchPage />,
+      },
+      {
+        path: "/band/profile/applications",
+        element: <ApplicationManagementPage />,
+      },
+      {
+        path: "/band/profile/postings",
+        element: <PostingManagementPage />,
+      },
     ],
   },
   {
@@ -135,16 +169,8 @@ export const router = createBrowserRouter([
         element: <BandHomePage />,
       },
       {
-        path: "/band/profile/edit",
-        element: <ProfileFormPage mode="edit" />,
-      },
-      {
         path: "/band/profile/new",
         element: <ProfileFormPage mode="create" />,
-      },
-      {
-        path: "/band/profile/invite",
-        element: <InviteMemberPage />,
       },
       {
         path: "/band/concerts/new",
@@ -169,6 +195,10 @@ export const router = createBrowserRouter([
       {
         path: "/band/session",
         element: <BandSessionPage />,
+      },
+      {
+        path: "/band/my",
+        element: <MyPage />,
       },
     ],
   },
