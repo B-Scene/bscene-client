@@ -6,8 +6,10 @@ import { ImagePickerSheet } from "@/components/band/home/ImagePickerSheet";
 import { Input, Textarea } from "@/components/common/Input/Input";
 import { Select } from "@/components/common/Select/Select";
 import { useBandProfileStore } from "@/stores/useBandProfileStore";
+import { NotificationBandBanner } from "@/components/band/my/NotificationBandBanner";
 
 const GENRE_OPTIONS = [
+  "인디",
   "록",
   "인디팝",
   "펑크",
@@ -98,7 +100,16 @@ const ProfileFormPage = ({ mode }: ProfileFormPageProps) => {
 
   return (
     <main className="relative min-h-dvh bg-neutral-0 pb-40">
-      <Header title={isEditMode ? "프로필 편집" : "프로필 생성"} />
+      <Header title={isEditMode ? "밴드 프로필 관리" : "프로필 생성"} />
+
+      {isEditMode ? (
+        <div className="px-5 pt-4">
+          <NotificationBandBanner
+            bandName={`현재 선택된 밴드 · ${profile.name || "WAVY"}`}
+            description="현재 선택된 밴드의 공개 프로필을 수정합니다"
+          />
+        </div>
+      ) : null}
 
       <section className="flex flex-col gap-6 px-5 pt-6">
         <div className="flex flex-col items-center gap-3">
@@ -211,7 +222,7 @@ const ProfileFormPage = ({ mode }: ProfileFormPageProps) => {
               : "bg-neutral-300 text-neutral-600"
           }`}
         >
-          {isEditMode ? "프로필 저장" : "프로필 생성"}
+          {isEditMode ? "밴드 프로필 저장" : "프로필 생성"}
         </button>
       </div>
     </main>
