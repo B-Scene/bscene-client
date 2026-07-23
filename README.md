@@ -186,17 +186,16 @@ src/
 - `develop`: 개발 통합 브랜치
 - 작업 브랜치: 기능, 수정, 리팩토링 등 작업 단위로 생성하는 브랜치
 
-브랜치명은 작업 목적이 한눈에 보이도록 아래 형식을 따릅니다.
+브랜치명은 아래 형식을 따릅니다.
 
 ```text
 {type}/{scope}-{short-description}
 ```
 
 - `type`은 소문자로 작성합니다.
-- `scope`는 가능한 짧게 작성합니다. 예: `fan`, `band`, `live`, `session`, `auth`, `common`, `api`
+- `scope`는 가능한 짧게 작성합니다. 예: `web`, `admin`, `api`, `auth`, `evaluation`
 - `short-description`은 kebab-case로 작성합니다.
 - 가능한 경우 한글과 지역 변수명은 사용하지 않고, 약어는 남발하지 않습니다.
-- 예를 들어 `feat/band-live`는 `type=feat`, `scope=band`, `short-description=live`인 작업 브랜치입니다.
 
 사용 가능한 `type`은 아래와 같습니다.
 
@@ -212,24 +211,22 @@ src/
 Good 예시:
 
 ```text
-feat/band-live
-feat/band-session
-feat/fan-home
-fix/band-live-modal
-chore/project-structure
-refactor/live-api-client
-hotfix/auth-login-redirect
+feat/admin-evaluation-create
+feat/login-page
+fix/web-admin-rewrite
+chore/web-add-admin-app-url
+refactor/admin-api-client
+hotfix/admin-login-redirect
 ```
 
 Bad 예시:
 
 ```text
-band
+admin
 feature-1
 fix_login
 프론트수정
-bugFix-band
-Feat/band_live
+bugFix-admin
 ```
 
 ### 커밋 메시지

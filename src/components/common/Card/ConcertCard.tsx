@@ -155,7 +155,9 @@ const ConcertCard = ({
       </div>
 
       {actions ? (
-        <div className="flex shrink-0 items-center">{actions}</div>
+        <div className="flex shrink-0 flex-col items-center gap-2">
+          {actions}
+        </div>
       ) : arrowIconSrc ? (
         <img
           src={arrowIconSrc}

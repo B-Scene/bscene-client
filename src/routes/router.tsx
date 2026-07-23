@@ -11,7 +11,8 @@ import RegionSelectPage from "@/pages/onboarding/RegionSelectPage";
 import OnboardingCompletePage from "@/pages/onboarding/OnboardingCompletePage";
 import OAuthCallbackPage from "@/pages/auth/OAuthCallbackPage";
 import BandHomePage from "@/pages/band/home/BandHomePage";
-import EditProfilePage from "@/pages/band/home/EditProfilePage";
+import ProfileFormPage from "@/pages/band/home/ProfileFormPage";
+import BandNotificationPage from "@/pages/band/home/NotificationPage";
 import InviteMemberPage from "@/pages/band/home/InviteMemberPage";
 import ConcertRegisterPage from "@/pages/band/home/ConcertRegisterPage";
 import CompletePage from "@/pages/band/home/CompletePage";
@@ -23,6 +24,7 @@ import FollowedConcertsPage from "@/pages/fan/home/FollowedConcertsPage";
 import ConcertCalendarPage from "@/pages/fan/home/ConcertCalendarPage";
 import ConcertDetailPage from "@/pages/fan/home/ConcertDetailPage";
 import NotificationPage from "@/pages/fan/home/NotificationPage";
+import { BandLivePage } from "@/pages/band/live/BandLivePage";
 import BandSessionPage from "@/pages/band/session/BandSessionPage";
 
 export const router = createBrowserRouter([
@@ -94,6 +96,14 @@ export const router = createBrowserRouter([
         path: "/fan/home/notifications",
         element: <NotificationPage />,
       },
+      {
+        path: "/band/live",
+        element: <BandLivePage />,
+      },
+      {
+        path: "/band/notifications",
+        element: <BandNotificationPage />,
+      },
     ],
   },
   {
@@ -126,7 +136,11 @@ export const router = createBrowserRouter([
       },
       {
         path: "/band/profile/edit",
-        element: <EditProfilePage />,
+        element: <ProfileFormPage mode="edit" />,
+      },
+      {
+        path: "/band/profile/new",
+        element: <ProfileFormPage mode="create" />,
       },
       {
         path: "/band/profile/invite",
@@ -134,6 +148,10 @@ export const router = createBrowserRouter([
       },
       {
         path: "/band/concerts/new",
+        element: <ConcertRegisterPage />,
+      },
+      {
+        path: "/band/concerts/:concertId/edit",
         element: <ConcertRegisterPage />,
       },
       {
