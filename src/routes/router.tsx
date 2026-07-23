@@ -27,6 +27,7 @@ import NotificationPage from "@/pages/fan/home/NotificationPage";
 import { BandLivePage } from "@/pages/band/live/BandLivePage";
 import MemberInviteSearchPage from "@/pages/band/home/MemberInviteSearchPage";
 import ApplicationManagementPage from "@/pages/band/home/ApplicationManagementPage";
+import PostingManagementPage from "@/pages/band/home/PostingManagementPage";
 import MyPage from "@/pages/band/my/MyPage";
 import RecruitAlertSettingsPage from "@/pages/band/my/RecruitAlertSettingsPage";
 import LiveAlertSettingsPage from "@/pages/band/my/LiveAlertSettingsPage";
@@ -131,6 +132,10 @@ export const router = createBrowserRouter([
       {
         path: "/band/profile/applications",
         element: <ApplicationManagementPage />,
+      },
+      {
+        path: "/band/profile/postings",
+        element: <PostingManagementPage />,
       },
     ],
   },
