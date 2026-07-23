@@ -31,6 +31,7 @@ import PostingManagementPage from "@/pages/band/my/PostingManagementPage";
 import MyPage from "@/pages/band/my/MyPage";
 import RecruitAlertSettingsPage from "@/pages/band/my/RecruitAlertSettingsPage";
 import LiveAlertSettingsPage from "@/pages/band/my/LiveAlertSettingsPage";
+import BandSessionPage from "@/pages/band/session/BandSessionPage";
 
 export const router = createBrowserRouter([
   {
@@ -194,6 +195,10 @@ export const router = createBrowserRouter([
       {
         path: "/band/my",
         element: <MyPage />,
+      },
+      {
+        path: "/band/session",
+        element: <BandSessionPage />,
       },
     ],
   },
