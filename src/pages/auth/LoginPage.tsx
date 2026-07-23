@@ -6,7 +6,6 @@ import googleLoginButton from "@/assets/btn_google_login.svg";
 import Button from "@/components/common/Button/Button";
 import { useLogin } from "@/hooks/api/auth/useAuth";
 
-
 export default function Login() {
   const navigate = useNavigate();
   const { mutate: loginMutate, isPending } = useLogin();
@@ -40,18 +39,27 @@ export default function Login() {
   };
 
   const handleSocialLogin = (provider: "kakao" | "google") => {
-  window.location.href = `${import.meta.env.VITE_API_BASE_URL}/oauth2/authorization/${provider}`;
-};
+    const redirectOrigin = window.location.origin;
+
+    window.location.href =
+      `${import.meta.env.VITE_API_BASE_URL}/oauth2/authorization/${provider}` +
+      `?redirect_origin=${encodeURIComponent(redirectOrigin)}`;
+  };
 
   return (
     <main className="h-full w-full bg-neutral-0 px-[30px] pt-[104px]">
       <section className="w-full">
         <div className="flex justify-center">
-          <img src={logoSignature} alt="B:Scene" className="h-auto w-[151px]" />
+          <img
+            src={logoSignature}
+            alt="B:Scene"
+            className="h-auto w-[151px]"
+          />
         </div>
 
         <div className="mt-[43px] text-center">
           <h1 className="text-h4 text-neutral-900">Be the Scene!</h1>
+
           <p className="mt-1 text-h4 text-neutral-900">
             당신이 무대가 되는 순간
           </p>
@@ -95,38 +103,50 @@ export default function Login() {
           <button type="button" onClick={() => navigate("/signup")}>
             회원가입
           </button>
+
           <span className="text-neutral-400">|</span>
+
           <button type="button">아이디 찾기</button>
+
           <span className="text-neutral-400">|</span>
+
           <button type="button">비밀번호 찾기</button>
         </div>
 
         <div className="mt-[54px] h-px w-full bg-neutral-400 opacity-40" />
 
-        <div className="mt-[35px] flex flex-col gap-3">
-          <button
-            type="button"
-            onClick={() => handleSocialLogin("kakao")}
-            className="h-[52px] w-full"
-          >
-            <img
-              src={kakaoLoginButton}
-              alt="카카오계정으로 로그인"
-              className="h-full w-full"
-            />
-          </button>
+        <div className="mt-[29px]">
+          <p className="text-center text-caption1 text-neutral-700">
+            SNS 계정으로 간편 로그인
+          </p>
 
-          <button
-            type="button"
-            onClick={() => handleSocialLogin("google")}
-            className="h-[52px] w-full"
-          >
-            <img
-              src={googleLoginButton}
-              alt="구글 계정으로 로그인"
-              className="h-full w-full"
-            />
-          </button>
+          <div className="mt-[17px] flex items-center justify-center gap-[14px]">
+            <button
+              type="button"
+              onClick={() => handleSocialLogin("kakao")}
+              className="size-11 shrink-0"
+              aria-label="카카오계정으로 로그인"
+            >
+              <img
+                src={kakaoLoginButton}
+                alt=""
+                className="size-full object-contain"
+              />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleSocialLogin("google")}
+              className="size-11 shrink-0"
+              aria-label="구글 계정으로 로그인"
+            >
+              <img
+                src={googleLoginButton}
+                alt=""
+                className="size-full object-contain"
+              />
+            </button>
+          </div>
         </div>
       </section>
     </main>
