@@ -20,7 +20,7 @@ export const NotificationBandBanner = ({
     />
 
     <div className="flex min-w-0 flex-1 flex-col">
-      <span className="text-body1 text-neutral-900">{bandName}</span>
+      <span className="text-caption3 text-neutral-900">{bandName}</span>
       <span className="truncate text-caption2 text-neutral-600">
         {description}
       </span>

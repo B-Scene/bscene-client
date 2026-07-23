@@ -22,6 +22,7 @@ interface BandMembersState {
   members: BandMember[];
   pendingInvites: PendingInvite[];
   removeMember: (id: string) => void;
+  updateSelfMember: (updates: { name: string; part: string }) => void;
   addPendingInvite: (nickname: string) => void;
   cancelPendingInvite: (id: string) => void;
 }
@@ -32,6 +33,18 @@ export const useBandMembersStore = create<BandMembersState>((set) => ({
   removeMember: (id) =>
     set((state) => ({
       members: state.members.filter((member) => member.id !== id),
+    })),
+  updateSelfMember: ({ name, part }) =>
+    set((state) => ({
+      members: state.members.map((member) =>
+        member.isSelf
+          ? {
+              ...member,
+              name,
+              roleLabel: `${member.roleLabel.split(" · ")[0]} · ${part}`,
+            }
+          : member,
+      ),
     })),
   addPendingInvite: (nickname) =>
     set((state) => ({

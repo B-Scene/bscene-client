@@ -6,19 +6,23 @@ import { ImagePickerSheet } from "@/components/band/home/ImagePickerSheet";
 import { Input, Textarea } from "@/components/common/Input/Input";
 import { Select } from "@/components/common/Select/Select";
 import { useBandProfileStore } from "@/stores/useBandProfileStore";
+import { useBandMembersStore } from "@/stores/useBandMembersStore";
 import { NotificationBandBanner } from "@/components/band/my/NotificationBandBanner";
 
 const GENRE_OPTIONS = [
   "인디",
-  "록",
-  "인디팝",
-  "펑크",
-  "메탈",
+  "팝",
+  "팝록",
   "재즈",
   "블루스",
-  "R&B",
-  "어쿠스틱",
-  "포크",
+  "얼터너티브록",
+  "사이키델릭록",
+  "일렉트로닉록",
+  "포크록",
+  "펑크록",
+  "하드록",
+  "메탈",
+  "etc.",
 ];
 
 const REGION_OPTIONS = [
@@ -31,12 +35,45 @@ const REGION_OPTIONS = [
   "대전",
   "울산",
   "세종",
-  "충청",
-  "전라",
-  "경상",
+  "충남",
+  "충북",
+  "전남",
+  "전북",
+  "경남",
+  "경북",
   "강원",
   "제주",
 ];
+
+const PART_OPTIONS = ["보컬", "기타", "베이스", "드럼", "키보드"];
+
+interface ChipGroupProps {
+  options: string[];
+  value: string;
+  onChange: (value: string) => void;
+}
+
+const ChipGroup = ({ options, value, onChange }: ChipGroupProps) => (
+  <div className="flex flex-wrap gap-2">
+    {options.map((option) => {
+      const isSelected = value === option;
+      return (
+        <button
+          key={option}
+          type="button"
+          onClick={() => onChange(option)}
+          className={`rounded-full px-3.75 py-1 text-caption3 whitespace-nowrap ${
+            isSelected
+              ? "bg-secondary-500 text-neutral-0"
+              : "bg-neutral-300 text-neutral-600"
+          }`}
+        >
+          {option}
+        </button>
+      );
+    })}
+  </div>
+);
 
 interface ProfileFormPageProps {
   mode: "create" | "edit";
@@ -48,6 +85,12 @@ const ProfileFormPage = ({ mode }: ProfileFormPageProps) => {
   const profile = useBandProfileStore((state) => state.profile);
   const setProfile = useBandProfileStore((state) => state.setProfile);
   const addBand = useBandProfileStore((state) => state.addBand);
+
+  const members = useBandMembersStore((state) => state.members);
+  const updateSelfMember = useBandMembersStore(
+    (state) => state.updateSelfMember,
+  );
+  const selfMember = members.find((member) => member.isSelf);
 
   const galleryInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -63,6 +106,11 @@ const ProfileFormPage = ({ mode }: ProfileFormPageProps) => {
     isEditMode ? (profile.regions[0] ?? "") : "",
   );
   const [bio, setBio] = useState(isEditMode ? profile.bio : "");
+
+  const [myActivityName, setMyActivityName] = useState(selfMember?.name ?? "");
+  const [myPart, setMyPart] = useState(
+    selfMember?.roleLabel.split(" · ")[1] ?? "",
+  );
 
   const isValid = Boolean(name.trim() && genre && region);
 
@@ -91,6 +139,9 @@ const ProfileFormPage = ({ mode }: ProfileFormPageProps) => {
 
     if (isEditMode) {
       setProfile(profileData);
+      if (myActivityName.trim() && myPart) {
+        updateSelfMember({ name: myActivityName.trim(), part: myPart });
+      }
     } else {
       addBand(profileData);
     }
@@ -99,7 +150,7 @@ const ProfileFormPage = ({ mode }: ProfileFormPageProps) => {
   };
 
   return (
-    <main className="relative min-h-dvh bg-neutral-0 pb-40">
+    <main className="relative min-h-dvh bg-neutral-0">
       <Header title={isEditMode ? "밴드 프로필 관리" : "프로필 생성"} />
 
       {isEditMode ? (
@@ -160,59 +211,84 @@ const ProfileFormPage = ({ mode }: ProfileFormPageProps) => {
           />
         </div>
 
-        <div className="flex flex-col items-center gap-3">
-          <div className="flex flex-col gap-2">
-            <label className="text-body1 text-neutral-900">
-              밴드명 <span className="text-body1 text-error">*</span>
-            </label>
-            <Input
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              placeholder="밴드 이름을 입력해주세요"
-              className="pl-4 py-1.25 w-82.5 max-w-full rounded-[5px]"
-            />
-          </div>
+        <div className="flex flex-col gap-2">
+          <label className="text-body1 text-neutral-900">
+            밴드명 <span className="text-body1 text-error">*</span>
+          </label>
+          <Input
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            placeholder="밴드 이름을 입력해주세요"
+            className="w-full rounded-[5px] py-1.25 pl-4"
+          />
+        </div>
 
-          <div className="flex flex-col gap-2">
-            <label className="text-body1 text-neutral-900">
-              장르 <span className="text-body1 text-error">*</span>
-            </label>
-            <Select
-              value={genre}
-              onChange={setGenre}
-              options={GENRE_OPTIONS}
-              placeholder="장르 선택"
-              className="w-82.5 max-w-full"
-            />
-          </div>
+        <div className="flex flex-col gap-3">
+          <label className="text-label1 text-neutral-900">관심 장르</label>
+          <ChipGroup
+            options={GENRE_OPTIONS}
+            value={genre}
+            onChange={setGenre}
+          />
+        </div>
 
-          <div className="flex flex-col gap-2">
-            <label className="text-body1 text-neutral-900">
-              활동 지역 <span className="text-body1 text-error">*</span>
-            </label>
-            <Select
-              value={region}
-              onChange={setRegion}
-              options={REGION_OPTIONS}
-              placeholder="지역 선택"
-              className="w-82.5 max-w-full"
-            />
-          </div>
+        <div className="flex flex-col gap-3">
+          <label className="text-label1 text-neutral-900">활동 지역</label>
+          <ChipGroup
+            options={REGION_OPTIONS}
+            value={region}
+            onChange={setRegion}
+          />
+        </div>
 
-          <div className="flex flex-col gap-2">
-            <label className="text-body1 text-neutral-900">밴드 소개</label>
-            <Textarea
-              value={bio}
-              onChange={(event) => setBio(event.target.value)}
-              placeholder="밴드 소개글을 입력해주세요"
-              maxLength={60}
-              className="h-15 w-82.5 max-w-full overflow-hidden rounded-[5px] pt-2.25 pr-6.5 pb-8.25 pl-4"
-            />
-          </div>
+        <div className="flex flex-col gap-2">
+          <label className="text-label1 text-neutral-900">밴드 소개</label>
+          <Textarea
+            value={bio}
+            onChange={(event) => setBio(event.target.value)}
+            placeholder="밴드 소개글을 입력해주세요"
+            maxLength={60}
+            className="h-15 w-full overflow-hidden rounded-[5px] pt-2.25 pr-6.5 pb-8.25 pl-4"
+          />
         </div>
       </section>
 
-      <div className="fixed inset-x-0 bottom-[calc(var(--bottom-nav-height)+16px)] px-5">
+      {isEditMode ? (
+        <>
+          <div className="my-4 h-4 bg-secondary-0" />
+
+          <section className="flex flex-col gap-4 px-8">
+            <div className="flex flex-col gap-1">
+              <h2 className="text-label1 text-neutral-900">내 프로필 수정</h2>
+              <p className="text-caption2 text-neutral-600">
+                이 밴드에서 표시되는 내 활동명과 파트를 수정합니다
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <label className="text-body1 text-neutral-900">활동명</label>
+              <Input
+                value={myActivityName}
+                onChange={(event) => setMyActivityName(event.target.value)}
+                placeholder="활동명을 입력해주세요"
+                className="w-full rounded-[5px] py-1.25 pl-4"
+              />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <label className="text-body1 text-neutral-900">파트</label>
+              <Select
+                value={myPart}
+                onChange={setMyPart}
+                options={PART_OPTIONS}
+                placeholder="파트를 선택해주세요"
+              />
+            </div>
+          </section>
+        </>
+      ) : null}
+
+      <div className="px-5 py-8">
         <button
           type="button"
           onClick={handleSubmit}
