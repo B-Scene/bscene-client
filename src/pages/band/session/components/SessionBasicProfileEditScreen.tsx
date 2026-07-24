@@ -1,5 +1,4 @@
 import {
-  useEffect,
   useRef,
   useState,
   type ChangeEvent,
@@ -15,6 +14,7 @@ import {
 import type {
   SessionApiResponse,
   SessionProfileGender,
+  SessionProfileResponse,
 } from "@/types/session/sessionProfile";
 
 interface SessionBasicProfileEditScreenProps {
@@ -36,33 +36,72 @@ const cx = (...classNames: Array<string | false | null | undefined>) =>
 export const SessionBasicProfileEditScreen = ({
   onBack,
 }: SessionBasicProfileEditScreenProps) => {
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const profileQuery = useSessionProfileQuery();
+
+  if (profileQuery.isLoading) {
+    return (
+      <main className="min-h-dvh bg-neutral-0">
+        <EditTopBar onBack={onBack} />
+        <section className="flex min-h-[360px] items-center justify-center text-caption1 text-neutral-500">
+          기본 정보를 불러오고 있어요
+        </section>
+      </main>
+    );
+  }
+
+  if (profileQuery.isError) {
+    return (
+      <main className="min-h-dvh bg-neutral-0">
+        <EditTopBar onBack={onBack} />
+        <section className="flex min-h-[360px] flex-col items-center justify-center px-6 text-center">
+          <p className="text-caption1 text-neutral-500">
+            기본 정보를 불러오지 못했어요
+          </p>
+          <button
+            type="button"
+            onClick={() => profileQuery.refetch()}
+            className="mt-3 rounded-[8px] bg-secondary-500 px-4 py-2 text-caption2 text-neutral-0"
+          >
+            다시 시도
+          </button>
+        </section>
+      </main>
+    );
+  }
+
+  if (!profileQuery.data) return null;
+
+  return (
+    <SessionBasicProfileEditForm
+      key={profileQuery.data.userId}
+      profile={profileQuery.data}
+      onBack={onBack}
+    />
+  );
+};
+
+interface SessionBasicProfileEditFormProps {
+  profile: SessionProfileResponse;
+  onBack: () => void;
+}
+
+const SessionBasicProfileEditForm = ({
+  profile,
+  onBack,
+}: SessionBasicProfileEditFormProps) => {
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const updateProfileMutation = useUpdateSessionProfile();
 
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [saveErrorMessage, setSaveErrorMessage] = useState("");
   const [values, setValues] = useState<BasicProfileValues>({
-    name: "",
-    phone: "",
-    email: "",
-    gender: "MALE",
-    birthDate: "",
-    profileImageUrl: null,
+    name: profile.name,
+    phone: profile.phone,
+    email: profile.email ?? "",
+    gender: profile.gender,
+    birthDate: profile.birthDate,
+    profileImageUrl: profile.profileImageUrl,
   });
-
-  useEffect(() => {
-    if (!profileQuery.data) return;
-
-    setValues({
-      name: profileQuery.data.name,
-      phone: profileQuery.data.phone,
-      email: profileQuery.data.email ?? "",
-      gender: profileQuery.data.gender,
-      birthDate: profileQuery.data.birthDate,
-      profileImageUrl: profileQuery.data.profileImageUrl,
-    });
-  }, [profileQuery.data]);
 
   const handleProfileImageChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -111,37 +150,6 @@ export const SessionBasicProfileEditScreen = ({
       );
     }
   };
-
-  if (profileQuery.isLoading) {
-    return (
-      <main className="min-h-dvh bg-neutral-0">
-        <EditTopBar onBack={onBack} />
-        <section className="flex min-h-[360px] items-center justify-center text-caption1 text-neutral-500">
-          기본 정보를 불러오고 있어요
-        </section>
-      </main>
-    );
-  }
-
-  if (profileQuery.isError) {
-    return (
-      <main className="min-h-dvh bg-neutral-0">
-        <EditTopBar onBack={onBack} />
-        <section className="flex min-h-[360px] flex-col items-center justify-center px-6 text-center">
-          <p className="text-caption1 text-neutral-500">
-            기본 정보를 불러오지 못했어요
-          </p>
-          <button
-            type="button"
-            onClick={() => profileQuery.refetch()}
-            className="mt-3 rounded-[8px] bg-secondary-500 px-4 py-2 text-caption2 text-neutral-0"
-          >
-            다시 시도
-          </button>
-        </section>
-      </main>
-    );
-  }
 
   return (
     <main className="min-h-dvh bg-neutral-0 pb-[calc(var(--bottom-nav-height)+92px)]">

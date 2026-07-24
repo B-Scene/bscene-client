@@ -5,6 +5,7 @@ import kakaoLoginButton from "@/assets/btn_kakao_login.svg";
 import googleLoginButton from "@/assets/btn_google_login.svg";
 import Button from "@/components/common/Button/Button";
 import { useLogin } from "@/hooks/api/auth/useAuth";
+import { saveAuthenticatedUser } from "@/utils/authUser";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -24,6 +25,12 @@ export default function Login() {
         onSuccess: (data) => {
           localStorage.setItem("accessToken", data.accessToken);
           localStorage.setItem("refreshToken", data.refreshToken);
+          saveAuthenticatedUser({
+            ...data.user,
+            email: (data.user as { email?: string | null }).email,
+            fanNickname: (data.user as { fanNickname?: string | null })
+              .fanNickname,
+          });
 
           navigate(
             data.user.onboardingCompleted ? "/home" : "/onboarding/agreement",
