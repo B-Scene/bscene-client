@@ -39,6 +39,10 @@ export type ChatMessage = {
   message: string;
   time: string;
   highlighted?: boolean;
+  clientMsgId?: string | null;
+  serverMessageId?: string | null;
+  senderProfileImageUrl?: string | null;
+  pending?: boolean;
 };
 
 export type Member = {
