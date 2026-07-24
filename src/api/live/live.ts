@@ -1,10 +1,15 @@
 import { axiosInstance } from "@/api/axiosInstance";
 import type {
+  CloseLiveResponse,
   CreateLiveRequest,
   CreateLiveResponse,
   EnterLiveResponse,
   LiveApiResponse,
   LiveHomeResponse,
+  LiveReservationResponse,
+  LiveSummaryResponse,
+  UpdateLiveReservationRequest,
+  UpdateLiveReservationResponse,
 } from "@/types/live/live";
 
 export const getLiveHome = async (): Promise<LiveHomeResponse> => {
@@ -31,6 +36,87 @@ export const enterLive = async (
 ): Promise<EnterLiveResponse> => {
   const { data } = await axiosInstance.post<LiveApiResponse<EnterLiveResponse>>(
     `/lives/${liveId}`,
+  );
+
+  return data.result;
+};
+
+export const closeLive = async (
+  liveId: number,
+): Promise<CloseLiveResponse> => {
+  const { data } = await axiosInstance.post<LiveApiResponse<CloseLiveResponse>>(
+    `/lives/${liveId}/close`,
+  );
+
+  return data.result;
+};
+
+export const requestLiveReplay = async (liveId: number): Promise<null> => {
+  const { data } = await axiosInstance.post<LiveApiResponse<null>>(
+    `/lives/${liveId}/replay`,
+  );
+
+  return data.result;
+};
+
+export const getLiveSummary = async (
+  liveId: number,
+): Promise<LiveSummaryResponse> => {
+  const { data } = await axiosInstance.get<LiveApiResponse<LiveSummaryResponse>>(
+    `/lives/${liveId}/summary`,
+  );
+
+  return data.result;
+};
+
+export const getLiveReservation = async (
+  liveId: number,
+): Promise<LiveReservationResponse> => {
+  const { data } = await axiosInstance.get<
+    LiveApiResponse<LiveReservationResponse>
+  >(`/lives/${liveId}/reservation`);
+
+  return data.result;
+};
+
+export const updateLiveReservation = async ({
+  liveId,
+  body,
+}: {
+  liveId: number;
+  body: UpdateLiveReservationRequest;
+}): Promise<UpdateLiveReservationResponse> => {
+  const formData = new FormData();
+
+  const { thumbnailImage, ...requestBody } = body;
+
+  formData.append(
+    "request",
+    new Blob([JSON.stringify(requestBody)], {
+      type: "application/json",
+    }),
+  );
+
+  if (body.thumbnailAction === "REPLACE" && thumbnailImage) {
+    formData.append("thumbnailImage", thumbnailImage);
+  }
+
+  const { data } = await axiosInstance.patch<
+    LiveApiResponse<UpdateLiveReservationResponse>
+  >(`/lives/${liveId}/reservation`, formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+
+  return data.result;
+};
+
+export const cancelLiveReservation = async (
+  liveId: number,
+): Promise<null> => {
+  const { data } = await axiosInstance.delete<LiveApiResponse<null>>(
+    `/lives/${liveId}/reservation`,
   );
 
   return data.result;

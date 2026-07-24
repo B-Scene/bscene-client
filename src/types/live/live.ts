@@ -65,6 +65,39 @@ export interface EnterLiveResponse {
   playback: LivePlayback;
 }
 
-export interface ViewerCountEvent {
-  viewerCount: number;
+export interface CloseLiveResponse {
+  liveId: string;
+  endedAt: string;
+}
+
+export interface LiveSummaryResponse {
+  title: string;
+  durationSec: number;
+  closedViewerCount: number;
+}
+
+export interface LiveReservationResponse {
+  liveId: number;
+  title: string;
+  description: string;
+  thumbnailImageUrl: string | null;
+  scheduledAt: string;
+  coHosts: number[];
+}
+
+export type ThumbnailAction = "KEEP" | "REPLACE" | "REMOVE";
+
+export interface UpdateLiveReservationRequest {
+  title: string;
+  description?: string;
+  scheduledAt: string;
+  coHosts: number[];
+  thumbnailAction: ThumbnailAction;
+  thumbnailImage?: File | null;
+}
+
+export interface UpdateLiveReservationResponse {
+  liveId: number;
+  scheduledAt: string;
+  thumbnailImageUrl: string | null;
 }
