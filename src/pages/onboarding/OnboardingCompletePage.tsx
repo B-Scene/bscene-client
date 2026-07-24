@@ -4,6 +4,7 @@ import BSceneSymbol from "@/assets/bscene-symbol.svg";
 import Button from "@/components/common/Button/Button";
 import { useSaveOnboarding } from "@/hooks/api/onboarding/useOnboarding";
 import type { ModeCode } from "@/types/onboarding/onboarding";
+import { saveFanNickname } from "@/utils/authUser";
 
 const getJsonItem = <T,>(key: string, fallback: T): T => {
   const value = sessionStorage.getItem(key);
@@ -44,6 +45,10 @@ const OnboardingCompletePage = () => {
       },
       {
         onSuccess: () => {
+          if (fanNickname) {
+            saveFanNickname(fanNickname);
+          }
+
           sessionStorage.removeItem("onboardingSelectedModes");
           sessionStorage.removeItem("onboardingInitialMode");
           sessionStorage.removeItem("onboardingFanNickname");

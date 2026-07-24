@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useOAuthExchange } from "@/hooks/api/auth/useAuth";
+import { saveAuthenticatedUser } from "@/utils/authUser";
 
 const OAuthCallbackPage = () => {
   const navigate = useNavigate();
@@ -36,6 +37,14 @@ const OAuthCallbackPage = () => {
         if (data.token) {
           localStorage.setItem("accessToken", data.token.accessToken);
           localStorage.setItem("refreshToken", data.token.refreshToken);
+          saveAuthenticatedUser({
+            ...data.token.user,
+            email:
+              (data.token.user as { email?: string | null }).email ??
+              data.email,
+            fanNickname: (data.token.user as { fanNickname?: string | null })
+              .fanNickname,
+          });
 
           navigate(
             data.token.user.onboardingCompleted

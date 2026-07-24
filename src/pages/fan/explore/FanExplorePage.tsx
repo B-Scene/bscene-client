@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import SearchIcon from "@/assets/icons/band/search.svg";
 import ArrowDownIcon from "@/assets/icons/band/arrow-down-gray.svg";
@@ -19,6 +19,17 @@ type AppliedExploreFilters = {
   genre: string;
   region: string;
   content: string;
+};
+
+type RecommendedBand = {
+  id: string;
+  name: string;
+  genre: string;
+  region: string;
+  contentTypes: string[];
+  followers: number;
+  score: number;
+  description: string;
 };
 
 const SORT_FILTER: ExploreFilter = { id: "recommend", label: "추천순" };
@@ -56,13 +67,88 @@ const FILTER_OPTIONS = {
   content: ["전체", "밴드", "공연", "영상"],
 };
 
-const RECOMMENDED_BANDS = Array.from({ length: 8 }, (_, index) => ({
-  id: `wavy-${index + 1}`,
-  name: "WAVY",
-  meta: "인디 · 서울",
-  followers: 560,
-  description: "몽환적인 사운드와 감각적인 스타일로 주목받는 3인조 밴드",
-}));
+const RECOMMENDED_BANDS: RecommendedBand[] = [
+  {
+    id: "wavy",
+    name: "WAVY",
+    genre: "인디팝",
+    region: "서울",
+    contentTypes: ["밴드", "공연", "영상"],
+    followers: 560,
+    score: 98,
+    description: "몽환적인 사운드와 감각적인 스타일로 주목받는 3인조 밴드",
+  },
+  {
+    id: "loud-kids",
+    name: "LOUD KIDS",
+    genre: "록",
+    region: "서울",
+    contentTypes: ["밴드", "공연"],
+    followers: 820,
+    score: 91,
+    description: "강한 기타 리프와 에너지 있는 라이브를 중심으로 활동해요",
+  },
+  {
+    id: "blue-hour",
+    name: "BLUE HOUR",
+    genre: "재즈",
+    region: "부산",
+    contentTypes: ["밴드", "영상"],
+    followers: 340,
+    score: 84,
+    description: "도시적인 재즈 사운드와 즉흥 연주 콘텐츠를 선보여요",
+  },
+  {
+    id: "silver-line",
+    name: "SILVER LINE",
+    genre: "메탈",
+    region: "대구",
+    contentTypes: ["밴드", "공연"],
+    followers: 730,
+    score: 79,
+    description: "묵직한 사운드와 공연 중심 활동으로 팬층을 넓히고 있어요",
+  },
+  {
+    id: "paper-moon",
+    name: "PAPER MOON",
+    genre: "어쿠스틱",
+    region: "경기",
+    contentTypes: ["밴드", "영상"],
+    followers: 290,
+    score: 76,
+    description: "잔잔한 어쿠스틱 편곡과 커버 영상으로 소통하는 듀오예요",
+  },
+  {
+    id: "river-folk",
+    name: "RIVER FOLK",
+    genre: "포크",
+    region: "강원",
+    contentTypes: ["밴드", "공연"],
+    followers: 410,
+    score: 72,
+    description: "지역 페스티벌과 작은 공연장에서 따뜻한 포크 음악을 전해요",
+  },
+  {
+    id: "neon-wave",
+    name: "NEON WAVE",
+    genre: "R&B",
+    region: "광주",
+    contentTypes: ["밴드", "영상"],
+    followers: 650,
+    score: 88,
+    description: "그루브한 리듬과 감각적인 보컬 라인으로 주목받고 있어요",
+  },
+  {
+    id: "punk-road",
+    name: "PUNK ROAD",
+    genre: "펑크",
+    region: "인천",
+    contentTypes: ["밴드", "공연", "영상"],
+    followers: 480,
+    score: 82,
+    description: "빠른 템포와 직설적인 메시지의 라이브 무대를 만들어요",
+  },
+];
 
 const ExploreTopBar = () => {
   const navigate = useNavigate();
@@ -113,7 +199,7 @@ export const ExploreFilterBar = ({
   onFilterClick,
 }: {
   appliedFilters: AppliedExploreFilters;
-  appliedSort?: SortOption | null;
+  appliedSort?: string | null;
   onSortClick?: () => void;
   onFilterClick?: () => void;
 }) => {
@@ -127,6 +213,7 @@ export const ExploreFilterBar = ({
     ? filterChips.filter((filter) => filter.value !== "전체")
     : filterChips;
   const isSortApplied = Boolean(appliedSort);
+  const sortChipWidthClass = appliedSort === "정확도순" ? "w-[73px]" : "w-[62px]";
 
   return (
     <div className="flex h-[48px] w-full max-w-[393px] items-center justify-between border-b border-neutral-400 bg-neutral-0 py-[11px] pl-[22px] pr-[26px]">
@@ -135,9 +222,10 @@ export const ExploreFilterBar = ({
           type="button"
           onClick={onSortClick}
           className={[
-            "flex h-[22px] w-[62px] shrink-0 items-center justify-center gap-[4px] whitespace-nowrap rounded-full border px-[15px] py-[7px] font-body text-caption3 text-center",
+            "box-border flex h-[22px] shrink-0 items-center justify-center gap-[4px] whitespace-nowrap rounded-full border px-[15px] py-[7px] text-center font-body text-caption3",
+            sortChipWidthClass,
             isSortApplied
-              ? "border-primary-400 bg-primary-50 text-primary-400"
+              ? "border-primary-400 bg-primary-0 text-primary-400"
               : "border-neutral-400 bg-neutral-0 text-neutral-600",
           ].join(" ")}
         >
@@ -165,7 +253,7 @@ export const ExploreFilterBar = ({
               "flex h-[22px] shrink-0 items-center justify-center whitespace-nowrap rounded-full border bg-neutral-0 py-[7px] font-body text-caption3",
               isApplied ? "px-[15px]" : "w-[48px] px-[15px]",
               isApplied
-                ? "border-primary-400 bg-primary-50 text-primary-400"
+                ? "border-primary-400 bg-primary-0 text-primary-400"
                 : "border-neutral-400 text-neutral-600",
             ].join(" ")}
           >
@@ -401,7 +489,13 @@ const ExploreFilterSheet = ({
   );
 };
 
-const RecommendationSection = () => {
+const RecommendationSection = ({
+  bands,
+  showIntro,
+}: {
+  bands: RecommendedBand[];
+  showIntro: boolean;
+}) => {
   const navigate = useNavigate();
   const [followingIds, setFollowingIds] = useState<Set<string>>(new Set());
   const [followerCounts, setFollowerCounts] = useState(() =>
@@ -454,22 +548,34 @@ const RecommendationSection = () => {
   };
 
   return (
-    <section className="px-[22px] pt-[24px]">
-      <h2 className="m-0 font-body text-label1 text-neutral-900">
-        회원님을 위한 추천 밴드
-      </h2>
-      <p className="m-0 mt-[4px] font-body text-caption2 text-neutral-600">
-        회원님의 취향과 활동을 기반으로 추천해요
-      </p>
+    <section
+      className="px-[22px]"
+      style={{ paddingTop: showIntro ? 24 : 16 }}
+    >
+      {showIntro ? (
+        <>
+          <h2 className="m-0 font-body text-label1 text-neutral-900">
+            회원님을 위한 추천 밴드
+          </h2>
+          <p className="m-0 mt-[4px] font-body text-caption2 text-neutral-600">
+            회원님의 취향과 활동을 기반으로 추천해요
+          </p>
+        </>
+      ) : null}
 
-      <div className="mt-[16px] flex flex-col gap-[12px]">
-        {RECOMMENDED_BANDS.map((band) => (
+      {bands.length > 0 ? (
+        <div
+          className={`flex flex-col gap-[12px] ${showIntro ? "mt-[16px]" : ""}`}
+        >
+          {bands.map((band) => (
           <BandCard
             key={band.id}
             imageSrc={BandImage}
             imageAlt={`${band.name} 프로필`}
             title={band.name}
-            subtitle={`${band.meta} · 팔로워 ${followerCounts[band.id]}명`}
+            subtitle={`${band.genre} · ${band.region} · 팔로워 ${
+              followerCounts[band.id]
+            }명`}
             description={band.description}
             following={followingIds.has(band.id)}
             onClick={() => navigate(`/fan/bands/${band.id}`)}
@@ -486,8 +592,9 @@ const RecommendationSection = () => {
             descriptionClassName="line-clamp-2 text-primary-300"
             descriptionMultiline
           />
-        ))}
-      </div>
+          ))}
+        </div>
+      ) : null}
 
       <ModalOverlay
         open={unfollowTargetId !== null}
@@ -525,6 +632,29 @@ const FanExplorePage = () => {
   const [appliedFilters, setAppliedFilters] = useState(
     DEFAULT_APPLIED_FILTERS,
   );
+  const hasAppliedFilter = Object.values(appliedFilters).some(
+    (value) => value !== "전체",
+  );
+  const filteredBands = useMemo(() => {
+    const nextBands = RECOMMENDED_BANDS.filter((band) => {
+      const matchesGenre =
+        appliedFilters.genre === "전체" || band.genre === appliedFilters.genre;
+      const matchesRegion =
+        appliedFilters.region === "전체" ||
+        band.region === appliedFilters.region;
+      const matchesContent =
+        appliedFilters.content === "전체" ||
+        band.contentTypes.includes(appliedFilters.content);
+
+      return matchesGenre && matchesRegion && matchesContent;
+    });
+
+    if (appliedSort === "인기순") {
+      return [...nextBands].sort((a, b) => b.followers - a.followers);
+    }
+
+    return [...nextBands].sort((a, b) => b.score - a.score);
+  }, [appliedFilters, appliedSort]);
 
   return (
     <main className="min-h-dvh bg-neutral-0 pb-[calc(var(--bottom-nav-height)+24px)]">
@@ -535,7 +665,10 @@ const FanExplorePage = () => {
         onSortClick={() => setIsSortSheetOpen(true)}
         onFilterClick={() => setIsFilterSheetOpen(true)}
       />
-      <RecommendationSection />
+      <RecommendationSection
+        bands={filteredBands}
+        showIntro={!hasAppliedFilter}
+      />
       <ExploreSortSheet
         open={isSortSheetOpen}
         onClose={() => setIsSortSheetOpen(false)}
