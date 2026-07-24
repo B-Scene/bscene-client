@@ -1,6 +1,12 @@
+import { useState } from "react";
+import type { AxiosError } from "axios";
 import { BottomNavBar } from "@/components/layout/BottomNavBar";
-import type { GoLiveScreen, LiveFormMode } from "./types";
+import { useCreateLiveMutation, useEnterLiveMutation } from "@/hooks/api/live/useLive";
+import type { LiveApiResponse } from "@/types/live/live";
+import type { ActiveLive, GoLiveScreen, LiveFormMode } from "./types";
 import { ConfirmDialog } from "./components/ConfirmDialog";
+import { CoHostSelectionScreen } from "./components/CoHostSelectionScreen";
+import { MicTestScreen } from "./components/MicTestScreen";
 import { TopBar } from "./components/TopBar";
 import {
   ChoiceCard,
@@ -14,24 +20,119 @@ import {
 interface LiveFormProps {
   mode: LiveFormMode;
   go: GoLiveScreen;
-  showCancelDialog?: boolean;
+  onCreatedLive?: (live: ActiveLive) => void;
 }
 
-export function LiveForm({
-  mode,
-  go,
-  showCancelDialog = false,
-}: LiveFormProps) {
+const toScheduledAt = (date: string, time: string) => `${date}T${time}:00`;
+
+export function LiveForm({ mode, go, onCreatedLive }: LiveFormProps) {
+  const createLiveMutation = useCreateLiveMutation();
+  const enterLiveMutation = useEnterLiveMutation();
+
+  const [isCoHostScreenOpen, setIsCoHostScreenOpen] = useState(false);
+  const [isMicTestScreenOpen, setIsMicTestScreenOpen] = useState(false);
+  const [isEditCancelDialogOpen, setIsEditCancelDialogOpen] = useState(false);
+  const [isReservationCancelDialogOpen, setIsReservationCancelDialogOpen] =
+    useState(false);
+
+  const [reservedDate, setReservedDate] = useState("2026-05-24");
+  const [reservedTime, setReservedTime] = useState("20:00");
+  const [submitErrorMessage, setSubmitErrorMessage] = useState("");
+
+  const isInstant = mode === "instant";
   const isReserve = mode === "reserve";
   const isEdit = mode === "edit";
   const isReservationMode = isReserve || isEdit;
 
+  const handleBack = () => {
+    if (isReservationMode) {
+      setIsEditCancelDialogOpen(true);
+      return;
+    }
+
+    go("home");
+  };
+
+  const handleClose = () => {
+    if (isReservationMode) {
+      setIsEditCancelDialogOpen(true);
+      return;
+    }
+
+    go("home");
+  };
+
+  const handleCreateLive = async () => {
+    setSubmitErrorMessage("");
+
+    try {
+      const createdLive = await createLiveMutation.mutateAsync({
+        title: "신곡 데모 첫 공개!",
+        description: "미공개 데모를 라이브로 들려드려요",
+        thumbnailImageUrl: "",
+        scheduledAt: isReserve ? toScheduledAt(reservedDate, reservedTime) : null,
+        coHost: [],
+      });
+
+      if (isReserve) {
+        go("home");
+        return;
+      }
+
+      const enteredLive = await enterLiveMutation.mutateAsync(createdLive.audioStreamId);
+      onCreatedLive?.(enteredLive);
+      go("room");
+    } catch (error) {
+      const apiMessage = (error as AxiosError<LiveApiResponse<null>>).response?.data
+        ?.message;
+
+      setSubmitErrorMessage(
+        apiMessage ?? "라이브 생성에 실패했어요. 잠시 후 다시 시도해주세요.",
+      );
+    }
+  };
+
+  const handleSaveReservation = () => {
+    go("home");
+  };
+
+  const handleEditCancelConfirm = () => {
+    setIsEditCancelDialogOpen(false);
+    go("home");
+  };
+
+  const handleReservationCancelConfirm = () => {
+    setIsReservationCancelDialogOpen(false);
+    go("home");
+  };
+
+  if (isCoHostScreenOpen) {
+    return (
+      <CoHostSelectionScreen
+        onBack={() => setIsCoHostScreenOpen(false)}
+        onClose={() => setIsCoHostScreenOpen(false)}
+      />
+    );
+  }
+
+  if (isMicTestScreenOpen) {
+    return (
+      <MicTestScreen
+        onBack={() => setIsMicTestScreenOpen(false)}
+        onClose={() => setIsMicTestScreenOpen(false)}
+        onComplete={() => setIsMicTestScreenOpen(false)}
+      />
+    );
+  }
+
+  const isSubmitting = createLiveMutation.isPending || enterLiveMutation.isPending;
+
   return (
     <main className="relative min-h-dvh bg-secondary-0 pb-[calc(var(--bottom-nav-height)+32px)] text-neutral-900">
       <TopBar
-        title={isReservationMode ? "라이브 예약 편집" : "라이브 시작"}
-        onBack={() => (isReservationMode ? go("cancelConfirm") : go("home"))}
-        onClose={isReservationMode ? undefined : () => go("home")}
+        title={isReservationMode ? "라이브 예약 수정" : "라이브 시작"}
+        onBack={handleBack}
+        onClose={handleClose}
       />
 
       <div className="grid gap-3 px-5 pt-3 pb-6">
@@ -39,7 +140,7 @@ export function LiveForm({
           <FormCard title="라이브 시간 설정">
             <div className="flex gap-5">
               <ChoiceCard
-                selected={!isReserve}
+                selected={isInstant}
                 title="지금 바로 시작"
                 description="즉시 라이브를 시작합니다"
                 onClick={() => go("instantForm")}
@@ -58,27 +159,41 @@ export function LiveForm({
           <LiveInfoFields />
         </FormCard>
 
-        {isReserve || isEdit ? (
+        {isReservationMode ? (
           <FormCard title="예약 일시 설정">
-            <DateTimeSelector />
+            <DateTimeSelector
+              date={reservedDate}
+              time={reservedTime}
+              onDateChange={setReservedDate}
+              onTimeChange={setReservedTime}
+            />
           </FormCard>
         ) : null}
 
-        <CoHostCard />
-        {!isReserve && !isEdit ? <TestBroadcastCard /> : null}
+        <CoHostCard onClick={() => setIsCoHostScreenOpen(true)} />
 
-        {isEdit ? (
+        {isInstant ? (
+          <TestBroadcastCard onClick={() => setIsMicTestScreenOpen(true)} />
+        ) : null}
+
+        {submitErrorMessage ? (
+          <p className="text-center text-caption2 text-error">{submitErrorMessage}</p>
+        ) : null}
+
+        {isReservationMode ? (
           <div className="mt-4 flex gap-5">
             <button
               type="button"
-              onClick={() => go("home")}
-              className="flex h-12 flex-1 items-center justify-center rounded-[10px] bg-secondary-500 text-label2 text-neutral-0"
+              onClick={isEdit ? handleSaveReservation : handleCreateLive}
+              disabled={isSubmitting}
+              className="flex h-12 flex-1 items-center justify-center rounded-[10px] bg-secondary-500 text-label2 text-neutral-0 disabled:opacity-60"
             >
-              저장
+              {isSubmitting ? "저장 중" : "저장"}
             </button>
+
             <button
               type="button"
-              onClick={() => go("cancelConfirm")}
+              onClick={() => setIsReservationCancelDialogOpen(true)}
               className="flex h-12 flex-1 items-center justify-center rounded-[10px] border border-secondary-500 bg-neutral-0 text-label2 text-secondary-500"
             >
               예약 취소
@@ -87,24 +202,36 @@ export function LiveForm({
         ) : (
           <button
             type="button"
-            onClick={() => (isReserve ? go("home") : go("room"))}
-            className="mt-4 flex h-[52px] w-full items-center justify-center rounded-[10px] bg-secondary-500 text-label1 text-neutral-0"
+            onClick={handleCreateLive}
+            disabled={isSubmitting}
+            className="mt-4 flex h-[52px] w-full items-center justify-center rounded-[10px] bg-secondary-500 text-label1 text-neutral-0 disabled:opacity-60"
           >
-            {isReserve ? "라이브 예약하기" : "라이브 시작하기"}
+            {isSubmitting ? "라이브 준비 중" : "라이브 시작하기"}
           </button>
         )}
       </div>
 
       <BottomNavBar modeOverride="band" />
 
-      {showCancelDialog ? (
+      {isReservationCancelDialogOpen ? (
         <ConfirmDialog
           title="예약을 취소할까요?"
-          description="취소된 라이브 예약은 복구할 수 없어요"
-          cancelLabel="돌아가기"
-          confirmLabel="예약 취소"
-          onCancel={() => go("editForm")}
-          onConfirm={() => go("home")}
+          description={"취소된 라이브 예약은\n복구할 수 없어요"}
+          cancelLabel="취소"
+          confirmLabel="확인"
+          onCancel={() => setIsReservationCancelDialogOpen(false)}
+          onConfirm={handleReservationCancelConfirm}
+        />
+      ) : null}
+
+      {isEditCancelDialogOpen ? (
+        <ConfirmDialog
+          title="수정을 취소할까요?"
+          description={"저장하지 않은 변경 사항은\n모두 사라집니다"}
+          cancelLabel="취소"
+          confirmLabel="확인"
+          onCancel={() => setIsEditCancelDialogOpen(false)}
+          onConfirm={handleEditCancelConfirm}
         />
       ) : null}
     </main>
@@ -112,5 +239,5 @@ export function LiveForm({
 }
 
 export function CancelConfirm({ go }: { go: GoLiveScreen }) {
-  return <LiveForm mode="edit" go={go} showCancelDialog />;
+  return <LiveForm mode="edit" go={go} />;
 }
