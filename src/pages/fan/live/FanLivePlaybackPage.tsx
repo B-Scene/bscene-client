@@ -132,30 +132,30 @@ function PlaybackToggle({
 export function FanLivePlaybackPage() {
   const navigate = useNavigate();
   const [playing, setPlaying] = useState(false);
-  const [progress, setProgress] = useState(0.27);
   const [elapsedSeconds, setElapsedSeconds] = useState(INITIAL_SECONDS);
+  const progress = elapsedSeconds / TOTAL_SECONDS;
 
   useEffect(() => {
     if (!playing) return;
 
-    const timer = window.setInterval(() => {
-      setElapsedSeconds((current) => Math.min(TOTAL_SECONDS, current + 0.25));
-      setProgress((current) => {
-        const nextProgress = Math.min(1, current + 0.001);
-        if (nextProgress >= 1) setPlaying(false);
-        return nextProgress;
-      });
+    const timer = window.setTimeout(() => {
+      const nextElapsedSeconds = Math.min(
+        TOTAL_SECONDS,
+        elapsedSeconds + 0.25,
+      );
+
+      setElapsedSeconds(nextElapsedSeconds);
+      if (nextElapsedSeconds >= TOTAL_SECONDS) {
+        setPlaying(false);
+      }
     }, 250);
 
-    return () => window.clearInterval(timer);
-  }, [playing]);
+    return () => window.clearTimeout(timer);
+  }, [elapsedSeconds, playing]);
 
   const seek = (seconds: number) => {
     setElapsedSeconds((current) =>
       Math.min(TOTAL_SECONDS, Math.max(0, current + seconds)),
-    );
-    setProgress((current) =>
-      Math.min(1, Math.max(0, current + seconds / TOTAL_SECONDS)),
     );
   };
 
@@ -188,7 +188,6 @@ export function FanLivePlaybackPage() {
             value={progress}
             onChange={(event) => {
               const nextProgress = Number(event.target.value);
-              setProgress(nextProgress);
               setElapsedSeconds(nextProgress * TOTAL_SECONDS);
             }}
             aria-label="재생 위치 조절"

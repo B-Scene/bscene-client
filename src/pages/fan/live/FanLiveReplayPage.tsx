@@ -21,6 +21,19 @@ const ALL_REPLAYS = [
   "replay-all-5",
 ];
 
+const REPLAY_METRICS: Record<
+  string,
+  { publishedOrder: number; viewCount: number }
+> = {
+  "replay-followed-1": { publishedOrder: 2, viewCount: 6785 },
+  "replay-followed-2": { publishedOrder: 1, viewCount: 8450 },
+  "replay-all-1": { publishedOrder: 5, viewCount: 6785 },
+  "replay-all-2": { publishedOrder: 4, viewCount: 9120 },
+  "replay-all-3": { publishedOrder: 3, viewCount: 4556 },
+  "replay-all-4": { publishedOrder: 2, viewCount: 10340 },
+  "replay-all-5": { publishedOrder: 1, viewCount: 7230 },
+};
+
 export function FanLiveReplayPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -30,9 +43,18 @@ export function FanLiveReplayPage() {
   const isEmpty = searchParams.get("empty") === "true";
   const items = filter === "followed" ? FOLLOWED_REPLAYS : ALL_REPLAYS;
   const normalizedQuery = searchQuery.trim().toLocaleLowerCase();
-  const visibleItems = items.filter(() =>
-    "라이브 제목명 밴드명".toLocaleLowerCase().includes(normalizedQuery),
-  );
+  const visibleItems = items
+    .filter(() =>
+      "라이브 제목명 밴드명".toLocaleLowerCase().includes(normalizedQuery),
+    )
+    .sort((firstId, secondId) => {
+      const firstMetrics = REPLAY_METRICS[firstId];
+      const secondMetrics = REPLAY_METRICS[secondId];
+
+      return sort === "latest"
+        ? secondMetrics.publishedOrder - firstMetrics.publishedOrder
+        : secondMetrics.viewCount - firstMetrics.viewCount;
+    });
   const hasNoResults = !isEmpty && visibleItems.length === 0;
 
   return (
@@ -98,22 +120,26 @@ export function FanLiveReplayPage() {
             </div>
 
             <section className="fan-live-home-scroll flex flex-1 flex-col items-center gap-3 overflow-y-auto px-5 pb-6">
-              {visibleItems.map((id) => (
-                <VideoCard
-                  key={id}
-                  title="라이브 제목명"
-                  bandName="밴드명"
-                  duration="00:00:00"
-                  onClick={() => navigate(`/fan/live/replays/${id}`)}
-                  ariaLabel="라이브 다시보기 열기"
-                  timeAgo={
-                    <span className="flex items-center gap-1">
-                      <img src={PlayIcon} alt="" className="size-3 opacity-40" />
-                      6,785
-                    </span>
-                  }
-                />
-              ))}
+              {visibleItems.map((id) => {
+                const { viewCount } = REPLAY_METRICS[id];
+
+                return (
+                  <VideoCard
+                    key={id}
+                    title="라이브 제목명"
+                    bandName="밴드명"
+                    duration="00:00:00"
+                    onClick={() => navigate(`/fan/live/replays/${id}`)}
+                    ariaLabel="라이브 다시보기 열기"
+                    timeAgo={
+                      <span className="flex items-center gap-1">
+                        <img src={PlayIcon} alt="" className="size-3 opacity-40" />
+                        {viewCount.toLocaleString()}
+                      </span>
+                    }
+                  />
+                );
+              })}
             </section>
           </>
         )}

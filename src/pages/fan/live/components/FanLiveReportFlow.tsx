@@ -37,7 +37,7 @@ interface ReportPageProps {
 }
 
 export function FanLiveReportPage({ onBack, onComplete }: ReportPageProps) {
-  const [selectedReason, setSelectedReason] = useState(2);
+  const [selectedReason, setSelectedReason] = useState(0);
   const [details, setDetails] = useState("");
 
   return (

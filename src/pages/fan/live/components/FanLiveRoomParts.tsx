@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import AirplaneIcon from "@/assets/icons/airplane.svg";
 import BandImage from "@/assets/Img_Band.png";
 import BadgeIcon from "@/assets/icons/Badge.svg";
@@ -280,6 +280,17 @@ export function FanLiveChatArea({
 }) {
   const [messages, setMessages] = useState(initialFanChatMessages);
   const [message, setMessage] = useState("");
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const scrollContainer = scrollRef.current;
+    if (!scrollContainer) return;
+
+    scrollContainer.scrollTo({
+      top: scrollContainer.scrollHeight,
+      behavior: "smooth",
+    });
+  }, [messages]);
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -306,6 +317,7 @@ export function FanLiveChatArea({
   return (
     <section className="absolute inset-x-0 top-[386px] bottom-0 overflow-hidden bg-primary-0/70">
       <div
+        ref={scrollRef}
         className={`fan-live-chat-scroll mx-auto h-full w-[338px] max-w-[calc(100%-48px)] overflow-x-hidden overflow-y-auto pt-3 ${
           composerOpen ? "pb-[190px]" : "pb-[110px]"
         }`}

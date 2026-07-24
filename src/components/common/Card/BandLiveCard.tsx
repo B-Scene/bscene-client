@@ -4,10 +4,10 @@ import { CompactBandCardContent, compactBandCardClassName } from './shared'
 import notificationIcon from '../../../assets/Notification.svg'
 
 type CardTone = 'pink' | 'orange'
-type NotificationVariant = 'soft' | 'outline'
-type NotificationContentSize = 'default' | 'compact'
+export type NotificationVariant = 'soft' | 'outline'
+export type NotificationContentSize = 'default' | 'compact'
 
-type BandLiveCardProps = CompactBandCardBaseProps & {
+export type BandLiveCardProps = CompactBandCardBaseProps & {
   bandName?: CompactBandCardBaseProps['subtitle']
   schedule?: CompactBandCardBaseProps['description']
   showNotificationButton?: boolean
