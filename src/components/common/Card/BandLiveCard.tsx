@@ -4,6 +4,8 @@ import { CompactBandCardContent, compactBandCardClassName } from './shared'
 import notificationIcon from '../../../assets/Notification.svg'
 
 type CardTone = 'pink' | 'orange'
+type NotificationVariant = 'soft' | 'outline'
+type NotificationContentSize = 'default' | 'compact'
 
 type BandLiveCardProps = CompactBandCardBaseProps & {
   bandName?: CompactBandCardBaseProps['subtitle']
@@ -12,6 +14,8 @@ type BandLiveCardProps = CompactBandCardBaseProps & {
   notificationIconSrc?: string
   notificationIconAlt?: string
   notificationLabel?: CompactBandCardBaseProps['description']
+  notificationVariant?: NotificationVariant
+  notificationContentSize?: NotificationContentSize
   tone?: CardTone
   onNotificationClick?: ButtonHTMLAttributes<HTMLButtonElement>['onClick']
 }
@@ -42,14 +46,35 @@ const BandLiveCard = ({
   notificationIconSrc = notificationIcon,
   notificationIconAlt = '',
   notificationLabel = '알림 받기',
+  notificationVariant = 'soft',
+  notificationContentSize = 'default',
   tone = 'pink',
   onNotificationClick,
 }: BandLiveCardProps) => {
   const toneClasses = toneClassNames[tone]
+  const notificationClassName =
+    notificationVariant === 'outline'
+      ? tone === 'pink'
+        ? 'border-primary-400 bg-neutral-0 text-primary-400 focus-visible:ring-primary-400'
+        : 'border-secondary-500 bg-neutral-0 text-secondary-500 focus-visible:ring-secondary-500'
+      : `${toneClasses.button} border-transparent`
+  const notificationPaddingClassName =
+    notificationContentSize === 'compact'
+      ? 'px-[2px]'
+      : notificationVariant === 'outline'
+        ? 'px-[4px]'
+        : 'px-[8px]'
+  const notificationTextClassName =
+    notificationContentSize === 'compact' ? 'text-body5' : 'text-caption3'
+  const notificationIconClassName =
+    notificationContentSize === 'compact'
+      ? 'h-[14px] w-[14px]'
+      : 'h-[18px] w-[18px]'
 
   return (
     <article className={compactBandCardClassName}>
       <CompactBandCardContent
+        contentClassName="h-[62px] min-w-0 flex-1"
         description={description}
         descriptionClassName={toneClasses.description}
         imageAlt={imageAlt}
@@ -60,14 +85,14 @@ const BandLiveCard = ({
 
       {showNotificationButton ? (
         <button
-          className={`font-body text-caption3 inline-flex h-[32px] w-[81px] shrink-0 cursor-pointer items-center justify-center gap-[4px] rounded-[100px] border-0 px-[8px] transition duration-150 ease-out active:translate-y-px focus-visible:outline-0 focus-visible:ring-4 ${toneClasses.button}`}
+          className={`font-body inline-flex h-[32px] w-[81px] shrink-0 cursor-pointer items-center justify-center gap-[4px] whitespace-nowrap rounded-[100px] border transition duration-150 ease-out active:translate-y-px focus-visible:outline-0 focus-visible:ring-4 ${notificationTextClassName} ${notificationPaddingClassName} ${notificationClassName}`}
           onClick={onNotificationClick}
           type="button"
         >
           {notificationIconSrc ? (
             <img
               alt={notificationIconAlt}
-              className="h-[18px] w-[18px] shrink-0 object-contain"
+              className={`${notificationIconClassName} shrink-0 object-contain`}
               src={notificationIconSrc}
             />
           ) : null}

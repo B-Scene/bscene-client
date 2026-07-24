@@ -24,7 +24,14 @@ import FollowedConcertsPage from "@/pages/fan/home/FollowedConcertsPage";
 import ConcertCalendarPage from "@/pages/fan/home/ConcertCalendarPage";
 import ConcertDetailPage from "@/pages/fan/home/ConcertDetailPage";
 import NotificationPage from "@/pages/fan/home/NotificationPage";
-import { FanLivePage } from "@/pages/fan/live";
+import {
+  FanLiveHomePage,
+  FanLiveNowPage,
+  FanLivePage,
+  FanLivePlaybackPage,
+  FanLiveReplayPage,
+  FanLiveScheduledPage,
+} from "@/pages/fan/live";
 import { BandLivePage } from "@/pages/band/live/BandLivePage";
 import BandSessionPage from "@/pages/band/session/BandSessionPage";
 
@@ -103,7 +110,27 @@ export const router = createBrowserRouter([
       },
       {
         path: "/fan/live",
+        element: <FanLiveHomePage />,
+      },
+      {
+        path: "/fan/live/room",
         element: <FanLivePage />,
+      },
+      {
+        path: "/fan/live/now",
+        element: <FanLiveNowPage />,
+      },
+      {
+        path: "/fan/live/scheduled",
+        element: <FanLiveScheduledPage />,
+      },
+      {
+        path: "/fan/live/replays",
+        element: <FanLiveReplayPage />,
+      },
+      {
+        path: "/fan/live/replays/:replayId",
+        element: <FanLivePlaybackPage />,
       },
       {
         path: "/band/notifications",

@@ -5,7 +5,9 @@ import BadgeIcon from "@/assets/icons/Badge.svg";
 import ChatIcon from "@/assets/icons/chat.svg";
 import HeadsetIcon from "@/assets/Headset.svg";
 import MicIcon from "@/assets/icons/ic_Mic.svg?react";
+import MuteIcon from "@/assets/icons/Mute.svg";
 import UsersIcon from "@/assets/icons/users.svg";
+import VolumeIcon from "@/assets/icons/Volume.svg";
 import UserProfileIcon from "@/assets/icons/band/user-default-profile.svg";
 import { useSlideUpSheet } from "@/hooks/useSlideUpSheet";
 
@@ -49,9 +51,12 @@ function Waveform() {
   );
 }
 
-export function FanLiveHero() {
+export function FanLiveHero({ top = 90 }: { top?: number }) {
   return (
-    <section className="absolute inset-x-0 top-[90px] h-[272px] text-center">
+    <section
+      className="absolute inset-x-0 h-[272px] text-center"
+      style={{ top }}
+    >
       <div className="flex h-[160px] items-center justify-center gap-2.5">
         <Waveform />
         <img
@@ -125,6 +130,8 @@ export function FanLiveActionBar({
   onOpenMembers: () => void;
   onToggleChat: () => void;
 }) {
+  const [isMuted, setIsMuted] = useState(false);
+
   return (
     <nav
       aria-label="라이브 메뉴"
@@ -135,10 +142,16 @@ export function FanLiveActionBar({
 
         <button
           type="button"
-          aria-label="마이크"
+          onClick={() => setIsMuted((current) => !current)}
+          aria-pressed={isMuted}
+          aria-label="소리 켜기/끄기"
           className="fan-live-mic-button absolute left-1/2 -top-[18px] flex size-[66px] -translate-x-1/2 items-center justify-center rounded-full bg-primary-0"
         >
-          <MicIcon aria-hidden="true" className="fan-live-mic-icon size-[42px]" />
+          <img
+            src={isMuted ? MuteIcon : VolumeIcon}
+            alt=""
+            className="size-[42px] object-contain"
+          />
         </button>
 
         <ActionItem
@@ -210,7 +223,10 @@ function FanChatAvatar({
         className="size-10 rounded-full border border-primary-300 object-cover"
       />
       <span className="absolute -right-0.5 -bottom-0.5 flex size-3.5 items-center justify-center rounded-full bg-neutral-0">
-        <MicIcon aria-hidden="true" className="fan-live-chat-mic-icon size-2.5" />
+        <MicIcon
+          aria-hidden="true"
+          className="fan-live-chat-mic-icon size-2.5"
+        />
       </span>
     </div>
   );

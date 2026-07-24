@@ -30,7 +30,17 @@
   overscroll-behavior: contain;
 }
 
+.fan-live-home-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  overscroll-behavior: contain;
+}
+
 .fan-live-chat-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.fan-live-home-scroll::-webkit-scrollbar {
   display: none;
 }
 

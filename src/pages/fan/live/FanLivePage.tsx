@@ -82,7 +82,7 @@ export function FanLivePage() {
       >
         <Modal
           onCancel={() => setIsExitModalOpen(false)}
-          onConfirm={() => navigate("/fan/home")}
+          onConfirm={() => navigate("/fan/live")}
         />
       </ModalOverlay>
     </main>
