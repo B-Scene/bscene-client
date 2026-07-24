@@ -249,6 +249,7 @@ export const ExploreFilterBar = ({
           <button
             key={filter.id}
             type="button"
+            onClick={onFilterClick}
             className={[
               "flex h-[22px] shrink-0 items-center justify-center whitespace-nowrap rounded-full border bg-neutral-0 py-[7px] font-body text-caption3",
               isApplied ? "px-[15px]" : "w-[48px] px-[15px]",
@@ -287,6 +288,7 @@ const ExploreSortSheet = ({
   onSelect: (sort: SortOption) => void;
 }) => {
   const { rendered, isVisible, handleTransitionEnd } = useSlideUpSheet(open);
+  const sortDialogLabel = selectedSort ?? SORT_FILTER.label;
 
   if (!rendered) return null;
 
@@ -304,7 +306,7 @@ const ExploreSortSheet = ({
       <section
         role="dialog"
         aria-modal="true"
-        aria-label="추천순"
+        aria-label={sortDialogLabel}
         onTransitionEnd={handleTransitionEnd}
         className={[
           "relative z-10 flex w-[393px] max-w-full flex-col items-start gap-[10px] rounded-t-[20px] bg-neutral-0 px-[15px] pt-[32px] pb-[48px] transition-transform duration-300 ease-out",

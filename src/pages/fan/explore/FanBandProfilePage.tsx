@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import ArrowLeftIcon from "@/assets/icons/arrow-left.svg";
 import OfficialIcon from "@/assets/icons/band/official-icon.svg";
 import PlusIcon from "@/assets/icons/Plus.svg";
@@ -154,7 +154,10 @@ const MusicLinkCard = ({
 
 const FanBandProfilePage = () => {
   const navigate = useNavigate();
+  const { bandId = "wavy" } = useParams<{ bandId: string }>();
   const [searchParams] = useSearchParams();
+  // TODO: currentBandId를 기준으로 밴드별 프로필 API 또는 Mock 데이터를 연결한다.
+  const currentBandId = bandId;
   const [isFollowing, setIsFollowing] = useState(false);
   const [followerCount, setFollowerCount] = useState(560);
   const [activeTab, setActiveTab] = useState<ProfileTab>("콘텐츠");
@@ -172,7 +175,10 @@ const FanBandProfilePage = () => {
   };
 
   return (
-    <main className="min-h-dvh bg-neutral-0 pb-[calc(var(--bottom-nav-height)+24px)]">
+    <main
+      className="min-h-dvh bg-neutral-0 pb-[calc(var(--bottom-nav-height)+24px)]"
+      data-band-id={currentBandId}
+    >
       <header className="relative flex h-[48px] w-full max-w-[393px] items-center justify-center bg-neutral-0 px-[15px]">
         <button
           type="button"

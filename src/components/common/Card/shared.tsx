@@ -42,11 +42,11 @@ export const CompactBandCardContent = ({
         <h3 className="font-body text-body1 m-0 truncate text-neutral-900">
           {title}
         </h3>
-        <p className="font-body text-body5 m-0 mt-[3px] truncate text-neutral700">
+        <p className="font-body text-body5 m-0 mt-[3px] truncate text-neutral-700">
           {subtitle}
         </p>
         <p
-          className={`font-body text-body5 m-0 mt-[3px]${
+          className={`font-body text-body5 m-0 mt-[3px] ${
             descriptionMultiline ? '' : 'truncate'
           } ${descriptionClassName}`}
         >

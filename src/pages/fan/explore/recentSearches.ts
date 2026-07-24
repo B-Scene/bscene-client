@@ -22,10 +22,14 @@ export const getRecentSearches = () => {
 export const setRecentSearches = (keywords: string[]) => {
   if (typeof window === "undefined") return;
 
-  window.localStorage.setItem(
-    RECENT_SEARCHES_STORAGE_KEY,
-    JSON.stringify(keywords),
-  );
+  try {
+    window.localStorage.setItem(
+      RECENT_SEARCHES_STORAGE_KEY,
+      JSON.stringify(keywords),
+    );
+  } catch {
+    // Ignore storage failures so search submissions can continue.
+  }
 };
 
 export const addRecentSearch = (keyword: string) => {
