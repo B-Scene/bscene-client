@@ -16,6 +16,7 @@ function HomeLiveCard({ live, onEnter }: { live: LiveCard; onEnter: () => void }
           LIVE
         </span>
       </div>
+
       <div className="ml-4 min-w-0 flex-1 pr-[62px]">
         <strong className="block truncate text-body1 text-neutral-900">{live.title}</strong>
         <span className="mt-0.5 block truncate text-body3 text-neutral-700">{live.subtitle}</span>
@@ -26,6 +27,7 @@ function HomeLiveCard({ live, onEnter }: { live: LiveCard; onEnter: () => void }
           </span>
         </span>
       </div>
+
       <button
         type="button"
         onClick={onEnter}
@@ -41,17 +43,19 @@ function ScheduledLiveCard({ onEdit }: { onEdit: () => void }) {
   return (
     <article className="flex h-[88px] items-center rounded-[10px] bg-neutral-0 px-4 shadow-[0_4px_15px_rgba(20,20,20,0.08)]">
       <ProfileImage />
+
       <div className="ml-4 min-w-0 flex-1">
         <strong className="block truncate text-body1 text-neutral-900">내 예정 라이브</strong>
         <span className="mt-0.5 block truncate text-body3 text-neutral-700">라이브 제목</span>
         <span className="mt-1 block text-caption2 text-secondary-500">5.28. (화) 오후 8:00</span>
       </div>
+
       <button
         type="button"
         onClick={onEdit}
         className="flex h-8 w-[69px] items-center justify-center rounded-lg bg-secondary-0 text-caption3 text-secondary-500"
       >
-        편집
+        수정
       </button>
     </article>
   );
@@ -60,9 +64,10 @@ function ScheduledLiveCard({ onEdit }: { onEdit: () => void }) {
 export function BandLiveHome({ go }: { go: GoLiveScreen }) {
   return (
     <main className="relative min-h-dvh bg-neutral-0 pb-[calc(var(--bottom-nav-height)+24px)] text-neutral-900">
-      <TopBar title="라이브" right="notification" align="left" />
+      <TopBar title="라이브" />
+
       <div className="px-5">
-        <section className="mt-6 flex h-[164px] w-full items-center justify-between rounded-xl bg-secondary-0 px-[18px] shadow-[0_4px_15px_rgba(20,20,20,0.08)]">
+        <section className="mt-5 flex h-[164px] w-full items-center justify-between rounded-xl bg-secondary-0 px-[18px] shadow-[0_4px_15px_rgba(20,20,20,0.08)]">
           <div className="min-w-0">
             <h2 className="text-[17px] leading-5 font-bold text-neutral-900">
               지금, 오디오 라이브를
@@ -82,11 +87,12 @@ export function BandLiveHome({ go }: { go: GoLiveScreen }) {
               라이브 시작하기
             </button>
           </div>
+
           <LiveIllustration />
         </section>
 
         <section className="mt-8">
-          <SectionHeader title="지금 라이브 중" />
+          <SectionHeader title="진행 중인 라이브" />
           <div className="mt-3 grid gap-3">
             {liveCards.map((live) => (
               <HomeLiveCard key={live.id} live={live} onEnter={() => go("room")} />
@@ -101,6 +107,7 @@ export function BandLiveHome({ go }: { go: GoLiveScreen }) {
           </div>
         </section>
       </div>
+
       <BottomNavBar modeOverride="fan" activeColorModeOverride="band" />
     </main>
   );

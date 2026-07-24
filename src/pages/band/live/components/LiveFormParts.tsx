@@ -1,4 +1,9 @@
-import { useState, type ChangeEvent, type ReactNode } from "react";
+import {
+  useRef,
+  useState,
+  type ChangeEvent,
+  type ReactNode,
+} from "react";
 import AddImageIcon from "@/assets/icons/band/add-image.svg";
 import ArrowDownGrayIcon from "@/assets/icons/band/arrow-down-gray.svg";
 import CalendarIcon from "@/assets/icons/band/data-range.svg";
@@ -29,7 +34,9 @@ export function ChoiceCard({
       <span
         className={cx(
           "mt-0.5 size-3 shrink-0 rounded-full border",
-          selected ? "border-secondary-500 bg-secondary-500 shadow-[inset_0_0_0_3px_#fffaf0]" : "border-neutral-300",
+          selected
+            ? "border-secondary-500 bg-secondary-500 shadow-[inset_0_0_0_3px_#fffaf0]"
+            : "border-neutral-300",
         )}
       />
       <span className="min-w-0">
@@ -89,6 +96,7 @@ function ThumbnailField() {
   const handleThumbnailChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+
     setThumbnailPreview(URL.createObjectURL(file));
   };
 
@@ -106,6 +114,7 @@ function ThumbnailField() {
         )}
         <input type="file" accept="image/*" className="sr-only" onChange={handleThumbnailChange} />
       </label>
+
       <p className="ml-3 text-caption2 text-neutral-500">
         라이브를 대표할 이미지에요.
         <br />
@@ -125,59 +134,148 @@ export function LiveInfoFields() {
   );
 }
 
-export function DateTimeSelector() {
+const formatDateLabel = (dateValue: string) => {
+  if (!dateValue) return "날짜 선택";
+
+  const [year, month, day] = dateValue.split("-").map(Number);
+  if (!year || !month || !day) return dateValue;
+
+  const weekDay = ["일", "월", "화", "수", "목", "금", "토"][
+    new Date(year, month - 1, day).getDay()
+  ];
+
+  return `${year}.${String(month).padStart(2, "0")}.${String(day).padStart(2, "0")}. (${weekDay})`;
+};
+
+interface DateTimeSelectorProps {
+  date: string;
+  time: string;
+  onDateChange: (date: string) => void;
+  onTimeChange: (time: string) => void;
+}
+
+export function DateTimeSelector({
+  date,
+  time,
+  onDateChange,
+  onTimeChange,
+}: DateTimeSelectorProps) {
+  const dateInputRef = useRef<HTMLInputElement>(null);
+  const timeInputRef = useRef<HTMLInputElement>(null);
+
+  const openNativePicker = (input: HTMLInputElement | null) => {
+    if (!input) return;
+
+    const pickerInput = input as HTMLInputElement & {
+      showPicker?: () => void;
+    };
+
+    if (pickerInput.showPicker) {
+      pickerInput.showPicker();
+      return;
+    }
+
+    input.focus();
+    input.click();
+  };
+
   return (
     <div className="rounded-lg border border-neutral-300 px-4 py-3">
-      <button type="button" className="flex h-9 w-full items-center gap-4 text-left">
-        <img src={CalendarIcon} alt="" className="size-6 shrink-0" />
-        <span className="flex-1">
-          <span className="block text-caption2 text-neutral-500">날짜 선택</span>
-          <strong className="block text-body2 text-neutral-900">2026.05.24. (금)</strong>
-        </span>
-        <img src={ArrowDownGrayIcon} alt="" className="size-4 shrink-0" />
-      </button>
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => openNativePicker(dateInputRef.current)}
+          className="flex h-9 w-full items-center gap-4 text-left"
+        >
+          <img src={CalendarIcon} alt="" className="size-6 shrink-0" />
+          <span className="flex-1">
+            <span className="block text-caption2 text-neutral-500">날짜 선택</span>
+            <strong className="block text-body2 text-neutral-900">
+              {formatDateLabel(date)}
+            </strong>
+          </span>
+          <img src={ArrowDownGrayIcon} alt="" className="size-4 shrink-0" />
+        </button>
+
+        <input
+          ref={dateInputRef}
+          type="date"
+          value={date}
+          tabIndex={-1}
+          aria-hidden="true"
+          onChange={(event) => onDateChange(event.target.value)}
+          className="pointer-events-none absolute top-0 right-0 h-px w-px opacity-0"
+        />
+      </div>
+
       <div className="my-2 h-px bg-neutral-300" />
-      <button type="button" className="flex h-9 w-full items-center gap-4 text-left">
-        <img src={ClockIcon} alt="" className="size-6 shrink-0" />
-        <span className="flex-1">
-          <span className="block text-caption2 text-neutral-500">시작 시간</span>
-          <strong className="block text-body2 text-neutral-900">20:00</strong>
-        </span>
-        <img src={ArrowDownGrayIcon} alt="" className="size-4 shrink-0" />
-      </button>
+
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => openNativePicker(timeInputRef.current)}
+          className="flex h-9 w-full items-center gap-4 text-left"
+        >
+          <img src={ClockIcon} alt="" className="size-6 shrink-0" />
+          <span className="flex-1">
+            <span className="block text-caption2 text-neutral-500">시작 시간</span>
+            <strong className="block text-body2 text-neutral-900">
+              {time || "시간 선택"}
+            </strong>
+          </span>
+          <img src={ArrowDownGrayIcon} alt="" className="size-4 shrink-0" />
+        </button>
+
+        <input
+          ref={timeInputRef}
+          type="time"
+          value={time}
+          tabIndex={-1}
+          aria-hidden="true"
+          onChange={(event) => onTimeChange(event.target.value)}
+          className="pointer-events-none absolute top-0 right-0 h-px w-px opacity-0"
+        />
+      </div>
     </div>
   );
 }
 
-export function CoHostCard() {
+export function CoHostCard({ onClick }: { onClick?: () => void }) {
   return (
     <button
       type="button"
+      onClick={onClick}
       className="flex h-16 w-full items-center rounded-[14px] bg-neutral-0 px-[18px] text-left shadow-[0_4px_15px_rgba(20,20,20,0.08)]"
     >
       <img src={CoHostBackgroundIcon} alt="" className="size-9 shrink-0" />
+
       <span className="ml-3 flex-1">
         <strong className="block text-caption3 text-neutral-900">공동 진행 (선택)</strong>
-        <span className="block text-caption2 text-neutral-600">멤버와 함께 라이브를 진행할 수 있어요.</span>
+        <span className="block text-caption2 text-neutral-600">
+          멤버와 함께 라이브를 진행할 수 있어요.
+        </span>
       </span>
+
       <span className="text-[32px] leading-none text-neutral-300">›</span>
     </button>
   );
 }
 
-export function TestBroadcastCard() {
+export function TestBroadcastCard({ onClick }: { onClick?: () => void }) {
   return (
     <section className="flex h-[88px] items-center justify-between rounded-[14px] bg-neutral-0 px-[18px] shadow-[0_4px_15px_rgba(20,20,20,0.08)]">
       <div>
-        <h2 className="text-body1 text-neutral-900">테스트 방송</h2>
+        <h2 className="text-body1 text-neutral-900">마이크 테스트</h2>
         <p className="mt-2 text-caption2 text-neutral-600">
           방송 전에 음질과 마이크를
           <br />
           테스트해보세요
         </p>
       </div>
+
       <button
         type="button"
+        onClick={onClick}
         className="flex h-8 w-[82px] items-center justify-center rounded-lg bg-secondary-0 text-caption3 text-secondary-500"
       >
         테스트 시작
