@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import type { AxiosError } from "axios";
 import { useNavigate } from "react-router-dom";
 import ArrowLeftIcon from "@/assets/icons/arrow-left.svg";
 import CheckIcon from "@/assets/icons/check.svg";
@@ -23,6 +24,16 @@ type SignupForm = {
   code: string;
   birth: string;
   gender: string;
+};
+
+type ApiErrorResponse = {
+  message?: string;
+};
+
+const getApiErrorMessage = (error: unknown, fallbackMessage: string) => {
+  const axiosError = error as AxiosError<ApiErrorResponse>;
+
+  return axiosError.response?.data?.message ?? fallbackMessage;
 };
 
 const SignupPage = () => {
@@ -140,7 +151,7 @@ const SignupPage = () => {
         },
         onError: (error) => {
           console.error(error);
-          alert("인증번호 발송에 실패했습니다.");
+          alert(getApiErrorMessage(error, "인증번호 발송에 실패했습니다."));
         },
       },
     );
@@ -167,7 +178,7 @@ const SignupPage = () => {
         onError: (error) => {
           console.error(error);
           setIsPhoneVerified(false);
-          alert("인증번호가 올바르지 않습니다.");
+          alert(getApiErrorMessage(error, "인증번호가 올바르지 않습니다."));
         },
       },
     );
@@ -207,7 +218,7 @@ const SignupPage = () => {
           },
           onError: (error) => {
             console.error(error);
-            alert("소셜 회원가입에 실패했습니다.");
+            alert(getApiErrorMessage(error, "소셜 회원가입에 실패했습니다."));
           },
         },
       );
@@ -236,7 +247,7 @@ const SignupPage = () => {
         },
         onError: (error) => {
           console.error(error);
-          alert("회원가입에 실패했습니다.");
+          alert(getApiErrorMessage(error, "회원가입에 실패했습니다."));
         },
       },
     );
