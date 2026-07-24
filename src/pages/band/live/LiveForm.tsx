@@ -1,6 +1,9 @@
 import { useState } from "react";
+import type { AxiosError } from "axios";
 import { BottomNavBar } from "@/components/layout/BottomNavBar";
-import type { GoLiveScreen, LiveFormMode } from "./types";
+import { useCreateLiveMutation, useEnterLiveMutation } from "@/hooks/api/live/useLive";
+import type { LiveApiResponse } from "@/types/live/live";
+import type { ActiveLive, GoLiveScreen, LiveFormMode } from "./types";
 import { ConfirmDialog } from "./components/ConfirmDialog";
 import { CoHostSelectionScreen } from "./components/CoHostSelectionScreen";
 import { MicTestScreen } from "./components/MicTestScreen";
@@ -17,9 +20,15 @@ import {
 interface LiveFormProps {
   mode: LiveFormMode;
   go: GoLiveScreen;
+  onCreatedLive?: (live: ActiveLive) => void;
 }
 
-export function LiveForm({ mode, go }: LiveFormProps) {
+const toScheduledAt = (date: string, time: string) => `${date}T${time}:00`;
+
+export function LiveForm({ mode, go, onCreatedLive }: LiveFormProps) {
+  const createLiveMutation = useCreateLiveMutation();
+  const enterLiveMutation = useEnterLiveMutation();
+
   const [isCoHostScreenOpen, setIsCoHostScreenOpen] = useState(false);
   const [isMicTestScreenOpen, setIsMicTestScreenOpen] = useState(false);
   const [isEditCancelDialogOpen, setIsEditCancelDialogOpen] = useState(false);
@@ -28,6 +37,7 @@ export function LiveForm({ mode, go }: LiveFormProps) {
 
   const [reservedDate, setReservedDate] = useState("2026-05-24");
   const [reservedTime, setReservedTime] = useState("20:00");
+  const [submitErrorMessage, setSubmitErrorMessage] = useState("");
 
   const isInstant = mode === "instant";
   const isReserve = mode === "reserve";
@@ -50,6 +60,36 @@ export function LiveForm({ mode, go }: LiveFormProps) {
     }
 
     go("home");
+  };
+
+  const handleCreateLive = async () => {
+    setSubmitErrorMessage("");
+
+    try {
+      const createdLive = await createLiveMutation.mutateAsync({
+        title: "신곡 데모 첫 공개!",
+        description: "미공개 데모를 라이브로 들려드려요",
+        thumbnailImageUrl: "",
+        scheduledAt: isReserve ? toScheduledAt(reservedDate, reservedTime) : null,
+        coHost: [],
+      });
+
+      if (isReserve) {
+        go("home");
+        return;
+      }
+
+      const enteredLive = await enterLiveMutation.mutateAsync(createdLive.audioStreamId);
+      onCreatedLive?.(enteredLive);
+      go("room");
+    } catch (error) {
+      const apiMessage = (error as AxiosError<LiveApiResponse<null>>).response?.data
+        ?.message;
+
+      setSubmitErrorMessage(
+        apiMessage ?? "라이브 생성에 실패했어요. 잠시 후 다시 시도해주세요.",
+      );
+    }
   };
 
   const handleSaveReservation = () => {
@@ -84,6 +124,8 @@ export function LiveForm({ mode, go }: LiveFormProps) {
       />
     );
   }
+
+  const isSubmitting = createLiveMutation.isPending || enterLiveMutation.isPending;
 
   return (
     <main className="relative min-h-dvh bg-secondary-0 pb-[calc(var(--bottom-nav-height)+32px)] text-neutral-900">
@@ -134,14 +176,19 @@ export function LiveForm({ mode, go }: LiveFormProps) {
           <TestBroadcastCard onClick={() => setIsMicTestScreenOpen(true)} />
         ) : null}
 
+        {submitErrorMessage ? (
+          <p className="text-center text-caption2 text-error">{submitErrorMessage}</p>
+        ) : null}
+
         {isReservationMode ? (
           <div className="mt-4 flex gap-5">
             <button
               type="button"
-              onClick={handleSaveReservation}
-              className="flex h-12 flex-1 items-center justify-center rounded-[10px] bg-secondary-500 text-label2 text-neutral-0"
+              onClick={isEdit ? handleSaveReservation : handleCreateLive}
+              disabled={isSubmitting}
+              className="flex h-12 flex-1 items-center justify-center rounded-[10px] bg-secondary-500 text-label2 text-neutral-0 disabled:opacity-60"
             >
-              저장
+              {isSubmitting ? "저장 중" : "저장"}
             </button>
 
             <button
@@ -155,10 +202,11 @@ export function LiveForm({ mode, go }: LiveFormProps) {
         ) : (
           <button
             type="button"
-            onClick={() => go("room")}
-            className="mt-4 flex h-[52px] w-full items-center justify-center rounded-[10px] bg-secondary-500 text-label1 text-neutral-0"
+            onClick={handleCreateLive}
+            disabled={isSubmitting}
+            className="mt-4 flex h-[52px] w-full items-center justify-center rounded-[10px] bg-secondary-500 text-label1 text-neutral-0 disabled:opacity-60"
           >
-            라이브 시작하기
+            {isSubmitting ? "라이브 준비 중" : "라이브 시작하기"}
           </button>
         )}
       </div>

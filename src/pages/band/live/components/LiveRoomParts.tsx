@@ -9,10 +9,16 @@ import LiveHeadIcon from "@/assets/icons/live-head.svg";
 import UsersIcon from "@/assets/icons/users.svg";
 import ProfileIcon from "@/assets/icons/profile.svg";
 import { members } from "../data";
-import type { ChatMessage, GoLiveScreen } from "../types";
+import type { ActiveLive, ChatMessage, GoLiveScreen } from "../types";
 import { ProfileImage } from "./ProfileImage";
 
-export function LiveRoomHeader({ go }: { go: GoLiveScreen }) {
+export function LiveRoomHeader({
+  go,
+  viewerCount,
+}: {
+  go: GoLiveScreen;
+  viewerCount: number;
+}) {
   return (
     <header className="flex h-[52px] shrink-0 items-center justify-between px-[25px]">
       <div className="flex items-center gap-2 text-body3 text-neutral-900">
@@ -22,9 +28,10 @@ export function LiveRoomHeader({ go }: { go: GoLiveScreen }) {
         <span>00:24:15</span>
         <span className="flex items-center gap-1">
           <img src={LiveHeadIcon} alt="" className="h-[13px] w-3 object-contain brightness-0" />
-          30명 청취 중
+          {viewerCount}명 청취 중
         </span>
       </div>
+
       <button
         type="button"
         onClick={() => go("endConfirm")}
@@ -33,6 +40,29 @@ export function LiveRoomHeader({ go }: { go: GoLiveScreen }) {
         라이브 종료
       </button>
     </header>
+  );
+}
+
+export function LiveRoomHero({ live }: { live: ActiveLive }) {
+  return (
+    <section className="relative h-[282px] shrink-0 text-center">
+      <Waveform />
+      <div className="relative z-10 flex justify-center pt-[18px]">
+        <ProfileImage size="lg" src={live?.bandProfileImageUrl ?? undefined} />
+      </div>
+      <div className="mt-5 flex items-center justify-center gap-2">
+        <h2 className="text-h4 font-bold text-neutral-900">
+          {live?.bandName ?? "WAVY"}
+        </h2>
+        <VerifiedBadge />
+      </div>
+      <h3 className="mt-1 text-h4 text-neutral-900">
+        {live?.title ?? "신곡 데모 첫 공개!"}
+      </h3>
+      <p className="mt-1 text-caption2 text-neutral-600">
+        {live?.description ?? "미공개 데모를 라이브로 들려드려요"}
+      </p>
+    </section>
   );
 }
 
@@ -67,22 +97,7 @@ function VerifiedBadge() {
   return <img src={BadgeIcon} alt="인증됨" className="size-6 object-contain" />;
 }
 
-export function LiveRoomHero() {
-  return (
-    <section className="relative h-[282px] shrink-0 text-center">
-      <Waveform />
-      <div className="relative z-10 flex justify-center pt-[18px]">
-        <ProfileImage size="lg" />
-      </div>
-      <div className="mt-5 flex items-center justify-center gap-2">
-        <h2 className="text-h4 font-bold text-neutral-900">WAVY</h2>
-        <VerifiedBadge />
-      </div>
-      <h3 className="mt-1 text-h4 text-neutral-900">신곡 데모 첫 공개!</h3>
-      <p className="mt-1 text-caption2 text-neutral-600">미공개 데모를 라이브로 들려드려요</p>
-    </section>
-  );
-}
+
 
 function ChatBubble({ chat }: { chat: ChatMessage }) {
   if (chat.highlighted) {

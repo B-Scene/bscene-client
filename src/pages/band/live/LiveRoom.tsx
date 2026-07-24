@@ -1,6 +1,8 @@
+import { useEffect, useState } from "react";
 import Modal from "@/components/Modal/Modal";
 import { ModalOverlay } from "@/components/common/Modal/ModalOverlay";
-import type { ChatMessage, GoLiveScreen } from "./types";
+import { subscribeViewerCount } from "@/api/live/live";
+import type { ActiveLive, ChatMessage, GoLiveScreen } from "./types";
 import {
   ChatComposer,
   LiveActionBar,
@@ -12,6 +14,7 @@ import {
 
 interface LiveRoomProps {
   go: GoLiveScreen;
+  live: ActiveLive;
   messages: ChatMessage[];
   onSendMessage: (message: string) => void;
   overlay?: "members" | "endConfirm";
@@ -19,18 +22,42 @@ interface LiveRoomProps {
 
 export function LiveRoom({
   go,
+  live,
   messages,
   onSendMessage,
   overlay,
 }: LiveRoomProps) {
+  const [viewerCount, setViewerCount] = useState(live?.viewerCount ?? 0);
+
+  useEffect(() => {
+    if (!live?.liveId) return;
+
+    const controller = new AbortController();
+
+    subscribeViewerCount({
+      liveId: live.liveId,
+      watchOnly: true,
+      onViewerCount: setViewerCount,
+      signal: controller.signal,
+    }).catch(() => {
+      // SSE는 연결 종료/취소 시에도 에러가 날 수 있어서 화면에서는 조용히 처리
+    });
+
+    return () => {
+      controller.abort();
+    };
+  }, [live?.liveId]);
+
   return (
     <main className="relative flex min-h-dvh flex-col overflow-hidden bg-neutral-0 text-neutral-900">
-      <LiveRoomHeader go={go} />
-      <LiveRoomHero />
+      <LiveRoomHeader go={go} viewerCount={viewerCount} />
+      <LiveRoomHero live={live} />
       <RoomMessageArea messages={messages} />
       <ChatComposer onSendMessage={onSendMessage} />
       <LiveActionBar go={go} />
+
       {overlay === "members" ? <MemberSheet go={go} /> : null}
+
       {overlay === "endConfirm" ? (
         <ModalOverlay open onClose={() => go("room")}>
           <Modal
@@ -56,16 +83,16 @@ export function LiveRoom({
 
 export function LiveChatRoom({
   go,
+  live,
   messages,
   onSendMessage,
 }: Omit<LiveRoomProps, "overlay">) {
   return (
-    <main className="relative flex min-h-dvh flex-col overflow-hidden bg-neutral-0 text-neutral-900">
-      <LiveRoomHeader go={go} />
-      <LiveRoomHero />
-      <RoomMessageArea messages={messages} />
-      <ChatComposer onSendMessage={onSendMessage} />
-      <LiveActionBar go={go} />
-    </main>
+    <LiveRoom
+      go={go}
+      live={live}
+      messages={messages}
+      onSendMessage={onSendMessage}
+    />
   );
 }
