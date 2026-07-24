@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import SearchIcon from "@/assets/icons/band/search.svg";
 import ArrowDownIcon from "@/assets/icons/band/arrow-down-gray.svg";
+import CheckActiveIcon from "@/assets/icons/check-active.svg";
 import BandImage from "@/assets/Img_Band.png";
 import Modal from "@/components/Modal/Modal";
 import BandCard from "@/components/common/Card/BandCard";
@@ -14,12 +15,21 @@ type ExploreFilter = {
   label: string;
 };
 
-const FILTERS: ExploreFilter[] = [
-  { id: "popular", label: "추천순" },
-  { id: "genre", label: "장르" },
-  { id: "region", label: "지역" },
-  { id: "content", label: "콘텐츠" },
-];
+type AppliedExploreFilters = {
+  genre: string;
+  region: string;
+  content: string;
+};
+
+const SORT_FILTER: ExploreFilter = { id: "recommend", label: "추천순" };
+const SORT_OPTIONS = ["정확도순", "인기순"] as const;
+type SortOption = (typeof SORT_OPTIONS)[number];
+
+const DEFAULT_APPLIED_FILTERS: AppliedExploreFilters = {
+  genre: "전체",
+  region: "전체",
+  content: "전체",
+};
 
 const FILTER_OPTIONS = {
   genre: ["전체", "록", "인디팝", "펑크", "메탈", "재즈", "블루스", "R&B", "어쿠스틱", "포크"],
@@ -50,6 +60,7 @@ const RECOMMENDED_BANDS = Array.from({ length: 8 }, (_, index) => ({
   id: `wavy-${index + 1}`,
   name: "WAVY",
   meta: "인디 · 서울",
+  followers: 560,
   description: "몽환적인 사운드와 감각적인 스타일로 주목받는 3인조 밴드",
 }));
 
@@ -69,7 +80,7 @@ const ExploreTopBar = () => {
         <img
           src={SearchIcon}
           alt=""
-          className="size-[24px] brightness-0"
+          className="h-[19.997px] w-[20.012px] brightness-0"
         />
       </button>
     </header>
@@ -96,52 +107,70 @@ export const FilterControlIcon = () => {
 };
 
 export const ExploreFilterBar = ({
-  filters = FILTERS,
+  appliedFilters,
+  appliedSort,
+  onSortClick,
   onFilterClick,
 }: {
-  filters?: ExploreFilter[];
+  appliedFilters: AppliedExploreFilters;
+  appliedSort?: SortOption | null;
+  onSortClick?: () => void;
   onFilterClick?: () => void;
 }) => {
+  const filterChips = [
+    { id: "genre", defaultLabel: "장르", value: appliedFilters.genre },
+    { id: "region", defaultLabel: "지역", value: appliedFilters.region },
+    { id: "content", defaultLabel: "콘텐츠", value: appliedFilters.content },
+  ];
+  const hasAppliedFilter = filterChips.some((filter) => filter.value !== "전체");
+  const visibleFilterChips = hasAppliedFilter
+    ? filterChips.filter((filter) => filter.value !== "전체")
+    : filterChips;
+  const isSortApplied = Boolean(appliedSort);
+
   return (
-    <div className="inline-flex h-[48px] w-full max-w-[393px] items-center gap-[91px] border-b border-neutral-400 bg-neutral-0 py-[11px] pl-[22px] pr-[26px]">
-      <div className="flex min-w-0 shrink items-center overflow-visible">
-        {filters.map((filter, index) => {
-          const isActive = index === 0;
+    <div className="flex h-[48px] w-full max-w-[393px] items-center justify-between border-b border-neutral-400 bg-neutral-0 py-[11px] pl-[22px] pr-[26px]">
+      <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto pr-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <button
+          type="button"
+          onClick={onSortClick}
+          className={[
+            "flex h-[22px] w-[62px] shrink-0 items-center justify-center gap-[4px] whitespace-nowrap rounded-full border px-[15px] py-[7px] font-body text-caption3 text-center",
+            isSortApplied
+              ? "border-primary-400 bg-primary-50 text-primary-400"
+              : "border-neutral-400 bg-neutral-0 text-neutral-600",
+          ].join(" ")}
+        >
+          {appliedSort ?? SORT_FILTER.label}
+          <img
+            src={ArrowDownIcon}
+            alt=""
+            className={[
+              "h-[7px] w-[12px]",
+              isSortApplied
+                ? "[filter:brightness(0)_saturate(100%)_invert(39%)_sepia(80%)_saturate(2432%)_hue-rotate(319deg)_brightness(96%)_contrast(96%)]"
+                : "[filter:brightness(0)_saturate(100%)_invert(44%)_sepia(0%)_saturate(0%)_hue-rotate(173deg)_brightness(95%)_contrast(92%)]",
+            ].join(" ")}
+          />
+        </button>
+
+        {visibleFilterChips.map((filter) => {
+          const isApplied = filter.value !== "전체";
 
           return (
-            <div
-              key={filter.id}
-              className={`flex shrink-0 items-center ${index > 1 ? "ml-1" : ""}`}
-            >
-              <button
-                type="button"
-                className={[
-                  "flex items-center justify-center whitespace-nowrap rounded-full border bg-neutral-0 font-body text-center",
-                  isActive
-                    ? "h-[22px] w-[62px] gap-[4px] px-[15px] py-[7px] text-caption3"
-                    : "h-[22px] w-[48px] gap-2 px-[15px] py-[7px] text-caption3",
-                  isActive
-                    ? "border-primary-400 bg-primary-50 text-primary-400"
-                    : "border-neutral-400 text-neutral-600",
-                ].join(" ")}
-              >
-                {filter.label}
-                {isActive ? (
-                  <img
-                    src={ArrowDownIcon}
-                    alt=""
-                    className="h-[7px] w-[12px] [filter:brightness(0)_saturate(100%)_invert(39%)_sepia(80%)_saturate(2432%)_hue-rotate(319deg)_brightness(96%)_contrast(96%)]"
-                  />
-                ) : null}
-              </button>
-
-              {isActive ? (
-                <span
-                  aria-hidden="true"
-                  className="ml-2 mr-2 h-[26px] w-[2px] rounded-full bg-neutral-400"
-                />
-              ) : null}
-            </div>
+          <button
+            key={filter.id}
+            type="button"
+            className={[
+              "flex h-[22px] shrink-0 items-center justify-center whitespace-nowrap rounded-full border bg-neutral-0 py-[7px] font-body text-caption3",
+              isApplied ? "px-[15px]" : "w-[48px] px-[15px]",
+              isApplied
+                ? "border-primary-400 bg-primary-50 text-primary-400"
+                : "border-neutral-400 text-neutral-600",
+            ].join(" ")}
+          >
+            {isApplied ? filter.value : filter.defaultLabel}
+          </button>
           );
         })}
       </div>
@@ -154,6 +183,72 @@ export const ExploreFilterBar = ({
       >
         <FilterControlIcon />
       </button>
+    </div>
+  );
+};
+
+const ExploreSortSheet = ({
+  open,
+  onClose,
+  selectedSort,
+  onSelect,
+}: {
+  open: boolean;
+  onClose: () => void;
+  selectedSort: SortOption | null;
+  onSelect: (sort: SortOption) => void;
+}) => {
+  const { rendered, isVisible, handleTransitionEnd } = useSlideUpSheet(open);
+
+  if (!rendered) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center">
+      <button
+        type="button"
+        aria-label="정렬 닫기"
+        onClick={onClose}
+        className={`absolute inset-0 bg-neutral-900/75 transition-opacity duration-300 ${
+          isVisible ? "opacity-100" : "opacity-0"
+        }`}
+      />
+
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-label="추천순"
+        onTransitionEnd={handleTransitionEnd}
+        className={[
+          "relative z-10 flex w-[393px] max-w-full flex-col items-start gap-[10px] rounded-t-[20px] bg-neutral-0 px-[15px] pt-[32px] pb-[48px] transition-transform duration-300 ease-out",
+          isVisible ? "translate-y-0" : "translate-y-full",
+        ].join(" ")}
+      >
+        {SORT_OPTIONS.map((option) => {
+          const isSelected = selectedSort === option;
+
+          return (
+            <button
+              key={option}
+              type="button"
+              onClick={() => {
+                onSelect(option);
+                onClose();
+              }}
+              className={[
+                "box-border flex h-6 w-full items-center justify-between px-3 font-body text-label2",
+                isSelected ? "text-primary-400" : "text-neutral-900",
+              ].join(" ")}
+            >
+              {option}
+              <span className="flex h-5 w-5 items-center justify-center">
+                {isSelected ? (
+                  <img src={CheckActiveIcon} alt="" className="h-5 w-5" />
+                ) : null}
+              </span>
+            </button>
+          );
+        })}
+      </section>
     </div>
   );
 };
@@ -215,14 +310,25 @@ const FilterOptionGroup = ({
 const ExploreFilterSheet = ({
   open,
   onClose,
+  appliedFilters,
+  onApply,
 }: {
   open: boolean;
   onClose: () => void;
+  appliedFilters: AppliedExploreFilters;
+  onApply: (filters: AppliedExploreFilters) => void;
 }) => {
-  const { rendered, isVisible, handleTransitionEnd } = useSlideUpSheet(open);
-  const [selectedGenre, setSelectedGenre] = useState("전체");
-  const [selectedRegion, setSelectedRegion] = useState("전체");
-  const [selectedContent, setSelectedContent] = useState("전체");
+  const [selectedGenre, setSelectedGenre] = useState(appliedFilters.genre);
+  const [selectedRegion, setSelectedRegion] = useState(appliedFilters.region);
+  const [selectedContent, setSelectedContent] = useState(appliedFilters.content);
+  const { rendered, isVisible, handleTransitionEnd } = useSlideUpSheet(
+    open,
+    () => {
+      setSelectedGenre(appliedFilters.genre);
+      setSelectedRegion(appliedFilters.region);
+      setSelectedContent(appliedFilters.content);
+    },
+  );
 
   if (!rendered) return null;
 
@@ -276,7 +382,14 @@ const ExploreFilterSheet = ({
         <div className="mt-[24px] px-[34px] shrink-0">
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => {
+              onApply({
+                genre: selectedGenre,
+                region: selectedRegion,
+                content: selectedContent,
+              });
+              onClose();
+            }}
             className="flex h-[52px] w-full items-center justify-center rounded-[12px] bg-primary-400 font-body text-label1 text-neutral-0"
           >
             선택완료
@@ -291,6 +404,11 @@ const ExploreFilterSheet = ({
 const RecommendationSection = () => {
   const navigate = useNavigate();
   const [followingIds, setFollowingIds] = useState<Set<string>>(new Set());
+  const [followerCounts, setFollowerCounts] = useState(() =>
+    Object.fromEntries(
+      RECOMMENDED_BANDS.map((band) => [band.id, band.followers]),
+    ),
+  );
   const [unfollowTargetId, setUnfollowTargetId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -305,11 +423,17 @@ const RecommendationSection = () => {
   }, [toastMessage]);
 
   const followBand = (bandId: string, bandName: string) => {
+    if (followingIds.has(bandId)) return;
+
     setFollowingIds((current) => {
       const next = new Set(current);
       next.add(bandId);
       return next;
     });
+    setFollowerCounts((current) => ({
+      ...current,
+      [bandId]: current[bandId] + 1,
+    }));
     setToastMessage(`${bandName}를 팔로우했어요`);
   };
 
@@ -321,6 +445,10 @@ const RecommendationSection = () => {
       next.delete(unfollowTargetId);
       return next;
     });
+    setFollowerCounts((current) => ({
+      ...current,
+      [unfollowTargetId]: Math.max(0, current[unfollowTargetId] - 1),
+    }));
 
     setUnfollowTargetId(null);
   };
@@ -341,7 +469,7 @@ const RecommendationSection = () => {
             imageSrc={BandImage}
             imageAlt={`${band.name} 프로필`}
             title={band.name}
-            subtitle={band.meta}
+            subtitle={`${band.meta} · 팔로워 ${followerCounts[band.id]}명`}
             description={band.description}
             following={followingIds.has(band.id)}
             onClick={() => navigate(`/fan/bands/${band.id}`)}
@@ -392,15 +520,35 @@ const RecommendationSection = () => {
 
 const FanExplorePage = () => {
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
+  const [isSortSheetOpen, setIsSortSheetOpen] = useState(false);
+  const [appliedSort, setAppliedSort] = useState<SortOption | null>(null);
+  const [appliedFilters, setAppliedFilters] = useState(
+    DEFAULT_APPLIED_FILTERS,
+  );
 
   return (
     <main className="min-h-dvh bg-neutral-0 pb-[calc(var(--bottom-nav-height)+24px)]">
       <ExploreTopBar />
-      <ExploreFilterBar onFilterClick={() => setIsFilterSheetOpen(true)} />
+      <ExploreFilterBar
+        appliedFilters={appliedFilters}
+        appliedSort={appliedSort}
+        onSortClick={() => setIsSortSheetOpen(true)}
+        onFilterClick={() => setIsFilterSheetOpen(true)}
+      />
       <RecommendationSection />
+      <ExploreSortSheet
+        open={isSortSheetOpen}
+        onClose={() => setIsSortSheetOpen(false)}
+        selectedSort={appliedSort}
+        onSelect={setAppliedSort}
+      />
       <ExploreFilterSheet
         open={isFilterSheetOpen}
         onClose={() => setIsFilterSheetOpen(false)}
+        appliedFilters={appliedFilters}
+        onApply={(nextFilters) => {
+          setAppliedFilters(nextFilters);
+        }}
       />
     </main>
   );

@@ -156,10 +156,20 @@ const FanBandProfilePage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [isFollowing, setIsFollowing] = useState(false);
+  const [followerCount, setFollowerCount] = useState(560);
   const [activeTab, setActiveTab] = useState<ProfileTab>("콘텐츠");
   const hasContent = searchParams.get("content") !== "empty";
   const hasSchedules = searchParams.get("schedule") !== "empty";
   const hasMusic = searchParams.get("music") !== "empty";
+
+  const handleToggleFollow = () => {
+    const nextIsFollowing = !isFollowing;
+
+    setIsFollowing(nextIsFollowing);
+    setFollowerCount((count) =>
+      nextIsFollowing ? count + 1 : Math.max(0, count - 1),
+    );
+  };
 
   return (
     <main className="min-h-dvh bg-neutral-0 pb-[calc(var(--bottom-nav-height)+24px)]">
@@ -193,7 +203,7 @@ const FanBandProfilePage = () => {
               <img src={OfficialIcon} alt="" className="size-[19px] shrink-0" />
             </div>
             <p className="m-0 mt-[5px] font-body text-caption2 text-neutral-700">
-              인디 · 서울 · 팔로워 560명
+              인디 · 서울 · 팔로워 {followerCount}명
             </p>
             <p className="m-0 mt-[5px] line-clamp-1 font-body text-body5 text-neutral-600">
               몽환적인 사운드와 감각적인 스타일로 주목받는 3인조 밴드
@@ -204,7 +214,7 @@ const FanBandProfilePage = () => {
         <div className="mt-[32px] grid grid-cols-2 gap-[16px]">
           <button
             type="button"
-            onClick={() => setIsFollowing((current) => !current)}
+            onClick={handleToggleFollow}
             className={[
               "flex h-[38px] items-center justify-center rounded-[8px] border font-body text-body1",
               isFollowing

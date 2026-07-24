@@ -11,13 +11,6 @@ import { FollowedNewsCard } from "@/components/fan/home/FollowedNewsCard";
 import { ExploreFilterBar } from "@/pages/fan/explore/FanExplorePage";
 import { addRecentSearch } from "./recentSearches";
 
-const SEARCH_RESULT_FILTERS = [
-  { id: "popular", label: "추천순" },
-  { id: "genre", label: "전체" },
-  { id: "region", label: "전체" },
-  { id: "content", label: "전체" },
-];
-
 const BAND_RESULTS = [
   {
     id: "band-wavy",
@@ -140,7 +133,9 @@ const FanExploreSearchResultPage = () => {
   return (
     <main className="min-h-dvh bg-neutral-0 pb-[calc(var(--bottom-nav-height)+24px)]">
       <SearchResultTopBar initialKeyword={keyword} />
-      <ExploreFilterBar filters={SEARCH_RESULT_FILTERS} />
+      <ExploreFilterBar
+        appliedFilters={{ genre: "전체", region: "전체", content: "전체" }}
+      />
 
       <section className="px-[23px] pt-[16px]">
         <SectionTitle title="밴드" count={resultCounts.bands} />
