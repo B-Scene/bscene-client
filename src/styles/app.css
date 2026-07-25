@@ -121,6 +121,14 @@
   letter-spacing: var(--text-body5-letter-spacing);
 }
 
+@utility text-body6 {
+  font-family: var(--font-body);
+  font-size: var(--text-body6-size);
+  font-weight: var(--text-body6-weight);
+  line-height: var(--text-body6-line-height);
+  letter-spacing: var(--text-body6-letter-spacing);
+}
+
 @utility text-label1 {
   font-family: var(--font-body);
   font-size: var(--text-label1-size);

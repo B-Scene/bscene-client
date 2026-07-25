@@ -13,6 +13,7 @@ import {
   useSignup,
   useVerifyPhone,
 } from "@/hooks/api/auth/useAuth";
+import { saveAuthenticatedUser } from "@/utils/authUser";
 
 type SignupForm = {
   email: string;
@@ -66,21 +67,15 @@ const SignupPage = () => {
   const [timeLeft, setTimeLeft] = useState(180);
 
   useEffect(() => {
-    if (!isSocialSignup || !socialEmail) return;
-
-    setForm((prev) => ({
-      ...prev,
-      email: socialEmail,
-    }));
-  }, [isSocialSignup, socialEmail]);
-
-  useEffect(() => {
     if (!isCodeSent || isPhoneVerified) return;
 
     if (timeLeft <= 0) {
-      setIsPhoneVerified(false);
-      handleChange("code", "");
-      return;
+      const timeout = window.setTimeout(() => {
+        setIsPhoneVerified(false);
+        setForm((prev) => ({ ...prev, code: "" }));
+      }, 0);
+
+      return () => window.clearTimeout(timeout);
     }
 
     const timer = setInterval(() => {
@@ -211,6 +206,10 @@ const SignupPage = () => {
           onSuccess: (data) => {
             localStorage.setItem("accessToken", data.accessToken);
             localStorage.setItem("refreshToken", data.refreshToken);
+            saveAuthenticatedUser({
+              ...data.user,
+              email: socialEmail,
+            });
 
             sessionStorage.removeItem("signupToken");
             sessionStorage.removeItem("socialEmail");
