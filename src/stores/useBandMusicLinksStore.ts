@@ -1,21 +1,20 @@
 import { create } from "zustand";
-
-export interface BandMusicOtherLink {
-  id: string;
-  label: string;
-  url: string;
-}
+import type { MusicEtcPlatform } from "@/types/band/musicLink";
 
 interface BandMusicLinksState {
   spotifyUrl: string;
   youtubeUrl: string;
   soundcloudUrl: string;
-  otherLinks: BandMusicOtherLink[];
+  etcPlatform: MusicEtcPlatform | null;
+  etcUrl: string;
+  otherUrl: string;
   setMusicLinks: (links: {
     spotifyUrl: string;
     youtubeUrl: string;
     soundcloudUrl: string;
-    otherLinks: BandMusicOtherLink[];
+    etcPlatform: MusicEtcPlatform | null;
+    etcUrl: string;
+    otherUrl: string;
   }) => void;
 }
 
@@ -23,6 +22,8 @@ export const useBandMusicLinksStore = create<BandMusicLinksState>((set) => ({
   spotifyUrl: "",
   youtubeUrl: "",
   soundcloudUrl: "",
-  otherLinks: [],
+  etcPlatform: null,
+  etcUrl: "",
+  otherUrl: "",
   setMusicLinks: (links) => set(links),
 }));

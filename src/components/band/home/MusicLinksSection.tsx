@@ -4,7 +4,14 @@ import SoundcloudIcon from "@/assets/icons/soundcloude.svg";
 import PlusIcon from "@/assets/icons/Plus.svg";
 import MusicNoteIcon from "@/assets/icons/band/menu-music.svg";
 import ArrowRightIcon from "@/assets/icons/band/arrow-right-home.svg";
-import type { BandMusicOtherLink } from "@/stores/useBandMusicLinksStore";
+import type { MusicEtcPlatform } from "@/types/band/musicLink";
+
+const ETC_PLATFORM_LABELS: Record<MusicEtcPlatform, string> = {
+  MELON: "Melon",
+  GENIE: "genie",
+  BUGS: "Bugs",
+  APPLE_MUSIC: "Apple Music",
+};
 
 interface MusicLinkRowProps {
   iconSrc: string;
@@ -34,7 +41,9 @@ interface MusicLinksSectionProps {
   spotifyUrl: string;
   youtubeUrl: string;
   soundcloudUrl: string;
-  otherLinks: BandMusicOtherLink[];
+  etcPlatform: MusicEtcPlatform | null;
+  etcUrl: string;
+  otherUrl: string;
   onAddLink: () => void;
 }
 
@@ -42,7 +51,9 @@ export const MusicLinksSection = ({
   spotifyUrl,
   youtubeUrl,
   soundcloudUrl,
-  otherLinks,
+  etcPlatform,
+  etcUrl,
+  otherUrl,
   onAddLink,
 }: MusicLinksSectionProps) => {
   return (
@@ -76,14 +87,17 @@ export const MusicLinksSection = ({
           />
         ) : null}
 
-        {otherLinks.map((link) => (
+        {etcPlatform && etcUrl ? (
           <MusicLinkRow
-            key={link.id}
             iconSrc={MusicNoteIcon}
-            label={link.label}
-            url={link.url}
+            label={ETC_PLATFORM_LABELS[etcPlatform]}
+            url={etcUrl}
           />
-        ))}
+        ) : null}
+
+        {otherUrl ? (
+          <MusicLinkRow iconSrc={MusicNoteIcon} label="기타" url={otherUrl} />
+        ) : null}
 
         <button
           type="button"

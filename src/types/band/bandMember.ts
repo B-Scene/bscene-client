@@ -18,8 +18,9 @@ export interface BandMemberResponse {
   id: number;
   bandId: number;
   userId: number;
-  sessionProfileId: number | null;
-  sessionNickname: string | null;
+  bandMemberProfileId: number | null;
+  profileNickname: string | null;
+  memberType: BandMemberType;
   status: string;
   createdAt: string;
 }
@@ -53,13 +54,4 @@ export interface BandMemberSearchItem {
   inviteAvailable: boolean;
 }
 
-export interface BandMemberListItem {
-  id: number;
-  bandId: number;
-  userId: number;
-  bandMemberProfileId: number | null;
-  profileNickname: string | null;
-  memberType: BandMemberType;
-  status: string;
-  createdAt: string;
-}
+export type BandMemberListItem = BandMemberResponse;

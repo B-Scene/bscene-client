@@ -3,9 +3,14 @@ import { useNavigate } from "react-router-dom";
 import { Header } from "@/components/band/home/Header";
 import { Input } from "@/components/common/Input/Input";
 import { useBandMusicLinksStore } from "@/stores/useBandMusicLinksStore";
-import TrashIcon from "@/assets/icons/band/delete.svg";
+import type { MusicEtcPlatform } from "@/types/band/musicLink";
 
-const STORE_PLATFORMS = ["Melon", "genie", "Bugs", "Apple Music"];
+const ETC_PLATFORM_OPTIONS: { value: MusicEtcPlatform; label: string }[] = [
+  { value: "MELON", label: "Melon" },
+  { value: "GENIE", label: "genie" },
+  { value: "BUGS", label: "Bugs" },
+  { value: "APPLE_MUSIC", label: "Apple Music" },
+];
 
 interface FieldProps {
   label: string;
@@ -30,63 +35,41 @@ const MusicRegisterPage = () => {
   const [soundcloudUrl, setSoundcloudUrl] = useState("");
   const [otherUrl, setOtherUrl] = useState("");
 
-  const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
-  const [platformLinks, setPlatformLinks] = useState<string[]>([""]);
+  const [etcPlatform, setEtcPlatform] = useState<MusicEtcPlatform | null>(null);
+  const [etcUrl, setEtcUrl] = useState("");
 
   const [showErrors, setShowErrors] = useState(false);
 
   const isValid = Boolean(
     spotifyUrl.trim() ||
-    youtubeUrl.trim() ||
-    soundcloudUrl.trim() ||
-    otherUrl.trim() ||
-    (selectedPlatform && platformLinks.some((link) => link.trim())),
+      youtubeUrl.trim() ||
+      soundcloudUrl.trim() ||
+      otherUrl.trim() ||
+      (etcPlatform && etcUrl.trim()),
   );
 
   const linksError = showErrors && !isValid;
+  const etcPlatformMismatchError =
+    showErrors && Boolean(etcPlatform) !== Boolean(etcUrl.trim());
 
-  const handleSelectPlatform = (platform: string) => {
-    setSelectedPlatform((prev) => (prev === platform ? null : platform));
-  };
-
-  const handlePlatformLinkChange = (index: number, value: string) => {
-    setPlatformLinks((prev) =>
-      prev.map((link, linkIndex) => (linkIndex === index ? value : link)),
-    );
-  };
-
-  const handleRemovePlatformLink = (index: number) => {
-    setPlatformLinks((prev) =>
-      prev.filter((_, linkIndex) => linkIndex !== index),
-    );
-  };
-
-  const handleAddPlatformLink = () => {
-    setPlatformLinks((prev) => [...prev, ""]);
+  const handleSelectEtcPlatform = (platform: MusicEtcPlatform) => {
+    setEtcPlatform((prev) => (prev === platform ? null : platform));
   };
 
   const handleSubmit = () => {
-    if (!isValid) {
+    if (!isValid || etcPlatformMismatchError) {
       setShowErrors(true);
       return;
     }
 
-    const otherLinks = [
-      ...(selectedPlatform
-        ? platformLinks
-            .filter((link) => link.trim())
-            .map((link) => ({
-              id: crypto.randomUUID(),
-              label: selectedPlatform,
-              url: link,
-            }))
-        : []),
-      ...(otherUrl.trim()
-        ? [{ id: crypto.randomUUID(), label: "기타", url: otherUrl }]
-        : []),
-    ];
-
-    setMusicLinks({ spotifyUrl, youtubeUrl, soundcloudUrl, otherLinks });
+    setMusicLinks({
+      spotifyUrl,
+      youtubeUrl,
+      soundcloudUrl,
+      etcPlatform,
+      etcUrl,
+      otherUrl,
+    });
 
     navigate("/band/home");
   };
@@ -131,57 +114,40 @@ const MusicRegisterPage = () => {
             />
           </Field>
 
-          <Field label="Melon / genie / Bugs / Apple Music URL">
+          <Field
+            label="Melon / genie / Bugs / Apple Music URL"
+            error={
+              etcPlatformMismatchError
+                ? "플랫폼과 링크를 함께 입력해주세요"
+                : null
+            }
+          >
             <div className="flex flex-col gap-2.5">
               <div className="flex flex-wrap gap-2">
-                {STORE_PLATFORMS.map((platform) => (
+                {ETC_PLATFORM_OPTIONS.map((platform) => (
                   <button
-                    key={platform}
+                    key={platform.value}
                     type="button"
-                    onClick={() => handleSelectPlatform(platform)}
+                    onClick={() => handleSelectEtcPlatform(platform.value)}
                     className={`flex h-6.5 shrink-0 items-center justify-center gap-2.5 rounded-lg px-3.75 py-1.75 text-center text-caption3 ${
-                      selectedPlatform === platform
+                      etcPlatform === platform.value
                         ? "bg-secondary-500 text-neutral-0"
                         : "bg-neutral-300 text-neutral-600"
                     }`}
                   >
-                    {platform}
+                    {platform.label}
                   </button>
                 ))}
               </div>
 
-              {selectedPlatform ? (
-                <div className="flex flex-col gap-2.5">
-                  {platformLinks.map((link, index) => (
-                    <div key={index} className="flex items-center gap-2">
-                      <Input
-                        value={link}
-                        onChange={(event) =>
-                          handlePlatformLinkChange(index, event.target.value)
-                        }
-                        placeholder="예매 링크 또는 관련 게시글 링크를 첨부해주세요"
-                        error={linksError}
-                        className="w-full rounded-[5px] px-4 py-1.25"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => handleRemovePlatformLink(index)}
-                        aria-label="링크 삭제"
-                        className="flex size-6 shrink-0 items-center justify-center"
-                      >
-                        <img src={TrashIcon} alt="" className="size-4" />
-                      </button>
-                    </div>
-                  ))}
-
-                  <button
-                    type="button"
-                    onClick={handleAddPlatformLink}
-                    className="flex w-full items-center justify-center rounded-[5px] border border-secondary-500 py-1.25 text-caption2 text-secondary-500"
-                  >
-                    + 링크 추가
-                  </button>
-                </div>
+              {etcPlatform ? (
+                <Input
+                  value={etcUrl}
+                  onChange={(event) => setEtcUrl(event.target.value)}
+                  placeholder="예매 링크 또는 관련 게시글 링크를 첨부해주세요"
+                  error={etcPlatformMismatchError}
+                  className="w-full rounded-[5px] px-4 py-1.25"
+                />
               ) : null}
             </div>
           </Field>

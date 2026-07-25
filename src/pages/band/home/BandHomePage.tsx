@@ -67,9 +67,11 @@ const BandHomePage = () => {
   const spotifyUrl = useBandMusicLinksStore((state) => state.spotifyUrl);
   const youtubeUrl = useBandMusicLinksStore((state) => state.youtubeUrl);
   const soundcloudUrl = useBandMusicLinksStore((state) => state.soundcloudUrl);
-  const otherLinks = useBandMusicLinksStore((state) => state.otherLinks);
+  const etcPlatform = useBandMusicLinksStore((state) => state.etcPlatform);
+  const etcUrl = useBandMusicLinksStore((state) => state.etcUrl);
+  const otherUrl = useBandMusicLinksStore((state) => state.otherUrl);
   const hasMusicLinks = Boolean(
-    spotifyUrl || youtubeUrl || soundcloudUrl || otherLinks.length > 0,
+    spotifyUrl || youtubeUrl || soundcloudUrl || (etcPlatform && etcUrl) || otherUrl,
   );
 
   const [activeTab, setActiveTab] = useState("content");
@@ -314,7 +316,9 @@ const BandHomePage = () => {
                 spotifyUrl={spotifyUrl}
                 youtubeUrl={youtubeUrl}
                 soundcloudUrl={soundcloudUrl}
-                otherLinks={otherLinks}
+                etcPlatform={etcPlatform}
+                etcUrl={etcUrl}
+                otherUrl={otherUrl}
                 onAddLink={() => navigate("/band/music/new")}
               />
             ) : null}
