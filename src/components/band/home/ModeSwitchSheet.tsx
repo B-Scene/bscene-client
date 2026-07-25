@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useOnboardingStatus } from "@/hooks/api/onboarding/useOnboarding";
 import { useSlideUpSheet } from "@/hooks/useSlideUpSheet";
 import { useBandProfileStore } from "@/stores/useBandProfileStore";
 import { useModeStore } from "@/stores/useModeStore";
+import { getFanAccountDisplay } from "@/utils/authUser";
 import BandAvatar from "@/assets/images/IMG_my.svg";
 import FanAvatar from "@/assets/icons/band/user-default-profile.svg";
 import CheckCircleYellowIcon from "@/assets/icons/band/check-circle-yellow.svg";
@@ -14,10 +16,6 @@ interface ModeSwitchSheetProps {
 }
 
 const LAST_FAN_PATH_KEY = "bscene:last-fan-path";
-
-const MOCK_FAN_ACCOUNTS = [
-  { id: "fan-1", nickname: "닉네임", email: "bethescene12@gmail.com" },
-];
 
 const MOCK_BAND_ACCOUNTS = [
   { id: "band-mock-1", name: "WAVY", subtitle: "인디록 · 서울" },
@@ -102,10 +100,16 @@ const AccountRow = ({
 export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const setMode = useModeStore((state) => state.setMode);
   const bands = useBandProfileStore((state) => state.bands);
   const activeBandId = useBandProfileStore((state) => state.activeBandId);
   const setActiveBandId = useBandProfileStore((state) => state.setActiveBandId);
-  const setMode = useModeStore((state) => state.setMode);
+  const { data: onboardingStatus } = useOnboardingStatus();
+  const storedFanAccount = getFanAccountDisplay();
+  const fanAccount = {
+    ...storedFanAccount,
+    nickname: onboardingStatus?.fanNickname || storedFanAccount.nickname,
+  };
 
   const registeredBands = bands.filter((band) => band.name.trim());
   const bandAccounts =
@@ -124,7 +128,7 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
         }));
   const isFanMode = location.pathname.startsWith("/fan");
   const initialSelectedId = isFanMode
-    ? MOCK_FAN_ACCOUNTS[0].id
+    ? fanAccount.id
     : bandAccounts.some((band) => band.id === activeBandId)
       ? activeBandId
       : bandAccounts[0]?.id ?? activeBandId;
@@ -134,6 +138,7 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
     () => setSelectedId(initialSelectedId),
   );
   const selectedMode = selectedId.startsWith("fan") ? "fan" : "band";
+
   const bandModeSection = (
     <div className="flex w-82.5 flex-col gap-4">
       <span className="text-label2 text-secondary-500">밴드 모드</span>
@@ -152,22 +157,20 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
       </div>
     </div>
   );
+
   const fanModeSection = (
     <div className="flex w-82.5 flex-col gap-4">
       <span className="text-label2 text-primary-400">팬 모드</span>
 
       <div className="flex w-full flex-col gap-3">
-        {MOCK_FAN_ACCOUNTS.map((fan) => (
-          <AccountRow
-            key={fan.id}
-            avatar={FanAvatar}
-            name={fan.nickname}
-            subtitle={fan.email}
-            selected={selectedId === fan.id}
-            selectedTone="fan"
-            onSelect={() => setSelectedId(fan.id)}
-          />
-        ))}
+        <AccountRow
+          avatar={FanAvatar}
+          name={fanAccount.nickname}
+          subtitle={fanAccount.email}
+          selected={selectedId === fanAccount.id}
+          selectedTone="fan"
+          onSelect={() => setSelectedId(fanAccount.id)}
+        />
       </div>
     </div>
   );

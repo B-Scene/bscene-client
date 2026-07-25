@@ -26,11 +26,25 @@ import AttendedConcertsPage from "@/pages/fan/my/AttendedConcertsPage";
 import ConcertAlertSettingsPage from "@/pages/fan/my/ConcertAlertSettingsPage";
 import FanLiveAlertSettingsPage from "@/pages/fan/my/LiveAlertSettingsPage";
 import ProfileEditPage from "@/pages/fan/my/ProfileEditPage";
+import FanExplorePage from "@/pages/fan/explore/FanExplorePage";
+import FanExploreSearchPage from "@/pages/fan/explore/FanExploreSearchPage";
+import FanExploreSearchResultPage from "@/pages/fan/explore/FanExploreSearchResultPage";
+import FanExploreConcertMorePage from "@/pages/fan/explore/FanExploreConcertMorePage";
+import FanContentDetailPage from "@/pages/fan/explore/FanContentDetailPage";
+import FanBandProfilePage from "@/pages/fan/explore/FanBandProfilePage";
 import FollowedBandNewsPage from "@/pages/fan/home/FollowedBandNewsPage";
 import FollowedConcertsPage from "@/pages/fan/home/FollowedConcertsPage";
 import ConcertCalendarPage from "@/pages/fan/home/ConcertCalendarPage";
 import ConcertDetailPage from "@/pages/fan/home/ConcertDetailPage";
 import NotificationPage from "@/pages/fan/home/NotificationPage";
+import {
+  FanLiveHomePage,
+  FanLiveNowPage,
+  FanLivePage,
+  FanLivePlaybackPage,
+  FanLiveReplayPage,
+  FanLiveScheduledPage,
+} from "@/pages/fan/live";
 import { BandLivePage } from "@/pages/band/live/BandLivePage";
 import BandSessionPage from "@/pages/band/session/BandSessionPage";
 import MemberInviteSearchPage from "@/pages/band/home/MemberInviteSearchPage";
@@ -110,8 +124,36 @@ export const router = createBrowserRouter([
         element: <NotificationPage />,
       },
       {
+        path: "/fan/explore/contents/:contentId",
+        element: <FanContentDetailPage />,
+      },
+      {
         path: "/band/live",
         element: <BandLivePage />,
+      },
+      {
+        path: "/fan/live",
+        element: <FanLiveHomePage />,
+      },
+      {
+        path: "/fan/live/room",
+        element: <FanLivePage />,
+      },
+      {
+        path: "/fan/live/now",
+        element: <FanLiveNowPage />,
+      },
+      {
+        path: "/fan/live/scheduled",
+        element: <FanLiveScheduledPage />,
+      },
+      {
+        path: "/fan/live/replays",
+        element: <FanLiveReplayPage />,
+      },
+      {
+        path: "/fan/live/replays/:replayId",
+        element: <FanLivePlaybackPage />,
       },
       {
         path: "/band/notifications",
@@ -162,6 +204,26 @@ export const router = createBrowserRouter([
       {
         path: "/fan/home",
         element: <FanHomePage />,
+      },
+      {
+        path: "/fan/explore",
+        element: <FanExplorePage />,
+      },
+      {
+        path: "/fan/explore/search",
+        element: <FanExploreSearchPage />,
+      },
+      {
+        path: "/fan/explore/search/results",
+        element: <FanExploreSearchResultPage />,
+      },
+      {
+        path: "/fan/explore/search/results/concerts",
+        element: <FanExploreConcertMorePage />,
+      },
+      {
+        path: "/fan/bands/:bandId",
+        element: <FanBandProfilePage />,
       },
       {
         path: "/fan/home/news",
@@ -228,21 +290,12 @@ export const router = createBrowserRouter([
         element: <ContentRegisterPage />,
       },
       {
-<<<<<<< HEAD
         path: "/band/session",
         element: <BandSessionPage />,
       },
       {
         path: "/band/my",
         element: <MyPage />,
-=======
-        path: "/band/my",
-        element: <MyPage />,
-      },
-      {
-        path: "/band/session",
-        element: <BandSessionPage />,
->>>>>>> develop
       },
     ],
   },

@@ -21,6 +21,7 @@ type ConcertCardProps = {
   thumbnailSrc?: string;
   thumbnailAlt?: string;
   showThumbnail?: boolean;
+  thumbnailClassName?: string;
 };
 
 const ImagePlaceholderIcon = () => (
@@ -69,6 +70,7 @@ const ConcertCard = ({
   thumbnailSrc,
   thumbnailAlt = "",
   showThumbnail = false,
+  thumbnailClassName = "bg-neutral-300 text-neutral-700",
 }: ConcertCardProps) => {
   const dateBadgeColorClassName = isPending
     ? "bg-neutral-300"
@@ -100,7 +102,9 @@ const ConcertCard = ({
     >
       <div className="flex min-w-0 flex-1 items-center gap-4">
         {showThumbnail ? (
-          <div className="flex h-[62px] w-[50px] shrink-0 items-center justify-center overflow-hidden rounded-lg bg-neutral-300 text-neutral-700">
+          <div
+            className={`flex h-[62px] w-[50px] shrink-0 items-center justify-center overflow-hidden rounded-lg ${thumbnailClassName}`}
+          >
             {thumbnailSrc ? (
               <img
                 src={thumbnailSrc}
