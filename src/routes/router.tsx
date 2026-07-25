@@ -228,12 +228,21 @@ export const router = createBrowserRouter([
         element: <ContentRegisterPage />,
       },
       {
+<<<<<<< HEAD
         path: "/band/session",
         element: <BandSessionPage />,
       },
       {
         path: "/band/my",
         element: <MyPage />,
+=======
+        path: "/band/my",
+        element: <MyPage />,
+      },
+      {
+        path: "/band/session",
+        element: <BandSessionPage />,
+>>>>>>> develop
       },
     ],
   },
