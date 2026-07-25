@@ -41,7 +41,21 @@ interface BandProfileState {
   setActiveBandId: (id: string) => void;
 }
 
-const INITIAL_BAND = createEmptyBandProfile("band-1");
+const INITIAL_BAND: BandProfile = {
+  id: "band-1",
+  name: "WAVY",
+  avatarUrl: "",
+  verified: false,
+  genre: "인디",
+  regions: ["서울"],
+  memberCount: 5,
+  bio: "몽환적인 사운드와 감각적인 스타일로 활동하는 5인조 밴드",
+  stats: {
+    followers: 128,
+    concerts: 8,
+    videos: 12,
+  },
+};
 
 export const useBandProfileStore = create<BandProfileState>((set) => ({
   bands: [INITIAL_BAND],
