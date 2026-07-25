@@ -8,6 +8,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { Header } from "@/components/band/home/Header";
 import { Input } from "@/components/common/Input/Input";
+import { useBandPostsStore } from "@/stores/useBandPostsStore";
 import UploadIcon from "@/assets/icons/band/upload.svg";
 import CloseCircleIcon from "@/assets/icons/band/close-circle.svg";
 import CloseIcon from "@/assets/icons/close.svg";
@@ -67,6 +68,7 @@ const formatFileSize = (bytes: number) =>
 const ContentRegisterPage = () => {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const addPost = useBandPostsStore((state) => state.addPost);
 
   const [contentType, setContentType] = useState<ContentType | null>(null);
   const [images, setImages] = useState<ImageFile[]>([]);
@@ -149,6 +151,18 @@ const ContentRegisterPage = () => {
       setShowErrors(true);
       return;
     }
+
+    addPost({
+      id: crypto.randomUUID(),
+      contentType: contentType!,
+      title,
+      description,
+      imageUrls: images.map((image) => image.url),
+      videoUrl: video?.url ?? null,
+      tags,
+      createdAt: new Date().toISOString(),
+    });
+
     navigate("/band/register/complete", {
       state: {
         title: "콘텐츠가 업로드됐어요",

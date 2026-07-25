@@ -6,14 +6,19 @@ import { HomeHeader } from "@/components/common/Header/HomeHeader";
 import { NotificationBellIcon } from "@/components/common/Header/NotificationBellIcon";
 import { useBandProfileStore } from "@/stores/useBandProfileStore";
 import { useConcertsStore, type Concert } from "@/stores/useConcertsStore";
+import { useBandPostsStore } from "@/stores/useBandPostsStore";
+import { useBandMusicLinksStore } from "@/stores/useBandMusicLinksStore";
 import { BandProfileCard } from "@/components/band/home/BandProfileCard";
 import { StatRow } from "@/components/band/home/StatRow";
 import { Tabs } from "@/components/band/home/Tabs";
 import { ModeSwitchSheet } from "@/components/band/home/ModeSwitchSheet";
+import { PostCard } from "@/components/band/home/PostCard";
+import { MusicLinksSection } from "@/components/band/home/MusicLinksSection";
 import { EmptyState } from "@/components/common/EmptyState/EmptyState";
 import { ModalOverlay } from "@/components/common/Modal/ModalOverlay";
 import Modal from "@/components/Modal/Modal";
 import ConcertCard from "@/components/common/Card/ConcertCard";
+import { formatRelativeTime } from "@/utils/formatRelativeTime";
 
 const HOME_TABS = [
   { id: "content", label: "콘텐츠" },
@@ -58,6 +63,14 @@ const BandHomePage = () => {
   const profile = useBandProfileStore((state) => state.profile);
   const concerts = useConcertsStore((state) => state.concerts);
   const removeConcert = useConcertsStore((state) => state.removeConcert);
+  const posts = useBandPostsStore((state) => state.posts);
+  const spotifyUrl = useBandMusicLinksStore((state) => state.spotifyUrl);
+  const youtubeUrl = useBandMusicLinksStore((state) => state.youtubeUrl);
+  const soundcloudUrl = useBandMusicLinksStore((state) => state.soundcloudUrl);
+  const otherLinks = useBandMusicLinksStore((state) => state.otherLinks);
+  const hasMusicLinks = Boolean(
+    spotifyUrl || youtubeUrl || soundcloudUrl || otherLinks.length > 0,
+  );
 
   const [activeTab, setActiveTab] = useState("content");
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
@@ -184,7 +197,7 @@ const BandHomePage = () => {
               />
             ) : null}
 
-            {hasBand && activeTab === "content" ? (
+            {hasBand && activeTab === "content" && posts.length === 0 ? (
               <EmptyState
                 title="등록된 콘텐츠가 없어요"
                 description={
@@ -197,6 +210,32 @@ const BandHomePage = () => {
                 actionLabel="등록하기"
                 onAction={() => navigate("/band/videos/new")}
               />
+            ) : null}
+
+            {hasBand && activeTab === "content" && posts.length > 0 ? (
+              <div className="flex flex-col gap-3">
+                {posts.map((post) => (
+                  <PostCard
+                    key={post.id}
+                    bandName={profile.name}
+                    avatarUrl={profile.avatarUrl}
+                    metaLabel={`${profile.genre} · ${profile.regions.join(", ")} · ${formatRelativeTime(post.createdAt)}`}
+                    mediaItems={
+                      post.videoUrl
+                        ? [{ type: "video", url: post.videoUrl }]
+                        : post.imageUrls.map((url) => ({
+                            type: "image" as const,
+                            url,
+                          }))
+                    }
+                    caption={
+                      post.description.trim() ||
+                      post.title ||
+                      "팬분들께 전하고 싶은 소식을 적어보세요"
+                    }
+                  />
+                ))}
+              </div>
             ) : null}
 
             {hasBand && activeTab === "schedule" && concerts.length === 0 ? (
@@ -255,7 +294,7 @@ const BandHomePage = () => {
               </div>
             ) : null}
 
-            {hasBand && activeTab === "music" ? (
+            {hasBand && activeTab === "music" && !hasMusicLinks ? (
               <EmptyState
                 title="등록된 음원이 없어요"
                 description={
@@ -267,6 +306,16 @@ const BandHomePage = () => {
                 }
                 actionLabel="등록하기"
                 onAction={() => navigate("/band/music/new")}
+              />
+            ) : null}
+
+            {hasBand && activeTab === "music" && hasMusicLinks ? (
+              <MusicLinksSection
+                spotifyUrl={spotifyUrl}
+                youtubeUrl={youtubeUrl}
+                soundcloudUrl={soundcloudUrl}
+                otherLinks={otherLinks}
+                onAddLink={() => navigate("/band/music/new")}
               />
             ) : null}
           </div>

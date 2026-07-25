@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { Header } from "@/components/band/home/Header";
 import { Input } from "@/components/common/Input/Input";
+import { useBandMusicLinksStore } from "@/stores/useBandMusicLinksStore";
 import TrashIcon from "@/assets/icons/band/delete.svg";
 
 const STORE_PLATFORMS = ["Melon", "genie", "Bugs", "Apple Music"];
@@ -22,6 +23,7 @@ const Field = ({ label, error, children }: FieldProps) => (
 
 const MusicRegisterPage = () => {
   const navigate = useNavigate();
+  const setMusicLinks = useBandMusicLinksStore((state) => state.setMusicLinks);
 
   const [spotifyUrl, setSpotifyUrl] = useState("");
   const [youtubeUrl, setYoutubeUrl] = useState("");
@@ -68,6 +70,24 @@ const MusicRegisterPage = () => {
       setShowErrors(true);
       return;
     }
+
+    const otherLinks = [
+      ...(selectedPlatform
+        ? platformLinks
+            .filter((link) => link.trim())
+            .map((link) => ({
+              id: crypto.randomUUID(),
+              label: selectedPlatform,
+              url: link,
+            }))
+        : []),
+      ...(otherUrl.trim()
+        ? [{ id: crypto.randomUUID(), label: "기타", url: otherUrl }]
+        : []),
+    ];
+
+    setMusicLinks({ spotifyUrl, youtubeUrl, soundcloudUrl, otherLinks });
+
     navigate("/band/home");
   };
 
