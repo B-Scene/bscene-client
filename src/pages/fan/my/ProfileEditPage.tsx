@@ -1,51 +1,32 @@
 import { useRef, useState, type ChangeEvent } from "react";
+import type { AxiosError } from "axios";
 import { useNavigate } from "react-router-dom";
 import DefaultAvatarIcon from "@/assets/icons/profile.svg";
 import { Header } from "@/components/band/home/Header";
 import { ImagePickerSheet } from "@/components/band/home/ImagePickerSheet";
 import { Input } from "@/components/common/Input/Input";
+import {
+  useFanInformationQuery,
+  useUpdateFanInformation,
+} from "@/hooks/api/user/useFanInformation";
+import { useGenres, useRegions } from "@/hooks/api/onboarding/useOnboarding";
+import type {
+  ApiResponse,
+  FanInformationResponse,
+} from "@/types/user/fanInformation";
+import type { CodeName } from "@/types/onboarding/onboarding";
 
-const GENRE_OPTIONS = [
-  "인디",
-  "팝",
-  "팝록",
-  "재즈",
-  "블루스",
-  "얼터너티브록",
-  "사이키델릭록",
-  "일렉트로닉록",
-  "포크록",
-  "펑크록",
-  "하드록",
-  "메탈",
-  "etc.",
-];
+const getApiErrorMessage = (error: unknown, fallbackMessage: string) => {
+  const axiosError = error as AxiosError<ApiResponse<null>>;
 
-const REGION_OPTIONS = [
-  "서울",
-  "경기",
-  "인천",
-  "부산",
-  "대구",
-  "광주",
-  "대전",
-  "울산",
-  "세종",
-  "충남",
-  "충북",
-  "전남",
-  "전북",
-  "경남",
-  "경북",
-  "강원",
-  "제주",
-];
+  return axiosError.response?.data?.message ?? fallbackMessage;
+};
 
 interface ChipMultiGroupProps {
-  options: string[];
+  options: CodeName[];
   selected: string[];
   max: number;
-  onToggle: (option: string) => void;
+  onToggle: (code: string) => void;
 }
 
 const ChipMultiGroup = ({
@@ -56,15 +37,15 @@ const ChipMultiGroup = ({
 }: ChipMultiGroupProps) => (
   <div className="flex flex-wrap gap-2">
     {options.map((option) => {
-      const isSelected = selected.includes(option);
+      const isSelected = selected.includes(option.code);
 
       return (
         <button
-          key={option}
+          key={option.code}
           type="button"
           onClick={() => {
             if (!isSelected && selected.length >= max) return;
-            onToggle(option);
+            onToggle(option.code);
           }}
           className={`rounded-full px-3.75 py-1 text-caption3 whitespace-nowrap ${
             isSelected
@@ -72,46 +53,53 @@ const ChipMultiGroup = ({
               : "bg-neutral-300 text-neutral-600"
           }`}
         >
-          {option}
+          {option.name}
         </button>
       );
     })}
   </div>
 );
 
-const ProfileEditPage = () => {
+const ProfileEditForm = ({
+  initialData,
+}: {
+  initialData: FanInformationResponse;
+}) => {
   const navigate = useNavigate();
   const galleryInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
+  const { data: genres = [] } = useGenres();
+  const { data: regions = [] } = useRegions();
+  const updateFanInformation = useUpdateFanInformation();
+
   const [avatarUrl, setAvatarUrl] = useState("");
   const [isImageMenuOpen, setIsImageMenuOpen] = useState(false);
-  const [nickname, setNickname] = useState("최유주");
-  const [selectedGenres, setSelectedGenres] = useState<string[]>([
-    "인디",
-    "팝",
-    "재즈",
-  ]);
-  const [selectedRegions, setSelectedRegions] = useState<string[]>([
-    "서울",
-    "경기",
-  ]);
+  const [nickname, setNickname] = useState(initialData.nickname);
+  const [selectedGenres, setSelectedGenres] = useState<string[]>(
+    initialData.genres,
+  );
+  const [selectedRegions, setSelectedRegions] = useState<string[]>(
+    initialData.regions,
+  );
 
-  const isValid = Boolean(nickname.trim());
+  const isValid = Boolean(
+    nickname.trim() && selectedGenres.length > 0 && selectedRegions.length > 0,
+  );
 
-  const toggleGenre = (genre: string) => {
+  const toggleGenre = (code: string) => {
     setSelectedGenres((prev) =>
-      prev.includes(genre)
-        ? prev.filter((item) => item !== genre)
-        : [...prev, genre],
+      prev.includes(code)
+        ? prev.filter((item) => item !== code)
+        : [...prev, code],
     );
   };
 
-  const toggleRegion = (region: string) => {
+  const toggleRegion = (code: string) => {
     setSelectedRegions((prev) =>
-      prev.includes(region)
-        ? prev.filter((item) => item !== region)
-        : [...prev, region],
+      prev.includes(code)
+        ? prev.filter((item) => item !== code)
+        : [...prev, code],
     );
   };
 
@@ -135,9 +123,19 @@ const ProfileEditPage = () => {
     });
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!isValid) return;
-    navigate(-1);
+
+    try {
+      await updateFanInformation.mutateAsync({
+        nickname: nickname.trim(),
+        genres: selectedGenres,
+        regions: selectedRegions,
+      });
+      navigate(-1);
+    } catch {
+      // 에러는 submitError로 화면에 표시됨
+    }
   };
 
   return (
@@ -199,6 +197,7 @@ const ProfileEditPage = () => {
             value={nickname}
             onChange={(event) => setNickname(event.target.value)}
             placeholder="닉네임을 입력해주세요"
+            maxLength={8}
             className="w-full rounded-[5px] py-1.25 pl-4"
           />
         </div>
@@ -208,7 +207,7 @@ const ProfileEditPage = () => {
             관심 장르 (최대 3개)
           </label>
           <ChipMultiGroup
-            options={GENRE_OPTIONS}
+            options={genres}
             selected={selectedGenres}
             max={3}
             onToggle={toggleGenre}
@@ -220,7 +219,7 @@ const ProfileEditPage = () => {
             활동 지역 (최대 2개)
           </label>
           <ChipMultiGroup
-            options={REGION_OPTIONS}
+            options={regions}
             selected={selectedRegions}
             max={2}
             onToggle={toggleRegion}
@@ -228,22 +227,65 @@ const ProfileEditPage = () => {
         </div>
       </section>
 
-      <div className="fixed inset-x-0 bottom-9 px-5">
+      <div className="fixed inset-x-0 bottom-9 flex flex-col gap-2 px-5">
+        {updateFanInformation.error ? (
+          <span className="text-center text-body5 text-error">
+            {getApiErrorMessage(
+              updateFanInformation.error,
+              "저장에 실패했어요. 다시 시도해주세요",
+            )}
+          </span>
+        ) : null}
+
         <button
           type="button"
           onClick={handleSubmit}
-          disabled={!isValid}
+          disabled={!isValid || updateFanInformation.isPending}
           className={`flex h-13 w-full items-center justify-center gap-2.5 rounded-xl text-label1 ${
-            isValid
+            isValid && !updateFanInformation.isPending
               ? "bg-primary-400 text-neutral-0"
               : "bg-neutral-300 text-neutral-600"
           }`}
         >
-          프로필 저장
+          {updateFanInformation.isPending ? "저장 중..." : "프로필 저장"}
         </button>
       </div>
     </main>
   );
+};
+
+const ProfileEditPage = () => {
+  const { data, isError, error, refetch } = useFanInformationQuery();
+
+  if (isError) {
+    return (
+      <main className="relative min-h-dvh bg-neutral-0 pb-24">
+        <Header title="내 정보 수정" />
+        <div className="flex flex-col items-center gap-3 px-6 pt-24 text-center">
+          <p className="text-caption1 text-neutral-500">
+            {getApiErrorMessage(error, "내 정보를 불러오지 못했어요")}
+          </p>
+          <button
+            type="button"
+            onClick={() => refetch()}
+            className="rounded-lg bg-primary-400 px-4 py-2 text-caption2 text-neutral-0"
+          >
+            다시 시도
+          </button>
+        </div>
+      </main>
+    );
+  }
+
+  if (!data) {
+    return (
+      <main className="relative min-h-dvh bg-neutral-0 pb-24">
+        <Header title="내 정보 수정" />
+      </main>
+    );
+  }
+
+  return <ProfileEditForm initialData={data} />;
 };
 
 export default ProfileEditPage;

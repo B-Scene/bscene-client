@@ -5,22 +5,22 @@ import { StatRow } from "@/components/band/home/StatRow";
 import { ModeSwitchSheet } from "@/components/band/home/ModeSwitchSheet";
 import { ModalOverlay } from "@/components/common/Modal/ModalOverlay";
 import Modal from "@/components/Modal/Modal";
-import { useBandProfileStore } from "@/stores/useBandProfileStore";
 import { ProfileSummary } from "@/components/band/my/ProfileSummary";
 import { MenuSection } from "@/components/band/my/MenuSection";
-
-const MEMBER_NAME = "정하람";
-const MEMBER_INSTRUMENT = "드럼";
-const APPLICANT_COUNT = 24;
+import { useBandMyPageQuery } from "@/hooks/api/user/useBandMyPage";
+import { useLogoutAndRedirect } from "@/hooks/useLogoutAndRedirect";
+import { getPartLabel } from "@/utils/bandLabels";
 
 const MyPage = () => {
   const navigate = useNavigate();
-  const profile = useBandProfileStore((state) => state.profile);
+  const { data } = useBandMyPageQuery();
+  const logout = useLogoutAndRedirect();
 
   const [isModeSwitchOpen, setIsModeSwitchOpen] = useState(false);
   const [isLogoutOpen, setIsLogoutOpen] = useState(false);
 
-  const bandName = profile.name.trim() || "WAVY";
+  const bandName = data?.bandName ?? "";
+  const partsLabel = data?.parts.map(getPartLabel).join(" · ") ?? "";
 
   return (
     <main className="relative flex min-h-dvh flex-col bg-neutral-0">
@@ -28,8 +28,8 @@ const MyPage = () => {
 
       <section className="bg-secondary-0 px-5 py-6">
         <ProfileSummary
-          name={MEMBER_NAME}
-          subtitle={`${bandName} · ${MEMBER_INSTRUMENT}`}
+          name={data?.nickname ?? ""}
+          subtitle={[bandName, partsLabel].filter(Boolean).join(" · ")}
           bandLabel={bandName}
           onSwitchBand={() => setIsModeSwitchOpen(true)}
         />
@@ -37,42 +37,46 @@ const MyPage = () => {
         <div className="mt-4">
           <StatRow
             stats={[
-              { label: "팔로워", value: profile.stats.followers },
-              { label: "지원자", value: APPLICANT_COUNT },
-              { label: "공연", value: profile.stats.concerts },
+              { label: "팔로워", value: data?.follower ?? 0 },
+              { label: "지원자", value: data?.applicant ?? 0 },
+              { label: "공연", value: data?.performance ?? 0 },
             ]}
           />
         </div>
       </section>
 
       <div className="flex flex-col gap-4 pt-4.5 pb-5">
-        <MenuSection
-          title="현재 선택된 밴드 관리"
-          items={[
-            {
-              id: "band-profile",
-              label: "밴드 프로필 관리",
-              onClick: () => navigate("/band/profile/edit"),
-            },
-            {
-              id: "members",
-              label: "멤버 관리",
-              onClick: () => navigate("/band/profile/invite"),
-            },
-            {
-              id: "postings",
-              label: "모집 공고 관리",
-              onClick: () => navigate("/band/profile/postings"),
-            },
-            {
-              id: "applications",
-              label: "받은 지원 관리",
-              onClick: () => navigate("/band/profile/applications"),
-            },
-          ]}
-        />
+        {data?.isBandMember ? (
+          <>
+            <MenuSection
+              title="현재 선택된 밴드 관리"
+              items={[
+                {
+                  id: "band-profile",
+                  label: "밴드 프로필 관리",
+                  onClick: () => navigate("/band/profile/edit"),
+                },
+                {
+                  id: "members",
+                  label: "멤버 관리",
+                  onClick: () => navigate("/band/profile/invite"),
+                },
+                {
+                  id: "postings",
+                  label: "모집 공고 관리",
+                  onClick: () => navigate("/band/profile/postings"),
+                },
+                {
+                  id: "applications",
+                  label: "받은 지원 관리",
+                  onClick: () => navigate("/band/profile/applications"),
+                },
+              ]}
+            />
 
-        <div className="h-px bg-neutral-400" />
+            <div className="h-px bg-neutral-400" />
+          </>
+        ) : null}
 
         <MenuSection
           title="알림"
@@ -113,7 +117,7 @@ const MyPage = () => {
           onCancel={() => setIsLogoutOpen(false)}
           onConfirm={() => {
             setIsLogoutOpen(false);
-            navigate("/login");
+            logout();
           }}
         />
       </ModalOverlay>

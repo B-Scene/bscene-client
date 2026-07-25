@@ -6,19 +6,29 @@ import { Header } from "@/components/band/home/Header";
 import { ImagePickerSheet } from "@/components/band/home/ImagePickerSheet";
 import { Input, Textarea } from "@/components/common/Input/Input";
 import { Select } from "@/components/common/Select/Select";
-import { useBandProfileStore } from "@/stores/useBandProfileStore";
-import { useBandMembersStore } from "@/stores/useBandMembersStore";
 import { NotificationBandBanner } from "@/components/band/my/NotificationBandBanner";
-import { useCreateBand } from "@/hooks/api/band/useBand";
-import { useCreateBandMemberProfile } from "@/hooks/api/band/useBandMemberProfile";
+import { useActiveBandId } from "@/hooks/api/user/useMyProfiles";
+import {
+  useBandQuery,
+  useCreateBand,
+  useUpdateBand,
+} from "@/hooks/api/band/useBand";
+import {
+  useActiveBandMemberProfileQuery,
+  useCreateBandMemberProfile,
+  useUpdateBandMemberProfile,
+} from "@/hooks/api/band/useBandMemberProfile";
 import { uploadMediaFile } from "@/utils/uploadMediaFile";
 import type { BandMemberProfilePart } from "@/types/band/bandMemberProfile";
 import type { BandApiResponse } from "@/types/band/band";
 import {
   BAND_GENRE_BY_LABEL,
+  BAND_GENRE_LABELS,
   BAND_GENRE_LABEL_OPTIONS,
   BAND_REGION_BY_LABEL,
+  BAND_REGION_LABELS,
   BAND_REGION_LABEL_OPTIONS,
+  getPartLabel,
 } from "@/utils/bandLabels";
 
 const GENRE_OPTIONS = BAND_GENRE_LABEL_OPTIONS;
@@ -68,49 +78,131 @@ const ChipGroup = ({ options, value, onChange }: ChipGroupProps) => (
   </div>
 );
 
+interface ProfileFormValues {
+  name: string;
+  genre: string;
+  region: string;
+  bio: string;
+  avatarUrl: string;
+  myActivityName: string;
+  myPart: string;
+}
+
+const EMPTY_FORM_VALUES: ProfileFormValues = {
+  name: "",
+  genre: "",
+  region: "",
+  bio: "",
+  avatarUrl: "",
+  myActivityName: "",
+  myPart: "",
+};
+
 interface ProfileFormPageProps {
   mode: "create" | "edit";
 }
 
 const ProfileFormPage = ({ mode }: ProfileFormPageProps) => {
+  if (mode === "create") {
+    return <ProfileForm mode="create" initialValues={EMPTY_FORM_VALUES} />;
+  }
+
+  return <ProfileEditLoader />;
+};
+
+const ProfileEditLoader = () => {
+  const activeBandId = useActiveBandId();
+  const bandId = activeBandId ?? NaN;
+
+  const bandQuery = useBandQuery(bandId);
+  const memberProfileQuery = useActiveBandMemberProfileQuery();
+
+  if (bandQuery.isError || memberProfileQuery.isError) {
+    return (
+      <main className="relative min-h-dvh bg-neutral-0 pb-24">
+        <Header title="밴드 프로필 관리" />
+        <div className="flex flex-col items-center gap-3 px-6 pt-24 text-center">
+          <p className="text-caption1 text-neutral-500">
+            {getApiErrorMessage(
+              bandQuery.error ?? memberProfileQuery.error,
+              "프로필 정보를 불러오지 못했어요",
+            )}
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  if (!bandQuery.data || !memberProfileQuery.data) {
+    return (
+      <main className="relative min-h-dvh bg-neutral-0 pb-24">
+        <Header title="밴드 프로필 관리" />
+      </main>
+    );
+  }
+
+  const band = bandQuery.data;
+  const memberProfile = memberProfileQuery.data;
+
+  return (
+    <ProfileForm
+      mode="edit"
+      bandId={bandId}
+      memberProfileId={memberProfile.id}
+      initialValues={{
+        name: band.name,
+        genre: BAND_GENRE_LABELS[band.genre] ?? band.genre,
+        region: BAND_REGION_LABELS[band.region] ?? band.region,
+        bio: band.description ?? "",
+        avatarUrl: band.profileImageUrl ?? "",
+        myActivityName: memberProfile.nickname,
+        myPart: getPartLabel(memberProfile.part),
+      }}
+    />
+  );
+};
+
+interface ProfileFormProps {
+  mode: "create" | "edit";
+  bandId?: number;
+  memberProfileId?: number;
+  initialValues: ProfileFormValues;
+}
+
+const ProfileForm = ({
+  mode,
+  bandId,
+  memberProfileId,
+  initialValues,
+}: ProfileFormProps) => {
   const isEditMode = mode === "edit";
   const navigate = useNavigate();
-  const profile = useBandProfileStore((state) => state.profile);
-  const setProfile = useBandProfileStore((state) => state.setProfile);
-
-  const members = useBandMembersStore((state) => state.members);
-  const updateSelfMember = useBandMembersStore(
-    (state) => state.updateSelfMember,
-  );
-  const selfMember = members.find((member) => member.isSelf);
 
   const createBandMemberProfile = useCreateBandMemberProfile();
   const createBand = useCreateBand();
+  const updateBand = useUpdateBand(bandId ?? NaN);
+  const updateBandMemberProfile = useUpdateBandMemberProfile(
+    memberProfileId ?? NaN,
+  );
 
   const galleryInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
-  const [avatarUrl, setAvatarUrl] = useState(
-    isEditMode ? profile.avatarUrl : "",
-  );
+  const [avatarUrl, setAvatarUrl] = useState(initialValues.avatarUrl);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [isImageMenuOpen, setIsImageMenuOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
-  const [name, setName] = useState(isEditMode ? profile.name : "");
-  const [genre, setGenre] = useState(isEditMode ? profile.genre : "");
-  const [region, setRegion] = useState(
-    isEditMode ? (profile.regions[0] ?? "") : "",
-  );
-  const [bio, setBio] = useState(isEditMode ? profile.bio : "");
+  const [name, setName] = useState(initialValues.name);
+  const [genre, setGenre] = useState(initialValues.genre);
+  const [region, setRegion] = useState(initialValues.region);
+  const [bio, setBio] = useState(initialValues.bio);
 
   const [myActivityName, setMyActivityName] = useState(
-    isEditMode ? (selfMember?.name ?? "") : "",
+    initialValues.myActivityName,
   );
-  const [myPart, setMyPart] = useState(
-    isEditMode ? (selfMember?.roleLabel.split(" · ")[1] ?? "") : "",
-  );
+  const [myPart, setMyPart] = useState(initialValues.myPart);
 
   const isValid = isEditMode
     ? Boolean(name.trim() && genre && region)
@@ -119,8 +211,15 @@ const ProfileFormPage = ({ mode }: ProfileFormPageProps) => {
       );
 
   const isSubmitting =
-    createBandMemberProfile.isPending || createBand.isPending || isUploading;
-  const submitError = createBandMemberProfile.error ?? createBand.error;
+    createBandMemberProfile.isPending ||
+    createBand.isPending ||
+    updateBand.isPending ||
+    updateBandMemberProfile.isPending ||
+    isUploading;
+
+  const submitError = isEditMode
+    ? (updateBand.error ?? updateBandMemberProfile.error)
+    : (createBandMemberProfile.error ?? createBand.error);
 
   const handleFileSelected = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -146,15 +245,6 @@ const ProfileFormPage = ({ mode }: ProfileFormPageProps) => {
   const handleSubmit = async () => {
     if (!isValid) return;
 
-    if (isEditMode) {
-      setProfile({ name, genre, regions: [region], bio, avatarUrl });
-      if (myActivityName.trim() && myPart) {
-        updateSelfMember({ name: myActivityName.trim(), part: myPart });
-      }
-      navigate("/band/home");
-      return;
-    }
-
     setUploadError(null);
     let uploadedAvatarUrl = avatarUrl;
 
@@ -168,6 +258,33 @@ const ProfileFormPage = ({ mode }: ProfileFormPageProps) => {
         return;
       }
       setIsUploading(false);
+    }
+
+    if (isEditMode) {
+      if (!bandId) return;
+
+      try {
+        await updateBand.mutateAsync({
+          name,
+          genre: BAND_GENRE_BY_LABEL[genre],
+          region: BAND_REGION_BY_LABEL[region],
+          profileImageUrl: uploadedAvatarUrl || undefined,
+          description: bio || undefined,
+        });
+
+        if (memberProfileId && myActivityName.trim() && myPart) {
+          await updateBandMemberProfile.mutateAsync({
+            nickname: myActivityName.trim(),
+            part: PART_LABEL_TO_ENUM[myPart],
+          });
+        }
+
+        navigate("/band/home");
+      } catch {
+        // 에러는 submitError로 화면에 표시됨
+      }
+
+      return;
     }
 
     try {
@@ -198,7 +315,7 @@ const ProfileFormPage = ({ mode }: ProfileFormPageProps) => {
       {isEditMode ? (
         <div className="px-5 pt-4">
           <NotificationBandBanner
-            bandName={`현재 선택된 밴드 · ${profile.name || "WAVY"}`}
+            bandName={`현재 선택된 밴드 · ${name || "밴드"}`}
             description="현재 선택된 밴드의 공개 프로필을 수정합니다"
           />
         </div>

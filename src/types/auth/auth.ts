@@ -70,6 +70,10 @@ export type ReissueRequest = {
   refreshToken: string;
 };
 
+export type LogoutRequest = {
+  refreshToken: string;
+};
+
 export type ReissueResponse = {
   grantType: "Bearer";
   accessToken: string;

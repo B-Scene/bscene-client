@@ -1,4 +1,5 @@
 import type { BandGenre, BandRegion } from "@/types/band/band";
+import type { BandMemberPart } from "@/types/band/bandMember";
 import type {
   PerformanceAgeRating,
   PerformanceGenre,
@@ -61,6 +62,26 @@ export const PERFORMANCE_AGE_RATING_LABELS: Record<
   AGE_15: "15세 이상",
   AGE_19: "19세 이상",
 };
+
+export const getGenreLabel = (genre: string) =>
+  BAND_GENRE_LABELS[genre as BandGenre] ??
+  PERFORMANCE_GENRE_LABELS[genre as PerformanceGenre] ??
+  genre;
+
+export const getRegionLabel = (region: string) =>
+  BAND_REGION_LABELS[region as BandRegion] ?? region;
+
+export const BAND_MEMBER_PART_LABELS: Record<BandMemberPart, string> = {
+  VOCAL: "보컬",
+  GUITAR: "기타",
+  BASS: "베이스",
+  KEYBOARD: "키보드",
+  DRUM: "드럼",
+  ETC: "etc",
+};
+
+export const getPartLabel = (part: string) =>
+  BAND_MEMBER_PART_LABELS[part as BandMemberPart] ?? part;
 
 const toReverseMap = <T extends string>(labels: Record<T, string>) => {
   const reverse = {} as Record<string, T>;

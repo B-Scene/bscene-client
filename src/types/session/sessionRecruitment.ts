@@ -46,6 +46,20 @@ export type UpdateSessionRecruitmentRequest = Omit<
 
 export type UpdateSessionRecruitmentResponse = CreateSessionRecruitmentResponse;
 
+export interface SessionRecruitmentEditInfoResponse {
+  recruitmentTitle: string;
+  summary: string;
+  content: string;
+  part: string;
+  skillLevel: string;
+  genre: string;
+  region: string;
+  practiceSchedule: string;
+  practicePlace: string;
+  deadlineAt: string;
+  qualification: string;
+}
+
 export type DeleteSessionRecruitmentResponse = null;
 
 export type SessionRecruitmentSort = "LATEST" | "IMMINENT";
