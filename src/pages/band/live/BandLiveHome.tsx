@@ -101,7 +101,7 @@ export function BandLiveHome({ go }: { go: GoLiveScreen }) {
           </div>
         </section>
       </div>
-      <BottomNavBar modeOverride="fan" activeColorModeOverride="band" />
+      <BottomNavBar modeOverride="band" />
     </main>
   );
 }

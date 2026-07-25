@@ -19,6 +19,13 @@ import CompletePage from "@/pages/band/home/CompletePage";
 import MusicRegisterPage from "@/pages/band/home/MusicRegisterPage";
 import ContentRegisterPage from "@/pages/band/home/ContentRegisterPage";
 import FanHomePage from "@/pages/fan/home/FanHomePage";
+import FanMyPage from "@/pages/fan/my/MyPage";
+import FollowedBandsPage from "@/pages/fan/my/FollowedBandsPage";
+import InterestedConcertsPage from "@/pages/fan/my/InterestedConcertsPage";
+import AttendedConcertsPage from "@/pages/fan/my/AttendedConcertsPage";
+import ConcertAlertSettingsPage from "@/pages/fan/my/ConcertAlertSettingsPage";
+import FanLiveAlertSettingsPage from "@/pages/fan/my/LiveAlertSettingsPage";
+import ProfileEditPage from "@/pages/fan/my/ProfileEditPage";
 import FanExplorePage from "@/pages/fan/explore/FanExplorePage";
 import FanExploreSearchPage from "@/pages/fan/explore/FanExploreSearchPage";
 import FanExploreSearchResultPage from "@/pages/fan/explore/FanExploreSearchResultPage";
@@ -39,13 +46,13 @@ import {
   FanLiveScheduledPage,
 } from "@/pages/fan/live";
 import { BandLivePage } from "@/pages/band/live/BandLivePage";
+import BandSessionPage from "@/pages/band/session/BandSessionPage";
 import MemberInviteSearchPage from "@/pages/band/home/MemberInviteSearchPage";
 import ApplicationManagementPage from "@/pages/band/my/ApplicationManagementPage";
 import PostingManagementPage from "@/pages/band/my/PostingManagementPage";
 import MyPage from "@/pages/band/my/MyPage";
 import RecruitAlertSettingsPage from "@/pages/band/my/RecruitAlertSettingsPage";
 import LiveAlertSettingsPage from "@/pages/band/my/LiveAlertSettingsPage";
-import BandSessionPage from "@/pages/band/session/BandSessionPage";
 
 export const router = createBrowserRouter([
   {
@@ -180,6 +187,10 @@ export const router = createBrowserRouter([
         path: "/band/profile/postings",
         element: <PostingManagementPage />,
       },
+      {
+        path: "/fan/my/profile/edit",
+        element: <ProfileEditPage />,
+      },
     ],
   },
   {
@@ -227,6 +238,30 @@ export const router = createBrowserRouter([
         element: <ConcertCalendarPage />,
       },
       {
+        path: "/fan/my",
+        element: <FanMyPage />,
+      },
+      {
+        path: "/fan/my/followed-bands",
+        element: <FollowedBandsPage />,
+      },
+      {
+        path: "/fan/my/interested-concerts",
+        element: <InterestedConcertsPage />,
+      },
+      {
+        path: "/fan/my/attended-concerts",
+        element: <AttendedConcertsPage />,
+      },
+      {
+        path: "/fan/my/concert-alert",
+        element: <ConcertAlertSettingsPage />,
+      },
+      {
+        path: "/fan/my/live-alert",
+        element: <FanLiveAlertSettingsPage />,
+      },
+      {
         path: "/band/home",
         element: <BandHomePage />,
       },
@@ -255,14 +290,13 @@ export const router = createBrowserRouter([
         element: <ContentRegisterPage />,
       },
       {
-        path: "/band/my",
-        element: <MyPage />,
-      },
-      {
         path: "/band/session",
         element: <BandSessionPage />,
+      },
+      {
+        path: "/band/my",
+        element: <MyPage />,
       },
     ],
   },
 ]);
-
