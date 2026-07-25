@@ -5,6 +5,7 @@ interface ModalOverlayProps {
   onClose?: () => void;
   children: ReactNode;
   panelClassName?: string;
+  clipContent?: boolean;
 }
 
 export const ModalOverlay = ({
@@ -12,6 +13,7 @@ export const ModalOverlay = ({
   onClose,
   children,
   panelClassName = "rounded-2xl",
+  clipContent = true,
 }: ModalOverlayProps) => {
   if (!open) return null;
 
@@ -21,7 +23,7 @@ export const ModalOverlay = ({
       onClick={onClose}
     >
       <div
-        className={`overflow-hidden bg-neutral-0 ${panelClassName}`}
+        className={`bg-neutral-0 ${clipContent ? "overflow-hidden" : ""} ${panelClassName}`}
         onClick={(event) => event.stopPropagation()}
       >
         {children}
