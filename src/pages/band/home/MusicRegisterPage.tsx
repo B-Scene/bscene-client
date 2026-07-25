@@ -1,9 +1,15 @@
 import { useState, type ReactNode } from "react";
+import type { AxiosError } from "axios";
 import { useNavigate } from "react-router-dom";
 import { Header } from "@/components/band/home/Header";
 import { Input } from "@/components/common/Input/Input";
-import { useBandMusicLinksStore } from "@/stores/useBandMusicLinksStore";
-import type { MusicEtcPlatform } from "@/types/band/musicLink";
+import { useActiveBandId } from "@/hooks/api/user/useMyProfiles";
+import { useMusicLinksQuery, useSaveMusicLinks } from "@/hooks/api/band/useMusicLink";
+import type {
+  BandApiResponse,
+  MusicEtcPlatform,
+  MusicLinksResponse,
+} from "@/types/band/musicLink";
 
 const ETC_PLATFORM_OPTIONS: { value: MusicEtcPlatform; label: string }[] = [
   { value: "MELON", label: "Melon" },
@@ -11,6 +17,12 @@ const ETC_PLATFORM_OPTIONS: { value: MusicEtcPlatform; label: string }[] = [
   { value: "BUGS", label: "Bugs" },
   { value: "APPLE_MUSIC", label: "Apple Music" },
 ];
+
+const getApiErrorMessage = (error: unknown, fallbackMessage: string) => {
+  const axiosError = error as AxiosError<BandApiResponse<null>>;
+
+  return axiosError.response?.data?.message ?? fallbackMessage;
+};
 
 interface FieldProps {
   label: string;
@@ -27,16 +39,44 @@ const Field = ({ label, error, children }: FieldProps) => (
 );
 
 const MusicRegisterPage = () => {
+  const activeBandId = useActiveBandId();
+  const bandId = activeBandId ?? NaN;
+  const { data: existingLinks, isLoading } = useMusicLinksQuery(bandId);
+
+  if (isLoading) {
+    return <main className="min-h-dvh bg-neutral-0" />;
+  }
+
+  return <MusicRegisterForm bandId={bandId} existingLinks={existingLinks} />;
+};
+
+interface MusicRegisterFormProps {
+  bandId: number;
+  existingLinks: MusicLinksResponse | undefined;
+}
+
+const MusicRegisterForm = ({
+  bandId,
+  existingLinks,
+}: MusicRegisterFormProps) => {
   const navigate = useNavigate();
-  const setMusicLinks = useBandMusicLinksStore((state) => state.setMusicLinks);
+  const saveMusicLinks = useSaveMusicLinks(bandId);
 
-  const [spotifyUrl, setSpotifyUrl] = useState("");
-  const [youtubeUrl, setYoutubeUrl] = useState("");
-  const [soundcloudUrl, setSoundcloudUrl] = useState("");
-  const [otherUrl, setOtherUrl] = useState("");
+  const [spotifyUrl, setSpotifyUrl] = useState(
+    () => existingLinks?.spotifyUrl ?? "",
+  );
+  const [youtubeUrl, setYoutubeUrl] = useState(
+    () => existingLinks?.youtubeUrl ?? "",
+  );
+  const [soundcloudUrl, setSoundcloudUrl] = useState(
+    () => existingLinks?.soundcloudUrl ?? "",
+  );
+  const [otherUrl, setOtherUrl] = useState(() => existingLinks?.otherUrl ?? "");
 
-  const [etcPlatform, setEtcPlatform] = useState<MusicEtcPlatform | null>(null);
-  const [etcUrl, setEtcUrl] = useState("");
+  const [etcPlatform, setEtcPlatform] = useState<MusicEtcPlatform | null>(
+    () => existingLinks?.etcPlatform ?? null,
+  );
+  const [etcUrl, setEtcUrl] = useState(() => existingLinks?.etcUrl ?? "");
 
   const [showErrors, setShowErrors] = useState(false);
 
@@ -62,16 +102,21 @@ const MusicRegisterPage = () => {
       return;
     }
 
-    setMusicLinks({
-      spotifyUrl,
-      youtubeUrl,
-      soundcloudUrl,
-      etcPlatform,
-      etcUrl,
-      otherUrl,
-    });
-
-    navigate("/band/home");
+    saveMusicLinks.mutate(
+      {
+        spotifyUrl: spotifyUrl.trim() || null,
+        youtubeUrl: youtubeUrl.trim() || null,
+        soundcloudUrl: soundcloudUrl.trim() || null,
+        etcPlatform,
+        etcUrl: etcUrl.trim() || null,
+        otherUrl: otherUrl.trim() || null,
+      },
+      {
+        onSuccess: () => {
+          navigate("/band/home");
+        },
+      },
+    );
   };
 
   return (
@@ -167,12 +212,22 @@ const MusicRegisterPage = () => {
         </div>
       </section>
 
-      <div className="fixed inset-x-0 bottom-[calc(var(--bottom-nav-height)+16px)] px-5">
+      <div className="fixed inset-x-0 bottom-[calc(var(--bottom-nav-height)+16px)] flex flex-col gap-2 px-5">
+        {saveMusicLinks.isError ? (
+          <span className="text-center text-body5 text-error">
+            {getApiErrorMessage(
+              saveMusicLinks.error,
+              "저장에 실패했어요. 다시 시도해주세요",
+            )}
+          </span>
+        ) : null}
+
         <button
           type="button"
           onClick={handleSubmit}
+          disabled={saveMusicLinks.isPending}
           className={`flex h-13 w-full items-center justify-center rounded-xl text-label1 ${
-            isValid
+            isValid && !saveMusicLinks.isPending
               ? "bg-secondary-500 text-neutral-0"
               : "bg-neutral-300 text-neutral-600"
           }`}

@@ -7,6 +7,7 @@ import {
 } from "@/api/band/band";
 import type { CreateBandRequest, UpdateBandRequest } from "@/types/band/band";
 import { bandMemberProfileKeys } from "@/hooks/api/band/useBandMemberProfile";
+import { myProfilesKeys } from "@/hooks/api/user/useMyProfiles";
 
 export const bandKeys = {
   all: ["band"] as const,
@@ -30,6 +31,7 @@ export const useCreateBand = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: bandKeys.all });
       queryClient.invalidateQueries({ queryKey: bandMemberProfileKeys.all });
+      queryClient.invalidateQueries({ queryKey: myProfilesKeys.all });
     },
   });
 };

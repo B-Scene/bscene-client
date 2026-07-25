@@ -4,10 +4,15 @@ import SwapIcon from "@/assets/icons/swap.svg";
 import DefaultBandAvatar from "@/assets/icons/band/band-default-profile.svg";
 import { HomeHeader } from "@/components/common/Header/HomeHeader";
 import { NotificationBellIcon } from "@/components/common/Header/NotificationBellIcon";
-import { useBandProfileStore } from "@/stores/useBandProfileStore";
-import { useConcertsStore, type Concert } from "@/stores/useConcertsStore";
-import { useBandPostsStore } from "@/stores/useBandPostsStore";
-import { useBandMusicLinksStore } from "@/stores/useBandMusicLinksStore";
+import { useActiveBandId } from "@/hooks/api/user/useMyProfiles";
+import { useBandQuery } from "@/hooks/api/band/useBand";
+import {
+  useDeletePerformance,
+  usePerformancesQuery,
+} from "@/hooks/api/band/usePerformance";
+import { usePostsQuery } from "@/hooks/api/band/usePost";
+import { useMusicLinksQuery } from "@/hooks/api/band/useMusicLink";
+import { BAND_GENRE_LABELS, BAND_REGION_LABELS } from "@/utils/bandLabels";
 import { BandProfileCard } from "@/components/band/home/BandProfileCard";
 import { StatRow } from "@/components/band/home/StatRow";
 import { Tabs } from "@/components/band/home/Tabs";
@@ -19,6 +24,7 @@ import { ModalOverlay } from "@/components/common/Modal/ModalOverlay";
 import Modal from "@/components/Modal/Modal";
 import ConcertCard from "@/components/common/Card/ConcertCard";
 import { formatRelativeTime } from "@/utils/formatRelativeTime";
+import type { PerformanceListItem } from "@/types/band/performance";
 
 const HOME_TABS = [
   { id: "content", label: "콘텐츠" },
@@ -41,45 +47,52 @@ const MONTH_ABBREVIATIONS = [
   "DEC",
 ];
 
-const CONCERT_STATUS_LABELS: Record<Concert["status"], string> = {
-  scheduled: "등록 완료",
-  draft: "준비중",
-};
-
-const getConcertCardProps = (concert: Concert) => {
-  const [, month, day] = concert.startDate.split("-");
-  const dateLabel = `${concert.startDate.replaceAll("-", ".")}.`;
+const getPerformanceCardProps = (performance: PerformanceListItem) => {
+  const [, month, day] = performance.performanceDate.split("-");
 
   return {
     month: MONTH_ABBREVIATIONS[Number(month) - 1] ?? "",
     day: day ?? "",
-    dateTime: concert.time ? `${dateLabel} ${concert.time}` : dateLabel,
-    statusLabel: CONCERT_STATUS_LABELS[concert.status],
+    dateTime: `${performance.performanceDate.replaceAll("-", ".")}.`,
   };
 };
 
 const BandHomePage = () => {
   const navigate = useNavigate();
-  const profile = useBandProfileStore((state) => state.profile);
-  const concerts = useConcertsStore((state) => state.concerts);
-  const removeConcert = useConcertsStore((state) => state.removeConcert);
-  const posts = useBandPostsStore((state) => state.posts);
-  const spotifyUrl = useBandMusicLinksStore((state) => state.spotifyUrl);
-  const youtubeUrl = useBandMusicLinksStore((state) => state.youtubeUrl);
-  const soundcloudUrl = useBandMusicLinksStore((state) => state.soundcloudUrl);
-  const etcPlatform = useBandMusicLinksStore((state) => state.etcPlatform);
-  const etcUrl = useBandMusicLinksStore((state) => state.etcUrl);
-  const otherUrl = useBandMusicLinksStore((state) => state.otherUrl);
+  const activeBandId = useActiveBandId();
+  const hasBand = activeBandId !== null;
+  const bandId = activeBandId ?? NaN;
+
+  const { data: band } = useBandQuery(bandId);
+  const { data: performancesData } = usePerformancesQuery(bandId);
+  const { data: postsData } = usePostsQuery(bandId);
+  const { data: musicLinks } = useMusicLinksQuery(bandId);
+  const deletePerformance = useDeletePerformance();
+
+  const performances = performancesData?.performances ?? [];
+  const posts = postsData?.posts ?? [];
+
+  const spotifyUrl = musicLinks?.spotifyUrl ?? "";
+  const youtubeUrl = musicLinks?.youtubeUrl ?? "";
+  const soundcloudUrl = musicLinks?.soundcloudUrl ?? "";
+  const etcPlatform = musicLinks?.etcPlatform ?? null;
+  const etcUrl = musicLinks?.etcUrl ?? "";
+  const otherUrl = musicLinks?.otherUrl ?? "";
   const hasMusicLinks = Boolean(
-    spotifyUrl || youtubeUrl || soundcloudUrl || (etcPlatform && etcUrl) || otherUrl,
+    spotifyUrl ||
+      youtubeUrl ||
+      soundcloudUrl ||
+      (etcPlatform && etcUrl) ||
+      otherUrl,
   );
 
   const [activeTab, setActiveTab] = useState("content");
-  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
   const [isModeSwitchOpen, setIsModeSwitchOpen] = useState(false);
 
-  const hasBand = Boolean(profile.name.trim());
-  const subtitle = `${profile.genre} · ${profile.regions.join(", ")} · 멤버 ${profile.memberCount}명`;
+  const subtitle = band
+    ? `${BAND_GENRE_LABELS[band.genre]} · ${BAND_REGION_LABELS[band.region]} · 멤버 ${band.memberCount}명`
+    : "";
   const goToCreateBand = () => navigate("/band/profile/new");
 
   return (
@@ -108,15 +121,17 @@ const BandHomePage = () => {
       />
 
       <section className="mt-6 flex flex-1 flex-col">
-        {hasBand ? (
+        {hasBand && band ? (
           <BandProfileCard
-            name={profile.name}
-            avatarUrl={profile.avatarUrl}
-            verified={profile.verified}
+            name={band.name}
+            avatarUrl={band.profileImageUrl ?? ""}
+            verified={false}
             subtitle={subtitle}
             onEditProfile={() => navigate("/band/profile/edit")}
           />
-        ) : (
+        ) : null}
+
+        {!hasBand ? (
           <div className="flex items-center gap-3">
             <img
               src={DefaultBandAvatar}
@@ -134,14 +149,14 @@ const BandHomePage = () => {
               </p>
             </div>
           </div>
-        )}
+        ) : null}
 
         <div className="mt-4">
           <StatRow
             stats={[
-              { label: "팔로워", value: profile.stats.followers },
-              { label: "공연", value: profile.stats.concerts },
-              { label: "영상", value: profile.stats.videos },
+              { label: "팔로워", value: band?.followerCount ?? 0 },
+              { label: "공연", value: band?.performanceCount ?? 0 },
+              { label: "콘텐츠", value: posts.length },
             ]}
           />
         </div>
@@ -218,20 +233,26 @@ const BandHomePage = () => {
               <div className="flex flex-col gap-3">
                 {posts.map((post) => (
                   <PostCard
-                    key={post.id}
-                    bandName={profile.name}
-                    avatarUrl={profile.avatarUrl}
-                    metaLabel={`${profile.genre} · ${profile.regions.join(", ")} · ${formatRelativeTime(post.createdAt)}`}
+                    key={post.postId}
+                    bandName={band?.name ?? ""}
+                    avatarUrl={band?.profileImageUrl ?? undefined}
+                    metaLabel={
+                      band
+                        ? `${BAND_GENRE_LABELS[band.genre]} · ${BAND_REGION_LABELS[band.region]} · ${formatRelativeTime(post.createdAt)}`
+                        : formatRelativeTime(post.createdAt)
+                    }
                     mediaItems={
-                      post.videoUrl
-                        ? [{ type: "video", url: post.videoUrl }]
-                        : post.imageUrls.map((url) => ({
-                            type: "image" as const,
-                            url,
-                          }))
+                      post.thumbnailUrl
+                        ? [
+                            {
+                              type: post.type === "VIDEO" ? "video" : "image",
+                              url: post.thumbnailUrl,
+                            },
+                          ]
+                        : []
                     }
                     caption={
-                      post.description.trim() ||
+                      post.description?.trim() ||
                       post.title ||
                       "팬분들께 전하고 싶은 소식을 적어보세요"
                     }
@@ -240,7 +261,7 @@ const BandHomePage = () => {
               </div>
             ) : null}
 
-            {hasBand && activeTab === "schedule" && concerts.length === 0 ? (
+            {hasBand && activeTab === "schedule" && performances.length === 0 ? (
               <EmptyState
                 title="등록된 일정이 없어요"
                 description={
@@ -255,27 +276,28 @@ const BandHomePage = () => {
               />
             ) : null}
 
-            {hasBand && activeTab === "schedule" && concerts.length > 0 ? (
+            {hasBand && activeTab === "schedule" && performances.length > 0 ? (
               <div className="flex flex-col gap-3">
-                {concerts.map((concert) => {
-                  const cardProps = getConcertCardProps(concert);
+                {performances.map((performance) => {
+                  const cardProps = getPerformanceCardProps(performance);
 
                   return (
                     <ConcertCard
-                      key={concert.id}
+                      key={performance.performanceId}
                       month={cardProps.month}
                       day={cardProps.day}
-                      title={concert.title}
-                      location={concert.location}
+                      title={performance.title}
+                      location={performance.venue}
                       dateTime={cardProps.dateTime}
-                      status={cardProps.statusLabel}
-                      isPending={concert.status === "draft"}
+                      status="등록 완료"
                       actions={
                         <>
                           <button
                             type="button"
                             onClick={() =>
-                              navigate(`/band/concerts/${concert.id}/edit`)
+                              navigate(
+                                `/band/concerts/${performance.performanceId}/edit`,
+                              )
                             }
                             className="flex h-6.5 items-center justify-center gap-2.5 rounded-lg bg-[#FFF6E5] px-3.75 py-1.75 text-center text-caption3 text-neutral-600"
                           >
@@ -283,7 +305,9 @@ const BandHomePage = () => {
                           </button>
                           <button
                             type="button"
-                            onClick={() => setDeleteTargetId(concert.id)}
+                            onClick={() =>
+                              setDeleteTargetId(performance.performanceId)
+                            }
                             className="flex h-6.5 items-center justify-center gap-2.5 rounded-lg bg-neutral-300 px-3.75 py-1.75 text-caption3 text-neutral-600"
                           >
                             삭제
@@ -337,7 +361,9 @@ const BandHomePage = () => {
           confirmLabel="삭제"
           onCancel={() => setDeleteTargetId(null)}
           onConfirm={() => {
-            if (deleteTargetId) removeConcert(deleteTargetId);
+            if (deleteTargetId !== null) {
+              deletePerformance.mutate(deleteTargetId);
+            }
             setDeleteTargetId(null);
           }}
         />

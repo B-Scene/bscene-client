@@ -1,4 +1,5 @@
 import { useRef, useState, type ChangeEvent } from "react";
+import type { AxiosError } from "axios";
 import { useNavigate } from "react-router-dom";
 import DefaultBandAvatar from "@/assets/icons/band/band-default-profile.svg";
 import { Header } from "@/components/band/home/Header";
@@ -8,44 +9,36 @@ import { Select } from "@/components/common/Select/Select";
 import { useBandProfileStore } from "@/stores/useBandProfileStore";
 import { useBandMembersStore } from "@/stores/useBandMembersStore";
 import { NotificationBandBanner } from "@/components/band/my/NotificationBandBanner";
+import { useCreateBand } from "@/hooks/api/band/useBand";
+import { useCreateBandMemberProfile } from "@/hooks/api/band/useBandMemberProfile";
+import { uploadMediaFile } from "@/utils/uploadMediaFile";
+import type { BandMemberProfilePart } from "@/types/band/bandMemberProfile";
+import type { BandApiResponse } from "@/types/band/band";
+import {
+  BAND_GENRE_BY_LABEL,
+  BAND_GENRE_LABEL_OPTIONS,
+  BAND_REGION_BY_LABEL,
+  BAND_REGION_LABEL_OPTIONS,
+} from "@/utils/bandLabels";
 
-const GENRE_OPTIONS = [
-  "인디",
-  "팝",
-  "팝록",
-  "재즈",
-  "블루스",
-  "얼터너티브록",
-  "사이키델릭록",
-  "일렉트로닉록",
-  "포크록",
-  "펑크록",
-  "하드록",
-  "메탈",
-  "etc.",
-];
-
-const REGION_OPTIONS = [
-  "서울",
-  "경기",
-  "인천",
-  "부산",
-  "대구",
-  "광주",
-  "대전",
-  "울산",
-  "세종",
-  "충남",
-  "충북",
-  "전남",
-  "전북",
-  "경남",
-  "경북",
-  "강원",
-  "제주",
-];
+const GENRE_OPTIONS = BAND_GENRE_LABEL_OPTIONS;
+const REGION_OPTIONS = BAND_REGION_LABEL_OPTIONS;
 
 const PART_OPTIONS = ["보컬", "기타", "베이스", "드럼", "키보드"];
+
+const PART_LABEL_TO_ENUM: Record<string, BandMemberProfilePart> = {
+  보컬: "VOCAL",
+  기타: "GUITAR",
+  베이스: "BASS",
+  드럼: "DRUM",
+  키보드: "KEYBOARD",
+};
+
+const getApiErrorMessage = (error: unknown, fallbackMessage: string) => {
+  const axiosError = error as AxiosError<BandApiResponse<null>>;
+
+  return axiosError.response?.data?.message ?? fallbackMessage;
+};
 
 interface ChipGroupProps {
   options: string[];
@@ -84,7 +77,6 @@ const ProfileFormPage = ({ mode }: ProfileFormPageProps) => {
   const navigate = useNavigate();
   const profile = useBandProfileStore((state) => state.profile);
   const setProfile = useBandProfileStore((state) => state.setProfile);
-  const addBand = useBandProfileStore((state) => state.addBand);
 
   const members = useBandMembersStore((state) => state.members);
   const updateSelfMember = useBandMembersStore(
@@ -92,13 +84,19 @@ const ProfileFormPage = ({ mode }: ProfileFormPageProps) => {
   );
   const selfMember = members.find((member) => member.isSelf);
 
+  const createBandMemberProfile = useCreateBandMemberProfile();
+  const createBand = useCreateBand();
+
   const galleryInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
   const [avatarUrl, setAvatarUrl] = useState(
     isEditMode ? profile.avatarUrl : "",
   );
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [isImageMenuOpen, setIsImageMenuOpen] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   const [name, setName] = useState(isEditMode ? profile.name : "");
   const [genre, setGenre] = useState(isEditMode ? profile.genre : "");
@@ -107,18 +105,29 @@ const ProfileFormPage = ({ mode }: ProfileFormPageProps) => {
   );
   const [bio, setBio] = useState(isEditMode ? profile.bio : "");
 
-  const [myActivityName, setMyActivityName] = useState(selfMember?.name ?? "");
+  const [myActivityName, setMyActivityName] = useState(
+    isEditMode ? (selfMember?.name ?? "") : "",
+  );
   const [myPart, setMyPart] = useState(
-    selfMember?.roleLabel.split(" · ")[1] ?? "",
+    isEditMode ? (selfMember?.roleLabel.split(" · ")[1] ?? "") : "",
   );
 
-  const isValid = Boolean(name.trim() && genre && region);
+  const isValid = isEditMode
+    ? Boolean(name.trim() && genre && region)
+    : Boolean(
+        name.trim() && genre && region && myActivityName.trim() && myPart,
+      );
+
+  const isSubmitting =
+    createBandMemberProfile.isPending || createBand.isPending || isUploading;
+  const submitError = createBandMemberProfile.error ?? createBand.error;
 
   const handleFileSelected = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
 
+    setAvatarFile(file);
     setAvatarUrl((prev) => {
       if (prev) URL.revokeObjectURL(prev);
       return URL.createObjectURL(file);
@@ -127,30 +136,63 @@ const ProfileFormPage = ({ mode }: ProfileFormPageProps) => {
 
   const handleDeleteImage = () => {
     setIsImageMenuOpen(false);
+    setAvatarFile(null);
     setAvatarUrl((prev) => {
       if (prev) URL.revokeObjectURL(prev);
       return "";
     });
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!isValid) return;
-    const profileData = { name, genre, regions: [region], bio, avatarUrl };
 
     if (isEditMode) {
-      setProfile(profileData);
+      setProfile({ name, genre, regions: [region], bio, avatarUrl });
       if (myActivityName.trim() && myPart) {
         updateSelfMember({ name: myActivityName.trim(), part: myPart });
       }
-    } else {
-      addBand(profileData);
+      navigate("/band/home");
+      return;
     }
 
-    navigate("/band/home");
+    setUploadError(null);
+    let uploadedAvatarUrl = avatarUrl;
+
+    if (avatarFile) {
+      try {
+        setIsUploading(true);
+        uploadedAvatarUrl = await uploadMediaFile(avatarFile, "BAND_PROFILE");
+      } catch {
+        setIsUploading(false);
+        setUploadError("이미지 업로드에 실패했어요. 다시 시도해주세요");
+        return;
+      }
+      setIsUploading(false);
+    }
+
+    try {
+      const ownerProfile = await createBandMemberProfile.mutateAsync({
+        nickname: myActivityName.trim(),
+        part: PART_LABEL_TO_ENUM[myPart],
+      });
+
+      await createBand.mutateAsync({
+        name,
+        genre: BAND_GENRE_BY_LABEL[genre],
+        region: BAND_REGION_BY_LABEL[region],
+        bandMemberProfileId: ownerProfile.id,
+        profileImageUrl: uploadedAvatarUrl || undefined,
+        description: bio || undefined,
+      });
+
+      navigate("/band/home");
+    } catch {
+      // 에러는 submitError로 화면에 표시됨
+    }
   };
 
   return (
-    <main className="relative min-h-dvh bg-neutral-0">
+    <main className="relative min-h-dvh bg-neutral-0 pb-24">
       <Header title={isEditMode ? "밴드 프로필 관리" : "프로필 생성"} />
 
       {isEditMode ? (
@@ -253,52 +295,74 @@ const ProfileFormPage = ({ mode }: ProfileFormPageProps) => {
         </div>
       </section>
 
-      {isEditMode ? (
-        <>
-          <div className="my-4 h-4 bg-secondary-0" />
+      <div className="my-4 h-4 bg-secondary-0" />
 
-          <section className="flex flex-col gap-4 px-8">
-            <div className="flex flex-col gap-1">
-              <h2 className="text-body6 text-neutral-900">내 프로필 수정</h2>
-              <p className="text-caption2 text-neutral-600">
-                이 밴드에서 표시되는 내 활동명과 파트를 수정합니다
-              </p>
-            </div>
+      <section className="flex flex-col gap-4 px-8">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-body6 text-neutral-900">
+            {isEditMode ? "내 프로필 수정" : "내 프로필"}
+          </h2>
+          <p className="text-caption2 text-neutral-600">
+            {isEditMode
+              ? "이 밴드에서 표시되는 내 활동명과 파트를 수정합니다"
+              : "이 밴드에서 표시될 내 활동명과 파트를 입력해주세요"}
+          </p>
+        </div>
 
-            <div className="flex flex-col gap-2">
-              <label className="text-body1 text-neutral-900">활동명</label>
-              <Input
-                value={myActivityName}
-                onChange={(event) => setMyActivityName(event.target.value)}
-                placeholder="활동명을 입력해주세요"
-                className="w-full rounded-[5px] py-1.25 pl-4"
-              />
-            </div>
+        <div className="flex flex-col gap-2">
+          <label className="text-body1 text-neutral-900">
+            활동명 <span className="text-body1 text-error">*</span>
+          </label>
+          <Input
+            value={myActivityName}
+            onChange={(event) => setMyActivityName(event.target.value)}
+            placeholder="활동명을 입력해주세요"
+            className="w-full rounded-[5px] py-1.25 pl-4"
+          />
+        </div>
 
-            <div className="flex flex-col gap-2">
-              <label className="text-body1 text-neutral-900">파트</label>
-              <Select
-                value={myPart}
-                onChange={setMyPart}
-                options={PART_OPTIONS}
-                placeholder="파트를 선택해주세요"
-              />
-            </div>
-          </section>
-        </>
-      ) : null}
+        <div className="flex flex-col gap-2">
+          <label className="text-body1 text-neutral-900">
+            파트 <span className="text-body1 text-error">*</span>
+          </label>
+          <Select
+            value={myPart}
+            onChange={setMyPart}
+            options={PART_OPTIONS}
+            placeholder="파트를 선택해주세요"
+          />
+        </div>
+      </section>
 
-      <div className="px-5 py-8">
+      <div className="flex flex-col gap-2 px-5 py-8">
+        {uploadError ? (
+          <span className="text-center text-body5 text-error">
+            {uploadError}
+          </span>
+        ) : submitError ? (
+          <span className="text-center text-body5 text-error">
+            {getApiErrorMessage(
+              submitError,
+              "저장에 실패했어요. 다시 시도해주세요",
+            )}
+          </span>
+        ) : null}
+
         <button
           type="button"
           onClick={handleSubmit}
+          disabled={isSubmitting}
           className={`flex h-13 w-full items-center justify-center gap-2.5 rounded-xl text-label1 ${
-            isValid
+            isValid && !isSubmitting
               ? "bg-secondary-500 text-neutral-0"
               : "bg-neutral-300 text-neutral-600"
           }`}
         >
-          {isEditMode ? "밴드 프로필 저장" : "프로필 생성"}
+          {isUploading
+            ? "업로드 중..."
+            : isEditMode
+              ? "밴드 프로필 저장"
+              : "프로필 생성"}
         </button>
       </div>
     </main>

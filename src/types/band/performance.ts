@@ -29,7 +29,7 @@ export interface CreatePerformanceRequest {
   region: BandRegion;
   venue: string;
   description: string;
-  ticketPrice: string;
+  ticketPrice: number;
   ticketLink?: string;
   posterImageUrl?: string;
   genre: PerformanceGenre;
