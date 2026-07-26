@@ -53,6 +53,7 @@ import PostingManagementPage from "@/pages/band/my/PostingManagementPage";
 import MyPage from "@/pages/band/my/MyPage";
 import RecruitAlertSettingsPage from "@/pages/band/my/RecruitAlertSettingsPage";
 import LiveAlertSettingsPage from "@/pages/band/my/LiveAlertSettingsPage";
+import ApplicationDetailPage from "@/pages/band/my/ApplicationDetailPage";
 
 export const router = createBrowserRouter([
   {
@@ -166,6 +167,10 @@ export const router = createBrowserRouter([
       {
         path: "/band/my/live-alert",
         element: <LiveAlertSettingsPage />,
+      },
+      {
+        path: "/band/my/applications/:applySubmissionId",
+        element: <ApplicationDetailPage />,
       },
       {
         path: "/band/profile/edit",
