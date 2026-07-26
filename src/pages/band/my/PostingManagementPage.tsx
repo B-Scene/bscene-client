@@ -1,5 +1,4 @@
 import { useMemo, useState } from "react";
-import type { AxiosError } from "axios";
 import { useQueryClient } from "@tanstack/react-query";
 import { Header } from "@/components/band/home/Header";
 import { NotificationBandBanner } from "@/components/band/my/NotificationBandBanner";
@@ -13,8 +12,8 @@ import {
 import { useDeleteSessionRecruitment } from "@/hooks/api/session/useSessionRecruitment";
 import { useInfiniteScrollObserver } from "@/hooks/useInfiniteScrollObserver";
 import { formatDDayLabel } from "@/utils/getDDay";
+import { getApiErrorMessage } from "@/utils/getApiErrorMessage";
 import { SessionRecruitmentFormScreen } from "@/pages/band/session/components/SessionRecruitmentFormScreen";
-import type { SessionApiResponse } from "@/types/session/sessionRecruitment";
 
 const PostingManagementPage = () => {
   const queryClient = useQueryClient();
@@ -53,11 +52,11 @@ const PostingManagementPage = () => {
       queryClient.invalidateQueries({ queryKey: postingManagementKeys.all });
       setDeleteTargetId(null);
     } catch (error) {
-      const apiMessage = (error as AxiosError<SessionApiResponse<null>>)
-        .response?.data?.message;
-
       setDeleteErrorMessage(
-        apiMessage ?? "모집 공고 삭제에 실패했어요. 잠시 후 다시 시도해주세요.",
+        getApiErrorMessage(
+          error,
+          "모집 공고 삭제에 실패했어요. 잠시 후 다시 시도해주세요.",
+        ),
       );
     }
   };

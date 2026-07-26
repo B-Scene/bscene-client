@@ -4,7 +4,10 @@ import SwapIcon from "@/assets/icons/swap.svg";
 import DefaultBandAvatar from "@/assets/icons/band/band-default-profile.svg";
 import { HomeHeader } from "@/components/common/Header/HomeHeader";
 import { NotificationBellIcon } from "@/components/common/Header/NotificationBellIcon";
-import { useActiveBandId } from "@/hooks/api/user/useMyProfiles";
+import {
+  useActiveBandId,
+  useMyProfilesQuery,
+} from "@/hooks/api/user/useMyProfiles";
 import { useBandQuery } from "@/hooks/api/band/useBand";
 import {
   useDeletePerformance,
@@ -60,7 +63,11 @@ const getPerformanceCardProps = (performance: PerformanceListItem) => {
 const BandHomePage = () => {
   const navigate = useNavigate();
   const activeBandId = useActiveBandId();
+  const bandProfilesQuery = useMyProfilesQuery({ type: "band" });
+  const isBandStatusLoading = bandProfilesQuery.isLoading;
+  const isBandStatusError = bandProfilesQuery.isError;
   const hasBand = activeBandId !== null;
+  const showNoBandState = !hasBand && !isBandStatusLoading && !isBandStatusError;
   const bandId = activeBandId ?? NaN;
 
   const { data: band } = useBandQuery(bandId);
@@ -91,7 +98,7 @@ const BandHomePage = () => {
   const [isModeSwitchOpen, setIsModeSwitchOpen] = useState(false);
 
   const subtitle = band
-    ? `${BAND_GENRE_LABELS[band.genre]} · ${BAND_REGION_LABELS[band.region]} · 멤버 ${band.memberCount}명`
+    ? `${BAND_GENRE_LABELS[band.genre] ?? band.genre} · ${BAND_REGION_LABELS[band.region] ?? band.region} · 멤버 ${band.memberCount}명`
     : "";
   const goToCreateBand = () => navigate("/band/profile/new");
 
@@ -131,7 +138,7 @@ const BandHomePage = () => {
           />
         ) : null}
 
-        {!hasBand ? (
+        {showNoBandState ? (
           <div className="flex items-center gap-3">
             <img
               src={DefaultBandAvatar}
@@ -149,6 +156,12 @@ const BandHomePage = () => {
               </p>
             </div>
           </div>
+        ) : null}
+
+        {isBandStatusError ? (
+          <p className="text-caption1 text-neutral-500">
+            밴드 정보를 불러오지 못했어요
+          </p>
         ) : null}
 
         <div className="mt-4">
@@ -199,7 +212,7 @@ const BandHomePage = () => {
           />
 
           <div className="flex flex-1 flex-col">
-            {!hasBand ? (
+            {showNoBandState ? (
               <EmptyState
                 title="등록된 밴드가 없어요"
                 description={
@@ -290,6 +303,8 @@ const BandHomePage = () => {
                       location={performance.venue}
                       dateTime={cardProps.dateTime}
                       status="등록 완료"
+                      showThumbnail={Boolean(performance.posterImageUrl)}
+                      thumbnailSrc={performance.posterImageUrl ?? undefined}
                       actions={
                         <>
                           <button

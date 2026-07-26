@@ -5,7 +5,6 @@ import {
   type KeyboardEvent,
   type ReactNode,
 } from "react";
-import type { AxiosError } from "axios";
 import { useNavigate, useParams } from "react-router-dom";
 import { Header } from "@/components/band/home/Header";
 import { DatePickerSheet } from "@/components/band/home/DatePickerSheet";
@@ -21,10 +20,8 @@ import {
   useUpdatePerformance,
 } from "@/hooks/api/band/usePerformance";
 import { uploadMediaFile } from "@/utils/uploadMediaFile";
-import type {
-  BandApiResponse,
-  PerformanceResponse,
-} from "@/types/band/performance";
+import { getApiErrorMessage } from "@/utils/getApiErrorMessage";
+import type { PerformanceResponse } from "@/types/band/performance";
 import {
   BAND_REGION_BY_LABEL,
   BAND_REGION_LABELS,
@@ -35,6 +32,7 @@ import {
   PERFORMANCE_GENRE_BY_LABEL,
   PERFORMANCE_GENRE_LABELS,
   PERFORMANCE_GENRE_LABEL_OPTIONS,
+  PERFORMANCE_REGION_BY_BAND_REGION,
 } from "@/utils/bandLabels";
 import CalendarIcon from "@/assets/icons/band/data-range.svg";
 import ClockIcon from "@/assets/icons/band/clock-band.svg";
@@ -47,12 +45,6 @@ import CheckCircleYellowIcon from "@/assets/icons/band/check-circle-yellow.svg";
 
 const DESCRIPTION_MAX_LENGTH = 500;
 const MAX_TAGS = 8;
-
-const getApiErrorMessage = (error: unknown, fallbackMessage: string) => {
-  const axiosError = error as AxiosError<BandApiResponse<null>>;
-
-  return axiosError.response?.data?.message ?? fallbackMessage;
-};
 
 const formatDateRange = (start: string, end: string) => {
   if (!start) return "";
@@ -142,7 +134,7 @@ const ConcertRegisterPage = () => {
   const { data: existingPerformance, isLoading } =
     usePerformanceQuery(performanceId);
 
-  if (isEditMode && isLoading) {
+  if (activeBandId === null || (isEditMode && isLoading)) {
     return <main className="min-h-dvh bg-secondary-0" />;
   }
 
@@ -292,6 +284,17 @@ const ConcertRegisterForm = ({
 
     const regionValue = BAND_REGION_BY_LABEL[region];
     const ageRatingValue = PERFORMANCE_AGE_RATING_BY_LABEL[ageRating];
+    const genreValue = PERFORMANCE_GENRE_BY_LABEL[genre];
+
+    if (!regionValue || !ageRatingValue || !genreValue) {
+      setUploadError("장르, 지역, 관람 연령을 다시 선택해주세요");
+      return;
+    }
+
+    const performanceRegionValue = PERFORMANCE_REGION_BY_BAND_REGION[regionValue];
+    const ticketPriceValue = String(
+      Number(price.replace(/[^0-9]/g, "")) || 0,
+    );
 
     setUploadError(null);
     let uploadedPosterUrl = posterUrl;
@@ -333,12 +336,13 @@ const ConcertRegisterForm = ({
       updatePerformance.mutate(
         {
           title,
+          genre: genreValue,
           performanceDate: startDate,
           startTime: time,
-          region: regionValue,
+          region: performanceRegionValue,
           venue: location,
           description,
-          ticketPrice: Number(price.replace(/[^0-9]/g, "")) || 0,
+          ticketPrice: ticketPriceValue,
           ticketLink: ticketLink.trim() || undefined,
           posterImageUrl: uploadedPosterUrl || undefined,
           ageRating: ageRatingValue,
@@ -352,13 +356,13 @@ const ConcertRegisterForm = ({
     createPerformance.mutate(
       {
         title,
-        genre: PERFORMANCE_GENRE_BY_LABEL[genre],
+        genre: genreValue,
         performanceDate: startDate,
         startTime: time,
-        region: regionValue,
+        region: performanceRegionValue,
         venue: location,
         description,
-        ticketPrice: Number(price.replace(/[^0-9]/g, "")) || 0,
+        ticketPrice: ticketPriceValue,
         ticketLink: ticketLink.trim() || undefined,
         posterImageUrl: uploadedPosterUrl || undefined,
         ageRating: ageRatingValue,

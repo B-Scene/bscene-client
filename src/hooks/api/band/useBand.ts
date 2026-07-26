@@ -49,6 +49,7 @@ export const useUpdateBand = (bandId: number) => {
     mutationFn: (body: UpdateBandRequest) => updateBand(bandId, body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: bandKeys.detail(bandId) });
+      queryClient.invalidateQueries({ queryKey: myProfilesKeys.all });
     },
   });
 };
