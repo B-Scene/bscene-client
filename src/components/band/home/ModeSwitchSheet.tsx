@@ -102,6 +102,7 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
 
   const storedFanAccount = getFanAccountDisplay();
   const fanProfile = myProfiles?.fanProfile ?? null;
+  const hasFanProfile = Boolean(fanProfile);
   const fanAccount = {
     id: fanProfile ? `fan-${fanProfile.fanProfileId}` : storedFanAccount.id,
     profileId: fanProfile?.fanProfileId ?? null,
@@ -121,9 +122,10 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
 
   const isFanMode = location.pathname.startsWith("/fan");
   const activeBand = bandAccounts.find((band) => band.isActive);
-  const initialSelectedId = isFanMode
-    ? fanAccount.id
-    : (activeBand?.id ?? bandAccounts[0]?.id ?? fanAccount.id);
+  const initialSelectedId =
+    isFanMode && hasFanProfile
+      ? fanAccount.id
+      : (activeBand?.id ?? bandAccounts[0]?.id ?? fanAccount.id);
   const [selectedId, setSelectedId] = useState(initialSelectedId);
   const { rendered, isVisible, handleTransitionEnd } = useSlideUpSheet(
     open,
@@ -155,14 +157,20 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
       <span className="text-label2 text-primary-400">팬 모드</span>
 
       <div className="flex w-full flex-col gap-3">
-        <AccountRow
-          avatar={fanAccount.avatar}
-          name={fanAccount.nickname}
-          subtitle={fanAccount.email}
-          selected={selectedId === fanAccount.id}
-          selectedTone="fan"
-          onSelect={() => setSelectedId(fanAccount.id)}
-        />
+        {hasFanProfile ? (
+          <AccountRow
+            avatar={fanAccount.avatar}
+            name={fanAccount.nickname}
+            subtitle={fanAccount.email}
+            selected={selectedId === fanAccount.id}
+            selectedTone="fan"
+            onSelect={() => setSelectedId(fanAccount.id)}
+          />
+        ) : (
+          <div className="flex w-full items-center justify-center rounded-lg bg-neutral-100 py-3 pr-3.75 pl-3 text-caption2 text-neutral-500">
+            아직 팬 프로필이 없어요
+          </div>
+        )}
       </div>
     </div>
   );
