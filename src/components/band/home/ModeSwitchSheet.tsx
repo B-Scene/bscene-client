@@ -132,6 +132,7 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
   const { rendered, isVisible, handleTransitionEnd } = useSlideUpSheet(
     open,
     () => setSelectedId(initialSelectedId),
+    () => setShowErrorToast(false),
   );
   const selectedMode = selectedId.startsWith("fan") ? "fan" : "band";
 
@@ -231,6 +232,7 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
               type="button"
               onClick={() => {
                 const proceed = () => {
+                  setShowErrorToast(false);
                   setMode(selectedMode);
                   if (selectedMode === "fan") {
                     onClose();
