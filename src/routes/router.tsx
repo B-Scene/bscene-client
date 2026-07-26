@@ -55,6 +55,7 @@ import RecruitAlertSettingsPage from "@/pages/band/my/RecruitAlertSettingsPage";
 import LiveAlertSettingsPage from "@/pages/band/my/LiveAlertSettingsPage";
 import SessionMailboxPage from "@/pages/band/session/components/SessionMailboxPage";
 import SessionChatPage from "@/pages/band/session/components/SessionChatPage";
+import ApplicationDetailPage from "@/pages/band/my/ApplicationDetailPage";
 
 export const router = createBrowserRouter([
   {
@@ -168,6 +169,10 @@ export const router = createBrowserRouter([
       {
         path: "/band/my/live-alert",
         element: <LiveAlertSettingsPage />,
+      },
+      {
+        path: "/band/my/applications/:applySubmissionId",
+        element: <ApplicationDetailPage />,
       },
       {
         path: "/band/profile/edit",

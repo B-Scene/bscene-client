@@ -1,26 +1,210 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ArrowLeftIcon from "@/assets/icons/arrow-left.svg";
 import ConcertCard from "@/components/common/Card/ConcertCard";
 import ConcertLikeButton from "@/components/fan/home/ConcertLikeButton";
-
-const INTEREST_CONCERTS = Array.from({ length: 7 }, (_, index) => ({
-  id: `interest-concert-${index + 1}`,
-  month: "MAY",
-  day: "17",
-  title: "WAVY 단독 공연",
-  location: "홍대 롤링홀",
-  dateTime: "2026.05.17. 18:00",
-  status: "D-7",
-  startsAt: `2026-05-${String(17 + index).padStart(2, "0")}T18:00:00`,
-  createdAt: `2026-04-${String(20 + index).padStart(2, "0")}T12:00:00`,
-  popularity: [78, 124, 63, 205, 91, 147, 110][index],
-  showThumbnail: index !== 1,
-}));
+import {
+  useFanHomeQuery,
+  useUpcomingPerformancesInfiniteQuery,
+} from "@/hooks/api/fan/useFanHome";
+import type {
+  FanHomeConcert,
+  FanHomeResponse,
+  UpcomingPerformanceSort,
+} from "@/types/fan/home";
 
 const SORT_OPTIONS = ["공연임박순", "최신순", "인기순"] as const;
+const MONTH_LABELS = [
+  "JAN",
+  "FEB",
+  "MAR",
+  "APR",
+  "MAY",
+  "JUN",
+  "JUL",
+  "AUG",
+  "SEP",
+  "OCT",
+  "NOV",
+  "DEC",
+];
 
 type SortOption = (typeof SORT_OPTIONS)[number];
+type ConcertListItem = {
+  id: string;
+  month: string;
+  day: string;
+  title: string;
+  location: string;
+  dateTime: string;
+  status: string;
+  thumbnailSrc?: string;
+  showThumbnail: boolean;
+};
+
+const SORT_TO_API: Record<SortOption, UpcomingPerformanceSort> = {
+  공연임박순: "IMMINENT",
+  최신순: "LATEST",
+  인기순: "POPULAR",
+};
+
+const firstList = <T,>(...lists: Array<T[] | undefined>) => {
+  return lists.find((list) => Array.isArray(list) && list.length > 0) ?? [];
+};
+
+const firstImageUrl = (...values: Array<string | null | undefined>) => {
+  return values.find((value): value is string => Boolean(value));
+};
+
+const firstMediaUrl = (
+  ...values: Array<string[] | string | null | undefined>
+) => {
+  for (const value of values) {
+    if (Array.isArray(value) && value.length > 0) return value[0];
+    if (typeof value === "string" && value) return value;
+  }
+
+  return undefined;
+};
+
+const getConcertThumbnailUrl = (concert: FanHomeConcert) => {
+  return (
+    firstImageUrl(
+      concert.posterImageUrl,
+      concert.posterUrl,
+      concert.posterImage,
+      concert.performancePosterUrl,
+      concert.performanceImageUrl,
+      concert.imageUrl,
+      concert.mainImageUrl,
+      concert.thumbnailUrl,
+      concert.thumbnailImageUrl,
+    ) ?? firstMediaUrl(concert.imageUrls)
+  );
+};
+
+const toDate = (value?: string | null) => {
+  if (!value) return null;
+
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const getConcertDate = (concert: FanHomeConcert) => {
+  const dateValue =
+    concert.startAt ??
+    concert.startedAt ??
+    concert.startDateTime ??
+    concert.performanceDate ??
+    concert.startDate;
+  const timeValue = concert.performanceTime ?? concert.startTime ?? concert.time;
+
+  if (dateValue && timeValue && !dateValue.includes("T")) {
+    return toDate(`${dateValue}T${timeValue}`);
+  }
+
+  return toDate(dateValue);
+};
+
+const formatDateTime = (date: Date | null) => {
+  if (!date) return "일정 미정";
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hour = String(date.getHours()).padStart(2, "0");
+  const minute = String(date.getMinutes()).padStart(2, "0");
+
+  return `${year}.${month}.${day}. ${hour}:${minute}`;
+};
+
+const getDday = (date: Date | null, status?: string | null) => {
+  if (!date) return status ?? "준비중";
+
+  const today = new Date();
+  const todayStart = new Date(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate(),
+  );
+  const dateStart = new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate(),
+  );
+  const diffDays = Math.ceil(
+    (dateStart.getTime() - todayStart.getTime()) / 86_400_000,
+  );
+
+  if (diffDays < 0) return "종료";
+  if (diffDays === 0) return "D-DAY";
+  return `D-${diffDays}`;
+};
+
+const getConcertTitle = (concert: FanHomeConcert) => {
+  return (
+    concert.performanceTitle ??
+    concert.performanceName ??
+    concert.concertTitle ??
+    concert.concertName ??
+    concert.showTitle ??
+    concert.showName ??
+    concert.name ??
+    concert.title ??
+    "공연명"
+  );
+};
+
+const getHomeRecommendedPerformances = (data?: FanHomeResponse) => {
+  return firstList(
+    data?.performances,
+    data?.recommendedConcerts,
+    data?.recommendConcerts,
+    data?.popularConcerts,
+  );
+};
+
+const sortPerformances = (
+  performances: FanHomeConcert[],
+  selectedSort: SortOption,
+) => {
+  return [...performances].sort((a, b) => {
+    if (selectedSort === "최신순") {
+      return (b.createdAt ?? "").localeCompare(a.createdAt ?? "");
+    }
+
+    if (selectedSort === "인기순") {
+      return (b.popularity ?? 0) - (a.popularity ?? 0);
+    }
+
+    const aDate = getConcertDate(a)?.getTime() ?? Number.MAX_SAFE_INTEGER;
+    const bDate = getConcertDate(b)?.getTime() ?? Number.MAX_SAFE_INTEGER;
+
+    return aDate - bDate;
+  });
+};
+
+const mapPerformanceToConcert = (
+  concert: FanHomeConcert,
+  index: number,
+): ConcertListItem => {
+  const date = getConcertDate(concert);
+  const thumbnailSrc = getConcertThumbnailUrl(concert);
+
+  return {
+    id: String(
+      concert.performanceId ?? concert.concertId ?? concert.id ?? `concert-${index}`,
+    ),
+    month: date ? MONTH_LABELS[date.getMonth()] : "TBD",
+    day: date ? String(date.getDate()).padStart(2, "0") : "--",
+    title: getConcertTitle(concert),
+    location: concert.location ?? concert.venue ?? concert.place ?? "공연 장소 미정",
+    dateTime: formatDateTime(date),
+    status: concert.status ?? getDday(date, concert.status),
+    thumbnailSrc,
+    showThumbnail: Boolean(thumbnailSrc),
+  };
+};
 
 const CalendarIcon = () => (
   <svg
@@ -78,31 +262,76 @@ const CheckIcon = () => (
 
 const FollowedConcertsPage = () => {
   const navigate = useNavigate();
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const [selectedSort, setSelectedSort] = useState<SortOption>("공연임박순");
   const [hasSelectedSort, setHasSelectedSort] = useState(false);
   const [isSortSheetOpen, setIsSortSheetOpen] = useState(false);
+  const fanHomeQuery = useFanHomeQuery();
+  const upcomingPerformancesQuery = useUpcomingPerformancesInfiniteQuery(
+    SORT_TO_API[selectedSort],
+    10,
+  );
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isError,
+    isFetchingNextPage,
+    isLoading,
+    refetch,
+  } = upcomingPerformancesQuery;
+  const isRecommendedFallback = fanHomeQuery.data?.hasFollowingBands === false;
   const sortButtonClassName = `flex shrink-0 flex-col items-center gap-2.5 rounded-full border px-[10px] py-1 font-body text-caption3 ${
     hasSelectedSort
       ? "border-primary-400 bg-primary-0 text-primary-400"
       : "border-neutral-400 bg-neutral-0 text-neutral-600"
   }`;
-  const sortedConcerts = useMemo(() => {
-    return [...INTEREST_CONCERTS].sort((a, b) => {
-      if (selectedSort === "최신순") {
-        return b.createdAt.localeCompare(a.createdAt);
-      }
+  const handleSortSelect = (option: SortOption) => {
+    setSelectedSort(option);
+    setHasSelectedSort(true);
+  };
+  const concerts = useMemo(() => {
+    if (isRecommendedFallback) {
+      return sortPerformances(
+        getHomeRecommendedPerformances(fanHomeQuery.data),
+        selectedSort,
+      ).map(mapPerformanceToConcert);
+    }
 
-      if (selectedSort === "인기순") {
-        return b.popularity - a.popularity;
-      }
+    return (
+      data?.pages.flatMap((page) => page.items ?? []).map(mapPerformanceToConcert) ??
+      []
+    );
+  }, [data, fanHomeQuery.data, isRecommendedFallback, selectedSort]);
 
-      return a.startsAt.localeCompare(b.startsAt);
+  useEffect(() => {
+    if (isRecommendedFallback) return;
+
+    const target = loadMoreRef.current;
+    if (!target) return;
+
+    const observer = new IntersectionObserver((entries) => {
+      const [entry] = entries;
+
+      if (entry?.isIntersecting && hasNextPage && !isFetchingNextPage) {
+        void fetchNextPage();
+      }
     });
-  }, [selectedSort]);
+
+    observer.observe(target);
+
+    return () => observer.disconnect();
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage, isRecommendedFallback]);
+
+  const isPageLoading =
+    isRecommendedFallback
+      ? fanHomeQuery.isLoading
+      : isLoading || (fanHomeQuery.isLoading && concerts.length === 0);
+  const isPageError = isRecommendedFallback ? fanHomeQuery.isError : isError;
 
   return (
     <main className="min-h-dvh bg-neutral-0 px-[15px] pb-[calc(var(--bottom-nav-height)+24px)]">
-      <header className="-mx-5 flex h-[60px] items-center justify-between px-[15px]">
+      <header className="-mx-[15px] flex h-[60px] items-center justify-between px-[15px]">
         <button
           type="button"
           aria-label="뒤로가기"
@@ -140,7 +369,31 @@ const FollowedConcertsPage = () => {
       </div>
 
       <section className="mt-2 flex flex-col items-center gap-3">
-        {sortedConcerts.map((concert) => (
+        {isPageLoading ? (
+          <p className="m-0 w-full py-6 text-center font-body text-body3 text-neutral-600">
+            공연을 불러오는 중이에요
+          </p>
+        ) : null}
+
+        {isPageError ? (
+          <div className="w-full rounded-[12px] bg-neutral-50 px-4 py-6">
+            <p className="m-0 font-body text-body3 text-neutral-700">
+              공연을 불러오지 못했어요
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                void refetch();
+                void fanHomeQuery.refetch();
+              }}
+              className="mt-3 rounded-[8px] bg-primary-400 px-4 py-2 font-body text-caption3 text-neutral-0"
+            >
+              다시 시도
+            </button>
+          </div>
+        ) : null}
+
+        {concerts.map((concert) => (
           <ConcertCard
             key={concert.id}
             month={concert.month}
@@ -151,6 +404,7 @@ const FollowedConcertsPage = () => {
             status={<span className="text-primary-500">{concert.status}</span>}
             dateBadgeClassName="bg-primary-300"
             isPending={concert.status === "준비중"}
+            thumbnailSrc={concert.thumbnailSrc}
             showThumbnail={concert.showThumbnail}
             actions={
               <ConcertLikeButton
@@ -162,10 +416,20 @@ const FollowedConcertsPage = () => {
             ariaLabel={`${concert.title} 상세보기`}
           />
         ))}
+
+        {!isRecommendedFallback ? (
+          <div ref={loadMoreRef} className="h-4 w-full" />
+        ) : null}
+
+        {isFetchingNextPage && !isRecommendedFallback ? (
+          <p className="m-0 text-center font-body text-caption2 text-neutral-600">
+            더 불러오는 중이에요
+          </p>
+        ) : null}
       </section>
 
       {isSortSheetOpen ? (
-        <div className="fixed inset-0 z-40 flex items-end bg-neutral-900/50">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-neutral-900/50">
           <button
             type="button"
             aria-label="정렬 옵션 닫기"
@@ -175,9 +439,9 @@ const FollowedConcertsPage = () => {
 
           <section
             aria-label="공연 정렬 옵션"
-            className="relative z-10 flex w-full flex-col items-start gap-2.5 rounded-t-[24px] bg-neutral-0 px-[30px] pb-12 pt-8"
+            className="relative z-10 flex w-full max-w-[393px] flex-col items-start gap-2.5 rounded-t-[24px] bg-neutral-0 px-[15px] pb-12 pt-8"
           >
-            <div className="flex w-[330px] flex-col items-start gap-6">
+            <div className="flex w-full flex-col items-start gap-6 px-[15px]">
               {SORT_OPTIONS.map((option) => {
                 const isSelected = option === selectedSort;
 
@@ -186,8 +450,7 @@ const FollowedConcertsPage = () => {
                     key={option}
                     type="button"
                     onClick={() => {
-                      setSelectedSort(option);
-                      setHasSelectedSort(true);
+                      handleSortSelect(option);
                       setIsSortSheetOpen(false);
                     }}
                     className={`flex w-full items-center justify-between text-left font-body text-label2 ${

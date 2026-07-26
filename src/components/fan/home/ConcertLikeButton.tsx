@@ -2,6 +2,11 @@ import type { KeyboardEvent, MouseEvent } from "react";
 import HeartIcon from "@/assets/icons/Heart.svg";
 import LikedHeartIcon from "@/assets/icons/Union.svg";
 import { useConcertLikeStore } from "@/stores/useConcertLikeStore";
+import {
+  useAddPerformanceInterest,
+  useDeletePerformanceInterest,
+} from "@/hooks/api/fan/useFanHome";
+import { isAlreadyInterestedPerformanceError } from "@/api/fan/home";
 
 type ConcertLikeButtonProps = {
   concertId: string;
@@ -17,13 +22,38 @@ const ConcertLikeButton = ({
   const isLiked = useConcertLikeStore(
     (state) => state.likedConcertIds[concertId] ?? false,
   );
-  const toggleConcertLike = useConcertLikeStore(
-    (state) => state.toggleConcertLike,
-  );
+  const setConcertLiked = useConcertLikeStore((state) => state.setConcertLiked);
+  const addPerformanceInterestMutation = useAddPerformanceInterest();
+  const deletePerformanceInterestMutation = useDeletePerformanceInterest();
 
-  const handleClick = (event: MouseEvent<HTMLButtonElement>) => {
+  const handleClick = async (event: MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
-    toggleConcertLike(concertId);
+
+    const performanceId = Number(concertId);
+
+    if (!Number.isFinite(performanceId) || performanceId <= 0) {
+      return;
+    }
+
+    if (isLiked) {
+      try {
+        await deletePerformanceInterestMutation.mutateAsync(performanceId);
+        setConcertLiked(concertId, false);
+      } catch {
+        return;
+      }
+      return;
+    }
+
+    try {
+      await addPerformanceInterestMutation.mutateAsync(performanceId);
+      setConcertLiked(concertId, true);
+    } catch (error) {
+      if (isAlreadyInterestedPerformanceError(error)) {
+        setConcertLiked(concertId, true);
+      }
+      return;
+    }
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
@@ -39,7 +69,11 @@ const ConcertLikeButton = ({
           : `${concertTitle} 관심 공연 등록`
       }
       aria-pressed={isLiked}
-      onClick={handleClick}
+      disabled={
+        addPerformanceInterestMutation.isPending ||
+        deletePerformanceInterestMutation.isPending
+      }
+      onClick={(event) => void handleClick(event)}
       onKeyDown={handleKeyDown}
       className={`flex size-6 items-center justify-center ${className}`}
     >

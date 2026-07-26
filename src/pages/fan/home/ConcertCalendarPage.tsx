@@ -1,10 +1,32 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ArrowLeftIcon from "@/assets/icons/arrow-left.svg";
 import ConcertCard from "@/components/common/Card/ConcertCard";
 import ConcertLikeButton from "@/components/fan/home/ConcertLikeButton";
+import {
+  usePerformanceCalendarQuery,
+  usePerformancesByDateInfiniteQuery,
+} from "@/hooks/api/fan/useFanHome";
+import type {
+  FanHomeConcert,
+  PerformanceCalendarDateItem,
+} from "@/types/fan/home";
 
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
+const MONTH_LABELS = [
+  "JAN",
+  "FEB",
+  "MAR",
+  "APR",
+  "MAY",
+  "JUN",
+  "JUL",
+  "AUG",
+  "SEP",
+  "OCT",
+  "NOV",
+  "DEC",
+];
 
 type CalendarDay = {
   date: Date;
@@ -18,117 +40,14 @@ type CalendarDay = {
 
 type CalendarPerformance = {
   id: string;
+  month: string;
+  day: string;
   title: string;
   location: string;
   dateTime: string;
   status: string;
-};
-
-const PERFORMANCES_BY_DATE: Record<string, CalendarPerformance[]> = {
-  "2026-05-02": [
-    {
-      id: "calendar-20260502-1",
-      title: "WAVY 단독 공연",
-      location: "홍대 롤링홀",
-      dateTime: "2026.05.02. 18:00",
-      status: "D-22",
-    },
-  ],
-  "2026-05-11": [
-    {
-      id: "calendar-20260511-1",
-      title: "WAVY 단독 공연",
-      location: "홍대 롤링홀",
-      dateTime: "2026.05.11. 18:00",
-      status: "D-13",
-    },
-  ],
-  "2026-05-17": Array.from({ length: 4 }, (_, index) => ({
-    id: `calendar-20260517-${index + 1}`,
-    title: "WAVY 단독 공연",
-    location: "홍대 롤링홀",
-    dateTime: "2026.05.17. 18:00",
-    status: "D-7",
-  })),
-  "2026-05-24": [
-    {
-      id: "calendar-20260524-1",
-      title: "WAVY 단독 공연",
-      location: "홍대 롤링홀",
-      dateTime: "2026.05.24. 18:00",
-      status: "D-DAY",
-    },
-  ],
-  "2026-06-03": [
-    {
-      id: "calendar-20260603-1",
-      title: "WAVY 단독 공연",
-      location: "홍대 롤링홀",
-      dateTime: "2026.06.03. 18:00",
-      status: "D-7",
-    },
-  ],
-  "2026-06-14": [
-    {
-      id: "calendar-20260614-1",
-      title: "WAVY 단독 공연",
-      location: "홍대 롤링홀",
-      dateTime: "2026.06.14. 18:00",
-      status: "D-7",
-    },
-  ],
-  "2026-06-19": Array.from({ length: 4 }, (_, index) => ({
-    id: `calendar-20260619-${index + 1}`,
-    title: "WAVY 단독 공연",
-    location: "홍대 롤링홀",
-    dateTime: "2026.05.17. 18:00",
-    status: "D-7",
-  })),
-  "2026-06-26": [
-    {
-      id: "calendar-20260626-1",
-      title: "WAVY 단독 공연",
-      location: "홍대 롤링홀",
-      dateTime: "2026.06.26. 18:00",
-      status: "D-7",
-    },
-  ],
-  "2026-07-05": [
-    {
-      id: "calendar-20260705-1",
-      title: "WAVY 단독 공연",
-      location: "홍대 롤링홀",
-      dateTime: "2026.07.05. 18:00",
-      status: "D-7",
-    },
-  ],
-  "2026-07-17": [
-    {
-      id: "calendar-20260717-1",
-      title: "WAVY 단독 공연",
-      location: "홍대 롤링홀",
-      dateTime: "2026.07.17. 18:00",
-      status: "D-7",
-    },
-  ],
-  "2026-07-22": [
-    {
-      id: "calendar-20260722-1",
-      title: "WAVY 단독 공연",
-      location: "홍대 롤링홀",
-      dateTime: "2026.07.22. 18:00",
-      status: "D-7",
-    },
-  ],
-  "2026-07-29": [
-    {
-      id: "calendar-20260729-1",
-      title: "WAVY 단독 공연",
-      location: "홍대 롤링홀",
-      dateTime: "2026.07.29. 18:00",
-      status: "D-7",
-    },
-  ],
+  thumbnailSrc?: string;
+  showThumbnail: boolean;
 };
 
 const formatDateKey = (date: Date) =>
@@ -136,15 +55,186 @@ const formatDateKey = (date: Date) =>
     date.getDate(),
   ).padStart(2, "0")}`;
 
+const normalizeDateKey = (value?: string | null) => {
+  if (!value) return null;
+
+  const datePart = value.split(/[T ]/)[0];
+  if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) return datePart;
+
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : formatDateKey(date);
+};
+
+const getCalendarDateKey = (item: PerformanceCalendarDateItem) => {
+  if (typeof item === "string") {
+    return normalizeDateKey(item);
+  }
+
+  const dateValue =
+    item.dateKey ??
+    item.date ??
+    item.performanceDate ??
+    item.startDate ??
+    item.startAt ??
+    item.startDateTime;
+
+  if (dateValue) {
+    return normalizeDateKey(dateValue);
+  }
+
+  if (
+    typeof item.year === "number" &&
+    typeof item.month === "number" &&
+    typeof item.day === "number"
+  ) {
+    return `${item.year}-${String(item.month).padStart(2, "0")}-${String(
+      item.day,
+    ).padStart(2, "0")}`;
+  }
+
+  return null;
+};
+
 const parseDateKey = (dateKey: string) => {
   const [year, month, day] = dateKey.split("-").map(Number);
 
   return new Date(year, month - 1, day);
 };
 
+const toDate = (value?: string | null) => {
+  if (!value) return null;
+
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const firstImageUrl = (...values: Array<string | null | undefined>) => {
+  return values.find((value): value is string => Boolean(value));
+};
+
+const firstMediaUrl = (
+  ...values: Array<string[] | string | null | undefined>
+) => {
+  for (const value of values) {
+    if (Array.isArray(value) && value.length > 0) return value[0];
+    if (typeof value === "string" && value) return value;
+  }
+
+  return undefined;
+};
+
+const getPerformanceThumbnailUrl = (performance: FanHomeConcert) => {
+  return (
+    firstImageUrl(
+      performance.posterImageUrl,
+      performance.posterUrl,
+      performance.posterImage,
+      performance.performancePosterUrl,
+      performance.performanceImageUrl,
+      performance.imageUrl,
+      performance.mainImageUrl,
+      performance.thumbnailUrl,
+      performance.thumbnailImageUrl,
+    ) ?? firstMediaUrl(performance.imageUrls)
+  );
+};
+
+const getPerformanceDate = (performance: FanHomeConcert) => {
+  const dateValue =
+    performance.startAt ??
+    performance.startedAt ??
+    performance.startDateTime ??
+    performance.performanceDate ??
+    performance.startDate;
+  const timeValue =
+    performance.performanceTime ?? performance.startTime ?? performance.time;
+
+  if (dateValue && timeValue && !dateValue.includes("T")) {
+    return toDate(`${dateValue}T${timeValue}`);
+  }
+
+  return toDate(dateValue);
+};
+
+const formatDateTime = (date: Date | null) => {
+  if (!date) return "일정 미정";
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hour = String(date.getHours()).padStart(2, "0");
+  const minute = String(date.getMinutes()).padStart(2, "0");
+
+  return `${year}.${month}.${day}. ${hour}:${minute}`;
+};
+
+const getDday = (date: Date | null, status?: string | null) => {
+  if (!date) return status ?? "준비중";
+
+  const today = new Date();
+  const todayStart = new Date(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate(),
+  );
+  const dateStart = new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate(),
+  );
+  const diffDays = Math.ceil(
+    (dateStart.getTime() - todayStart.getTime()) / 86_400_000,
+  );
+
+  if (diffDays < 0) return "종료";
+  if (diffDays === 0) return "D-DAY";
+  return `D-${diffDays}`;
+};
+
+const getPerformanceTitle = (performance: FanHomeConcert) => {
+  return (
+    performance.performanceTitle ??
+    performance.performanceName ??
+    performance.concertTitle ??
+    performance.concertName ??
+    performance.showTitle ??
+    performance.showName ??
+    performance.name ??
+    performance.title ??
+    "공연명"
+  );
+};
+
+const mapPerformanceToCalendarItem = (
+  performance: FanHomeConcert,
+  index: number,
+): CalendarPerformance => {
+  const date = getPerformanceDate(performance);
+  const thumbnailSrc = getPerformanceThumbnailUrl(performance);
+
+  return {
+    id: String(
+      performance.performanceId ??
+        performance.concertId ??
+        performance.id ??
+        `calendar-performance-${index}`,
+    ),
+    month: date ? MONTH_LABELS[date.getMonth()] : "TBD",
+    day: date ? String(date.getDate()).padStart(2, "0") : "--",
+    title: getPerformanceTitle(performance),
+    location:
+      performance.location ?? performance.venue ?? performance.place ?? "공연 장소 미정",
+    dateTime: formatDateTime(date),
+    status: performance.status ?? getDday(date, performance.status),
+    thumbnailSrc,
+    showThumbnail: Boolean(thumbnailSrc),
+  };
+};
+
 const getCalendarDays = (
   displayedMonth: Date,
   selectedDateKey: string | null,
+  eventDateKeys: Set<string>,
 ): CalendarDay[] => {
   const year = displayedMonth.getFullYear();
   const month = displayedMonth.getMonth();
@@ -157,7 +247,7 @@ const getCalendarDays = (
     const date = new Date(year, month, index - startOffset + 1);
     const dateKey = formatDateKey(date);
     const muted = date.getMonth() !== month;
-    const hasEvent = (PERFORMANCES_BY_DATE[dateKey]?.length ?? 0) > 0;
+    const hasEvent = eventDateKeys.has(dateKey);
 
     return {
       date,
@@ -191,22 +281,93 @@ const ChevronIcon = ({ direction }: { direction: "left" | "right" }) => (
 
 const ConcertCalendarPage = () => {
   const navigate = useNavigate();
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null);
   const [displayedMonth, setDisplayedMonth] = useState(
-    () => new Date(2026, 5, 1),
+    () => {
+      const today = new Date();
+      return new Date(today.getFullYear(), today.getMonth(), 1);
+    },
+  );
+  const [hasMovedMonth, setHasMovedMonth] = useState(false);
+  const calendarParams = useMemo(
+    () =>
+      hasMovedMonth
+        ? {
+            year: displayedMonth.getFullYear(),
+            month: displayedMonth.getMonth() + 1,
+          }
+        : {},
+    [displayedMonth, hasMovedMonth],
+  );
+  const calendarQuery = usePerformanceCalendarQuery(calendarParams);
+  const performancesByDateQuery = usePerformancesByDateInfiniteQuery(
+    selectedDateKey
+      ? {
+          date: selectedDateKey,
+        }
+      : {},
+    10,
+  );
+  const {
+    data: performancesByDate,
+    fetchNextPage,
+    hasNextPage,
+    isError: isPerformancesByDateError,
+    isFetchingNextPage,
+    isLoading: isPerformancesByDateLoading,
+    refetch: refetchPerformancesByDate,
+  } = performancesByDateQuery;
+  const eventDateKeys = useMemo(
+    () =>
+      new Set(
+        (calendarQuery.data?.items ?? [])
+          .map(getCalendarDateKey)
+          .filter((dateKey): dateKey is string => Boolean(dateKey)),
+      ),
+    [calendarQuery.data],
   );
   const calendarDays = useMemo(
-    () => getCalendarDays(displayedMonth, selectedDateKey),
-    [displayedMonth, selectedDateKey],
+    () => getCalendarDays(displayedMonth, selectedDateKey, eventDateKeys),
+    [displayedMonth, eventDateKeys, selectedDateKey],
   );
-  const selectedEvents = selectedDateKey
-    ? (PERFORMANCES_BY_DATE[selectedDateKey] ?? [])
-    : [];
-  const monthLabel = `${displayedMonth.getFullYear()}.${String(
+  const monthLabel = `${displayedMonth.getFullYear()}년 ${String(
     displayedMonth.getMonth() + 1,
-  ).padStart(2, "0")}`;
+  ).padStart(2, "0")}월`;
+  const selectedEvents = useMemo(() => {
+    return (
+      performancesByDate?.pages
+        .flatMap((page) => page.items ?? [])
+        .map(mapPerformanceToCalendarItem) ?? []
+    );
+  }, [performancesByDate]);
+  const selectedEventsTotal =
+    performancesByDate?.pages[0]?.totalCount ??
+    performancesByDate?.pages[0]?.totalElements ??
+    performancesByDate?.pages[0]?.total ??
+    selectedEvents.length;
+
+  useEffect(() => {
+    if (!selectedDateKey) return;
+
+    const target = loadMoreRef.current;
+    if (!target) return;
+
+    const observer = new IntersectionObserver((entries) => {
+      const [entry] = entries;
+
+      if (entry?.isIntersecting && hasNextPage && !isFetchingNextPage) {
+        void fetchNextPage();
+      }
+    });
+
+    observer.observe(target);
+
+    return () => observer.disconnect();
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage, selectedDateKey]);
 
   const moveMonth = (amount: number) => {
+    setHasMovedMonth(true);
     setDisplayedMonth(
       (current) => new Date(current.getFullYear(), current.getMonth() + amount, 1),
     );
@@ -243,8 +404,8 @@ const ConcertCalendarPage = () => {
         <span aria-hidden="true" className="size-6" />
       </header>
 
-      <section className="mt-6">
-        <div className="flex items-center justify-between px-6">
+      <section className="mt-6 mx-[16px]">
+        <div className="flex items-center justify-between">
           <button
             type="button"
             aria-label="이전 달"
@@ -307,6 +468,27 @@ const ConcertCalendarPage = () => {
             </div>
           ))}
         </div>
+
+        {calendarQuery.isLoading ? (
+          <p className="m-0 mt-8 text-center font-body text-body3 text-neutral-600">
+            공연 일정을 불러오는 중이에요
+          </p>
+        ) : null}
+
+        {calendarQuery.isError ? (
+          <div className="mt-8 rounded-[12px] bg-neutral-50 px-4 py-6 text-center">
+            <p className="m-0 font-body text-body3 text-neutral-700">
+              공연 일정을 불러오지 못했어요
+            </p>
+            <button
+              type="button"
+              onClick={() => void calendarQuery.refetch()}
+              className="mt-3 rounded-[8px] bg-primary-400 px-4 py-2 font-body text-caption3 text-neutral-0"
+            >
+              다시 시도
+            </button>
+          </div>
+        ) : null}
       </section>
 
       {selectedDateKey ? (
@@ -314,11 +496,11 @@ const ConcertCalendarPage = () => {
           <button
             type="button"
             aria-label="일정 목록 닫기"
-            className="fixed inset-0 z-20 cursor-default bg-transparent"
+            className="fixed inset-0 z-40 cursor-default bg-transparent"
             onClick={() => setSelectedDateKey(null)}
           />
 
-          <section className="fixed inset-x-0 bottom-0 z-30 h-[488px] rounded-t-[24px] bg-neutral-0 px-[22.5px] pt-3 shadow-[0_-5px_10px_0_rgba(0,0,0,0.10)]">
+          <section className="fixed inset-x-0 bottom-0 z-50 h-[488px] overflow-y-auto rounded-t-[24px] bg-neutral-0 px-[22.5px] pt-3 pb-8 shadow-[0_-5px_10px_0_rgba(0,0,0,0.10)]">
             <div className="mx-auto h-1 w-11 rounded-full bg-neutral-300" />
 
             <header className="mt-6 flex items-center justify-between">
@@ -326,21 +508,55 @@ const ConcertCalendarPage = () => {
                 {selectedDateLabel}
               </h2>
               <span className="font-body text-caption3 text-neutral-600">
-                총 {selectedEvents.length}개
+                총 {selectedEventsTotal}개
               </span>
             </header>
 
             <div className="mt-4 flex flex-col gap-3">
+              {isPerformancesByDateLoading ? (
+                <p className="m-0 py-6 text-center font-body text-body3 text-neutral-600">
+                  공연을 불러오는 중이에요
+                </p>
+              ) : null}
+
+              {isPerformancesByDateError ? (
+                <div className="rounded-[12px] bg-neutral-50 px-4 py-6">
+                  <p className="m-0 font-body text-body3 text-neutral-700">
+                    공연을 불러오지 못했어요
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => void refetchPerformancesByDate()}
+                    className="mt-3 rounded-[8px] bg-primary-400 px-4 py-2 font-body text-caption3 text-neutral-0"
+                  >
+                    다시 시도
+                  </button>
+                </div>
+              ) : null}
+
+              {!isPerformancesByDateLoading &&
+              !isPerformancesByDateError &&
+              selectedEvents.length === 0 ? (
+                <p className="m-0 py-6 text-center font-body text-body3 text-neutral-600">
+                  선택한 날짜의 공연이 없어요
+                </p>
+              ) : null}
+
               {selectedEvents.map((event) => (
                 <ConcertCard
                   key={event.id}
+                  month={event.month}
+                  day={event.day}
                   title={event.title}
                   location={event.location}
                   dateTime={event.dateTime}
                   status={
                     <span className="text-primary-500">{event.status}</span>
                   }
-                  showThumbnail
+                  dateBadgeClassName="bg-primary-300"
+                  isPending={event.status === "준비중"}
+                  thumbnailSrc={event.thumbnailSrc}
+                  showThumbnail={event.showThumbnail}
                   actions={
                     <ConcertLikeButton
                       concertId={event.id}
@@ -351,6 +567,14 @@ const ConcertCalendarPage = () => {
                   ariaLabel={`${event.title} 상세보기`}
                 />
               ))}
+
+              <div ref={loadMoreRef} className="h-4 w-full" />
+
+              {isFetchingNextPage ? (
+                <p className="m-0 text-center font-body text-caption2 text-neutral-600">
+                  더 불러오는 중이에요
+                </p>
+              ) : null}
             </div>
           </section>
         </>
