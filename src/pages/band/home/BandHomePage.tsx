@@ -98,7 +98,7 @@ const BandHomePage = () => {
   const [isModeSwitchOpen, setIsModeSwitchOpen] = useState(false);
 
   const subtitle = band
-    ? `${BAND_GENRE_LABELS[band.genre]} · ${BAND_REGION_LABELS[band.region]} · 멤버 ${band.memberCount}명`
+    ? `${BAND_GENRE_LABELS[band.genre] ?? band.genre} · ${BAND_REGION_LABELS[band.region] ?? band.region} · 멤버 ${band.memberCount}명`
     : "";
   const goToCreateBand = () => navigate("/band/profile/new");
 
