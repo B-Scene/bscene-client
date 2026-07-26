@@ -118,7 +118,7 @@ const NotificationPage = () => {
                   key={notification.id}
                   className="flex w-full flex-col gap-4 self-stretch rounded-xl bg-neutral-0 px-4 py-6 shadow-[0_0_8px_0_rgba(0,0,0,0.10)]"
                 >
-                  <div className="mx-auto flex w-71.5 items-start gap-4">
+                  <div className="mx-auto flex w-full max-w-71.5 items-start gap-4">
                     <img
                       src={InviteAlertIcon}
                       alt=""
@@ -135,7 +135,7 @@ const NotificationPage = () => {
                     </div>
                   </div>
 
-                  <div className="mx-auto flex gap-5 w-75">
+                  <div className="mx-auto flex w-full max-w-75 gap-5">
                     <button
                       type="button"
                       className="flex h-7.5 w-35 flex-1 items-center justify-center rounded-md border border-secondary-500 bg-neutral-0 text-caption3 text-secondary-500"
@@ -158,7 +158,7 @@ const NotificationPage = () => {
                 key={notification.id}
                 className="flex w-full flex-col gap-4 self-stretch rounded-xl bg-neutral-0 px-4 py-6 shadow-[0_0_8px_0_rgba(0,0,0,0.10)]"
               >
-                <div className="mx-auto flex w-71.5 items-start gap-4">
+                <div className="mx-auto flex w-full max-w-71.5 items-start gap-4">
                   <img
                     src={InviteAlertIcon}
                     alt=""
@@ -180,7 +180,7 @@ const NotificationPage = () => {
 
                 <div className="h-px bg-neutral-400" />
 
-                <div className="mx-auto flex w-71.5 items-center gap-3">
+                <div className="mx-auto flex w-full max-w-71.5 items-center gap-3">
                   <img
                     src={BandDefaultProfileImage}
                     alt=""
@@ -196,7 +196,7 @@ const NotificationPage = () => {
                   </div>
                 </div>
 
-                <div className="mx-auto flex w-71.5 items-center gap-3 rounded-md border border-neutral-300 px-4 py-3">
+                <div className="mx-auto flex w-full max-w-71.5 items-center gap-3 rounded-md border border-neutral-300 px-4 py-3">
                   <span className="font-body text-caption3 text-neutral-500">
                     역할
                   </span>
@@ -205,7 +205,7 @@ const NotificationPage = () => {
                   </span>
                 </div>
 
-                <div className="mx-auto flex gap-5 w-75">
+                <div className="mx-auto flex w-full max-w-75 gap-5">
                   <button
                     type="button"
                     className="flex h-7.5 w-35 flex-1 items-center justify-center rounded-md border border-secondary-500 bg-neutral-0 text-caption3 text-secondary-500"
