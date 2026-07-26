@@ -94,7 +94,12 @@ const MusicRegisterForm = ({
   const etcPlatformMismatchError = showErrors && hasEtcPlatformMismatch;
 
   const handleSelectEtcPlatform = (platform: MusicEtcPlatform) => {
-    setEtcPlatform((prev) => (prev === platform ? null : platform));
+    if (etcPlatform === platform) {
+      setEtcPlatform(null);
+      setEtcUrl("");
+      return;
+    }
+    setEtcPlatform(platform);
   };
 
   const handleSubmit = () => {
