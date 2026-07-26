@@ -78,6 +78,7 @@ export interface SessionRecruitmentListParams {
 export interface SessionRecruitmentListItem {
   sessionRecruitmentId: number;
   bandId: number;
+  isMine?: boolean;
   dDay: number;
   isNew: boolean;
   isInterested: boolean;
@@ -101,6 +102,7 @@ export interface SessionRecruitmentListResponse {
 export interface SessionRecruitmentDetailResponse {
   sessionRecruitmentId: number;
   isNew: boolean;
+  isMine?: boolean;
   recruitmentTitle: string;
   deadlineAt: string;
   dDay: number;
