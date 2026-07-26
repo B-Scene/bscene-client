@@ -164,6 +164,8 @@ const ContentRegisterPage = () => {
   };
 
   const handleSubmit = async () => {
+    if (activeBandId === null) return;
+
     if (!isValid) {
       setShowErrors(true);
       return;
@@ -428,9 +430,9 @@ const ContentRegisterPage = () => {
         <button
           type="button"
           onClick={handleSubmit}
-          disabled={createPost.isPending || isUploading}
+          disabled={createPost.isPending || isUploading || activeBandId === null}
           className={`flex h-13 w-full items-center justify-center rounded-xl text-label1 ${
-            isValid && !createPost.isPending && !isUploading
+            isValid && !createPost.isPending && !isUploading && activeBandId !== null
               ? "bg-secondary-500 text-neutral-0"
               : "bg-neutral-300 text-neutral-600"
           }`}

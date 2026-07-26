@@ -134,7 +134,7 @@ const ConcertRegisterPage = () => {
   const { data: existingPerformance, isLoading } =
     usePerformanceQuery(performanceId);
 
-  if (isEditMode && isLoading) {
+  if (activeBandId === null || (isEditMode && isLoading)) {
     return <main className="min-h-dvh bg-secondary-0" />;
   }
 

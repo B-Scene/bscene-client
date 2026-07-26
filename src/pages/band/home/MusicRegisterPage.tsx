@@ -36,11 +36,17 @@ const MusicRegisterPage = () => {
   const bandId = activeBandId ?? NaN;
   const { data: existingLinks, isLoading } = useMusicLinksQuery(bandId);
 
-  if (isLoading) {
+  if (activeBandId === null || isLoading) {
     return <main className="min-h-dvh bg-neutral-0" />;
   }
 
-  return <MusicRegisterForm bandId={bandId} existingLinks={existingLinks} />;
+  return (
+    <MusicRegisterForm
+      key={bandId}
+      bandId={bandId}
+      existingLinks={existingLinks}
+    />
+  );
 };
 
 interface MusicRegisterFormProps {
@@ -81,16 +87,18 @@ const MusicRegisterForm = ({
       (etcPlatform && etcUrl.trim()),
   );
 
+  const hasEtcPlatformMismatch =
+    Boolean(etcPlatform) !== Boolean(etcUrl.trim());
+
   const linksError = showErrors && !isValid;
-  const etcPlatformMismatchError =
-    showErrors && Boolean(etcPlatform) !== Boolean(etcUrl.trim());
+  const etcPlatformMismatchError = showErrors && hasEtcPlatformMismatch;
 
   const handleSelectEtcPlatform = (platform: MusicEtcPlatform) => {
     setEtcPlatform((prev) => (prev === platform ? null : platform));
   };
 
   const handleSubmit = () => {
-    if (!isValid || etcPlatformMismatchError) {
+    if (!isValid || hasEtcPlatformMismatch) {
       setShowErrors(true);
       return;
     }
