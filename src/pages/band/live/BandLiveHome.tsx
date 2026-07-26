@@ -214,8 +214,7 @@ export function BandLiveHome({ go, onEnterLive }: BandLiveHomeProps) {
           </div>
         </section>
       </div>
-
-      <BottomNavBar modeOverride="fan" activeColorModeOverride="band" />
+      <BottomNavBar modeOverride="band" />
     </main>
   );
 }

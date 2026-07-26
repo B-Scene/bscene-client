@@ -7,7 +7,12 @@ import CloseIcon from "@/assets/icons/close.svg";
 import ArrowDownGrayIcon from "@/assets/icons/band/arrow-down-gray.svg";
 import CalendarIcon from "@/assets/icons/band/data-range.svg";
 import ClockIcon from "@/assets/icons/band/clock-band.svg";
-import { useCreateSessionRecruitment } from "@/hooks/api/session/useSessionRecruitment";
+import {
+  useCreateSessionRecruitment,
+  useSessionRecruitmentEditInfoQuery,
+  useUpdateSessionRecruitment,
+} from "@/hooks/api/session/useSessionRecruitment";
+import { useActiveBandMemberId } from "@/hooks/api/band/useBandMember";
 import type {
   CreateSessionRecruitmentResponse,
   SessionApiResponse,
@@ -56,11 +61,14 @@ const REGION_OPTIONS = [
 
 type FormStep = 1 | 2;
 type SelectBottomSheetType = "genre" | "region" | null;
+type FormMode = "create" | "edit";
 
 interface SessionRecruitmentFormScreenProps {
   onBack: () => void;
   onClose: () => void;
   onViewCreatedPost?: (sessionRecruitmentId?: number) => void;
+  editSessionRecruitmentId?: number;
+  onSaved?: () => void;
 }
 
 interface BasicFormValues {
@@ -98,19 +106,6 @@ interface FormErrors {
 const cx = (...classNames: Array<string | false | null | undefined>) =>
   classNames.filter(Boolean).join(" ");
 
-const getBandMemberId = () => {
-  const storedBandMemberId =
-    localStorage.getItem("bandMemberId") ??
-    localStorage.getItem("currentBandMemberId") ??
-    localStorage.getItem("selectedBandMemberId");
-
-  const parsedBandMemberId = Number(storedBandMemberId);
-
-  return Number.isFinite(parsedBandMemberId) && parsedBandMemberId > 0
-    ? parsedBandMemberId
-    : null;
-};
-
 const toDeadlineAt = (dateValue: string, timeValue: string) => `${dateValue}T${timeValue}:00`;
 
 const splitDeadlineAt = (deadlineAt?: string) => ({
@@ -128,12 +123,150 @@ const isFutureDeadline = (dateValue: string, timeValue: string) => {
   return deadline.getTime() > Date.now();
 };
 
+const DEFAULT_BASIC_VALUES: BasicFormValues = {
+  title: "",
+  summary: "",
+  detail: "",
+  part: "",
+  skill: "중급",
+  genre: "",
+};
+
+const DEFAULT_DETAIL_VALUES: DetailFormValues = {
+  region: "",
+  practiceSchedule: "",
+  practiceLocation: "",
+  deadlineDate: "",
+  deadlineTime: "",
+  qualification: "",
+};
+
 export const SessionRecruitmentFormScreen = ({
   onBack,
   onClose,
   onViewCreatedPost,
+  editSessionRecruitmentId,
+  onSaved,
 }: SessionRecruitmentFormScreenProps) => {
+  if (!editSessionRecruitmentId) {
+    return (
+      <SessionRecruitmentFormBody
+        mode="create"
+        initialBasicValues={DEFAULT_BASIC_VALUES}
+        initialDetailValues={DEFAULT_DETAIL_VALUES}
+        onBack={onBack}
+        onClose={onClose}
+        onViewCreatedPost={onViewCreatedPost}
+      />
+    );
+  }
+
+  return (
+    <SessionRecruitmentEditLoader
+      sessionRecruitmentId={editSessionRecruitmentId}
+      onBack={onBack}
+      onClose={onClose}
+      onSaved={onSaved}
+    />
+  );
+};
+
+interface SessionRecruitmentEditLoaderProps {
+  sessionRecruitmentId: number;
+  onBack: () => void;
+  onClose: () => void;
+  onSaved?: () => void;
+}
+
+const SessionRecruitmentEditLoader = ({
+  sessionRecruitmentId,
+  onBack,
+  onClose,
+  onSaved,
+}: SessionRecruitmentEditLoaderProps) => {
+  const editInfoQuery = useSessionRecruitmentEditInfoQuery(sessionRecruitmentId);
+
+  if (editInfoQuery.isError) {
+    return (
+      <main className="flex min-h-dvh flex-col items-center justify-center gap-3 bg-secondary-0 px-6 text-center">
+        <p className="text-caption1 text-neutral-500">
+          모집 공고 정보를 불러오지 못했어요
+        </p>
+        <button
+          type="button"
+          onClick={onBack}
+          className="rounded-[8px] bg-secondary-500 px-4 py-2 text-caption2 text-neutral-0"
+        >
+          뒤로가기
+        </button>
+      </main>
+    );
+  }
+
+  if (!editInfoQuery.data) {
+    return (
+      <main className="flex min-h-dvh items-center justify-center bg-secondary-0">
+        <p className="text-caption1 text-neutral-500">
+          모집 공고 정보를 불러오고 있어요
+        </p>
+      </main>
+    );
+  }
+
+  const detail = editInfoQuery.data;
+  const deadline = splitDeadlineAt(detail.deadlineAt);
+
+  return (
+    <SessionRecruitmentFormBody
+      mode="edit"
+      sessionRecruitmentId={sessionRecruitmentId}
+      initialBasicValues={{
+        title: detail.recruitmentTitle,
+        summary: detail.summary,
+        detail: detail.content,
+        part: detail.part,
+        skill: detail.skillLevel,
+        genre: detail.genre,
+      }}
+      initialDetailValues={{
+        region: detail.region,
+        practiceSchedule: detail.practiceSchedule,
+        practiceLocation: detail.practicePlace,
+        deadlineDate: deadline.deadlineDate,
+        deadlineTime: deadline.deadlineTime,
+        qualification: detail.qualification,
+      }}
+      onBack={onBack}
+      onClose={onClose}
+      onSaved={onSaved}
+    />
+  );
+};
+
+interface SessionRecruitmentFormBodyProps {
+  mode: FormMode;
+  sessionRecruitmentId?: number;
+  initialBasicValues: BasicFormValues;
+  initialDetailValues: DetailFormValues;
+  onBack: () => void;
+  onClose: () => void;
+  onViewCreatedPost?: (sessionRecruitmentId?: number) => void;
+  onSaved?: () => void;
+}
+
+const SessionRecruitmentFormBody = ({
+  mode,
+  sessionRecruitmentId,
+  initialBasicValues,
+  initialDetailValues,
+  onBack,
+  onClose,
+  onViewCreatedPost,
+  onSaved,
+}: SessionRecruitmentFormBodyProps) => {
   const createRecruitmentMutation = useCreateSessionRecruitment();
+  const updateRecruitmentMutation = useUpdateSessionRecruitment();
+  const activeBandMemberId = useActiveBandMemberId();
   const [currentStep, setCurrentStep] = useState<FormStep>(1);
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [isCompleteScreenOpen, setIsCompleteScreenOpen] = useState(false);
@@ -143,23 +276,11 @@ export const SessionRecruitmentFormScreen = ({
     useState<CreateSessionRecruitmentResponse | null>(null);
   const [submitErrorMessage, setSubmitErrorMessage] = useState("");
 
-  const [basicValues, setBasicValues] = useState<BasicFormValues>({
-    title: "",
-    summary: "",
-    detail: "",
-    part: "",
-    skill: "중급",
-    genre: "",
-  });
+  const [basicValues, setBasicValues] =
+    useState<BasicFormValues>(initialBasicValues);
 
-  const [detailValues, setDetailValues] = useState<DetailFormValues>({
-    region: "",
-    practiceSchedule: "",
-    practiceLocation: "",
-    deadlineDate: "",
-    deadlineTime: "",
-    qualification: "",
-  });
+  const [detailValues, setDetailValues] =
+    useState<DetailFormValues>(initialDetailValues);
 
   const [errors, setErrors] = useState<FormErrors>({});
 
@@ -350,53 +471,93 @@ export const SessionRecruitmentFormScreen = ({
 
     setSubmitErrorMessage("");
 
-    const bandMemberId = getBandMemberId();
+    if (mode === "edit") {
+      if (!sessionRecruitmentId) return;
 
-if (!bandMemberId) {
-  setSubmitErrorMessage(
-    "밴드 정보를 찾을 수 없어요. 밴드 오너 계정으로 로그인했는지 확인해주세요.",
-  );
-  return;
-}
+      const body = {
+        recruitmentTitle: basicValues.title.trim(),
+        summary: basicValues.summary.trim(),
+        content: basicValues.detail.trim(),
+        part: basicValues.part,
+        skillLevel: basicValues.skill,
+        genre: basicValues.genre,
+        region: detailValues.region,
+        practiceSchedule: detailValues.practiceSchedule.trim(),
+        practicePlace: detailValues.practiceLocation.trim(),
+        deadlineAt: toDeadlineAt(
+          detailValues.deadlineDate,
+          detailValues.deadlineTime,
+        ),
+        qualification: detailValues.qualification.trim(),
+      };
 
-const requestBody = {
-  bandMemberId,
-  recruitmentTitle: basicValues.title.trim(),
-  summary: basicValues.summary.trim(),
-  content: basicValues.detail.trim(),
-  part: basicValues.part,
-  skillLevel: basicValues.skill,
-  genre: basicValues.genre,
-  region: detailValues.region,
-  practiceSchedule: detailValues.practiceSchedule.trim(),
-  practicePlace: detailValues.practiceLocation.trim(),
-  deadlineAt: toDeadlineAt(detailValues.deadlineDate, detailValues.deadlineTime),
-  qualification: detailValues.qualification.trim(),
-};
+      try {
+        await updateRecruitmentMutation.mutateAsync({
+          sessionRecruitmentId,
+          body,
+        });
+        onSaved?.();
+      } catch (error) {
+        const apiMessage = (error as AxiosError<SessionApiResponse<null>>)
+          .response?.data?.message;
 
-    console.log("세션 모집 공고 등록 requestBody:", requestBody);
+        setSubmitErrorMessage(
+          apiMessage ?? "모집 공고 수정에 실패했어요. 잠시 후 다시 시도해주세요.",
+        );
+      }
+
+      return;
+    }
+
+    const bandMemberId = activeBandMemberId;
+
+    if (!bandMemberId) {
+      setSubmitErrorMessage(
+        "밴드 정보를 찾을 수 없어요. 밴드 오너 계정으로 로그인했는지 확인해주세요.",
+      );
+      return;
+    }
+
+    const requestBody = {
+      bandMemberId,
+      recruitmentTitle: basicValues.title.trim(),
+      summary: basicValues.summary.trim(),
+      content: basicValues.detail.trim(),
+      part: basicValues.part,
+      skillLevel: basicValues.skill,
+      genre: basicValues.genre,
+      region: detailValues.region,
+      practiceSchedule: detailValues.practiceSchedule.trim(),
+      practicePlace: detailValues.practiceLocation.trim(),
+      deadlineAt: toDeadlineAt(
+        detailValues.deadlineDate,
+        detailValues.deadlineTime,
+      ),
+      qualification: detailValues.qualification.trim(),
+    };
 
     try {
       const result = await createRecruitmentMutation.mutateAsync(requestBody);
 
       setCreatedRecruitment(result);
       setIsCompleteScreenOpen(true);
-   } catch (error) {
-  const errorResponse = (error as AxiosError<SessionApiResponse<null>>).response;
-  const apiMessage = errorResponse?.data?.message;
+    } catch (error) {
+      const errorResponse = (error as AxiosError<SessionApiResponse<null>>)
+        .response;
+      const apiMessage = errorResponse?.data?.message;
 
-  if (errorResponse?.status === 403) {
-    setSubmitErrorMessage(
-      apiMessage ??
-        "밴드 오너 계정만 세션 모집 공고를 등록할 수 있어요. 현재 선택된 밴드 정보를 확인해주세요.",
-    );
-    return;
-  }
+      if (errorResponse?.status === 403) {
+        setSubmitErrorMessage(
+          apiMessage ??
+            "밴드 오너 계정만 세션 모집 공고를 등록할 수 있어요. 현재 선택된 밴드 정보를 확인해주세요.",
+        );
+        return;
+      }
 
-  setSubmitErrorMessage(
-    apiMessage ?? "모집 공고 등록에 실패했어요. 잠시 후 다시 시도해주세요.",
-  );
-}
+      setSubmitErrorMessage(
+        apiMessage ?? "모집 공고 등록에 실패했어요. 잠시 후 다시 시도해주세요.",
+      );
+    }
   };
 
   const handleBack = () => {
@@ -442,9 +603,18 @@ const requestBody = {
     );
   }
 
+  const isSubmitting =
+    mode === "edit"
+      ? updateRecruitmentMutation.isPending
+      : createRecruitmentMutation.isPending;
+
   return (
     <main className="min-h-dvh bg-secondary-0 pb-[calc(var(--bottom-nav-height)+92px)]">
-      <FormTopBar onBack={handleBack} onClose={onClose} />
+      <FormTopBar
+        title={mode === "edit" ? "세션 모집 공고 수정" : "세션 모집 공고 등록"}
+        onBack={handleBack}
+        onClose={onClose}
+      />
       <StepIndicator currentStep={currentStep} />
 
       {currentStep === 1 ? (
@@ -464,7 +634,9 @@ const requestBody = {
           errors={errors}
           isComplete={isDetailComplete}
           submitErrorMessage={submitErrorMessage}
-          isSubmitting={createRecruitmentMutation.isPending}
+          isSubmitting={isSubmitting}
+          submitLabel={mode === "edit" ? "수정하기" : "모집 공고 등록"}
+          submittingLabel={mode === "edit" ? "수정 중" : "등록 중"}
           onFieldChange={handleDetailFieldChange}
           onOpenRegionSelect={() => setSelectBottomSheetType("region")}
           onDeadlineDateChange={handleDeadlineDateChange}
@@ -476,7 +648,11 @@ const requestBody = {
       <ModalOverlay open={isCancelModalOpen} onClose={handleCancelModalClose}>
         <Modal
           tone="orange"
-          title="모집 공고 등록을 취소할까요?"
+          title={
+            mode === "edit"
+              ? "모집 공고 수정을 취소할까요?"
+              : "모집 공고 등록을 취소할까요?"
+          }
           description={
             <>
               입력한 내용은 저장되지 않고
@@ -647,6 +823,8 @@ interface DetailInfoStepProps {
   isComplete: boolean;
   submitErrorMessage: string;
   isSubmitting: boolean;
+  submitLabel: string;
+  submittingLabel: string;
   onFieldChange: (
     field: keyof Pick<
       DetailFormValues,
@@ -665,6 +843,8 @@ const DetailInfoStep = ({
   isComplete,
   submitErrorMessage,
   isSubmitting,
+  submitLabel,
+  submittingLabel,
   onFieldChange,
   onOpenRegionSelect,
   onDeadlineDateChange,
@@ -814,7 +994,7 @@ const DetailInfoStep = ({
       ) : null}
       <BottomActionButton
         active={isComplete && !isSubmitting}
-        label={isSubmitting ? "등록 중" : "모집 공고 등록"}
+        label={isSubmitting ? submittingLabel : submitLabel}
         onClick={onSubmit}
       />
     </>
@@ -883,11 +1063,12 @@ const SelectBottomSheet = ({
 };
 
 interface FormTopBarProps {
+  title: string;
   onBack: () => void;
   onClose: () => void;
 }
 
-const FormTopBar = ({ onBack, onClose }: FormTopBarProps) => {
+const FormTopBar = ({ title, onBack, onClose }: FormTopBarProps) => {
   return (
     <header className="relative flex h-12 w-full items-center justify-center bg-neutral-0 px-[15px] py-[5px]">
       <button
@@ -899,7 +1080,7 @@ const FormTopBar = ({ onBack, onClose }: FormTopBarProps) => {
         <img src={ArrowLeftIcon} alt="" className="size-6" />
       </button>
 
-      <h1 className="text-[18px] leading-5 font-bold text-neutral-900">세션 모집 공고 등록</h1>
+      <h1 className="text-[18px] leading-5 font-bold text-neutral-900">{title}</h1>
 
       <button
         type="button"

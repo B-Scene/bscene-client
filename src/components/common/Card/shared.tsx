@@ -9,7 +9,9 @@ export type CompactBandCardBaseProps = {
 }
 
 type CompactBandCardContentProps = CompactBandCardBaseProps & {
+  contentClassName?: string
   descriptionClassName?: string
+  descriptionMultiline?: boolean
 }
 
 export const compactBandCardClassName =
@@ -24,7 +26,9 @@ export const CompactBandCardContent = ({
   title,
   subtitle,
   description,
+  contentClassName = '',
   descriptionClassName = 'text-primary-400',
+  descriptionMultiline = false,
 }: CompactBandCardContentProps) => {
   return (
     <>
@@ -34,15 +38,17 @@ export const CompactBandCardContent = ({
         src={imageSrc}
       />
 
-      <div className="h-[62px] w-[165px] min-w-0 shrink-0">
+      <div className={`h-[62px] w-[165px] min-w-0 shrink-0 ${contentClassName}`}>
         <h3 className="font-body text-body1 m-0 truncate text-neutral-900">
           {title}
         </h3>
-        <p className="font-body text-caption2 m-0 mt-[2px] truncate text-neutral-700">
+        <p className="font-body text-body5 m-0 mt-[3px] truncate text-neutral-700">
           {subtitle}
         </p>
         <p
-          className={`font-body text-caption2 m-0 mt-[4px] truncate ${descriptionClassName}`}
+          className={`font-body text-body5 m-0 mt-[3px] ${
+            descriptionMultiline ? '' : 'truncate'
+          } ${descriptionClassName}`}
         >
           {description}
         </p>
