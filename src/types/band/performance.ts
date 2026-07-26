@@ -80,6 +80,7 @@ export type CreatePerformanceResponse = PerformanceResponse;
 
 export interface UpdatePerformanceRequest {
   title?: string;
+  genre?: PerformanceGenre;
   performanceDate?: string;
   startTime?: string;
   region?: PerformanceRegion;

@@ -267,11 +267,19 @@ const ProfileForm = ({
     if (isEditMode) {
       if (!bandId) return;
 
+      const genreValue = BAND_GENRE_BY_LABEL[genre];
+      const regionValue = BAND_REGION_BY_LABEL[region];
+
+      if (!genreValue || !regionValue) {
+        setUploadError("장르 또는 지역을 다시 선택해주세요");
+        return;
+      }
+
       try {
         await updateBand.mutateAsync({
           name,
-          genre: BAND_GENRE_BY_LABEL[genre],
-          region: BAND_REGION_BY_LABEL[region],
+          genre: genreValue,
+          region: regionValue,
           profileImageUrl: isAvatarRemoved
             ? null
             : uploadedAvatarUrl || undefined,

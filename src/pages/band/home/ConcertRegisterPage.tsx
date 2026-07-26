@@ -329,6 +329,7 @@ const ConcertRegisterForm = ({
       updatePerformance.mutate(
         {
           title,
+          genre: PERFORMANCE_GENRE_BY_LABEL[genre],
           performanceDate: startDate,
           startTime: time,
           region: performanceRegionValue,

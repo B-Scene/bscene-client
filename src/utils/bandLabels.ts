@@ -108,8 +108,10 @@ export const BAND_MEMBER_PART_LABELS: Record<BandMemberPart, string> = {
 export const getPartLabel = (part: string) =>
   BAND_MEMBER_PART_LABELS[part as BandMemberPart] ?? part;
 
-const toReverseMap = <T extends string>(labels: Record<T, string>) => {
-  const reverse = {} as Record<string, T>;
+const toReverseMap = <T extends string>(
+  labels: Record<T, string>,
+): Partial<Record<string, T>> => {
+  const reverse: Partial<Record<string, T>> = {};
   (Object.keys(labels) as T[]).forEach((key) => {
     reverse[labels[key]] = key;
   });
