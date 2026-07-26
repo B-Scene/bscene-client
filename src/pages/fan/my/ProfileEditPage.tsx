@@ -1,5 +1,4 @@
 import { useRef, useState, type ChangeEvent } from "react";
-import type { AxiosError } from "axios";
 import { useNavigate } from "react-router-dom";
 import DefaultAvatarIcon from "@/assets/icons/profile.svg";
 import { Header } from "@/components/band/home/Header";
@@ -10,17 +9,9 @@ import {
   useUpdateFanInformation,
 } from "@/hooks/api/user/useFanInformation";
 import { useGenres, useRegions } from "@/hooks/api/onboarding/useOnboarding";
-import type {
-  ApiResponse,
-  FanInformationResponse,
-} from "@/types/user/fanInformation";
+import { getApiErrorMessage } from "@/utils/getApiErrorMessage";
+import type { FanInformationResponse } from "@/types/user/fanInformation";
 import type { CodeName } from "@/types/onboarding/onboarding";
-
-const getApiErrorMessage = (error: unknown, fallbackMessage: string) => {
-  const axiosError = error as AxiosError<ApiResponse<null>>;
-
-  return axiosError.response?.data?.message ?? fallbackMessage;
-};
 
 interface ChipMultiGroupProps {
   options: CodeName[];

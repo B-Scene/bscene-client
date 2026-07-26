@@ -1,5 +1,4 @@
 import { useRef, useState, type ChangeEvent } from "react";
-import type { AxiosError } from "axios";
 import { useNavigate } from "react-router-dom";
 import DefaultBandAvatar from "@/assets/icons/band/band-default-profile.svg";
 import { Header } from "@/components/band/home/Header";
@@ -19,8 +18,11 @@ import {
   useUpdateBandMemberProfile,
 } from "@/hooks/api/band/useBandMemberProfile";
 import { uploadMediaFile } from "@/utils/uploadMediaFile";
-import type { BandMemberProfilePart } from "@/types/band/bandMemberProfile";
-import type { BandApiResponse } from "@/types/band/band";
+import { getApiErrorMessage } from "@/utils/getApiErrorMessage";
+import type {
+  BandMemberProfilePart,
+  BandMemberProfileResponse,
+} from "@/types/band/bandMemberProfile";
 import {
   BAND_GENRE_BY_LABEL,
   BAND_GENRE_LABELS,
@@ -42,12 +44,6 @@ const PART_LABEL_TO_ENUM: Record<string, BandMemberProfilePart> = {
   베이스: "BASS",
   드럼: "DRUM",
   키보드: "KEYBOARD",
-};
-
-const getApiErrorMessage = (error: unknown, fallbackMessage: string) => {
-  const axiosError = error as AxiosError<BandApiResponse<null>>;
-
-  return axiosError.response?.data?.message ?? fallbackMessage;
 };
 
 interface ChipGroupProps {
@@ -187,9 +183,15 @@ const ProfileForm = ({
 
   const galleryInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+  const ownerProfileRef = useRef<{
+    nickname: string;
+    part: BandMemberProfilePart;
+    profile: BandMemberProfileResponse;
+  } | null>(null);
 
   const [avatarUrl, setAvatarUrl] = useState(initialValues.avatarUrl);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [isAvatarRemoved, setIsAvatarRemoved] = useState(false);
   const [isImageMenuOpen, setIsImageMenuOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -227,6 +229,7 @@ const ProfileForm = ({
     if (!file) return;
 
     setAvatarFile(file);
+    setIsAvatarRemoved(false);
     setAvatarUrl((prev) => {
       if (prev) URL.revokeObjectURL(prev);
       return URL.createObjectURL(file);
@@ -236,6 +239,7 @@ const ProfileForm = ({
   const handleDeleteImage = () => {
     setIsImageMenuOpen(false);
     setAvatarFile(null);
+    setIsAvatarRemoved(true);
     setAvatarUrl((prev) => {
       if (prev) URL.revokeObjectURL(prev);
       return "";
@@ -263,19 +267,31 @@ const ProfileForm = ({
     if (isEditMode) {
       if (!bandId) return;
 
+      const genreValue = BAND_GENRE_BY_LABEL[genre];
+      const regionValue = BAND_REGION_BY_LABEL[region];
+
+      if (!genreValue || !regionValue) {
+        setUploadError("장르 또는 지역을 다시 선택해주세요");
+        return;
+      }
+
       try {
         await updateBand.mutateAsync({
           name,
-          genre: BAND_GENRE_BY_LABEL[genre],
-          region: BAND_REGION_BY_LABEL[region],
-          profileImageUrl: uploadedAvatarUrl || undefined,
+          genre: genreValue,
+          region: regionValue,
+          profileImageUrl: isAvatarRemoved
+            ? null
+            : uploadedAvatarUrl || undefined,
           description: bio || undefined,
         });
 
         if (memberProfileId && myActivityName.trim() && myPart) {
+          const partEnum = PART_LABEL_TO_ENUM[myPart];
+
           await updateBandMemberProfile.mutateAsync({
             nickname: myActivityName.trim(),
-            part: PART_LABEL_TO_ENUM[myPart],
+            ...(partEnum ? { part: partEnum } : {}),
           });
         }
 
@@ -287,21 +303,36 @@ const ProfileForm = ({
       return;
     }
 
+    const genreValue = BAND_GENRE_BY_LABEL[genre];
+    const regionValue = BAND_REGION_BY_LABEL[region];
+
+    if (!genreValue || !regionValue) {
+      setUploadError("장르 또는 지역을 다시 선택해주세요");
+      return;
+    }
+
     try {
-      const ownerProfile = await createBandMemberProfile.mutateAsync({
-        nickname: myActivityName.trim(),
-        part: PART_LABEL_TO_ENUM[myPart],
-      });
+      const nickname = myActivityName.trim();
+      const part = PART_LABEL_TO_ENUM[myPart];
+
+      const cached = ownerProfileRef.current;
+      const ownerProfile =
+        cached && cached.nickname === nickname && cached.part === part
+          ? cached.profile
+          : await createBandMemberProfile.mutateAsync({ nickname, part });
+
+      ownerProfileRef.current = { nickname, part, profile: ownerProfile };
 
       await createBand.mutateAsync({
         name,
-        genre: BAND_GENRE_BY_LABEL[genre],
-        region: BAND_REGION_BY_LABEL[region],
+        genre: genreValue,
+        region: regionValue,
         bandMemberProfileId: ownerProfile.id,
         profileImageUrl: uploadedAvatarUrl || undefined,
         description: bio || undefined,
       });
 
+      ownerProfileRef.current = null;
       navigate("/band/home");
     } catch {
       // 에러는 submitError로 화면에 표시됨

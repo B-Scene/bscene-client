@@ -12,6 +12,7 @@ import type {
   CreateBandMemberProfileRequest,
   UpdateBandMemberProfileRequest,
 } from "@/types/band/bandMemberProfile";
+import { myProfilesKeys } from "@/hooks/api/user/useMyProfiles";
 
 export const bandMemberProfileKeys = {
   all: ["bandMemberProfile"] as const,
@@ -87,6 +88,7 @@ export const useActivateBandMemberProfile = () => {
     mutationFn: (profileId: number) => activateBandMemberProfile(profileId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: bandMemberProfileKeys.all });
+      queryClient.invalidateQueries({ queryKey: myProfilesKeys.all });
     },
   });
 };

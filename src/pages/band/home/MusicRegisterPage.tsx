@@ -1,12 +1,11 @@
 import { useState, type ReactNode } from "react";
-import type { AxiosError } from "axios";
 import { useNavigate } from "react-router-dom";
 import { Header } from "@/components/band/home/Header";
 import { Input } from "@/components/common/Input/Input";
 import { useActiveBandId } from "@/hooks/api/user/useMyProfiles";
 import { useMusicLinksQuery, useSaveMusicLinks } from "@/hooks/api/band/useMusicLink";
+import { getApiErrorMessage } from "@/utils/getApiErrorMessage";
 import type {
-  BandApiResponse,
   MusicEtcPlatform,
   MusicLinksResponse,
 } from "@/types/band/musicLink";
@@ -17,12 +16,6 @@ const ETC_PLATFORM_OPTIONS: { value: MusicEtcPlatform; label: string }[] = [
   { value: "BUGS", label: "Bugs" },
   { value: "APPLE_MUSIC", label: "Apple Music" },
 ];
-
-const getApiErrorMessage = (error: unknown, fallbackMessage: string) => {
-  const axiosError = error as AxiosError<BandApiResponse<null>>;
-
-  return axiosError.response?.data?.message ?? fallbackMessage;
-};
 
 interface FieldProps {
   label: string;
@@ -43,11 +36,17 @@ const MusicRegisterPage = () => {
   const bandId = activeBandId ?? NaN;
   const { data: existingLinks, isLoading } = useMusicLinksQuery(bandId);
 
-  if (isLoading) {
+  if (activeBandId === null || isLoading) {
     return <main className="min-h-dvh bg-neutral-0" />;
   }
 
-  return <MusicRegisterForm bandId={bandId} existingLinks={existingLinks} />;
+  return (
+    <MusicRegisterForm
+      key={bandId}
+      bandId={bandId}
+      existingLinks={existingLinks}
+    />
+  );
 };
 
 interface MusicRegisterFormProps {
@@ -88,16 +87,23 @@ const MusicRegisterForm = ({
       (etcPlatform && etcUrl.trim()),
   );
 
+  const hasEtcPlatformMismatch =
+    Boolean(etcPlatform) !== Boolean(etcUrl.trim());
+
   const linksError = showErrors && !isValid;
-  const etcPlatformMismatchError =
-    showErrors && Boolean(etcPlatform) !== Boolean(etcUrl.trim());
+  const etcPlatformMismatchError = showErrors && hasEtcPlatformMismatch;
 
   const handleSelectEtcPlatform = (platform: MusicEtcPlatform) => {
-    setEtcPlatform((prev) => (prev === platform ? null : platform));
+    if (etcPlatform === platform) {
+      setEtcPlatform(null);
+      setEtcUrl("");
+      return;
+    }
+    setEtcPlatform(platform);
   };
 
   const handleSubmit = () => {
-    if (!isValid || etcPlatformMismatchError) {
+    if (!isValid || hasEtcPlatformMismatch) {
       setShowErrors(true);
       return;
     }

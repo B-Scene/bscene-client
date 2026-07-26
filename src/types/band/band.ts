@@ -82,7 +82,7 @@ export interface UpdateBandRequest {
   name?: string;
   genre?: BandGenre;
   region?: BandRegion;
-  profileImageUrl?: string;
+  profileImageUrl?: string | null;
   description?: string;
 }
 
