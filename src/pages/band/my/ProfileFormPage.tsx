@@ -190,6 +190,7 @@ const ProfileForm = ({
 
   const [avatarUrl, setAvatarUrl] = useState(initialValues.avatarUrl);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [isAvatarRemoved, setIsAvatarRemoved] = useState(false);
   const [isImageMenuOpen, setIsImageMenuOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -227,6 +228,7 @@ const ProfileForm = ({
     if (!file) return;
 
     setAvatarFile(file);
+    setIsAvatarRemoved(false);
     setAvatarUrl((prev) => {
       if (prev) URL.revokeObjectURL(prev);
       return URL.createObjectURL(file);
@@ -236,6 +238,7 @@ const ProfileForm = ({
   const handleDeleteImage = () => {
     setIsImageMenuOpen(false);
     setAvatarFile(null);
+    setIsAvatarRemoved(true);
     setAvatarUrl((prev) => {
       if (prev) URL.revokeObjectURL(prev);
       return "";
@@ -268,7 +271,9 @@ const ProfileForm = ({
           name,
           genre: BAND_GENRE_BY_LABEL[genre],
           region: BAND_REGION_BY_LABEL[region],
-          profileImageUrl: uploadedAvatarUrl || undefined,
+          profileImageUrl: isAvatarRemoved
+            ? null
+            : uploadedAvatarUrl || undefined,
           description: bio || undefined,
         });
 
