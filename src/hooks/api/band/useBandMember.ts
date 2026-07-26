@@ -12,6 +12,8 @@ import type {
   InviteBandMemberRequest,
 } from "@/types/band/bandMember";
 import { bandMemberProfileKeys } from "@/hooks/api/band/useBandMemberProfile";
+import { useActiveBandId } from "@/hooks/api/user/useMyProfiles";
+import { getStoredAuthUser } from "@/utils/authUser";
 
 export const bandMemberKeys = {
   all: ["bandMember"] as const,
@@ -28,6 +30,14 @@ export const useBandMembersQuery = (bandId: number) => {
     staleTime: 1000 * 30,
     enabled: Number.isFinite(bandId),
   });
+};
+
+export const useActiveBandMemberId = () => {
+  const activeBandId = useActiveBandId();
+  const { data: members } = useBandMembersQuery(activeBandId ?? NaN);
+  const myUserId = getStoredAuthUser()?.userId;
+
+  return members?.find((member) => member.userId === myUserId)?.id ?? null;
 };
 
 export const useBandMemberCandidatesQuery = (

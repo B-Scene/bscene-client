@@ -6,26 +6,108 @@ import { NotificationBandBanner } from "@/components/band/my/NotificationBandBan
 import { ModalOverlay } from "@/components/common/Modal/ModalOverlay";
 import Modal from "@/components/Modal/Modal";
 import { Toast } from "@/components/common/Toast/Toast";
-import { useBandProfileStore } from "@/stores/useBandProfileStore";
-import { useBandMembersStore } from "@/stores/useBandMembersStore";
+import { useActiveBandId } from "@/hooks/api/user/useMyProfiles";
+import { useBandQuery } from "@/hooks/api/band/useBand";
+import {
+  useBandMembersQuery,
+  useRemoveBandMember,
+} from "@/hooks/api/band/useBandMember";
+import { useBandMemberProfileQuery } from "@/hooks/api/band/useBandMemberProfile";
+import { getStoredAuthUser } from "@/utils/authUser";
+import { getPartLabel } from "@/utils/bandLabels";
+import { getCachedNickname } from "@/utils/bandMemberNicknameCache";
+import type {
+  BandMemberListItem,
+  BandMemberType,
+} from "@/types/band/bandMember";
+
+const MEMBER_TYPE_LABELS: Record<BandMemberType, string> = {
+  MEMBER: "멤버",
+  SESSION: "세션",
+};
+
+interface MemberRowProps {
+  member: BandMemberListItem;
+  isSelf: boolean;
+  onRemoveClick: (userId: number) => void;
+}
+
+const MemberRow = ({ member, isSelf, onRemoveClick }: MemberRowProps) => {
+  const profileQuery = useBandMemberProfileQuery(
+    member.bandMemberProfileId ?? NaN,
+  );
+  const profile = profileQuery.data;
+
+  const name = profile?.nickname ?? member.profileNickname ?? "닉네임 없음";
+  const roleLabel = profile?.part
+    ? `${MEMBER_TYPE_LABELS[member.memberType]} · ${getPartLabel(profile.part)}`
+    : MEMBER_TYPE_LABELS[member.memberType];
+
+  return (
+    <div className="flex items-center justify-between gap-4 rounded-lg bg-neutral-0 p-3 shadow-[0_0_8px_0_rgba(0,0,0,0.10)]">
+      <div className="flex min-w-0 flex-1 items-center gap-3">
+        <img
+          src={DefaultAvatar}
+          alt=""
+          className="size-10 shrink-0 rounded-full object-cover"
+        />
+
+        <div className="flex min-w-0 flex-col gap-0.75">
+          <span className="truncate text-caption3 text-neutral-900">
+            {name}
+            {isSelf ? " (나)" : ""}
+          </span>
+          <span className="truncate text-caption2 text-neutral-600">
+            {roleLabel}
+          </span>
+        </div>
+      </div>
+
+      {isSelf ? (
+        <span className="shrink-0 rounded-full border border-secondary-500 px-3 py-1 text-caption3 text-secondary-500">
+          운영자
+        </span>
+      ) : (
+        <button
+          type="button"
+          onClick={() => onRemoveClick(member.userId)}
+          className="shrink-0 text-caption4 text-neutral-500"
+        >
+          내보내기
+        </button>
+      )}
+    </div>
+  );
+};
 
 const InviteMemberPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const profile = useBandProfileStore((state) => state.profile);
-  const bandName = profile.name.trim() || "WAVY";
+  const activeBandId = useActiveBandId();
+  const bandId = activeBandId ?? NaN;
+  const myUserId = getStoredAuthUser()?.userId;
 
-  const members = useBandMembersStore((state) => state.members);
-  const pendingInvites = useBandMembersStore((state) => state.pendingInvites);
-  const removeMember = useBandMembersStore((state) => state.removeMember);
-  const cancelPendingInvite = useBandMembersStore(
-    (state) => state.cancelPendingInvite,
+  const { data: band } = useBandQuery(bandId);
+  const { data: members = [] } = useBandMembersQuery(bandId);
+  const removeMember = useRemoveBandMember(bandId);
+
+  const bandName = band?.name ?? "";
+  const activeMembers = members.filter((member) => member.status !== "INVITED");
+  const pendingMembers = members.filter(
+    (member) => member.status === "INVITED",
   );
 
-  const [removeTargetId, setRemoveTargetId] = useState<string | null>(null);
+  const [removeTargetId, setRemoveTargetId] = useState<number | null>(null);
+
   const [toastOpen, setToastOpen] = useState(
     () => Boolean((location.state as { invited?: boolean } | null)?.invited),
   );
+
+  const getPendingMemberName = (member: BandMemberListItem) => {
+    return (
+      member.profileNickname ?? getCachedNickname(member.userId) ?? "닉네임 없음"
+    );
+  };
 
   return (
     <main className="relative min-h-dvh bg-neutral-0 pb-24">
@@ -35,7 +117,7 @@ const InviteMemberPage = () => {
         <div className="px-6 pt-4">
           <NotificationBandBanner
             bandName={bandName}
-            description={`현재 선택된 밴드 · 멤버 ${profile.memberCount}명`}
+            description={`현재 선택된 밴드 · 멤버 ${band?.memberCount ?? 0}명`}
             action={
               <button
                 type="button"
@@ -48,48 +130,18 @@ const InviteMemberPage = () => {
           />
 
           <div className="mt-6 flex flex-col gap-3.5 px-2">
-            {members.map((member) => (
-              <div
+            {activeMembers.map((member) => (
+              <MemberRow
                 key={member.id}
-                className="flex items-center justify-between gap-4 rounded-lg bg-neutral-0 p-3 shadow-[0_0_8px_0_rgba(0,0,0,0.10)]"
-              >
-                <div className="flex min-w-0 flex-1 items-center gap-3">
-                  <img
-                    src={DefaultAvatar}
-                    alt=""
-                    className="size-10 shrink-0 rounded-full object-cover"
-                  />
-
-                  <div className="flex min-w-0 flex-col gap-0.75">
-                    <span className="truncate text-body6 text-neutral-900">
-                      {member.name}
-                      {member.isSelf ? " (나)" : ""}
-                    </span>
-                    <span className="truncate text-caption2 text-neutral-600">
-                      {member.roleLabel}
-                    </span>
-                  </div>
-                </div>
-
-                {member.isSelf ? (
-                  <span className="shrink-0 rounded-full border border-secondary-500 px-3 py-1 text-caption3 text-secondary-500">
-                    운영자
-                  </span>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setRemoveTargetId(member.id)}
-                    className="shrink-0 text-caption4 text-neutral-500"
-                  >
-                    내보내기
-                  </button>
-                )}
-              </div>
+                member={member}
+                isSelf={member.userId === myUserId}
+                onRemoveClick={setRemoveTargetId}
+              />
             ))}
           </div>
         </div>
 
-        {pendingInvites.length > 0 ? (
+        {pendingMembers.length > 0 ? (
           <>
             <div className="h-4 bg-neutral-200" />
 
@@ -99,9 +151,9 @@ const InviteMemberPage = () => {
               </h2>
 
               <div className="flex flex-col gap-3.5 px-8">
-                {pendingInvites.map((invite) => (
+                {pendingMembers.map((member) => (
                   <div
-                    key={invite.id}
+                    key={member.id}
                     className="flex items-center justify-between gap-4 rounded-lg bg-neutral-0 p-3 shadow-[0_0_8px_0_rgba(0,0,0,0.10)]"
                   >
                     <div className="flex min-w-0 flex-1 items-center gap-3">
@@ -112,8 +164,8 @@ const InviteMemberPage = () => {
                       />
 
                       <div className="flex min-w-0 flex-col gap-0.75">
-                        <span className="truncate text-body6 text-neutral-900">
-                          {invite.nickname}
+                        <span className="truncate text-caption3 text-neutral-900">
+                          {getPendingMemberName(member)}
                         </span>
                         <span className="truncate text-caption2 text-neutral-600">
                           초대 발송됨
@@ -123,7 +175,7 @@ const InviteMemberPage = () => {
 
                     <button
                       type="button"
-                      onClick={() => cancelPendingInvite(invite.id)}
+                      onClick={() => removeMember.mutate(member.userId)}
                       className="shrink-0 text-right text-caption3 text-error"
                     >
                       취소
@@ -146,8 +198,10 @@ const InviteMemberPage = () => {
           description="내보낸 멤버는 밴드에서 제거됩니다."
           confirmLabel="내보내기"
           onCancel={() => setRemoveTargetId(null)}
-          onConfirm={() => {
-            if (removeTargetId) removeMember(removeTargetId);
+          onConfirm={async () => {
+            if (removeTargetId !== null) {
+              await removeMember.mutateAsync(removeTargetId);
+            }
             setRemoveTargetId(null);
           }}
         />

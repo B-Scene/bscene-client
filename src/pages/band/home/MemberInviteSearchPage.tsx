@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import SearchIcon from "@/assets/icons/band/search.svg";
 import SearchActiveIcon from "@/assets/icons/band/search-active.svg";
@@ -9,45 +9,66 @@ import { Header } from "@/components/band/home/Header";
 import { ModalOverlay } from "@/components/common/Modal/ModalOverlay";
 import { Toast } from "@/components/common/Toast/Toast";
 import Modal from "@/components/Modal/Modal";
-import { useBandProfileStore } from "@/stores/useBandProfileStore";
-import { useBandMembersStore } from "@/stores/useBandMembersStore";
+import { useActiveBandId } from "@/hooks/api/user/useMyProfiles";
+import { useBandQuery } from "@/hooks/api/band/useBand";
+import {
+  useBandMemberCandidatesQuery,
+  useInviteBandMember,
+} from "@/hooks/api/band/useBandMember";
+import { cacheNicknames } from "@/utils/bandMemberNicknameCache";
+import type { BandMemberSearchItem } from "@/types/band/bandMember";
 
-type InviteStatus = "invite" | "member" | "pending";
+type InviteBadge = "invite" | "member" | "pending" | "unavailable";
 
-interface SearchUser {
-  id: string;
-  nickname: string;
-  part: string;
-  status: InviteStatus;
-}
+const getInviteBadge = (candidate: BandMemberSearchItem): InviteBadge => {
+  if (candidate.bandMemberStatus === "INVITED") {
+    return "pending";
+  }
 
-const INITIAL_RESULTS: SearchUser[] = [
-  { id: "1", nickname: "이름", part: "파트", status: "invite" },
-  { id: "2", nickname: "이름", part: "파트", status: "invite" },
-  { id: "3", nickname: "이름", part: "파트", status: "member" },
-  { id: "4", nickname: "이름", part: "파트", status: "pending" },
-];
+  if (candidate.bandMemberStatus === "ACCEPTED") {
+    return "member";
+  }
+
+  if (candidate.bandMemberStatus) {
+    return "unavailable";
+  }
+
+  return candidate.inviteAvailable ? "invite" : "unavailable";
+};
 
 const MemberInviteSearchPage = () => {
   const navigate = useNavigate();
-  const profile = useBandProfileStore((state) => state.profile);
-  const bandName = profile.name.trim() || "WAVY";
-  const addPendingInvite = useBandMembersStore(
-    (state) => state.addPendingInvite,
-  );
+  const activeBandId = useActiveBandId();
+  const bandId = activeBandId ?? NaN;
+  const { data: band } = useBandQuery(bandId);
+  const bandName = band?.name ?? "";
 
   const [search, setSearch] = useState("");
   const [isFocused, setIsFocused] = useState(false);
-  const [results, setResults] = useState(INITIAL_RESULTS);
-  const [inviteTargetId, setInviteTargetId] = useState<string | null>(null);
+  const [inviteTargetId, setInviteTargetId] = useState<number | null>(null);
   const [showCopyToast, setShowCopyToast] = useState(false);
 
   const isSearchActive = isFocused || search.length > 0;
   const showResults = search.trim().length > 0;
-  const filteredResults = results.filter((user) =>
-    user.nickname.includes(search.trim()),
+
+  const candidatesQuery = useBandMemberCandidatesQuery(bandId, search);
+  const candidates = candidatesQuery.data ?? [];
+  const inviteMutation = useInviteBandMember(bandId);
+
+  useEffect(() => {
+    if (!candidatesQuery.data) return;
+
+    cacheNicknames(
+      candidatesQuery.data.map((candidate) => ({
+        userId: candidate.userId,
+        nickname: candidate.nickname,
+      })),
+    );
+  }, [candidatesQuery.data]);
+
+  const inviteTarget = candidates.find(
+    (candidate) => candidate.userId === inviteTargetId,
   );
-  const inviteTarget = results.find((user) => user.id === inviteTargetId);
 
   const handleCopyInviteLink = async () => {
     try {
@@ -58,15 +79,13 @@ const MemberInviteSearchPage = () => {
     }
   };
 
-  const handleConfirmInvite = () => {
+  const handleConfirmInvite = async () => {
     if (!inviteTarget) return;
 
-    setResults((prev) =>
-      prev.map((user) =>
-        user.id === inviteTarget.id ? { ...user, status: "pending" } : user,
-      ),
-    );
-    addPendingInvite(inviteTarget.nickname);
+    await inviteMutation.mutateAsync({
+      userId: inviteTarget.userId,
+      memberType: "MEMBER",
+    });
     navigate("/band/profile/invite", { state: { invited: true } });
   };
 
@@ -106,7 +125,7 @@ const MemberInviteSearchPage = () => {
           ) : null}
         </div>
 
-        {showResults && filteredResults.length === 0 ? (
+        {showResults && candidates.length === 0 ? (
           <div className="mt-16 flex flex-col items-center gap-6 px-4 text-center">
             <div className="flex flex-col gap-3">
               <h3 className="text-label1 text-neutral-900">
@@ -129,47 +148,52 @@ const MemberInviteSearchPage = () => {
           </div>
         ) : showResults ? (
           <div className="mt-6 flex flex-col gap-4 px-4">
-            {filteredResults.map((user) => (
-              <div
-                key={user.id}
-                className="flex items-center justify-between gap-4"
-              >
-                <div className="flex min-w-0 flex-1 items-center gap-3">
-                  <img
-                    src={DefaultAvatar}
-                    alt=""
-                    className="size-10 shrink-0 rounded-full object-cover"
-                  />
+            {candidates.map((candidate) => {
+              const badge = getInviteBadge(candidate);
 
-                  <div className="flex min-w-0 flex-col gap-1">
-                    <span className="truncate text-body6 text-neutral-900">
-                      {user.nickname}
-                    </span>
-                    <span className="truncate text-caption2 text-neutral-600">
-                      {user.part}
-                    </span>
+              return (
+                <div
+                  key={candidate.userId}
+                  className="flex items-center justify-between gap-4"
+                >
+                  <div className="flex min-w-0 flex-1 items-center gap-3">
+                    <img
+                      src={DefaultAvatar}
+                      alt=""
+                      className="size-10 shrink-0 rounded-full object-cover"
+                    />
+
+                    <div className="flex min-w-0 flex-col gap-1">
+                      <span className="truncate text-body6 text-neutral-900">
+                        {candidate.nickname}
+                      </span>
+                    </div>
                   </div>
-                </div>
 
-                {user.status === "invite" ? (
-                  <button
-                    type="button"
-                    onClick={() => setInviteTargetId(user.id)}
-                    className="flex h-6.5 w-13.25 shrink-0 items-center justify-center rounded-lg border border-secondary-500 text-caption3 text-secondary-500"
-                  >
-                    초대
-                  </button>
-                ) : user.status === "member" ? (
-                  <span className="flex h-6.5 w-13.25 shrink-0 items-center justify-center rounded-lg bg-secondary-400 text-caption3 text-neutral-0">
-                    멤버
-                  </span>
-                ) : (
-                  <span className="flex h-6.5 w-13.25 shrink-0 items-center justify-center rounded-lg bg-secondary-100 text-caption3 text-secondary-400">
-                    대기
-                  </span>
-                )}
-              </div>
-            ))}
+                  {badge === "invite" ? (
+                    <button
+                      type="button"
+                      onClick={() => setInviteTargetId(candidate.userId)}
+                      className="flex h-6.5 w-13.25 shrink-0 items-center justify-center rounded-lg border border-secondary-500 text-caption3 text-secondary-500"
+                    >
+                      초대
+                    </button>
+                  ) : badge === "member" ? (
+                    <span className="flex h-6.5 w-13.25 shrink-0 items-center justify-center rounded-lg bg-secondary-400 text-caption3 text-neutral-0">
+                      멤버
+                    </span>
+                  ) : badge === "pending" ? (
+                    <span className="flex h-6.5 w-13.25 shrink-0 items-center justify-center rounded-lg bg-secondary-100 text-caption3 text-secondary-400">
+                      대기
+                    </span>
+                  ) : (
+                    <span className="flex h-6.5 w-13.25 shrink-0 items-center justify-center rounded-lg bg-neutral-300 text-caption3 text-neutral-500">
+                      초대불가
+                    </span>
+                  )}
+                </div>
+              );
+            })}
           </div>
         ) : null}
       </div>
