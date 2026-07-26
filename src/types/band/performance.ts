@@ -22,14 +22,35 @@ export type PerformanceGenre =
 
 export type PerformanceAgeRating = "ALL" | "AGE_12" | "AGE_15" | "AGE_19";
 
+// 공연 등록/수정 API는 밴드 프로필의 BandRegion(전체 대문자)과 달리
+// 첫 글자만 대문자인 지역명 문자열을 요구한다 (예: "Gyeonggi").
+export type PerformanceRegion =
+  | "Seoul"
+  | "Gyeonggi"
+  | "Incheon"
+  | "Busan"
+  | "Daegu"
+  | "Gwangju"
+  | "Daejeon"
+  | "Ulsan"
+  | "Sejong"
+  | "Chungbuk"
+  | "Chungnam"
+  | "Jeonbuk"
+  | "Jeonnam"
+  | "Gyeongbuk"
+  | "Gyeongnam"
+  | "Gangwon"
+  | "Jeju";
+
 export interface CreatePerformanceRequest {
   title: string;
   performanceDate: string;
   startTime: string;
-  region: BandRegion;
+  region: PerformanceRegion;
   venue: string;
   description: string;
-  ticketPrice: number;
+  ticketPrice: string;
   ticketLink?: string;
   posterImageUrl?: string;
   genre: PerformanceGenre;
@@ -61,10 +82,10 @@ export interface UpdatePerformanceRequest {
   title?: string;
   performanceDate?: string;
   startTime?: string;
-  region?: BandRegion;
+  region?: PerformanceRegion;
   venue?: string;
   description?: string;
-  ticketPrice?: number;
+  ticketPrice?: string;
   ticketLink?: string;
   posterImageUrl?: string;
   ageRating?: PerformanceAgeRating;

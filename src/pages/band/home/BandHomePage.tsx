@@ -290,6 +290,8 @@ const BandHomePage = () => {
                       location={performance.venue}
                       dateTime={cardProps.dateTime}
                       status="등록 완료"
+                      showThumbnail={Boolean(performance.posterImageUrl)}
+                      thumbnailSrc={performance.posterImageUrl ?? undefined}
                       actions={
                         <>
                           <button

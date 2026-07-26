@@ -3,6 +3,7 @@ import type { BandMemberPart } from "@/types/band/bandMember";
 import type {
   PerformanceAgeRating,
   PerformanceGenre,
+  PerformanceRegion,
 } from "@/types/band/performance";
 
 export const BAND_REGION_LABELS: Record<BandRegion, string> = {
@@ -70,6 +71,30 @@ export const getGenreLabel = (genre: string) =>
 
 export const getRegionLabel = (region: string) =>
   BAND_REGION_LABELS[region as BandRegion] ?? region;
+
+// 공연 등록/수정 API 전용: BandRegion(전체 대문자) -> PerformanceRegion(첫 글자만 대문자)
+export const PERFORMANCE_REGION_BY_BAND_REGION: Record<
+  BandRegion,
+  PerformanceRegion
+> = {
+  SEOUL: "Seoul",
+  GYEONGGI: "Gyeonggi",
+  INCHEON: "Incheon",
+  BUSAN: "Busan",
+  DAEGU: "Daegu",
+  GWANGJU: "Gwangju",
+  DAEJEON: "Daejeon",
+  ULSAN: "Ulsan",
+  SEJONG: "Sejong",
+  CHUNGBUK: "Chungbuk",
+  CHUNGNAM: "Chungnam",
+  JEONBUK: "Jeonbuk",
+  JEONNAM: "Jeonnam",
+  GYEONGBUK: "Gyeongbuk",
+  GYEONGNAM: "Gyeongnam",
+  GANGWON: "Gangwon",
+  JEJU: "Jeju",
+};
 
 export const BAND_MEMBER_PART_LABELS: Record<BandMemberPart, string> = {
   VOCAL: "보컬",

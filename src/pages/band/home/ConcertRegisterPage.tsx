@@ -35,6 +35,7 @@ import {
   PERFORMANCE_GENRE_BY_LABEL,
   PERFORMANCE_GENRE_LABELS,
   PERFORMANCE_GENRE_LABEL_OPTIONS,
+  PERFORMANCE_REGION_BY_BAND_REGION,
 } from "@/utils/bandLabels";
 import CalendarIcon from "@/assets/icons/band/data-range.svg";
 import ClockIcon from "@/assets/icons/band/clock-band.svg";
@@ -291,7 +292,11 @@ const ConcertRegisterForm = ({
     }
 
     const regionValue = BAND_REGION_BY_LABEL[region];
+    const performanceRegionValue = PERFORMANCE_REGION_BY_BAND_REGION[regionValue];
     const ageRatingValue = PERFORMANCE_AGE_RATING_BY_LABEL[ageRating];
+    const ticketPriceValue = String(
+      Number(price.replace(/[^0-9]/g, "")) || 0,
+    );
 
     setUploadError(null);
     let uploadedPosterUrl = posterUrl;
@@ -335,10 +340,10 @@ const ConcertRegisterForm = ({
           title,
           performanceDate: startDate,
           startTime: time,
-          region: regionValue,
+          region: performanceRegionValue,
           venue: location,
           description,
-          ticketPrice: Number(price.replace(/[^0-9]/g, "")) || 0,
+          ticketPrice: ticketPriceValue,
           ticketLink: ticketLink.trim() || undefined,
           posterImageUrl: uploadedPosterUrl || undefined,
           ageRating: ageRatingValue,
@@ -355,10 +360,10 @@ const ConcertRegisterForm = ({
         genre: PERFORMANCE_GENRE_BY_LABEL[genre],
         performanceDate: startDate,
         startTime: time,
-        region: regionValue,
+        region: performanceRegionValue,
         venue: location,
         description,
-        ticketPrice: Number(price.replace(/[^0-9]/g, "")) || 0,
+        ticketPrice: ticketPriceValue,
         ticketLink: ticketLink.trim() || undefined,
         posterImageUrl: uploadedPosterUrl || undefined,
         ageRating: ageRatingValue,
