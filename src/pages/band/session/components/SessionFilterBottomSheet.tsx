@@ -28,7 +28,14 @@ export const SessionFilterBottomSheet = ({
     }));
   };
 
+  const hasChanges = Object.keys(draftValues).some((key) => {
+    const filterKey = key as SessionFilterKey;
+    return draftValues[filterKey] !== values[filterKey];
+  });
+
   const handleApply = () => {
+    if (!hasChanges) return;
+
     onApply(draftValues);
     onClose();
   };
@@ -37,21 +44,22 @@ export const SessionFilterBottomSheet = ({
     <div
       role="presentation"
       onClick={handleOverlayClick}
-      className="fixed inset-0 z-40 flex items-end bg-neutral-900/70"
+      className="fixed inset-0 z-50 flex items-end bg-neutral-900/70"
     >
       <section
         role="dialog"
         aria-modal="true"
         aria-label="필터"
-        className="h-[610px] w-full rounded-t-[24px] bg-neutral-0"
+        className="flex h-[610px] w-full flex-col rounded-t-[24px] bg-neutral-0"
       >
-        <header className="h-[70px] px-6 pt-3">
+        <header className="h-[70px] shrink-0 px-6 pt-3">
           <div className="mx-auto h-1.5 w-14 rounded-full bg-neutral-300" />
           <h2 className="mt-5 text-center text-h4 text-neutral-900">필터</h2>
         </header>
 
-        <div className="flex h-[540px] flex-col px-10 pb-5">
-          <div className="flex flex-1 flex-col gap-3">
+        <div className="flex min-h-0 flex-1 flex-col px-5 pb-5">
+          <div className="min-h-0 flex-1 overflow-y-auto px-3">
+            <div className="flex flex-col gap-3">
             {SESSION_FILTER_GROUPS.map((group) => (
               <FilterGroup
                 key={group.id}
@@ -61,12 +69,19 @@ export const SessionFilterBottomSheet = ({
                 onSelect={(option) => handleSelect(group.id, option)}
               />
             ))}
+            </div>
           </div>
 
           <button
             type="button"
             onClick={handleApply}
-            className="mt-4 flex h-[52px] w-[353px] shrink-0 self-center items-center justify-center rounded-[12px] bg-secondary-500 text-label2 text-neutral-0"
+            disabled={!hasChanges}
+            className={[
+              "mt-4 flex h-[52px] w-[353px] max-w-full shrink-0 self-center items-center justify-center rounded-[12px] text-label2",
+              hasChanges
+                ? "bg-secondary-500 text-neutral-0"
+                : "bg-neutral-300 text-neutral-600",
+            ].join(" ")}
           >
             선택완료
           </button>
@@ -87,7 +102,7 @@ const FilterGroup = ({ title, options, selectedValue, onSelect }: FilterGroupPro
   return (
     <section>
       <h3 className="text-label1 text-neutral-900">{title}</h3>
-      <div className="mt-2 grid grid-cols-5 gap-x-2 gap-y-1.5">
+      <div className="mt-2 flex flex-wrap gap-x-1.5 gap-y-1.5">
         {options.map((option) => {
           const isSelected = selectedValue === option;
 
@@ -97,7 +112,7 @@ const FilterGroup = ({ title, options, selectedValue, onSelect }: FilterGroupPro
               type="button"
               onClick={() => onSelect(option)}
               className={[
-                "flex h-[26px] items-center justify-center rounded-full text-caption3",
+                "flex h-[26px] items-center justify-center rounded-full px-3 text-caption3",
                 isSelected ? "bg-secondary-500 text-neutral-0" : "bg-neutral-300 text-neutral-600",
               ].join(" ")}
             >

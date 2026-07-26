@@ -1,15 +1,20 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   useAddSessionRecruitmentInterest,
   useRemoveSessionRecruitmentInterest,
   useSessionRecruitmentsQuery,
 } from "@/hooks/api/session/useSessionRecruitment";
-import type { SessionRecruitmentListItem } from "@/types/session/sessionRecruitment";
+import type {
+  SessionRecruitmentListItem,
+  SessionRecruitmentSort,
+} from "@/types/session/sessionRecruitment";
 import { INITIAL_SESSION_FILTERS } from "../data/sessionRecruitmentPosts";
 import type { SessionFilterValues, SessionRecruitmentPost, SessionTabId } from "../types";
 import { FloatingCreateButton } from "./FloatingCreateButton";
 import { RecruitmentPostCard } from "./RecruitmentPostCard";
 import { SessionApplicationsScreen } from "./SessionApplicationsScreen";
+import { SessionApplicationDetailScreen } from "./SessionApplicationDetailScreen";
 import { SessionBasicProfileEditScreen } from "./SessionBasicProfileEditScreen";
 import { SessionFilterBar } from "./SessionFilterBar";
 import { SessionFilterBottomSheet } from "./SessionFilterBottomSheet";
@@ -31,6 +36,7 @@ const mapRecruitmentToPost = (
 ): SessionRecruitmentPost => {
   return {
     id: recruitment.sessionRecruitmentId,
+    isMine: recruitment.isMine ?? false,
     deadline: toDeadlineLabel(recruitment.dDay),
     title: recruitment.recruitmentTitle,
     bandName: recruitment.bandName,
@@ -42,9 +48,13 @@ const mapRecruitmentToPost = (
   };
 };
 
-const createFallbackPost = (sessionRecruitmentId: number): SessionRecruitmentPost => {
+const createFallbackPost = (
+  sessionRecruitmentId: number,
+  isMine = false,
+): SessionRecruitmentPost => {
   return {
     id: sessionRecruitmentId,
+    isMine,
     deadline: "",
     title: "",
     bandName: "",
@@ -57,15 +67,20 @@ const createFallbackPost = (sessionRecruitmentId: number): SessionRecruitmentPos
 };
 
 export const RecruitmentNoticeScreen = () => {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<SessionTabId>("recruitment");
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [filterValues, setFilterValues] =
     useState<SessionFilterValues>(INITIAL_SESSION_FILTERS);
+  const [sort, setSort] =
+    useState<SessionRecruitmentSort>("LATEST");
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isBasicProfileEditOpen, setIsBasicProfileEditOpen] = useState(false);
   const [selectedPostId, setSelectedPostId] = useState<number | null>(null);
+  const [selectedApplicationId, setSelectedApplicationId] = useState<number | null>(null);
   const [deletedPostIds, setDeletedPostIds] = useState<number[]>([]);
+  const [createdPostIds, setCreatedPostIds] = useState<number[]>([]);
   const [bookmarkOverrides, setBookmarkOverrides] = useState<Record<number, boolean>>({});
 
   const addInterestMutation = useAddSessionRecruitmentInterest();
@@ -73,7 +88,7 @@ export const RecruitmentNoticeScreen = () => {
 
   const sessionRecruitmentsQuery = useSessionRecruitmentsQuery({
     size: 20,
-    sort: "LATEST",
+    sort,
   });
 
   const posts = useMemo(() => {
@@ -102,8 +117,13 @@ export const RecruitmentNoticeScreen = () => {
   const selectedPost = useMemo(() => {
     if (!selectedPostId) return null;
 
-    return posts.find((post) => post.id === selectedPostId) ?? createFallbackPost(selectedPostId);
-  }, [posts, selectedPostId]);
+    const isCreatedByCurrentUser = createdPostIds.includes(selectedPostId);
+    const post =
+      posts.find((candidate) => candidate.id === selectedPostId) ??
+      createFallbackPost(selectedPostId, isCreatedByCurrentUser);
+
+    return isCreatedByCurrentUser ? { ...post, isMine: true } : post;
+  }, [createdPostIds, posts, selectedPostId]);
 
   const handleToggleBookmark = (postId: number) => {
     const currentPost = posts.find((post) => post.id === postId);
@@ -141,6 +161,11 @@ export const RecruitmentNoticeScreen = () => {
           setIsCreateOpen(false);
 
           if (sessionRecruitmentId) {
+            setCreatedPostIds((currentIds) =>
+              currentIds.includes(sessionRecruitmentId)
+                ? currentIds
+                : [...currentIds, sessionRecruitmentId],
+            );
             setSelectedPostId(sessionRecruitmentId);
             sessionRecruitmentsQuery.refetch();
           }
@@ -163,6 +188,15 @@ export const RecruitmentNoticeScreen = () => {
     );
   }
 
+  if (selectedApplicationId) {
+    return (
+      <SessionApplicationDetailScreen
+        sessionApplicationId={selectedApplicationId}
+        onBack={() => setSelectedApplicationId(null)}
+      />
+    );
+  }
+
   if (selectedPost) {
     return (
       <SessionRecruitmentDetailScreen
@@ -170,18 +204,24 @@ export const RecruitmentNoticeScreen = () => {
         onBack={() => setSelectedPostId(null)}
         onToggleBookmark={handleToggleBookmark}
         onDeletePost={handleDeletePost}
+        onPreviewApplication={setSelectedApplicationId}
       />
     );
   }
 
   return (
     <main className="relative min-h-dvh bg-neutral-0 pb-[calc(var(--bottom-nav-height)+24px)]">
-      <SessionPageHeader onSearch={() => setIsSearchOpen(true)} />
+      <SessionPageHeader
+        onSearch={() => setIsSearchOpen(true)}
+        onMessages={() => navigate("/band/session/messages")}
+      />
       <SessionTabs activeTab={activeTab} onTabChange={setActiveTab} />
 
       {activeTab !== "applications" ? (
         <SessionFilterBar
           values={filterValues}
+          sort={sort}
+          onSortChange={setSort}
           showBottomBorder={activeTab !== "find"}
           compactHeight={activeTab === "find"}
           onOpenFilter={() => setIsFilterOpen(true)}
@@ -225,7 +265,24 @@ export const RecruitmentNoticeScreen = () => {
       ) : activeTab === "find" ? (
         <SessionFindScreen values={filterValues} />
       ) : activeTab === "applications" ? (
-        <SessionApplicationsScreen onEditBasicInfo={() => setIsBasicProfileEditOpen(true)} />
+        <SessionApplicationsScreen
+          onEditBasicInfo={() => setIsBasicProfileEditOpen(true)}
+          onBrowseRecruitments={() => setActiveTab("recruitment")}
+          onViewHistoryApplication={(application) =>
+            setSelectedApplicationId(application.id)
+          }
+          onMessage={(application) =>
+            navigate(`/band/session/messages/${application.id}`, {
+              state: {
+                senderName: application.bandName,
+              },
+            })
+          }
+          onOpenRecruitment={(recruitment) => {
+            setActiveTab("recruitment");
+            setSelectedPostId(recruitment.id);
+          }}
+        />
       ) : null}
 
       {activeTab === "recruitment" ? (

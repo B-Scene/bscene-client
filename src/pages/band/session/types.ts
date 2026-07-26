@@ -7,6 +7,7 @@ export interface SessionTabItem {
 
 export interface SessionRecruitmentPost {
   id: number;
+  isMine?: boolean;
   deadline: string;
   title: string;
   bandName: string;

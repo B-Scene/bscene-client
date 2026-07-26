@@ -16,7 +16,10 @@ import {
   useSessionRecruitmentsQuery,
   useSessionSearchHistoryQuery,
 } from "@/hooks/api/session/useSessionRecruitment";
-import type { SessionRecruitmentListItem } from "@/types/session/sessionRecruitment";
+import type {
+  SessionRecruitmentListItem,
+  SessionRecruitmentSort,
+} from "@/types/session/sessionRecruitment";
 import type { SessionFilterValues, SessionRecruitmentPost } from "../types";
 import { RecruitmentPostCard } from "./RecruitmentPostCard";
 import { SessionFilterBar } from "./SessionFilterBar";
@@ -59,6 +62,8 @@ export const SessionSearchScreen = ({
   const [keyword, setKeyword] = useState("");
   const [submittedKeyword, setSubmittedKeyword] = useState("");
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [sort, setSort] =
+    useState<SessionRecruitmentSort>("LATEST");
   const [bookmarkOverrides, setBookmarkOverrides] = useState<Record<number, boolean>>({});
 
   const searchHistoryQuery = useSessionSearchHistoryQuery();
@@ -73,7 +78,7 @@ export const SessionSearchScreen = ({
   const searchResultQuery = useSessionRecruitmentsQuery(
     {
       keyword: submittedKeyword,
-      sort: "LATEST",
+      sort,
       size: 20,
     },
     isResultMode,
@@ -169,6 +174,8 @@ export const SessionSearchScreen = ({
 
         <SessionFilterBar
           values={values}
+          sort={sort}
+          onSortChange={setSort}
           showSelectedValues={false}
           onOpenFilter={() => setIsFilterOpen(true)}
         />

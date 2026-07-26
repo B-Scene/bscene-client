@@ -1,5 +1,10 @@
+import { useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
+
 import ArrowLeftIcon from "@/assets/icons/arrow-left.svg";
 import UserDefaultProfileIcon from "@/assets/icons/band/user-default-profile.svg";
+import PlayButtonIcon from "@/assets/icons/band/play-button.svg";
+import Button from "@/components/common/Button/Button";
 import { useSessionApplicationDetailQuery } from "@/hooks/api/session/useSessionApplication";
 
 interface SessionApplicationDetailScreenProps {
@@ -7,154 +12,447 @@ interface SessionApplicationDetailScreenProps {
   onBack: () => void;
 }
 
+type DetailSectionId =
+  | "introduction"
+  | "information"
+  | "career"
+  | "portfolio";
+
+interface DetailTab {
+  id: DetailSectionId;
+  label: string;
+}
+
+const DETAIL_TABS: DetailTab[] = [
+  {
+    id: "introduction",
+    label: "소개",
+  },
+  {
+    id: "information",
+    label: "정보",
+  },
+  {
+    id: "career",
+    label: "경력",
+  },
+  {
+    id: "portfolio",
+    label: "포트폴리오",
+  },
+];
+
+const DetailChip = ({
+  children,
+}: {
+  children: string;
+}) => {
+  return (
+    <span className="inline-flex h-[26px] items-center justify-center rounded-[8px] border border-neutral-400 bg-neutral-0 px-[15px] text-caption3 text-neutral-600">
+      {children}
+    </span>
+  );
+};
+
 export const SessionApplicationDetailScreen = ({
   sessionApplicationId,
   onBack,
 }: SessionApplicationDetailScreenProps) => {
-  const detailQuery = useSessionApplicationDetailQuery(sessionApplicationId);
+  const navigate = useNavigate();
+  const detailQuery =
+    useSessionApplicationDetailQuery(
+      sessionApplicationId,
+    );
+
   const detail = detailQuery.data;
 
+  const [activeSection, setActiveSection] =
+    useState<DetailSectionId>(
+      "introduction",
+    );
+
+  const sectionRefs = useRef<
+    Record<
+      DetailSectionId,
+      HTMLElement | null
+    >
+  >({
+    introduction: null,
+    information: null,
+    career: null,
+    portfolio: null,
+  });
+
+  const moveToSection = (
+    sectionId: DetailSectionId,
+  ) => {
+    setActiveSection(sectionId);
+
+    sectionRefs.current[
+      sectionId
+    ]?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  };
+
   return (
-    <main className="min-h-dvh bg-neutral-0 pb-[calc(var(--bottom-nav-height)+24px)]">
-      <header className="relative flex h-12 w-full items-center justify-center bg-neutral-0 px-[15px] py-[5px]">
+    <main className="fixed inset-0 z-50 mx-auto w-full max-w-[393px] overflow-y-auto bg-neutral-0 pb-[92px]">
+      <header className="flex h-12 w-full items-center bg-neutral-0 px-[15px] py-[5px]">
         <button
           type="button"
           aria-label="뒤로가기"
           onClick={onBack}
-          className="absolute top-[5px] left-[15px] flex size-[38px] items-center justify-center"
+          className="flex size-[38px] items-center justify-center"
         >
-          <img src={ArrowLeftIcon} alt="" className="size-6" />
+          <img
+            src={ArrowLeftIcon}
+            alt=""
+            className="size-6"
+          />
         </button>
-        <h1 className="text-body1 text-neutral-900">세션 지원서</h1>
       </header>
 
       {detailQuery.isLoading ? (
-        <section className="flex min-h-[360px] items-center justify-center text-caption1 text-neutral-500">
+        <section className="flex min-h-[560px] items-center justify-center text-caption1 text-neutral-500">
           지원서 정보를 불러오고 있어요
         </section>
       ) : detailQuery.isError ? (
-        <section className="flex min-h-[360px] flex-col items-center justify-center px-6 text-center">
+        <section className="flex min-h-[560px] flex-col items-center justify-center px-6 text-center">
           <p className="text-caption1 text-neutral-500">
-            지원서 정보를 불러오지 못했어요
+            지원서 정보를 불러오지
+            못했어요
           </p>
+
           <button
             type="button"
-            onClick={() => detailQuery.refetch()}
+            onClick={() =>
+              detailQuery.refetch()
+            }
             className="mt-3 rounded-[8px] bg-secondary-500 px-4 py-2 text-caption2 text-neutral-0"
           >
             다시 시도
           </button>
         </section>
       ) : detail ? (
-        <section className="flex flex-col gap-4 px-6 pt-5">
-          <article className="rounded-[12px] bg-neutral-0 px-5 py-4 shadow-[0_0_8px_rgba(0,0,0,0.08)]">
-            <div className="flex gap-4">
+        <>
+          <section className="px-6 pt-[25px] pb-[30px]">
+            <h1 className="text-h3 text-neutral-900">
+              {detail.title}
+            </h1>
+
+            <div className="mt-[30px] flex items-center gap-[32px]">
               <img
-                src={detail.profileImageUrl || UserDefaultProfileIcon}
+                src={
+                  detail.profileImageUrl ||
+                  UserDefaultProfileIcon
+                }
                 alt=""
-                className="size-[58px] shrink-0 rounded-full object-cover"
+                className="size-24 shrink-0 rounded-full object-cover"
               />
 
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <strong className="text-label1 text-neutral-900">
-                    {detail.nickname}
-                  </strong>
-                  <span className="inline-flex h-[22px] min-w-[48px] items-center justify-center rounded-full bg-secondary-0 px-3 text-caption3 font-semibold text-secondary-500">
-                    {detail.skillLevel}
-                  </span>
-                </div>
-                <p className="mt-1 text-caption2 text-neutral-600">
-                  {detail.part} · {detail.genre} · {detail.region}
-                </p>
-                <p className="mt-3 text-caption2 text-neutral-800">
-                  {detail.oneLineIntro}
+              <div className="min-w-0">
+                <strong className="block truncate text-label1 text-neutral-900">
+                  {detail.nickname}
+                </strong>
+
+                <p className="mt-2 truncate text-caption3 text-neutral-600">
+                  {detail.part} ·{" "}
+                  {detail.skillLevel} ·{" "}
+                  {detail.region}
                 </p>
               </div>
             </div>
-          </article>
+          </section>
 
-          <article className="rounded-[12px] bg-neutral-0 px-5 py-4 shadow-[0_0_8px_rgba(0,0,0,0.08)]">
-            <h2 className="text-label1 text-neutral-900">{detail.title}</h2>
-            <p className="mt-3 whitespace-pre-line text-caption2 text-neutral-800">
-              {detail.intro || "자기소개가 없습니다."}
-            </p>
-          </article>
+          <nav
+            aria-label="세션 지원서 상세 메뉴"
+            className="grid h-12 grid-cols-4 border-b border-neutral-400 bg-neutral-0"
+          >
+            {DETAIL_TABS.map((tab) => {
+              const isActive =
+                activeSection === tab.id;
 
-          <article className="rounded-[12px] bg-neutral-0 px-5 py-4 shadow-[0_0_8px_rgba(0,0,0,0.08)]">
-            <h2 className="text-label1 text-neutral-900">가능 활동</h2>
-            {detail.availableActivities.length > 0 ? (
-              <div className="mt-3 flex flex-wrap gap-2">
-                {detail.availableActivities.map((activity) => (
-                  <span
-                    key={activity}
-                    className="rounded-full bg-secondary-0 px-3 py-1 text-caption3 font-semibold text-secondary-500"
-                  >
-                    {activity}
-                  </span>
-                ))}
-              </div>
-            ) : (
-              <p className="mt-3 text-caption2 text-neutral-600">
-                등록된 가능 활동이 없어요
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() =>
+                    moveToSection(tab.id)
+                  }
+                  className={`relative flex items-center justify-center text-body1 ${
+                    isActive
+                      ? "text-neutral-900"
+                      : "text-neutral-400"
+                  }`}
+                >
+                  {tab.label}
+
+                  {isActive ? (
+                    <span className="absolute inset-x-0 bottom-[-1px] h-0.5 bg-secondary-500" />
+                  ) : null}
+                </button>
+              );
+            })}
+          </nav>
+
+          <div className="px-6">
+            <section
+              ref={(element) => {
+                sectionRefs.current.introduction =
+                  element;
+              }}
+              className="scroll-mt-4 border-b border-neutral-300 py-[28px]"
+            >
+              <h2 className="text-label1 text-neutral-900">
+                세션 소개
+              </h2>
+
+              <p className="mt-5 whitespace-pre-line text-body1 text-secondary-500">
+                “
+                {detail.oneLineIntro ||
+                  "등록된 한줄 소개가 없어요"}
+                ”
               </p>
-            )}
-          </article>
 
-          <article className="rounded-[12px] bg-neutral-0 px-5 py-4 shadow-[0_0_8px_rgba(0,0,0,0.08)]">
-            <h2 className="text-label1 text-neutral-900">경력</h2>
-            {detail.careers.length > 0 ? (
-              <div className="mt-3 flex flex-col gap-3">
-                {detail.careers.map((career) => (
-                  <div key={career.sessionApplicationCareerId}>
-                    <h3 className="text-body1 font-semibold text-neutral-900">
-                      {career.name}
-                    </h3>
-                    <p className="mt-1 text-caption3 text-neutral-500">
-                      {career.period}
-                    </p>
-                    <p className="mt-1 text-caption2 text-neutral-800">
-                      {career.description}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="mt-3 text-caption2 text-neutral-600">
-                등록된 경력이 없어요
+              <p className="mt-3 whitespace-pre-line text-caption2 text-neutral-800">
+                {detail.intro ||
+                  "자기소개가 없습니다."}
               </p>
-            )}
-          </article>
+            </section>
 
-          <article className="rounded-[12px] bg-neutral-0 px-5 py-4 shadow-[0_0_8px_rgba(0,0,0,0.08)]">
-            <h2 className="text-label1 text-neutral-900">포트폴리오</h2>
-            {detail.portfolioLinks.length > 0 ? (
-              <div className="mt-3 flex flex-col gap-3">
-                {detail.portfolioLinks.map((link) => (
-                  <a
-                    key={link.sessionApplicationLinkId}
-                    href={link.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="block rounded-[8px] border border-neutral-300 px-3 py-2"
-                  >
-                    <p className="text-body1 font-semibold text-neutral-900">
-                      {link.title}
-                    </p>
-                    <p className="mt-1 truncate text-caption3 text-neutral-500">
-                      {link.url}
-                    </p>
-                  </a>
-                ))}
-              </div>
-            ) : (
-              <p className="mt-3 text-caption2 text-neutral-600">
-                등록된 포트폴리오가 없어요
-              </p>
-            )}
-          </article>
-        </section>
+            <section
+              ref={(element) => {
+                sectionRefs.current.information =
+                  element;
+              }}
+              className="scroll-mt-4 border-b border-neutral-300 py-[28px]"
+            >
+              <h2 className="text-label1 text-neutral-900">
+                세션 정보
+              </h2>
+
+              <dl className="mt-5 flex flex-col gap-5">
+                <DetailInfo
+                  label="파트"
+                  values={[detail.part]}
+                />
+
+                <DetailInfo
+                  label="실력대"
+                  values={[
+                    detail.skillLevel,
+                  ]}
+                />
+
+                <DetailInfo
+                  label="선호 장르"
+                  values={detail.genre
+                    .split(/[,/·]/)
+                    .map((value) =>
+                      value.trim(),
+                    )}
+                />
+
+                <DetailInfo
+                  label="활동 지역"
+                  values={[detail.region]}
+                />
+
+                <DetailInfo
+                  label="가능한 활동"
+                  values={
+                    detail.availableActivities
+                  }
+                  emptyText="등록된 가능 활동이 없어요"
+                />
+              </dl>
+            </section>
+
+            <section
+              ref={(element) => {
+                sectionRefs.current.career =
+                  element;
+              }}
+              className="scroll-mt-4 border-b border-neutral-300 py-[28px]"
+            >
+              <h2 className="text-label1 text-neutral-900">
+                경력
+              </h2>
+
+              {detail.careers.length >
+              0 ? (
+                <div className="mt-5 flex flex-col gap-5">
+                  {detail.careers.map(
+                    (career) => (
+                      <article
+                        key={
+                          career.sessionApplicationCareerId
+                        }
+                        className="relative pl-7"
+                      >
+                        <span className="absolute top-[2px] left-1 size-2.5 rounded-full bg-secondary-400" />
+
+                        <p className="text-body4 text-neutral-500">
+                          {career.period}
+                        </p>
+
+                        <h3 className="mt-1 text-body6 text-neutral-800">
+                          {career.name}
+                        </h3>
+
+                        {career.description ? (
+                          <p className="mt-1 whitespace-pre-line text-caption2 text-neutral-700">
+                            {
+                              career.description
+                            }
+                          </p>
+                        ) : null}
+                      </article>
+                    ),
+                  )}
+                </div>
+              ) : (
+                <p className="mt-5 text-caption2 text-neutral-500">
+                  등록된 경력이 없어요
+                </p>
+              )}
+            </section>
+
+            <section
+              ref={(element) => {
+                sectionRefs.current.portfolio =
+                  element;
+              }}
+              className="scroll-mt-4 py-[28px]"
+            >
+              <h2 className="text-label1 text-neutral-900">
+                포트폴리오
+              </h2>
+
+              {detail.portfolioLinks
+                .length > 0 ? (
+                <div className="mt-5 flex flex-col gap-6">
+                  {detail.portfolioLinks.map(
+                    (link) => (
+                      <a
+                        key={
+                          link.sessionApplicationLinkId
+                        }
+                        href={link.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="block"
+                      >
+                        <div className="relative flex h-[172px] w-full items-center justify-center overflow-hidden rounded-[8px] bg-neutral-400">
+                          {link.thumbnailUrl ? (
+                            <img
+                              src={
+                                link.thumbnailUrl
+                              }
+                              alt=""
+                              className="size-full object-cover"
+                            />
+                          ) : null}
+
+                          <img
+                            src={
+                              PlayButtonIcon
+                            }
+                            alt=""
+                            className="absolute size-6"
+                          />
+                        </div>
+
+                        <h3 className="mt-4 text-body1 text-neutral-800">
+                          {link.title}
+                        </h3>
+
+                        <p className="mt-1 truncate text-caption2 text-neutral-500">
+                          {link.url}
+                        </p>
+                      </a>
+                    ),
+                  )}
+                </div>
+              ) : (
+                <p className="mt-5 text-caption2 text-neutral-500">
+                  등록된 포트폴리오가
+                  없어요
+                </p>
+              )}
+            </section>
+          </div>
+        </>
+      ) : null}
+
+      {detail ? (
+        <div className="fixed inset-x-0 bottom-0 z-10 mx-auto w-full max-w-[393px] bg-neutral-0 px-5 py-4 shadow-[0_-5px_20px_rgba(0,0,0,0.03)]">
+          <Button
+            tone="orange"
+            className="w-full"
+            onClick={() =>
+              navigate(
+                `/band/session/messages/${detail.userId}`,
+                {
+                  state: {
+                    senderName: detail.nickname,
+                    profileImageUrl:
+                      detail.profileImageUrl,
+                  },
+                },
+              )
+            }
+          >
+            쪽지 보내기
+          </Button>
+        </div>
       ) : null}
     </main>
+  );
+};
+
+interface DetailInfoProps {
+  label: string;
+  values: string[];
+  emptyText?: string;
+}
+
+const DetailInfo = ({
+  label,
+  values,
+  emptyText,
+}: DetailInfoProps) => {
+  const visibleValues = values.filter(
+    (value) =>
+      typeof value === "string" &&
+      value.trim().length > 0,
+  );
+
+  return (
+    <div>
+      <dt className="text-body1 text-neutral-800">
+        {label}
+      </dt>
+
+      <dd className="mt-2 flex flex-wrap gap-2">
+        {visibleValues.length > 0 ? (
+          visibleValues.map(
+            (value, index) => (
+              <DetailChip
+                key={`${label}-${value}-${index}`}
+              >
+                {value}
+              </DetailChip>
+            ),
+          )
+        ) : (
+          <span className="text-caption2 text-neutral-500">
+            {emptyText ||
+              "등록된 정보가 없어요"}
+          </span>
+        )}
+      </dd>
+    </div>
   );
 };

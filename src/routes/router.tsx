@@ -53,6 +53,8 @@ import PostingManagementPage from "@/pages/band/my/PostingManagementPage";
 import MyPage from "@/pages/band/my/MyPage";
 import RecruitAlertSettingsPage from "@/pages/band/my/RecruitAlertSettingsPage";
 import LiveAlertSettingsPage from "@/pages/band/my/LiveAlertSettingsPage";
+import SessionMailboxPage from "@/pages/band/session/components/SessionMailboxPage";
+import SessionChatPage from "@/pages/band/session/components/SessionChatPage";
 
 export const router = createBrowserRouter([
   {
@@ -190,6 +192,14 @@ export const router = createBrowserRouter([
       {
         path: "/fan/my/profile/edit",
         element: <ProfileEditPage />,
+      },
+      {
+        path: "/band/session/messages",
+        element: <SessionMailboxPage />,
+      },
+      {
+        path: "/band/session/messages/:messageId",
+        element: <SessionChatPage />,
       },
     ],
   },

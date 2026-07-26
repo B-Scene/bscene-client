@@ -1,67 +1,44 @@
-import { useRef, useState, type ChangeEvent } from "react";
+import { useState, type ChangeEvent } from "react";
 import type { AxiosError } from "axios";
 import Modal from "@/components/Modal/Modal";
 import { ModalOverlay } from "@/components/common/Modal/ModalOverlay";
-import ArrowLeftIcon from "@/assets/icons/arrow-left.svg";
-import CloseIcon from "@/assets/icons/close.svg";
-import ArrowDownGrayIcon from "@/assets/icons/band/arrow-down-gray.svg";
-import CalendarIcon from "@/assets/icons/band/data-range.svg";
-import ClockIcon from "@/assets/icons/band/clock-band.svg";
+import {
+  DEFAULT_RECRUITMENT_BASIC_VALUES,
+  DEFAULT_RECRUITMENT_DETAIL_VALUES,
+  RECRUITMENT_GENRE_OPTIONS,
+  RECRUITMENT_REGION_OPTIONS,
+} from "@/features/session/recruitmentForm/sessionRecruitmentForm.constants";
+import type {
+  BasicFormValues,
+  DetailFormValues,
+  FormErrors,
+  FormMode,
+  FormStep,
+  SelectBottomSheetType,
+} from "@/features/session/recruitmentForm/sessionRecruitmentForm.types";
+import {
+  isFutureRecruitmentDeadline,
+  splitRecruitmentDeadlineAt,
+  toRecruitmentDeadlineAt,
+} from "@/features/session/recruitmentForm/sessionRecruitmentForm.utils";
+import {
+  RecruitmentFormTopBar,
+  RecruitmentSelectBottomSheet,
+  RecruitmentStepIndicator,
+} from "@/features/session/recruitmentForm/RecruitmentFormChrome";
+import { RecruitmentBasicInfoStep } from "@/features/session/recruitmentForm/RecruitmentBasicInfoStep";
+import { RecruitmentDetailInfoStep } from "@/features/session/recruitmentForm/RecruitmentDetailInfoStep";
+import { useActiveBandMemberId } from "@/hooks/api/band/useBandMember";
 import {
   useCreateSessionRecruitment,
   useSessionRecruitmentEditInfoQuery,
   useUpdateSessionRecruitment,
 } from "@/hooks/api/session/useSessionRecruitment";
-import { useActiveBandMemberId } from "@/hooks/api/band/useBandMember";
 import type {
   CreateSessionRecruitmentResponse,
   SessionApiResponse,
 } from "@/types/session/sessionRecruitment";
 import { SessionRecruitmentCompleteScreen } from "./SessionRecruitmentCompleteScreen";
-
-const PART_OPTIONS = ["보컬", "기타", "베이스", "키보드", "드럼", "etc"];
-const SKILL_OPTIONS = ["입문", "중급", "상급"];
-
-const GENRE_OPTIONS = [
-  "인디",
-  "팝",
-  "팝록",
-  "재즈",
-  "블루스",
-  "얼터너티브록",
-  "사이키델릭록",
-  "일렉트로닉록",
-  "포크록",
-  "펑크록",
-  "하드록",
-  "메탈",
-  "etc",
-];
-
-const REGION_OPTIONS = [
-  "서울",
-  "경기",
-  "인천",
-  "부산",
-  "대구",
-  "광주",
-  "대전",
-  "울산",
-  "세종",
-  "충남",
-  "충북",
-  "전남",
-  "전북",
-  "경남",
-  "경북",
-  "강원",
-  "제주",
-  "지역 미상",
-];
-
-type FormStep = 1 | 2;
-type SelectBottomSheetType = "genre" | "region" | null;
-type FormMode = "create" | "edit";
 
 interface SessionRecruitmentFormScreenProps {
   onBack: () => void;
@@ -70,76 +47,6 @@ interface SessionRecruitmentFormScreenProps {
   editSessionRecruitmentId?: number;
   onSaved?: () => void;
 }
-
-interface BasicFormValues {
-  title: string;
-  summary: string;
-  detail: string;
-  part: string;
-  skill: string;
-  genre: string;
-}
-
-interface DetailFormValues {
-  region: string;
-  practiceSchedule: string;
-  practiceLocation: string;
-  deadlineDate: string;
-  deadlineTime: string;
-  qualification: string;
-}
-
-interface FormErrors {
-  title?: string;
-  summary?: string;
-  detail?: string;
-  part?: string;
-  genre?: string;
-  region?: string;
-  practiceSchedule?: string;
-  practiceLocation?: string;
-  deadlineDate?: string;
-  deadlineTime?: string;
-  qualification?: string;
-}
-
-const cx = (...classNames: Array<string | false | null | undefined>) =>
-  classNames.filter(Boolean).join(" ");
-
-const toDeadlineAt = (dateValue: string, timeValue: string) => `${dateValue}T${timeValue}:00`;
-
-const splitDeadlineAt = (deadlineAt?: string) => ({
-  deadlineDate: deadlineAt?.slice(0, 10) ?? "",
-  deadlineTime: deadlineAt?.slice(11, 16) ?? "",
-});
-
-const isFutureDeadline = (dateValue: string, timeValue: string) => {
-  if (!dateValue || !timeValue) return false;
-
-  const deadline = new Date(toDeadlineAt(dateValue, timeValue));
-
-  if (Number.isNaN(deadline.getTime())) return false;
-
-  return deadline.getTime() > Date.now();
-};
-
-const DEFAULT_BASIC_VALUES: BasicFormValues = {
-  title: "",
-  summary: "",
-  detail: "",
-  part: "",
-  skill: "중급",
-  genre: "",
-};
-
-const DEFAULT_DETAIL_VALUES: DetailFormValues = {
-  region: "",
-  practiceSchedule: "",
-  practiceLocation: "",
-  deadlineDate: "",
-  deadlineTime: "",
-  qualification: "",
-};
 
 export const SessionRecruitmentFormScreen = ({
   onBack,
@@ -152,8 +59,8 @@ export const SessionRecruitmentFormScreen = ({
     return (
       <SessionRecruitmentFormBody
         mode="create"
-        initialBasicValues={DEFAULT_BASIC_VALUES}
-        initialDetailValues={DEFAULT_DETAIL_VALUES}
+        initialBasicValues={DEFAULT_RECRUITMENT_BASIC_VALUES}
+        initialDetailValues={DEFAULT_RECRUITMENT_DETAIL_VALUES}
         onBack={onBack}
         onClose={onClose}
         onViewCreatedPost={onViewCreatedPost}
@@ -214,7 +121,7 @@ const SessionRecruitmentEditLoader = ({
   }
 
   const detail = editInfoQuery.data;
-  const deadline = splitDeadlineAt(detail.deadlineAt);
+  const deadline = splitRecruitmentDeadlineAt(detail.deadlineAt);
 
   return (
     <SessionRecruitmentFormBody
@@ -446,7 +353,10 @@ const SessionRecruitmentFormBody = ({
     if (
       detailValues.deadlineDate &&
       detailValues.deadlineTime &&
-      !isFutureDeadline(detailValues.deadlineDate, detailValues.deadlineTime)
+      !isFutureRecruitmentDeadline(
+        detailValues.deadlineDate,
+        detailValues.deadlineTime,
+      )
     ) {
       nextErrors.deadlineTime = "모집 마감일은 현재 시간 이후여야 해요";
     }
@@ -484,7 +394,7 @@ const SessionRecruitmentFormBody = ({
         region: detailValues.region,
         practiceSchedule: detailValues.practiceSchedule.trim(),
         practicePlace: detailValues.practiceLocation.trim(),
-        deadlineAt: toDeadlineAt(
+        deadlineAt: toRecruitmentDeadlineAt(
           detailValues.deadlineDate,
           detailValues.deadlineTime,
         ),
@@ -529,7 +439,7 @@ const SessionRecruitmentFormBody = ({
       region: detailValues.region,
       practiceSchedule: detailValues.practiceSchedule.trim(),
       practicePlace: detailValues.practiceLocation.trim(),
-      deadlineAt: toDeadlineAt(
+      deadlineAt: toRecruitmentDeadlineAt(
         detailValues.deadlineDate,
         detailValues.deadlineTime,
       ),
@@ -582,7 +492,9 @@ const SessionRecruitmentFormBody = ({
     onClose();
   };
 
-  const deadlineSummary = splitDeadlineAt(createdRecruitment?.deadlineAt);
+  const deadlineSummary = splitRecruitmentDeadlineAt(
+    createdRecruitment?.deadlineAt,
+  );
   const completionSummary = {
     title: createdRecruitment?.recruitmentTitle ?? basicValues.title.trim(),
     part: createdRecruitment?.part ?? basicValues.part,
@@ -610,15 +522,15 @@ const SessionRecruitmentFormBody = ({
 
   return (
     <main className="min-h-dvh bg-secondary-0 pb-[calc(var(--bottom-nav-height)+92px)]">
-      <FormTopBar
+      <RecruitmentFormTopBar
         title={mode === "edit" ? "세션 모집 공고 수정" : "세션 모집 공고 등록"}
         onBack={handleBack}
         onClose={onClose}
       />
-      <StepIndicator currentStep={currentStep} />
+      <RecruitmentStepIndicator currentStep={currentStep} />
 
       {currentStep === 1 ? (
-        <BasicInfoStep
+        <RecruitmentBasicInfoStep
           values={basicValues}
           errors={errors}
           isComplete={isBasicComplete}
@@ -629,7 +541,7 @@ const SessionRecruitmentFormBody = ({
           onNext={handleNext}
         />
       ) : (
-        <DetailInfoStep
+        <RecruitmentDetailInfoStep
           values={detailValues}
           errors={errors}
           isComplete={isDetailComplete}
@@ -668,9 +580,9 @@ const SessionRecruitmentFormBody = ({
       </ModalOverlay>
 
       {selectBottomSheetType === "genre" ? (
-        <SelectBottomSheet
+        <RecruitmentSelectBottomSheet
           title="장르"
-          options={GENRE_OPTIONS}
+          options={RECRUITMENT_GENRE_OPTIONS}
           selectedValue={basicValues.genre}
           onSelect={handleGenreSelect}
           onClose={() => setSelectBottomSheetType(null)}
@@ -678,9 +590,9 @@ const SessionRecruitmentFormBody = ({
       ) : null}
 
       {selectBottomSheetType === "region" ? (
-        <SelectBottomSheet
+        <RecruitmentSelectBottomSheet
           title="지역"
-          options={REGION_OPTIONS}
+          options={RECRUITMENT_REGION_OPTIONS}
           selectedValue={detailValues.region}
           onSelect={handleRegionSelect}
           onClose={() => setSelectBottomSheetType(null)}
@@ -688,627 +600,4 @@ const SessionRecruitmentFormBody = ({
       ) : null}
     </main>
   );
-};
-
-interface BasicInfoStepProps {
-  values: BasicFormValues;
-  errors: FormErrors;
-  isComplete: boolean;
-  onFieldChange: (
-    field: keyof Pick<BasicFormValues, "title" | "summary" | "detail">,
-  ) => (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
-  onPartClick: (part: string) => void;
-  onSkillClick: (skill: string) => void;
-  onOpenGenreSelect: () => void;
-  onNext: () => void;
-}
-
-const BasicInfoStep = ({
-  values,
-  errors,
-  isComplete,
-  onFieldChange,
-  onPartClick,
-  onSkillClick,
-  onOpenGenreSelect,
-  onNext,
-}: BasicInfoStepProps) => {
-  return (
-    <>
-      <section className="px-5 pt-0">
-        <div className="rounded-[16px] bg-neutral-0 px-[18px] py-4 shadow-[0_0_8px_rgba(0,0,0,0.08)]">
-          <FieldLabel htmlFor="session-recruitment-title" required>
-            공고 제목
-          </FieldLabel>
-          <TextInput
-            id="session-recruitment-title"
-            value={values.title}
-            placeholder="공고 제목을 입력해주세요"
-            maxLength={50}
-            error={Boolean(errors.title)}
-            onChange={onFieldChange("title")}
-          />
-          {errors.title ? <ErrorMessage>{errors.title}</ErrorMessage> : null}
-
-          <div className="mt-3">
-            <FieldLabel htmlFor="session-recruitment-summary" required>
-              공고 한줄 소개
-            </FieldLabel>
-            <TextInput
-              id="session-recruitment-summary"
-              value={values.summary}
-              placeholder="공고 목록에 표시될 짧은 소개를 입력해주세요. (최대 50자)"
-              maxLength={50}
-              error={Boolean(errors.summary)}
-              onChange={onFieldChange("summary")}
-            />
-            {errors.summary ? <ErrorMessage>{errors.summary}</ErrorMessage> : null}
-          </div>
-
-          <div className="mt-3">
-            <FieldLabel htmlFor="session-recruitment-detail" required>
-              공고 상세 소개
-            </FieldLabel>
-            <div className="relative">
-              <textarea
-                id="session-recruitment-detail"
-                value={values.detail}
-                maxLength={500}
-                placeholder="모집 공고의 상세 내용을 입력해주세요"
-                onChange={onFieldChange("detail")}
-                className={cx(
-                  "h-[58px] w-full resize-none rounded-[5px] border bg-neutral-0 px-4 py-2 text-caption2 text-neutral-900 outline-none placeholder:text-caption2 placeholder:text-neutral-500",
-                  errors.detail ? "border-error" : "border-neutral-400 focus:border-secondary-500",
-                )}
-              />
-              <span className="absolute right-[13px] bottom-2 text-caption4 text-neutral-500">
-                {values.detail.length}/500
-              </span>
-            </div>
-            {errors.detail ? <ErrorMessage>{errors.detail}</ErrorMessage> : null}
-          </div>
-
-          <div className="mt-3">
-            <FieldLabel required>모집 파트</FieldLabel>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {PART_OPTIONS.map((part) => (
-                <OptionChip
-                  key={part}
-                  selected={values.part === part}
-                  onClick={() => onPartClick(part)}
-                >
-                  {part === "etc" ? "etc." : part}
-                </OptionChip>
-              ))}
-            </div>
-            {errors.part ? <ErrorMessage>{errors.part}</ErrorMessage> : null}
-          </div>
-
-          <div className="mt-3">
-            <FieldLabel required>실력대</FieldLabel>
-            <div className="mt-2 flex gap-2">
-              {SKILL_OPTIONS.map((skill) => (
-                <OptionChip
-                  key={skill}
-                  selected={values.skill === skill}
-                  onClick={() => onSkillClick(skill)}
-                >
-                  {skill}
-                </OptionChip>
-              ))}
-            </div>
-          </div>
-
-          <div className="mt-3">
-            <FieldLabel required>장르</FieldLabel>
-            <SelectButton
-              value={values.genre === "etc" ? "etc." : values.genre}
-              placeholder="장르 선택"
-              error={Boolean(errors.genre)}
-              onClick={onOpenGenreSelect}
-            />
-            {errors.genre ? <ErrorMessage>{errors.genre}</ErrorMessage> : null}
-          </div>
-        </div>
-      </section>
-
-      <BottomActionButton active={isComplete} label="다음" onClick={onNext} />
-    </>
-  );
-};
-
-interface DetailInfoStepProps {
-  values: DetailFormValues;
-  errors: FormErrors;
-  isComplete: boolean;
-  submitErrorMessage: string;
-  isSubmitting: boolean;
-  submitLabel: string;
-  submittingLabel: string;
-  onFieldChange: (
-    field: keyof Pick<
-      DetailFormValues,
-      "practiceSchedule" | "practiceLocation" | "qualification"
-    >,
-  ) => (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
-  onOpenRegionSelect: () => void;
-  onDeadlineDateChange: (event: ChangeEvent<HTMLInputElement>) => void;
-  onDeadlineTimeChange: (event: ChangeEvent<HTMLInputElement>) => void;
-  onSubmit: () => void;
-}
-
-const DetailInfoStep = ({
-  values,
-  errors,
-  isComplete,
-  submitErrorMessage,
-  isSubmitting,
-  submitLabel,
-  submittingLabel,
-  onFieldChange,
-  onOpenRegionSelect,
-  onDeadlineDateChange,
-  onDeadlineTimeChange,
-  onSubmit,
-}: DetailInfoStepProps) => {
-  const dateInputRef = useRef<HTMLInputElement>(null);
-  const timeInputRef = useRef<HTMLInputElement>(null);
-
-  const openNativePicker = (input: HTMLInputElement | null) => {
-    if (!input) return;
-
-    const pickerInput = input as HTMLInputElement & { showPicker?: () => void };
-
-    if (pickerInput.showPicker) {
-      pickerInput.showPicker();
-      return;
-    }
-
-    input.focus();
-    input.click();
-  };
-
-  return (
-    <>
-      <section className="px-5 pt-0">
-        <div className="rounded-[16px] bg-neutral-0 px-[18px] py-4 shadow-[0_0_8px_rgba(0,0,0,0.08)]">
-          <FieldLabel required>활동 지역</FieldLabel>
-          <SelectButton
-            value={values.region}
-            placeholder="지역 선택"
-            error={Boolean(errors.region)}
-            onClick={onOpenRegionSelect}
-          />
-          {errors.region ? <ErrorMessage>{errors.region}</ErrorMessage> : null}
-
-          <div className="mt-3">
-            <FieldLabel htmlFor="session-practice-schedule" required>
-              연습 일정
-            </FieldLabel>
-            <TextInput
-              id="session-practice-schedule"
-              value={values.practiceSchedule}
-              placeholder="연습 일정을 작성해주세요"
-              maxLength={50}
-              error={Boolean(errors.practiceSchedule)}
-              onChange={onFieldChange("practiceSchedule")}
-            />
-            {errors.practiceSchedule ? (
-              <ErrorMessage>{errors.practiceSchedule}</ErrorMessage>
-            ) : null}
-          </div>
-
-          <div className="mt-3">
-            <FieldLabel htmlFor="session-practice-location" required>
-              연습 장소
-            </FieldLabel>
-            <TextInput
-              id="session-practice-location"
-              value={values.practiceLocation}
-              placeholder="연습 장소를 작성해주세요"
-              maxLength={50}
-              error={Boolean(errors.practiceLocation)}
-              onChange={onFieldChange("practiceLocation")}
-            />
-            {errors.practiceLocation ? (
-              <ErrorMessage>{errors.practiceLocation}</ErrorMessage>
-            ) : null}
-          </div>
-
-          <div className="mt-3">
-            <FieldLabel required>모집 마감일</FieldLabel>
-            <div className="flex flex-col gap-1">
-              <div className="relative">
-                <DeadlinePickerButton
-                  value={formatDeadlineDateLabel(values.deadlineDate)}
-                  placeholder="날짜 선택"
-                  icon={CalendarIcon}
-                  error={Boolean(errors.deadlineDate)}
-                  onClick={() => openNativePicker(dateInputRef.current)}
-                />
-                <input
-                  ref={dateInputRef}
-                  type="date"
-                  value={values.deadlineDate}
-                  tabIndex={-1}
-                  aria-hidden="true"
-                  onChange={onDeadlineDateChange}
-                  className="pointer-events-none absolute top-0 right-0 h-px w-px opacity-0"
-                />
-              </div>
-
-              <div className="relative">
-                <DeadlinePickerButton
-                  value={values.deadlineTime}
-                  placeholder="시간 선택"
-                  icon={ClockIcon}
-                  error={Boolean(errors.deadlineTime)}
-                  onClick={() => openNativePicker(timeInputRef.current)}
-                />
-                <input
-                  ref={timeInputRef}
-                  type="time"
-                  value={values.deadlineTime}
-                  tabIndex={-1}
-                  aria-hidden="true"
-                  onChange={onDeadlineTimeChange}
-                  className="pointer-events-none absolute top-0 right-0 h-px w-px opacity-0"
-                />
-              </div>
-            </div>
-            {errors.deadlineDate ? <ErrorMessage>{errors.deadlineDate}</ErrorMessage> : null}
-            {errors.deadlineTime ? <ErrorMessage>{errors.deadlineTime}</ErrorMessage> : null}
-          </div>
-
-          <div className="mt-3">
-            <FieldLabel htmlFor="session-qualification" required>
-              지원 자격
-            </FieldLabel>
-            <div className="relative">
-              <textarea
-                id="session-qualification"
-                value={values.qualification}
-                maxLength={500}
-                placeholder="지원 자격을 입력해주세요"
-                onChange={onFieldChange("qualification")}
-                className={cx(
-                  "h-[58px] w-full resize-none rounded-[5px] border bg-neutral-0 px-4 py-2 text-caption2 text-neutral-900 outline-none placeholder:text-caption2 placeholder:text-neutral-500",
-                  errors.qualification
-                    ? "border-error"
-                    : "border-neutral-400 focus:border-secondary-500",
-                )}
-              />
-              <span className="absolute right-[13px] bottom-2 text-caption4 text-neutral-500">
-                {values.qualification.length}/500
-              </span>
-            </div>
-            {errors.qualification ? <ErrorMessage>{errors.qualification}</ErrorMessage> : null}
-          </div>
-        </div>
-      </section>
-
-     {submitErrorMessage ? (
-  <p className="fixed left-1/2 bottom-[calc(var(--bottom-nav-height)+128px)] z-30 w-full max-w-[393px] -translate-x-1/2 px-6 text-center text-caption2 text-error">
-          {submitErrorMessage}
-        </p>
-      ) : null}
-      <BottomActionButton
-        active={isComplete && !isSubmitting}
-        label={isSubmitting ? submittingLabel : submitLabel}
-        onClick={onSubmit}
-      />
-    </>
-  );
-};
-
-interface SelectBottomSheetProps {
-  title: string;
-  options: string[];
-  selectedValue: string;
-  onSelect: (value: string) => void;
-  onClose: () => void;
-}
-
-const SelectBottomSheet = ({
-  title,
-  options,
-  selectedValue,
-  onSelect,
-  onClose,
-}: SelectBottomSheetProps) => {
-  return (
-    <div
-      role="presentation"
-      onClick={(event) => {
-        if (event.target === event.currentTarget) {
-          onClose();
-        }
-      }}
-      className="fixed inset-0 z-50 flex items-end bg-neutral-900/70"
-    >
-      <section
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
-        className="max-h-[70dvh] w-full overflow-y-auto rounded-t-[24px] bg-neutral-0 px-6 pt-3 pb-[calc(var(--bottom-nav-height)+24px)]"
-      >
-        <div className="mx-auto h-1.5 w-14 rounded-full bg-neutral-300" />
-        <h2 className="mt-5 text-h4 text-neutral-900">{title}</h2>
-
-        <div className="mt-5 flex flex-wrap gap-x-3 gap-y-4">
-          {options.map((option) => {
-            const isSelected = selectedValue === option;
-            const label = option === "etc" ? "etc." : option;
-
-            return (
-              <button
-                key={option}
-                type="button"
-                onClick={() => onSelect(option)}
-                className={cx(
-                  "flex h-[54px] min-w-[76px] items-center justify-center rounded-full px-6 text-body1 font-semibold",
-                  isSelected
-                    ? "bg-secondary-500 text-neutral-0"
-                    : "bg-neutral-300 text-neutral-600",
-                )}
-              >
-                {label}
-              </button>
-            );
-          })}
-        </div>
-      </section>
-    </div>
-  );
-};
-
-interface FormTopBarProps {
-  title: string;
-  onBack: () => void;
-  onClose: () => void;
-}
-
-const FormTopBar = ({ title, onBack, onClose }: FormTopBarProps) => {
-  return (
-    <header className="relative flex h-12 w-full items-center justify-center bg-neutral-0 px-[15px] py-[5px]">
-      <button
-        type="button"
-        aria-label="뒤로가기"
-        onClick={onBack}
-        className="absolute top-[5px] left-[15px] flex size-[38px] items-center justify-center"
-      >
-        <img src={ArrowLeftIcon} alt="" className="size-6" />
-      </button>
-
-      <h1 className="text-[18px] leading-5 font-bold text-neutral-900">{title}</h1>
-
-      <button
-        type="button"
-        aria-label="닫기"
-        onClick={onClose}
-        className="absolute top-[5px] right-[15px] flex size-[38px] items-center justify-center"
-      >
-        <img src={CloseIcon} alt="" className="size-6" />
-      </button>
-    </header>
-  );
-};
-
-interface StepIndicatorProps {
-  currentStep: FormStep;
-}
-
-const StepIndicator = ({ currentStep }: StepIndicatorProps) => {
-  return (
-    <section className="flex h-[77px] items-start justify-center bg-secondary-0 pt-4">
-      <div className="flex items-start">
-        <StepNode complete={currentStep === 2} active={currentStep === 1} label="기본 정보" number={1} />
-        <div
-          className={cx(
-            "mt-[9px] h-0.5 w-32",
-            currentStep === 2 ? "bg-secondary-500" : "bg-neutral-400",
-          )}
-        />
-        <StepNode active={currentStep === 2} label="상세 정보" number={2} />
-      </div>
-    </section>
-  );
-};
-
-interface StepNodeProps {
-  active?: boolean;
-  complete?: boolean;
-  label: string;
-  number: number;
-}
-
-const StepNode = ({ active = false, complete = false, label, number }: StepNodeProps) => {
-  return (
-    <div className="flex w-[58px] flex-col items-center gap-[3px]">
-      <span
-        className={cx(
-          "flex size-5 items-center justify-center rounded-full text-[10px] leading-3 font-bold text-neutral-0",
-          active || complete ? "bg-secondary-500" : "bg-neutral-500",
-        )}
-      >
-        {complete ? "✓" : number}
-      </span>
-      <span
-        className={cx(
-          "text-[10px] leading-3 font-bold",
-          active || complete ? "text-secondary-500" : "text-neutral-500",
-        )}
-      >
-        {label}
-      </span>
-    </div>
-  );
-};
-
-interface FieldLabelProps {
-  children: string;
-  htmlFor?: string;
-  required?: boolean;
-}
-
-const FieldLabel = ({ children, htmlFor, required = false }: FieldLabelProps) => {
-  return (
-    <label htmlFor={htmlFor} className="mb-1 block text-body1 text-neutral-900">
-      {children}
-      {required ? <span className="text-error"> *</span> : null}
-    </label>
-  );
-};
-
-interface TextInputProps {
-  id: string;
-  value: string;
-  placeholder: string;
-  error?: boolean;
-  maxLength?: number;
-  onChange: (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
-}
-
-const TextInput = ({
-  id,
-  value,
-  placeholder,
-  error = false,
-  maxLength,
-  onChange,
-}: TextInputProps) => {
-  return (
-    <input
-      id={id}
-      value={value}
-      maxLength={maxLength}
-      placeholder={placeholder}
-      onChange={onChange}
-      className={cx(
-        "h-[30px] w-full rounded-[5px] border bg-neutral-0 px-4 text-caption2 text-neutral-900 outline-none placeholder:text-caption2 placeholder:text-neutral-500",
-        error ? "border-error" : "border-neutral-400 focus:border-secondary-500",
-      )}
-    />
-  );
-};
-
-interface SelectButtonProps {
-  value: string;
-  placeholder: string;
-  error?: boolean;
-  onClick: () => void;
-}
-
-const SelectButton = ({ value, placeholder, error = false, onClick }: SelectButtonProps) => {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cx(
-        "flex h-[30px] w-full items-center justify-between rounded-[5px] border bg-neutral-0 px-4 text-caption2",
-        error ? "border-error" : "border-neutral-400",
-        value ? "text-neutral-900" : "text-neutral-500",
-      )}
-    >
-      <span>{value || placeholder}</span>
-      <img src={ArrowDownGrayIcon} alt="" className="h-[7px] w-3" />
-    </button>
-  );
-};
-
-interface DeadlinePickerButtonProps {
-  value: string;
-  placeholder: string;
-  icon: string;
-  error?: boolean;
-  onClick: () => void;
-}
-
-const DeadlinePickerButton = ({
-  value,
-  placeholder,
-  icon,
-  error = false,
-  onClick,
-}: DeadlinePickerButtonProps) => {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cx(
-        "flex h-[30px] w-full items-center justify-between rounded-[5px] border bg-neutral-0 px-4 text-caption2",
-        error ? "border-error" : "border-neutral-400",
-        value ? "text-neutral-900" : "text-neutral-500",
-      )}
-    >
-      <span>{value || placeholder}</span>
-      <img src={icon} alt="" className="size-[18px]" />
-    </button>
-  );
-};
-
-const formatDeadlineDateLabel = (value: string) => {
-  if (!value) return "";
-
-  const [year, month, day] = value.split("-").map(Number);
-  if (!year || !month || !day) return value;
-
-  const weekDay = ["일", "월", "화", "수", "목", "금", "토"][
-    new Date(year, month - 1, day).getDay()
-  ];
-
-  return `${year}.${String(month).padStart(2, "0")}.${String(day).padStart(2, "0")}. (${weekDay})`;
-};
-
-interface OptionChipProps {
-  children: string;
-  selected: boolean;
-  onClick: () => void;
-}
-
-const OptionChip = ({ children, selected, onClick }: OptionChipProps) => {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cx(
-        "flex h-[26px] min-w-14 items-center justify-center whitespace-nowrap rounded-[8px] px-2 text-caption2",
-        selected ? "bg-secondary-500 text-neutral-0" : "bg-neutral-300 text-neutral-600",
-      )}
-    >
-      {children}
-    </button>
-  );
-};
-
-interface BottomActionButtonProps {
-  active: boolean;
-  label: string;
-  onClick: () => void | Promise<void>;
-}
-
-const BottomActionButton = ({ active, label, onClick }: BottomActionButtonProps) => {
-  return (
-    <div className="fixed inset-x-0 bottom-[var(--bottom-nav-height)] z-20 bg-secondary-0 px-5 py-5">
-      <button
-        type="button"
-        onClick={onClick}
-        disabled={!active}
-        className={cx(
-          "flex h-[52px] w-full items-center justify-center rounded-[12px] text-label2",
-          active ? "bg-secondary-500 text-neutral-0" : "bg-neutral-300 text-neutral-700",
-        )}
-      >
-        {label}
-      </button>
-    </div>
-  );
-};
-
-interface ErrorMessageProps {
-  children: string;
-}
-
-const ErrorMessage = ({ children }: ErrorMessageProps) => {
-  return <p className="mt-1 text-[10px] leading-3 font-bold text-error">{children}</p>;
 };
