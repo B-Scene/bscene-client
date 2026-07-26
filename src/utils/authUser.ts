@@ -125,6 +125,9 @@ export const saveFanNickname = (fanNickname: string) => {
   );
 };
 
+export const getHomePathForMode = (mode?: string | null) =>
+  mode === "BAND" ? "/band/home" : "/fan/home";
+
 export const getFanAccountDisplay = () => {
   const user = getStoredAuthUser();
   const tokenPayload = decodeJwtPayload(window.localStorage.getItem("accessToken"));

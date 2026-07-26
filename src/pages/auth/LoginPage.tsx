@@ -5,11 +5,13 @@ import kakaoLoginButton from "@/assets/btn_kakao_login.svg";
 import googleLoginButton from "@/assets/btn_google_login.svg";
 import Button from "@/components/common/Button/Button";
 import { useLogin } from "@/hooks/api/auth/useAuth";
-import { saveAuthenticatedUser } from "@/utils/authUser";
+import { getHomePathForMode, saveAuthenticatedUser } from "@/utils/authUser";
+import { useModeStore } from "@/stores/useModeStore";
 
 export default function Login() {
   const navigate = useNavigate();
   const { mutate: loginMutate, isPending } = useLogin();
+  const setMode = useModeStore((state) => state.setMode);
 
   const [loginId, setLoginId] = useState("");
   const [password, setPassword] = useState("");
@@ -32,10 +34,14 @@ export default function Login() {
               .fanNickname,
           });
 
-          navigate(
-            data.user.onboardingCompleted ? "/home" : "/onboarding/agreement",
-            { replace: true },
-          );
+          if (data.user.onboardingCompleted) {
+            setMode(data.user.currentMode === "BAND" ? "band" : "fan");
+            navigate(getHomePathForMode(data.user.currentMode), {
+              replace: true,
+            });
+          } else {
+            navigate("/onboarding/agreement", { replace: true });
+          }
         },
         onError: (error) => {
           console.error(error);
