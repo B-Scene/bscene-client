@@ -19,7 +19,10 @@ import {
 } from "@/hooks/api/band/useBandMemberProfile";
 import { uploadMediaFile } from "@/utils/uploadMediaFile";
 import { getApiErrorMessage } from "@/utils/getApiErrorMessage";
-import type { BandMemberProfilePart } from "@/types/band/bandMemberProfile";
+import type {
+  BandMemberProfilePart,
+  BandMemberProfileResponse,
+} from "@/types/band/bandMemberProfile";
 import {
   BAND_GENRE_BY_LABEL,
   BAND_GENRE_LABELS,
@@ -180,6 +183,11 @@ const ProfileForm = ({
 
   const galleryInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+  const ownerProfileRef = useRef<{
+    nickname: string;
+    part: BandMemberProfilePart;
+    profile: BandMemberProfileResponse;
+  } | null>(null);
 
   const [avatarUrl, setAvatarUrl] = useState(initialValues.avatarUrl);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
@@ -271,9 +279,11 @@ const ProfileForm = ({
         });
 
         if (memberProfileId && myActivityName.trim() && myPart) {
+          const partEnum = PART_LABEL_TO_ENUM[myPart];
+
           await updateBandMemberProfile.mutateAsync({
             nickname: myActivityName.trim(),
-            part: PART_LABEL_TO_ENUM[myPart],
+            ...(partEnum ? { part: partEnum } : {}),
           });
         }
 
@@ -286,10 +296,16 @@ const ProfileForm = ({
     }
 
     try {
-      const ownerProfile = await createBandMemberProfile.mutateAsync({
-        nickname: myActivityName.trim(),
-        part: PART_LABEL_TO_ENUM[myPart],
-      });
+      const nickname = myActivityName.trim();
+      const part = PART_LABEL_TO_ENUM[myPart];
+
+      const cached = ownerProfileRef.current;
+      const ownerProfile =
+        cached && cached.nickname === nickname && cached.part === part
+          ? cached.profile
+          : await createBandMemberProfile.mutateAsync({ nickname, part });
+
+      ownerProfileRef.current = { nickname, part, profile: ownerProfile };
 
       await createBand.mutateAsync({
         name,
@@ -300,6 +316,7 @@ const ProfileForm = ({
         description: bio || undefined,
       });
 
+      ownerProfileRef.current = null;
       navigate("/band/home");
     } catch {
       // 에러는 submitError로 화면에 표시됨
