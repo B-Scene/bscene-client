@@ -303,6 +303,14 @@ const ProfileForm = ({
       return;
     }
 
+    const genreValue = BAND_GENRE_BY_LABEL[genre];
+    const regionValue = BAND_REGION_BY_LABEL[region];
+
+    if (!genreValue || !regionValue) {
+      setUploadError("장르 또는 지역을 다시 선택해주세요");
+      return;
+    }
+
     try {
       const nickname = myActivityName.trim();
       const part = PART_LABEL_TO_ENUM[myPart];
@@ -317,8 +325,8 @@ const ProfileForm = ({
 
       await createBand.mutateAsync({
         name,
-        genre: BAND_GENRE_BY_LABEL[genre],
-        region: BAND_REGION_BY_LABEL[region],
+        genre: genreValue,
+        region: regionValue,
         bandMemberProfileId: ownerProfile.id,
         profileImageUrl: uploadedAvatarUrl || undefined,
         description: bio || undefined,

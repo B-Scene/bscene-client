@@ -283,8 +283,15 @@ const ConcertRegisterForm = ({
     }
 
     const regionValue = BAND_REGION_BY_LABEL[region];
-    const performanceRegionValue = PERFORMANCE_REGION_BY_BAND_REGION[regionValue];
     const ageRatingValue = PERFORMANCE_AGE_RATING_BY_LABEL[ageRating];
+    const genreValue = PERFORMANCE_GENRE_BY_LABEL[genre];
+
+    if (!regionValue || !ageRatingValue || !genreValue) {
+      setUploadError("장르, 지역, 관람 연령을 다시 선택해주세요");
+      return;
+    }
+
+    const performanceRegionValue = PERFORMANCE_REGION_BY_BAND_REGION[regionValue];
     const ticketPriceValue = String(
       Number(price.replace(/[^0-9]/g, "")) || 0,
     );
@@ -329,7 +336,7 @@ const ConcertRegisterForm = ({
       updatePerformance.mutate(
         {
           title,
-          genre: PERFORMANCE_GENRE_BY_LABEL[genre],
+          genre: genreValue,
           performanceDate: startDate,
           startTime: time,
           region: performanceRegionValue,
@@ -349,7 +356,7 @@ const ConcertRegisterForm = ({
     createPerformance.mutate(
       {
         title,
-        genre: PERFORMANCE_GENRE_BY_LABEL[genre],
+        genre: genreValue,
         performanceDate: startDate,
         startTime: time,
         region: performanceRegionValue,
