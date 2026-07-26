@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Header } from "@/components/band/home/Header";
-import { useBandProfileStore } from "@/stores/useBandProfileStore";
+import { useActiveBandId } from "@/hooks/api/user/useMyProfiles";
+import { useBandQuery } from "@/hooks/api/band/useBand";
 import { NotificationBandBanner } from "@/components/band/my/NotificationBandBanner";
 import {
   NotificationToggleList,
@@ -21,8 +22,9 @@ const LIVE_ALERT_ITEMS: NotificationToggleItem[] = [
 ];
 
 const LiveAlertSettingsPage = () => {
-  const profile = useBandProfileStore((state) => state.profile);
-  const bandName = profile.name.trim() || "WAVY";
+  const activeBandId = useActiveBandId();
+  const { data: band } = useBandQuery(activeBandId ?? NaN);
+  const bandName = band?.name ?? "";
 
   const [values, setValues] = useState<Record<string, boolean>>({
     "upcoming-live-reminder": true,
