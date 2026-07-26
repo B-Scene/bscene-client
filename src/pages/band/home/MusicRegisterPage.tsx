@@ -1,12 +1,11 @@
 import { useState, type ReactNode } from "react";
-import type { AxiosError } from "axios";
 import { useNavigate } from "react-router-dom";
 import { Header } from "@/components/band/home/Header";
 import { Input } from "@/components/common/Input/Input";
 import { useActiveBandId } from "@/hooks/api/user/useMyProfiles";
 import { useMusicLinksQuery, useSaveMusicLinks } from "@/hooks/api/band/useMusicLink";
+import { getApiErrorMessage } from "@/utils/getApiErrorMessage";
 import type {
-  BandApiResponse,
   MusicEtcPlatform,
   MusicLinksResponse,
 } from "@/types/band/musicLink";
@@ -17,12 +16,6 @@ const ETC_PLATFORM_OPTIONS: { value: MusicEtcPlatform; label: string }[] = [
   { value: "BUGS", label: "Bugs" },
   { value: "APPLE_MUSIC", label: "Apple Music" },
 ];
-
-const getApiErrorMessage = (error: unknown, fallbackMessage: string) => {
-  const axiosError = error as AxiosError<BandApiResponse<null>>;
-
-  return axiosError.response?.data?.message ?? fallbackMessage;
-};
 
 interface FieldProps {
   label: string;

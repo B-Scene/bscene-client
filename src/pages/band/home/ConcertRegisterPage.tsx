@@ -5,7 +5,6 @@ import {
   type KeyboardEvent,
   type ReactNode,
 } from "react";
-import type { AxiosError } from "axios";
 import { useNavigate, useParams } from "react-router-dom";
 import { Header } from "@/components/band/home/Header";
 import { DatePickerSheet } from "@/components/band/home/DatePickerSheet";
@@ -21,10 +20,8 @@ import {
   useUpdatePerformance,
 } from "@/hooks/api/band/usePerformance";
 import { uploadMediaFile } from "@/utils/uploadMediaFile";
-import type {
-  BandApiResponse,
-  PerformanceResponse,
-} from "@/types/band/performance";
+import { getApiErrorMessage } from "@/utils/getApiErrorMessage";
+import type { PerformanceResponse } from "@/types/band/performance";
 import {
   BAND_REGION_BY_LABEL,
   BAND_REGION_LABELS,
@@ -48,12 +45,6 @@ import CheckCircleYellowIcon from "@/assets/icons/band/check-circle-yellow.svg";
 
 const DESCRIPTION_MAX_LENGTH = 500;
 const MAX_TAGS = 8;
-
-const getApiErrorMessage = (error: unknown, fallbackMessage: string) => {
-  const axiosError = error as AxiosError<BandApiResponse<null>>;
-
-  return axiosError.response?.data?.message ?? fallbackMessage;
-};
 
 const formatDateRange = (start: string, end: string) => {
   if (!start) return "";

@@ -1,5 +1,4 @@
 import { useRef, useState, type ChangeEvent } from "react";
-import type { AxiosError } from "axios";
 import { useNavigate } from "react-router-dom";
 import DefaultBandAvatar from "@/assets/icons/band/band-default-profile.svg";
 import { Header } from "@/components/band/home/Header";
@@ -19,8 +18,8 @@ import {
   useUpdateBandMemberProfile,
 } from "@/hooks/api/band/useBandMemberProfile";
 import { uploadMediaFile } from "@/utils/uploadMediaFile";
+import { getApiErrorMessage } from "@/utils/getApiErrorMessage";
 import type { BandMemberProfilePart } from "@/types/band/bandMemberProfile";
-import type { BandApiResponse } from "@/types/band/band";
 import {
   BAND_GENRE_BY_LABEL,
   BAND_GENRE_LABELS,
@@ -42,12 +41,6 @@ const PART_LABEL_TO_ENUM: Record<string, BandMemberProfilePart> = {
   베이스: "BASS",
   드럼: "DRUM",
   키보드: "KEYBOARD",
-};
-
-const getApiErrorMessage = (error: unknown, fallbackMessage: string) => {
-  const axiosError = error as AxiosError<BandApiResponse<null>>;
-
-  return axiosError.response?.data?.message ?? fallbackMessage;
 };
 
 interface ChipGroupProps {

@@ -5,14 +5,14 @@ import {
   type KeyboardEvent,
   type ReactNode,
 } from "react";
-import type { AxiosError } from "axios";
 import { useNavigate } from "react-router-dom";
 import { Header } from "@/components/band/home/Header";
 import { Input } from "@/components/common/Input/Input";
 import { useActiveBandId } from "@/hooks/api/user/useMyProfiles";
 import { useCreatePost } from "@/hooks/api/band/usePost";
 import { uploadMediaFile } from "@/utils/uploadMediaFile";
-import type { BandApiResponse, PostType } from "@/types/band/post";
+import { getApiErrorMessage } from "@/utils/getApiErrorMessage";
+import type { PostType } from "@/types/band/post";
 import UploadIcon from "@/assets/icons/band/upload.svg";
 import CloseCircleIcon from "@/assets/icons/band/close-circle.svg";
 import CloseIcon from "@/assets/icons/close.svg";
@@ -25,12 +25,6 @@ const CONTENT_TYPE_TO_POST_TYPE: Record<ContentType, PostType> = {
   사진: "PHOTO",
   글: "TEXT",
   영상: "VIDEO",
-};
-
-const getApiErrorMessage = (error: unknown, fallbackMessage: string) => {
-  const axiosError = error as AxiosError<BandApiResponse<null>>;
-
-  return axiosError.response?.data?.message ?? fallbackMessage;
 };
 
 const MAX_IMAGES = 10;
