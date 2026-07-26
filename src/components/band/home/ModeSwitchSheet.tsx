@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useMyProfilesQuery } from "@/hooks/api/user/useMyProfiles";
 import { useChangeUserMode } from "@/hooks/api/user/useMode";
 import { useSlideUpSheet } from "@/hooks/useSlideUpSheet";
+import { Toast } from "@/components/common/Toast/Toast";
 import { useModeStore } from "@/stores/useModeStore";
 import { getFanAccountDisplay } from "@/utils/authUser";
 import { BAND_GENRE_LABELS, BAND_REGION_LABELS } from "@/utils/bandLabels";
@@ -127,6 +128,7 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
       ? fanAccount.id
       : (activeBand?.id ?? bandAccounts[0]?.id ?? fanAccount.id);
   const [selectedId, setSelectedId] = useState(initialSelectedId);
+  const [showErrorToast, setShowErrorToast] = useState(false);
   const { rendered, isVisible, handleTransitionEnd } = useSlideUpSheet(
     open,
     () => setSelectedId(initialSelectedId),
@@ -248,7 +250,7 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
                 if (selectedMode === "fan" && fanAccount.profileId) {
                   changeUserMode.mutate(
                     { profileId: fanAccount.profileId, type: "FAN" },
-                    { onSuccess: proceed },
+                    { onSuccess: proceed, onError: () => setShowErrorToast(true) },
                   );
                   return;
                 }
@@ -263,7 +265,7 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
                       profileId: selectedBand.bandMemberProfileId,
                       type: "BAND",
                     },
-                    { onSuccess: proceed },
+                    { onSuccess: proceed, onError: () => setShowErrorToast(true) },
                   );
                   return;
                 }
@@ -280,6 +282,12 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
           </div>
         </div>
       </div>
+
+      <Toast
+        open={showErrorToast}
+        message="모드 전환에 실패했어요. 다시 시도해주세요"
+        onClose={() => setShowErrorToast(false)}
+      />
     </div>
   );
 };
