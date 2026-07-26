@@ -6,29 +6,65 @@ import { ModalOverlay } from "@/components/common/Modal/ModalOverlay";
 import Modal from "@/components/Modal/Modal";
 import { ProfileSummary } from "@/components/fan/my/ProfileSummary";
 import { MenuSection } from "@/components/band/my/MenuSection";
+import { useFanMyPageQuery } from "@/hooks/api/user/useFanMyPage";
+import { useGenres, useRegions } from "@/hooks/api/onboarding/useOnboarding";
+import { useLogoutAndRedirect } from "@/hooks/useLogoutAndRedirect";
+import type { CodeName } from "@/types/onboarding/onboarding";
 
-const PROFILE = {
-  name: "최유주",
-  subtitle: "관심장르 · 지역",
+const getCodeName = (codeNames: CodeName[], code: string) =>
+  codeNames.find((item) => item.code === code)?.name ?? code;
+
+const buildSubtitle = (
+  data: {
+    genre: string;
+    additionalGenreCount: number;
+    regions: string[];
+  },
+  genres: CodeName[],
+  regions: CodeName[],
+) => {
+  const genreLabel = data.genre ? getCodeName(genres, data.genre) : "";
+  const genreText =
+    data.additionalGenreCount > 0
+      ? `${genreLabel} 외 ${data.additionalGenreCount}`
+      : genreLabel;
+  const regionText = (data.regions ?? [])
+    .map((region) => getCodeName(regions, region))
+    .join(", ");
+
+  return [genreText, regionText].filter(Boolean).join(" · ");
 };
 
 const MyPage = () => {
   const navigate = useNavigate();
   const [isLogoutOpen, setIsLogoutOpen] = useState(false);
+  const { data } = useFanMyPageQuery();
+  const logout = useLogoutAndRedirect();
+  const { data: genres = [] } = useGenres();
+  const { data: regions = [] } = useRegions();
 
   return (
     <main className="relative flex min-h-dvh flex-col bg-neutral-0">
       <Header title="마이" showBack={false} />
 
       <section className="bg-primary-0 px-5 py-6">
-        <ProfileSummary name={PROFILE.name} subtitle={PROFILE.subtitle} />
+        <ProfileSummary
+          name={data?.nickname ?? ""}
+          subtitle={data ? buildSubtitle(data, genres, regions) : ""}
+        />
 
         <div className="mt-4">
           <StatRow
             stats={[
-              { label: "팔로잉", value: 128 },
-              { label: "관심 공연", value: 24 },
-              { label: "참여 공연", value: 8 },
+              { label: "팔로잉", value: data?.followingCount ?? 0 },
+              {
+                label: "관심 공연",
+                value: data?.interestedPerformanceCount ?? 0,
+              },
+              {
+                label: "참여 공연",
+                value: data?.participatedPerformanceCount ?? 0,
+              },
             ]}
           />
         </div>
@@ -101,7 +137,7 @@ const MyPage = () => {
           onCancel={() => setIsLogoutOpen(false)}
           onConfirm={() => {
             setIsLogoutOpen(false);
-            navigate("/login");
+            logout();
           }}
         />
       </ModalOverlay>

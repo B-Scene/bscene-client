@@ -5,6 +5,7 @@ import {
   deleteSessionRecruitment,
   deleteSessionSearchHistory,
   getSessionRecruitmentDetail,
+  getSessionRecruitmentEditInfo,
   getSessionRecruitments,
   getSessionSearchHistory,
   removeSessionRecruitmentInterest,
@@ -28,6 +29,8 @@ export const sessionRecruitmentKeys = {
     [...sessionRecruitmentKeys.lists(), params] as const,
   detail: (sessionRecruitmentId: number) =>
     [...sessionRecruitmentKeys.all, "detail", sessionRecruitmentId] as const,
+  editInfo: (sessionRecruitmentId: number) =>
+    [...sessionRecruitmentKeys.all, "editInfo", sessionRecruitmentId] as const,
   searchHistory: () => [...sessionRecruitmentKeys.all, "searchHistory"] as const,
 };
 
@@ -51,6 +54,16 @@ export const useSessionRecruitmentDetailQuery = (
     queryFn: () => getSessionRecruitmentDetail(sessionRecruitmentId),
     enabled: sessionRecruitmentId > 0,
     staleTime: 1000 * 30,
+  });
+};
+
+export const useSessionRecruitmentEditInfoQuery = (
+  sessionRecruitmentId: number,
+) => {
+  return useQuery({
+    queryKey: sessionRecruitmentKeys.editInfo(sessionRecruitmentId),
+    queryFn: () => getSessionRecruitmentEditInfo(sessionRecruitmentId),
+    enabled: sessionRecruitmentId > 0,
   });
 };
 

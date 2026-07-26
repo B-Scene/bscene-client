@@ -2,6 +2,7 @@ import FilterIcon from "@/assets/icons/band/filter.svg";
 import LineIcon from "@/assets/icons/band/Line.svg";
 import { SESSION_FILTERS } from "../data/sessionRecruitmentPosts";
 import type { SessionFilterValues } from "../types";
+import type { SessionRecruitmentSort } from "@/types/session/sessionRecruitment";
 import { ChevronDownIcon } from "./SessionIcons";
 
 interface SessionFilterBarProps {
@@ -9,6 +10,8 @@ interface SessionFilterBarProps {
   showSelectedValues?: boolean;
   showBottomBorder?: boolean;
   compactHeight?: boolean;
+  sort: SessionRecruitmentSort;
+  onSortChange: (sort: SessionRecruitmentSort) => void;
   onOpenFilter: () => void;
 }
 
@@ -17,6 +20,8 @@ export const SessionFilterBar = ({
   showSelectedValues = true,
   showBottomBorder = true,
   compactHeight = false,
+  sort,
+  onSortChange,
   onOpenFilter,
 }: SessionFilterBarProps) => {
   const selectedFilters = [values.part, values.skill, values.genre, values.region];
@@ -32,9 +37,19 @@ export const SessionFilterBar = ({
     >
       <button
         type="button"
+        aria-label={`정렬 기준: ${sort === "LATEST" ? "최신순" : "마감순"}`}
+        onClick={() =>
+          onSortChange(
+            sort === "LATEST"
+              ? "IMMINENT"
+              : "LATEST",
+          )
+        }
         className="flex h-[22px] w-[62px] shrink-0 items-center justify-center gap-0.5 rounded-full border border-[#FBB10E] text-caption2 text-[#FBB10E]"
       >
-        최신순
+        {sort === "LATEST"
+          ? "최신순"
+          : "마감순"}
         <ChevronDownIcon className="size-3" />
       </button>
 

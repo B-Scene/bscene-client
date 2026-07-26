@@ -11,7 +11,7 @@ export const Toast = ({ open, message, onClose }: ToastProps) => {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-x-5 bottom-24 z-50 flex items-center gap-3 rounded-xl bg-neutral-900 px-4 py-3.5 text-body1 text-white">
+    <div className="fixed inset-x-5 bottom-7 z-50 flex items-center gap-3 rounded-xl bg-neutral-900 px-4 py-3.5 text-body1 text-white">
       <svg
         xmlns="http://www.w3.org/2000/svg"
         viewBox="0 0 24 24"

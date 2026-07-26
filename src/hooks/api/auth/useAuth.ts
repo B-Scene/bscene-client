@@ -6,6 +6,7 @@ import {
   verifyPhone,
   login,
   reissueToken,
+  logout,
   oauthSignup,
   exchangeOAuthCode,
 } from "@/api/auth/auth";
@@ -16,6 +17,7 @@ import type {
   VerifyPhoneRequest,
   LoginRequest,
   ReissueRequest,
+  LogoutRequest,
   OAuthSignupRequest,
 } from "@/types/auth/auth";
 
@@ -53,6 +55,12 @@ export const useLogin = () => {
 export const useReissueToken = () => {
   return useMutation({
     mutationFn: (body: ReissueRequest) => reissueToken(body),
+  });
+};
+
+export const useLogout = () => {
+  return useMutation({
+    mutationFn: (body: LogoutRequest) => logout(body),
   });
 };
 

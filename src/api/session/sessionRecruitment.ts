@@ -6,6 +6,7 @@ import type {
   DeleteSessionSearchHistoryResponse,
   SessionApiResponse,
   SessionRecruitmentDetailResponse,
+  SessionRecruitmentEditInfoResponse,
   SessionRecruitmentInterestResponse,
   SessionRecruitmentListParams,
   SessionRecruitmentListResponse,
@@ -61,6 +62,16 @@ export const updateSessionRecruitment = async (
   const { data } = await axiosInstance.patch<
     SessionApiResponse<UpdateSessionRecruitmentResponse>
   >(`/sessions/recruitments/${sessionRecruitmentId}`, body);
+
+  return data.result;
+};
+
+export const getSessionRecruitmentEditInfo = async (
+  sessionRecruitmentId: number,
+) => {
+  const { data } = await axiosInstance.get<
+    SessionApiResponse<SessionRecruitmentEditInfoResponse>
+  >(`/sessions/recruitments/${sessionRecruitmentId}/edit`);
 
   return data.result;
 };

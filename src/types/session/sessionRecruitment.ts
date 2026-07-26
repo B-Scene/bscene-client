@@ -46,6 +46,20 @@ export type UpdateSessionRecruitmentRequest = Omit<
 
 export type UpdateSessionRecruitmentResponse = CreateSessionRecruitmentResponse;
 
+export interface SessionRecruitmentEditInfoResponse {
+  recruitmentTitle: string;
+  summary: string;
+  content: string;
+  part: string;
+  skillLevel: string;
+  genre: string;
+  region: string;
+  practiceSchedule: string;
+  practicePlace: string;
+  deadlineAt: string;
+  qualification: string;
+}
+
 export type DeleteSessionRecruitmentResponse = null;
 
 export type SessionRecruitmentSort = "LATEST" | "IMMINENT";
@@ -64,6 +78,7 @@ export interface SessionRecruitmentListParams {
 export interface SessionRecruitmentListItem {
   sessionRecruitmentId: number;
   bandId: number;
+  isMine?: boolean;
   dDay: number;
   isNew: boolean;
   isInterested: boolean;
@@ -87,6 +102,7 @@ export interface SessionRecruitmentListResponse {
 export interface SessionRecruitmentDetailResponse {
   sessionRecruitmentId: number;
   isNew: boolean;
+  isMine?: boolean;
   recruitmentTitle: string;
   deadlineAt: string;
   dDay: number;

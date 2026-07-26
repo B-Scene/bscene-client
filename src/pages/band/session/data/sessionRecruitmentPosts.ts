@@ -34,7 +34,22 @@ export const SESSION_FILTER_GROUPS: SessionFilterGroup[] = [
   {
     id: "genre",
     title: "장르",
-    options: ["전체", "록", "인디팝", "펑크", "메탈", "재즈", "블루스", "R&B", "어쿠스틱", "포크"],
+    options: [
+      "전체",
+      "인디",
+      "팝",
+      "팝록",
+      "재즈",
+      "블루스",
+      "얼터너티브록",
+      "사이키델릭록",
+      "일렉트로닉록",
+      "포크록",
+      "펑크록",
+      "하드록",
+      "메탈",
+      "etc.",
+    ],
   },
   {
     id: "region",

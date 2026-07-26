@@ -76,6 +76,10 @@ export const getStoredAuthUser = () => {
   return parseStoredAuthUser(window.localStorage.getItem(AUTH_USER_STORAGE_KEY));
 };
 
+export const clearStoredAuthUser = () => {
+  window.localStorage.removeItem(AUTH_USER_STORAGE_KEY);
+};
+
 export const saveSignupEmail = (email: string) => {
   const trimmedEmail = email.trim();
 
@@ -120,6 +124,9 @@ export const saveFanNickname = (fanNickname: string) => {
     }),
   );
 };
+
+export const getHomePathForMode = (mode?: string | null) =>
+  mode === "BAND" ? "/band/home" : "/fan/home";
 
 export const getFanAccountDisplay = () => {
   const user = getStoredAuthUser();

@@ -1,54 +1,82 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import type { AxiosError } from "axios";
+import { useQueryClient } from "@tanstack/react-query";
 import { Header } from "@/components/band/home/Header";
 import { NotificationBandBanner } from "@/components/band/my/NotificationBandBanner";
 import { ModalOverlay } from "@/components/common/Modal/ModalOverlay";
 import Modal from "@/components/Modal/Modal";
-import { useBandProfileStore } from "@/stores/useBandProfileStore";
-
-interface Posting {
-  id: string;
-  dDay: string;
-  title: string;
-  tags: string;
-  time: string;
-  description: string;
-}
-
-const INITIAL_POSTINGS: Posting[] = [
-  {
-    id: "1",
-    dDay: "D-18",
-    title: "드럼 세션 구합니다",
-    tags: "인디 · 서울",
-    time: "2일 전",
-    description:
-      "장기적으로 함께 활동할 드러머를 찾습니다. 라이브와 앨범 작업 경험자 우대",
-  },
-  {
-    id: "2",
-    dDay: "D-18",
-    title: "드럼 세션 구합니다",
-    tags: "인디 · 서울",
-    time: "2일 전",
-    description:
-      "장기적으로 함께 활동할 드러머를 찾습니다. 라이브와 앨범 작업 경험자 우대",
-  },
-];
+import { useActiveBandId } from "@/hooks/api/user/useMyProfiles";
+import {
+  postingManagementKeys,
+  usePostingManagementQuery,
+} from "@/hooks/api/user/usePostingManagement";
+import { useDeleteSessionRecruitment } from "@/hooks/api/session/useSessionRecruitment";
+import { useInfiniteScrollObserver } from "@/hooks/useInfiniteScrollObserver";
+import { formatDDayLabel } from "@/utils/getDDay";
+import { SessionRecruitmentFormScreen } from "@/pages/band/session/components/SessionRecruitmentFormScreen";
+import type { SessionApiResponse } from "@/types/session/sessionRecruitment";
 
 const PostingManagementPage = () => {
-  const profile = useBandProfileStore((state) => state.profile);
-  const bandName = profile.name.trim() || "WAVY";
+  const queryClient = useQueryClient();
+  const activeBandId = useActiveBandId();
+  const bandId = activeBandId ?? NaN;
 
-  const [postings, setPostings] = useState(INITIAL_POSTINGS);
-  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    usePostingManagementQuery(bandId);
+  const deleteRecruitment = useDeleteSessionRecruitment();
 
-  const handleConfirmDelete = () => {
-    if (!deleteTargetId) return;
-    setPostings((prev) =>
-      prev.filter((posting) => posting.id !== deleteTargetId),
-    );
-    setDeleteTargetId(null);
+  const bandName = data?.pages[0]?.bandName ?? "";
+  const postings = useMemo(
+    () => data?.pages.flatMap((page) => page.content) ?? [],
+    [data],
+  );
+
+  const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
+  const [deleteErrorMessage, setDeleteErrorMessage] = useState("");
+  const [editTargetId, setEditTargetId] = useState<number | null>(null);
+
+  const sentinelRef = useInfiniteScrollObserver({
+    enabled: Boolean(hasNextPage) && !isFetchingNextPage,
+    onIntersect: fetchNextPage,
+  });
+
+  const handleOpenDeleteModal = (sessionRecruitmentId: number) => {
+    setDeleteErrorMessage("");
+    setDeleteTargetId(sessionRecruitmentId);
   };
+
+  const handleConfirmDelete = async () => {
+    if (deleteTargetId === null) return;
+
+    try {
+      await deleteRecruitment.mutateAsync(deleteTargetId);
+      queryClient.invalidateQueries({ queryKey: postingManagementKeys.all });
+      setDeleteTargetId(null);
+    } catch (error) {
+      const apiMessage = (error as AxiosError<SessionApiResponse<null>>)
+        .response?.data?.message;
+
+      setDeleteErrorMessage(
+        apiMessage ?? "모집 공고 삭제에 실패했어요. 잠시 후 다시 시도해주세요.",
+      );
+    }
+  };
+
+  if (editTargetId !== null) {
+    return (
+      <SessionRecruitmentFormScreen
+        editSessionRecruitmentId={editTargetId}
+        onBack={() => setEditTargetId(null)}
+        onClose={() => setEditTargetId(null)}
+        onSaved={() => {
+          queryClient.invalidateQueries({
+            queryKey: postingManagementKeys.all,
+          });
+          setEditTargetId(null);
+        }}
+      />
+    );
+  }
 
   return (
     <main className="relative min-h-dvh bg-neutral-0 pb-24">
@@ -63,29 +91,32 @@ const PostingManagementPage = () => {
         <div className="mt-6 flex flex-col gap-3">
           {postings.map((posting) => (
             <div
-              key={posting.id}
+              key={posting.sessionRecruitmentId}
               className="flex flex-col gap-2.5 rounded-lg bg-neutral-0 py-3 px-6 shadow-[0_0_8px_0_rgba(0,0,0,0.10)]"
             >
               <div className="flex flex-col gap-3">
                 <span className="self-start rounded-full px-3 py-0.5 bg-secondary-500 text-center text-caption3 text-white">
-                  {posting.dDay}
+                  {formatDDayLabel(posting.dDay)}
                 </span>
 
                 <div className="flex flex-col gap-2">
                   <div className="flex flex-col gap-1">
                     <h3 className="text-label1 text-neutral-900">
-                      {posting.title}
+                      {posting.recruitmentTitle}
                     </h3>
                     <p className="text-caption3 text-neutral-600">
-                      {bandName} · {posting.tags}
+                      {posting.bandName} · {posting.bandGenre} ·{" "}
+                      {posting.bandRegion}
                       <span className="mx-1.5 text-neutral-300">|</span>
                       <span className="text-caption2 text-secondary-500">
-                        {posting.time}
+                        {posting.postedAgo === 0
+                          ? "오늘"
+                          : `${posting.postedAgo}일 전`}
                       </span>
                     </p>
                   </div>
                   <p className="text-caption2 text-neutral-800">
-                    {posting.description}
+                    {posting.summary}
                   </p>
                 </div>
               </div>
@@ -93,13 +124,16 @@ const PostingManagementPage = () => {
               <div className="flex gap-5">
                 <button
                   type="button"
+                  onClick={() => setEditTargetId(posting.sessionRecruitmentId)}
                   className="flex h-7.5 flex-1 items-center justify-center rounded-md bg-secondary-0 text-caption3 text-neutral-600"
                 >
                   수정
                 </button>
                 <button
                   type="button"
-                  onClick={() => setDeleteTargetId(posting.id)}
+                  onClick={() =>
+                    handleOpenDeleteModal(posting.sessionRecruitmentId)
+                  }
                   className="flex h-7.5 flex-1 items-center justify-center rounded-md bg-neutral-300 text-caption3 text-neutral-600"
                 >
                   삭제
@@ -108,11 +142,16 @@ const PostingManagementPage = () => {
             </div>
           ))}
         </div>
+
+        <div ref={sentinelRef} aria-hidden="true" className="h-px w-full" />
       </div>
 
       <ModalOverlay
         open={deleteTargetId !== null}
-        onClose={() => setDeleteTargetId(null)}
+        onClose={() => {
+          if (deleteRecruitment.isPending) return;
+          setDeleteTargetId(null);
+        }}
       >
         <Modal
           tone="orange"
@@ -124,9 +163,15 @@ const PostingManagementPage = () => {
               받을 수 없으며,
               <br />
               삭제된 내용은 복구할 수 없어요
+              {deleteErrorMessage ? (
+                <>
+                  <br />
+                  <span className="text-error">{deleteErrorMessage}</span>
+                </>
+              ) : null}
             </>
           }
-          confirmLabel="확인"
+          confirmLabel={deleteRecruitment.isPending ? "삭제 중" : "확인"}
           onCancel={() => setDeleteTargetId(null)}
           onConfirm={handleConfirmDelete}
         />

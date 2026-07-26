@@ -1,12 +1,14 @@
 import { useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useOAuthExchange } from "@/hooks/api/auth/useAuth";
-import { saveAuthenticatedUser } from "@/utils/authUser";
+import { getHomePathForMode, saveAuthenticatedUser } from "@/utils/authUser";
+import { useModeStore } from "@/stores/useModeStore";
 
 const OAuthCallbackPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { mutateAsync } = useOAuthExchange();
+  const setMode = useModeStore((state) => state.setMode);
 
   const hasExchanged = useRef(false);
 
@@ -46,12 +48,14 @@ const OAuthCallbackPage = () => {
               .fanNickname,
           });
 
-          navigate(
-            data.token.user.onboardingCompleted
-              ? "/home"
-              : "/onboarding/agreement",
-            { replace: true },
-          );
+          if (data.token.user.onboardingCompleted) {
+            setMode(data.token.user.currentMode === "BAND" ? "band" : "fan");
+            navigate(getHomePathForMode(data.token.user.currentMode), {
+              replace: true,
+            });
+          } else {
+            navigate("/onboarding/agreement", { replace: true });
+          }
           return;
         }
 
@@ -63,7 +67,7 @@ const OAuthCallbackPage = () => {
     };
 
     handleOAuthExchange();
-  }, [mutateAsync, navigate, searchParams]);
+  }, [mutateAsync, navigate, searchParams, setMode]);
 
   return (
     <main className="flex min-h-dvh items-center justify-center bg-neutral-0">

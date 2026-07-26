@@ -1,53 +1,33 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ArrowLeftIcon from "@/assets/icons/arrow-left.svg";
-import ImagePlaceholderIcon from "@/assets/icons/fan/image-icon.svg";
 import TicketPerformIcon from "@/assets/icons/fan/ticket-perform.svg";
+import { usePerformanceHistoryQuery } from "@/hooks/api/user/usePerformanceHistory";
+import { useInfiniteScrollObserver } from "@/hooks/useInfiniteScrollObserver";
+import type { PerformanceHistoryFilter } from "@/types/user/performanceHistory";
 
-interface AttendedConcert {
-  id: string;
-  title: string;
-  location: string;
-  dateTime: string;
-  year: number;
-  month?: string;
-  day?: string;
-}
-
-const ATTENDED_CONCERTS: AttendedConcert[] = [
-  {
-    id: "concert-1",
-    title: "WAVY 단독 공연",
-    location: "홍대 롤링홀",
-    dateTime: "2026. 08. 17. 18:00",
-    year: 2026,
-  },
-  {
-    id: "concert-2",
-    title: "인디 나잇 vol.3",
-    location: "상수 무브홀",
-    dateTime: "2026. 05. 21. 18:00",
-    year: 2026,
-    month: "MAY",
-    day: "21",
-  },
-  {
-    id: "concert-3",
-    title: "클럽 FF 특별 공연",
-    location: "클럽 FF",
-    dateTime: "2026. 04. 16. 18:00",
-    year: 2026,
-  },
+const MONTH_ABBREVIATIONS = [
+  "JAN",
+  "FEB",
+  "MAR",
+  "APR",
+  "MAY",
+  "JUN",
+  "JUL",
+  "AUG",
+  "SEP",
+  "OCT",
+  "NOV",
+  "DEC",
 ];
 
-const FILTERS = ["전체", "2026년", "2025년", "2024년 이전"] as const;
+const getDateBadge = (performanceDate: string) => {
+  const [, month, day] = performanceDate.split("-");
 
-type Filter = (typeof FILTERS)[number];
-
-const matchesFilter = (concert: AttendedConcert, filter: Filter) => {
-  if (filter === "전체") return true;
-  if (filter === "2024년 이전") return concert.year <= 2024;
-  return `${concert.year}년` === filter;
+  return {
+    month: MONTH_ABBREVIATIONS[Number(month) - 1] ?? "",
+    day: day ?? "",
+  };
 };
 
 const LocationIcon = () => (
@@ -67,11 +47,30 @@ const LocationIcon = () => (
 
 const AttendedConcertsPage = () => {
   const navigate = useNavigate();
-  const [activeFilter, setActiveFilter] = useState<Filter>("전체");
+  const [activeFilter, setActiveFilter] =
+    useState<PerformanceHistoryFilter>("ALL");
 
-  const filteredConcerts = ATTENDED_CONCERTS.filter((concert) =>
-    matchesFilter(concert, activeFilter),
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    usePerformanceHistoryQuery(activeFilter);
+
+  const baseYear = data?.pages[0]?.baseYear ?? new Date().getFullYear();
+  const totalCount = data?.pages[0]?.totalCount ?? 0;
+  const concerts = useMemo(
+    () => data?.pages.flatMap((page) => page.items) ?? [],
+    [data],
   );
+
+  const filters: { code: PerformanceHistoryFilter; label: string }[] = [
+    { code: "ALL", label: "전체" },
+    { code: "THIS_YEAR", label: `${baseYear}년` },
+    { code: "LAST_YEAR", label: `${baseYear - 1}년` },
+    { code: "BEFORE", label: `${baseYear - 2}년 이전` },
+  ];
+
+  const sentinelRef = useInfiniteScrollObserver({
+    enabled: Boolean(hasNextPage) && !isFetchingNextPage,
+    onIntersect: fetchNextPage,
+  });
 
   return (
     <main className="min-h-dvh bg-neutral-0 px-5 pb-[calc(var(--bottom-nav-height)+24px)]">
@@ -108,7 +107,7 @@ const AttendedConcertsPage = () => {
             <span className="text-caption3 text-neutral-900">총 참여 공연</span>
             <span className="flex items-baseline gap-1">
               <strong className="text-h4 text-primary-500">
-                {ATTENDED_CONCERTS.length}
+                {totalCount}
               </strong>
               <span className="text-caption2 text-neutral-600">회</span>
             </span>
@@ -116,49 +115,43 @@ const AttendedConcertsPage = () => {
         </div>
 
         <div className="flex rounded-md bg-primary-0 p-1">
-          {FILTERS.map((filter) => {
-            const isActive = filter === activeFilter;
+          {filters.map((filter) => {
+            const isActive = filter.code === activeFilter;
 
             return (
               <button
-                key={filter}
+                key={filter.code}
                 type="button"
-                onClick={() => setActiveFilter(filter)}
+                onClick={() => setActiveFilter(filter.code)}
                 className={`flex flex-1 items-center justify-center gap-2.5 rounded-md border border-transparent px-2 py-1.25 text-center text-caption3 text-neutral-900 ${
                   isActive
                     ? "border-black/4 bg-neutral-0 shadow-[0_3px_8px_0_rgba(0,0,0,0.12),0_3px_1px_0_rgba(0,0,0,0.04)]"
                     : ""
                 }`}
               >
-                {filter}
+                {filter.label}
               </button>
             );
           })}
         </div>
 
         <ul className="flex flex-col gap-3">
-          {filteredConcerts.map((concert) => {
-            const hasDateBadge = Boolean(concert.month && concert.day);
+          {concerts.map((concert) => {
+            const { month, day } = getDateBadge(concert.performanceDate);
 
             return (
               <li
-                key={concert.id}
+                key={concert.performanceId}
                 className="flex items-center gap-4 rounded-xl bg-neutral-0 px-4 py-3 shadow-[0_0_8px_0_rgba(0,0,0,0.10)]"
               >
-                {hasDateBadge ? (
-                  <div className="flex w-12.5 h-15.5 shrink-0 flex-col items-center justify-center rounded-lg bg-primary-600">
-                    <span className="text-[14px] leading-none font-medium text-neutral-0">
-                      {concert.month}
-                    </span>
-                    <span className="mt-1 text-[22px] leading-none font-semibold text-neutral-0">
-                      {concert.day}
-                    </span>
-                  </div>
-                ) : (
-                  <div className="flex w-12.5 h-15.5 shrink-0 items-center justify-center rounded-lg bg-neutral-400">
-                    <img src={ImagePlaceholderIcon} alt="" />
-                  </div>
-                )}
+                <div className="flex w-12.5 h-15.5 shrink-0 flex-col items-center justify-center rounded-lg bg-primary-600">
+                  <span className="text-[14px] leading-none font-medium text-neutral-0">
+                    {month}
+                  </span>
+                  <span className="mt-1 text-[22px] leading-none font-semibold text-neutral-0">
+                    {day}
+                  </span>
+                </div>
 
                 <div className="flex min-w-0 flex-col gap-1.25">
                   <div className="flex min-w-0 flex-col">
@@ -167,18 +160,20 @@ const AttendedConcertsPage = () => {
                     </h3>
                     <p className="m-0 flex items-center gap-1 text-caption2 text-neutral-700">
                       <LocationIcon />
-                      <span className="truncate">{concert.location}</span>
+                      <span className="truncate">{concert.venue}</span>
                     </p>
                   </div>
 
                   <p className="m-0 text-body5 text-neutral-500">
-                    {concert.dateTime}
+                    {`${concert.performanceDate.replaceAll("-", ".")}. ${concert.startTime.slice(0, 5)}`}
                   </p>
                 </div>
               </li>
             );
           })}
         </ul>
+
+        <div ref={sentinelRef} aria-hidden="true" className="h-px w-full" />
       </div>
     </main>
   );

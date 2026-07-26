@@ -25,6 +25,12 @@ type NotificationItem =
       time: string;
       bandTag: string;
       role: string;
+    }
+  | {
+      id: string;
+      type: "live-invite";
+      bandName: string;
+      time: string;
     };
 
 const NOTIFICATIONS: NotificationItem[] = [
@@ -36,6 +42,12 @@ const NOTIFICATIONS: NotificationItem[] = [
     time: "1시간 전",
     bandTag: "인디팝 · 서울 · 멤버 5명",
     role: "밴드 멤버 · 보컬",
+  },
+  {
+    id: "notification-live-invite-1",
+    type: "live-invite",
+    bandName: "WAVY",
+    time: "1분 전",
   },
   {
     id: "notification-1",
@@ -98,14 +110,55 @@ const NotificationPage = () => {
       </header>
 
       {hasNotifications ? (
-        <section className="flex flex-col gap-3 pl-[23px] pr-[22px] pt-6">
-          {NOTIFICATIONS.map((notification) =>
-            notification.type === "invite" ? (
+        <section className="flex flex-col gap-3 pl-[23px] pr-[22px] pt-6 pb-6">
+          {NOTIFICATIONS.map((notification) => {
+            if (notification.type === "live-invite") {
+              return (
+                <article
+                  key={notification.id}
+                  className="flex w-full flex-col gap-4 self-stretch rounded-xl bg-neutral-0 px-4 py-6 shadow-[0_0_8px_0_rgba(0,0,0,0.10)]"
+                >
+                  <div className="mx-auto flex w-full max-w-71.5 items-start gap-4">
+                    <img
+                      src={InviteAlertIcon}
+                      alt=""
+                      className="shrink-0 rounded-full object-cover"
+                    />
+
+                    <div className="flex min-w-0 flex-1 flex-col gap-2">
+                      <h2 className="font-body text-body1 text-neutral-900">
+                        {notification.bandName}에서 라이브 초대를 보냈어요
+                      </h2>
+                      <p className="font-body text-caption2 text-neutral-600">
+                        {notification.time}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mx-auto flex w-full max-w-75 gap-5">
+                    <button
+                      type="button"
+                      className="flex h-7.5 w-35 flex-1 items-center justify-center rounded-md border border-secondary-500 bg-neutral-0 text-caption3 text-secondary-500"
+                    >
+                      거절
+                    </button>
+                    <button
+                      type="button"
+                      className="flex h-7.5 w-35 flex-1 items-center justify-center rounded-md bg-secondary-500 text-caption3 text-neutral-0"
+                    >
+                      수락
+                    </button>
+                  </div>
+                </article>
+              );
+            }
+
+            return notification.type === "invite" ? (
               <article
                 key={notification.id}
                 className="flex w-full flex-col gap-4 self-stretch rounded-xl bg-neutral-0 px-4 py-6 shadow-[0_0_8px_0_rgba(0,0,0,0.10)]"
               >
-                <div className="mx-auto flex w-71.5 items-start gap-4">
+                <div className="mx-auto flex w-full max-w-71.5 items-start gap-4">
                   <img
                     src={InviteAlertIcon}
                     alt=""
@@ -119,7 +172,7 @@ const NotificationPage = () => {
                     <p className="font-body text-caption2 text-neutral-600">
                       {notification.position} 포지션으로 함께 활동해 주세요
                     </p>
-                    <p className="font-body text-caption3 text-neutral-400">
+                    <p className="font-body text-caption2 text-neutral-600">
                       {notification.time}
                     </p>
                   </div>
@@ -127,7 +180,7 @@ const NotificationPage = () => {
 
                 <div className="h-px bg-neutral-400" />
 
-                <div className="mx-auto flex w-71.5 items-center gap-3">
+                <div className="mx-auto flex w-full max-w-71.5 items-center gap-3">
                   <img
                     src={BandDefaultProfileImage}
                     alt=""
@@ -143,7 +196,7 @@ const NotificationPage = () => {
                   </div>
                 </div>
 
-                <div className="mx-auto flex w-71.5 items-center gap-3 rounded-md border border-neutral-300 px-4 py-3">
+                <div className="mx-auto flex w-full max-w-71.5 items-center gap-3 rounded-md border border-neutral-300 px-4 py-3">
                   <span className="font-body text-caption3 text-neutral-500">
                     역할
                   </span>
@@ -152,7 +205,7 @@ const NotificationPage = () => {
                   </span>
                 </div>
 
-                <div className="mx-auto flex gap-5 w-75">
+                <div className="mx-auto flex w-full max-w-75 gap-5">
                   <button
                     type="button"
                     className="flex h-7.5 w-35 flex-1 items-center justify-center rounded-md border border-secondary-500 bg-neutral-0 text-caption3 text-secondary-500"
@@ -192,8 +245,8 @@ const NotificationPage = () => {
                   </div>
                 </div>
               </article>
-            ),
-          )}
+            );
+          })}
         </section>
       ) : (
         <section className="flex h-[calc(100dvh-60px)] flex-col items-center pt-[274px] text-center">
