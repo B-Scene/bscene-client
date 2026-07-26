@@ -156,7 +156,6 @@ const FanBandProfilePage = () => {
   const navigate = useNavigate();
   const { bandId = "wavy" } = useParams<{ bandId: string }>();
   const [searchParams] = useSearchParams();
-  // TODO: currentBandId를 기준으로 밴드별 프로필 API 또는 Mock 데이터를 연결한다.
   const currentBandId = bandId;
   const [isFollowing, setIsFollowing] = useState(false);
   const [followerCount, setFollowerCount] = useState(560);
