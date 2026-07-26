@@ -12,7 +12,7 @@ import type {
   InviteBandMemberRequest,
 } from "@/types/band/bandMember";
 import { bandMemberProfileKeys } from "@/hooks/api/band/useBandMemberProfile";
-import { useActiveBandId } from "@/hooks/api/user/useMyProfiles";
+import { myProfilesKeys, useActiveBandId } from "@/hooks/api/user/useMyProfiles";
 import { getStoredAuthUser } from "@/utils/authUser";
 
 export const bandMemberKeys = {
@@ -73,6 +73,7 @@ export const useAcceptBandInvite = (bandId: number) => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: bandMemberKeys.lists(bandId) });
       queryClient.invalidateQueries({ queryKey: bandMemberProfileKeys.all });
+      queryClient.invalidateQueries({ queryKey: myProfilesKeys.all });
     },
   });
 };
