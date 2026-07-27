@@ -60,6 +60,7 @@ export const useCloseLiveMutation = () => {
       queryClient.invalidateQueries({
         queryKey: liveKeys.home(),
       });
+
       queryClient.invalidateQueries({
         queryKey: liveKeys.summary(liveId),
       });
@@ -101,11 +102,16 @@ export const useUpdateLiveReservationMutation = () => {
     }: {
       liveId: number;
       body: UpdateLiveReservationRequest;
-    }) => updateLiveReservation({ liveId, body }),
+    }) =>
+      updateLiveReservation({
+        liveId,
+        request: body,
+      }),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({
         queryKey: liveKeys.home(),
       });
+
       queryClient.invalidateQueries({
         queryKey: liveKeys.reservation(variables.liveId),
       });
