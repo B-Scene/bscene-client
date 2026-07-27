@@ -23,6 +23,8 @@ export interface LiveReplayItem {
   title: string;
   bandName: string;
   viewCount: number;
+  durationSeconds?: number;
+  durationSec?: number;
 }
 
 export interface ScheduledLiveItem {
@@ -38,6 +40,94 @@ export interface LiveHomeResponse {
   liveNow: LiveNowItem[];
   replays: LiveReplayItem[];
   scheduled: ScheduledLiveItem[];
+}
+
+export type LiveNowListFilter = "following" | "all";
+
+export interface LiveNowListItem {
+  liveId: number;
+  bandProfileImageUrl: string | null;
+  title: string;
+  bandName: string;
+  viewCount: number;
+}
+
+export interface LiveNowPageInfo {
+  nextCursor: number | null;
+  hasNext: boolean;
+}
+
+export interface LiveNowListResponse {
+  items: LiveNowListItem[];
+  pageInfo: LiveNowPageInfo;
+}
+
+export interface GetLiveNowListParams {
+  filter: LiveNowListFilter;
+  cursor?: number;
+  size?: number;
+}
+
+export type ScheduledLiveScope = "FOLLOWING" | "ALL";
+
+export interface ScheduledLiveListItem {
+  liveId: number;
+  bandProfileImageUrl: string | null;
+  title: string;
+  bandName: string;
+  scheduledAt: string;
+  alarmSet?: boolean;
+  notificationEnabled?: boolean;
+}
+
+export interface ScheduledLiveListResponse {
+  items: ScheduledLiveListItem[];
+  nextCursor: number | null;
+  hasNext: boolean;
+}
+
+export interface GetScheduledLiveListParams {
+  scope: ScheduledLiveScope;
+  cursor?: number;
+  size?: number;
+}
+
+export interface ToggleLiveAlarmResponse {
+  alarmSet: boolean;
+}
+
+export type ReplayListFilter = "following" | "all";
+export type ReplaySort = "LATEST" | "POPULAR";
+
+export interface ReplayListItem {
+  replayId: number;
+  thumbnailImageUrl?: string | null;
+  title: string;
+  bandName: string;
+  viewCount: number;
+  durationSeconds?: number;
+  durationSec?: number;
+}
+
+export interface ReplayListResponse {
+  items: ReplayListItem[];
+  pageInfo: LiveNowPageInfo;
+}
+
+export interface GetReplayListParams {
+  filter: ReplayListFilter;
+  sort: ReplaySort;
+  cursor?: number;
+  size?: number;
+}
+
+export interface ReplayPlaybackResponse {
+  title: string;
+  bandName: string;
+  bandProfileImageUrl: string | null;
+  viewCount: number;
+  durationSeconds: number;
+  playbackUrl: string;
 }
 
 export interface CreateLiveRequest {
@@ -75,6 +165,30 @@ export interface EnterLiveResponse {
   title: string;
   description: string | null;
   playback: LivePlayback;
+}
+
+export type LiveReportType =
+  | "SPAM"
+  | "ABUSE"
+  | "SEXUAL"
+  | "VIOLENCE"
+  | "COPYRIGHT"
+  | "ETC";
+
+export interface ReportLiveUserRequest {
+  targetUserId: number;
+  reportType: LiveReportType;
+  chatMessage?: string | null;
+  comment?: string | null;
+}
+
+export interface ReportLiveUserResponse {
+  targetUserId: number;
+}
+
+export interface BlockLiveUserRequest {
+  liveId: number;
+  targetUserId: number;
 }
 
 export interface CloseLiveResponse {

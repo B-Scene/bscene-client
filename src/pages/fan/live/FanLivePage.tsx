@@ -9,13 +9,22 @@ import {
 import Modal from "@/components/Modal/Modal";
 import { ModalOverlay } from "@/components/common/Modal/ModalOverlay";
 import {
+  useBlockLiveUserMutation,
   useEnterLiveQuery,
   useLeaveLiveMutation,
+  useReportLiveUserMutation,
+  useUnblockLiveUserMutation,
 } from "@/hooks/api/live/useLive";
+import { useLiveChatSocket } from "@/hooks/api/live/useLiveChatSocket";
 import type {
   EnterLiveResponse,
   LiveApiResponse,
+  ReportLiveUserRequest,
 } from "@/types/live/live";
+import type {
+  LiveChatMessageData,
+  LiveChatMessageFrame,
+} from "@/types/live/liveChat";
 import "./FanLivePage.css";
 import {
   EmptyChatArea,
@@ -26,6 +35,7 @@ import {
   FanLiveMemberSheet,
   FanLiveProfileActionSheet,
 } from "./components/FanLiveRoomParts";
+import type { FanChatMessage } from "./components/FanLiveRoomParts";
 import {
   FanLiveReportCompletePage,
   FanLiveReportPage,
@@ -35,6 +45,11 @@ type FanLiveView = "room" | "report" | "reportComplete";
 
 type FanLiveLocationState = {
   live?: EnterLiveResponse;
+};
+
+type ReportTarget = {
+  targetUserId?: number;
+  chatMessage: string;
 };
 
 const parseStartedAt = (startedAt: string) => {
@@ -52,6 +67,23 @@ const getDurationSeconds = (startedAt: string) => {
   if (!startedDate) return 0;
 
   return Math.max(0, Math.floor((Date.now() - startedDate.getTime()) / 1000));
+};
+
+const formatChatTime = (sentAt: string) => {
+  const normalizedValue = sentAt.includes("T")
+    ? sentAt
+    : sentAt.replace(" ", "T");
+  const sentDate = new Date(normalizedValue);
+
+  if (Number.isNaN(sentDate.getTime())) {
+    return sentAt.slice(11, 16);
+  }
+
+  return sentDate.toLocaleTimeString("ko-KR", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
 };
 
 export function FanLivePage() {
@@ -72,6 +104,9 @@ export function FanLivePage() {
   );
   const live = stateLive ?? queriedLive;
   const leaveLiveMutation = useLeaveLiveMutation();
+  const reportLiveUserMutation = useReportLiveUserMutation();
+  const blockLiveUserMutation = useBlockLiveUserMutation();
+  const unblockLiveUserMutation = useUnblockLiveUserMutation();
   const audioRef = useRef<HTMLAudioElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const [view, setView] = useState<FanLiveView>("room");
@@ -87,6 +122,90 @@ export function FanLivePage() {
   const [isProfileActionSheetOpen, setIsProfileActionSheetOpen] =
     useState(false);
   const [isExitModalOpen, setIsExitModalOpen] = useState(false);
+  const [isBlockConfirmOpen, setIsBlockConfirmOpen] = useState(false);
+  const [reportTarget, setReportTarget] = useState<ReportTarget | null>(null);
+  const [blockedUserIds, setBlockedUserIds] = useState<Set<number>>(
+    () => new Set(),
+  );
+  const [chatMessages, setChatMessages] = useState<FanChatMessage[]>([]);
+  const [chatEnded, setChatEnded] = useState(false);
+  const selectedUserId = reportTarget?.targetUserId;
+  const isSelectedUserBlocked = selectedUserId
+    ? blockedUserIds.has(selectedUserId)
+    : false;
+  const isBlockPending =
+    blockLiveUserMutation.isPending || unblockLiveUserMutation.isPending;
+
+  const handleChatMessage = useCallback(
+    (message: LiveChatMessageData, frame: LiveChatMessageFrame) => {
+      if (blockedUserIds.has(message.senderId)) return;
+
+      const confirmedMessage: FanChatMessage = {
+        id: message.messageId,
+        senderId: message.senderId,
+        sender: message.senderName,
+        message: message.content,
+        time: formatChatTime(message.sentAt),
+        profileImageUrl: message.senderProfileImageUrl,
+        band: message.senderName === live?.bandName,
+      };
+
+      setChatMessages((current) => {
+        if (current.some((chat) => chat.id === message.messageId)) {
+          return current;
+        }
+
+        const optimisticIndex = current.findIndex(
+          (chat) => chat.id === frame.clientMsgId,
+        );
+
+        if (optimisticIndex < 0) {
+          return [...current, confirmedMessage];
+        }
+
+        return current.map((chat, index) =>
+          index === optimisticIndex ? confirmedMessage : chat,
+        );
+      });
+    },
+    [blockedUserIds, live?.bandName],
+  );
+
+  const {
+    isConnected: isChatConnected,
+    lastErrorMessage: chatErrorMessage,
+    sendMessage: sendChatMessage,
+  } = useLiveChatSocket({
+    liveId: live?.liveId,
+    enabled: Boolean(live?.isLive && live.liveId),
+    onMessage: handleChatMessage,
+    onLiveEnded: () => {
+      setChatEnded(true);
+      setAudioMessage("라이브가 종료됐어요.");
+    },
+  });
+
+  const handleSendChatMessage = useCallback(
+    (content: string) => {
+      const clientMsgId = sendChatMessage(content);
+
+      if (!clientMsgId) return false;
+
+      setChatMessages((current) => [
+        ...current,
+        {
+          id: clientMsgId,
+          sender: "나",
+          message: content.trim(),
+          time: formatChatTime(new Date().toISOString()),
+          pending: true,
+        },
+      ]);
+
+      return true;
+    },
+    [sendChatMessage],
+  );
 
   const startPlayback = useCallback(async () => {
     const audio = audioRef.current;
@@ -247,6 +366,97 @@ export function FanLivePage() {
     }
   };
 
+  const handleSubmitReport = async (
+    request: Omit<ReportLiveUserRequest, "targetUserId" | "chatMessage">,
+  ) => {
+    if (!live?.liveId || !reportTarget?.targetUserId) {
+      alert("신고 대상 사용자 정보를 확인할 수 없어요.");
+      return;
+    }
+
+    try {
+      await reportLiveUserMutation.mutateAsync({
+        liveId: live.liveId,
+        request: {
+          ...request,
+          targetUserId: reportTarget.targetUserId,
+          chatMessage: reportTarget.chatMessage,
+        },
+      });
+      setView("reportComplete");
+    } catch (error) {
+      const apiMessage = (error as AxiosError<LiveApiResponse<null>>).response
+        ?.data?.message;
+
+      alert(apiMessage ?? "신고를 접수하지 못했어요.");
+    }
+  };
+
+  const handleConfirmBlock = async () => {
+    if (!live?.liveId || !selectedUserId || blockLiveUserMutation.isPending) {
+      return;
+    }
+
+    try {
+      await blockLiveUserMutation.mutateAsync({
+        liveId: live.liveId,
+        targetUserId: selectedUserId,
+      });
+      setBlockedUserIds((current) => {
+        const next = new Set(current);
+        next.add(selectedUserId);
+        return next;
+      });
+      setChatMessages((current) =>
+        current.filter((chat) => chat.senderId !== selectedUserId),
+      );
+      setIsBlockConfirmOpen(false);
+    } catch (error) {
+      const apiMessage = (error as AxiosError<LiveApiResponse<null>>).response
+        ?.data?.message;
+
+      alert(apiMessage ?? "사용자를 차단하지 못했어요.");
+    }
+  };
+
+  const handleUnblockUser = async () => {
+    if (!live?.liveId || !selectedUserId || unblockLiveUserMutation.isPending) {
+      return;
+    }
+
+    try {
+      await unblockLiveUserMutation.mutateAsync({
+        liveId: live.liveId,
+        targetUserId: selectedUserId,
+      });
+      setBlockedUserIds((current) => {
+        const next = new Set(current);
+        next.delete(selectedUserId);
+        return next;
+      });
+    } catch (error) {
+      const apiMessage = (error as AxiosError<LiveApiResponse<null>>).response
+        ?.data?.message;
+
+      alert(apiMessage ?? "사용자 차단을 해제하지 못했어요.");
+    }
+  };
+
+  const handleBlockToggle = () => {
+    if (!selectedUserId) {
+      alert("현재 예시 채팅에는 실제 사용자 ID가 없어 차단할 수 없어요.");
+      return;
+    }
+
+    if (isSelectedUserBlocked) {
+      void handleUnblockUser();
+      return;
+    }
+
+    setIsProfileActionSheetOpen(false);
+    setIsBlockConfirmOpen(true);
+  };
+
   if (!live && isLoading) {
     return (
       <main className="flex h-full items-center justify-center bg-neutral-0">
@@ -290,8 +500,9 @@ export function FanLivePage() {
   if (view === "report") {
     return (
       <FanLiveReportPage
+        isSubmitting={reportLiveUserMutation.isPending}
         onBack={() => setView("room")}
-        onComplete={() => setView("reportComplete")}
+        onSubmit={handleSubmitReport}
       />
     );
   }
@@ -330,7 +541,21 @@ export function FanLivePage() {
       {hasOpenedChat ? (
         <FanLiveChatArea
           composerOpen={isChatComposerOpen}
-          onProfileClick={() => setIsProfileActionSheetOpen(true)}
+          connectionMessage={
+            chatEnded
+              ? "라이브가 종료되어 채팅을 보낼 수 없어요."
+              : chatErrorMessage
+          }
+          isConnected={isChatConnected && !chatEnded}
+          messages={chatMessages}
+          onProfileClick={(chat: FanChatMessage) => {
+            setReportTarget({
+              targetUserId: chat.senderId,
+              chatMessage: chat.message,
+            });
+            setIsProfileActionSheetOpen(true);
+          }}
+          onSendMessage={handleSendChatMessage}
         />
       ) : (
         <EmptyChatArea />
@@ -347,13 +572,48 @@ export function FanLivePage() {
         onClose={() => setIsMemberSheetOpen(false)}
       />
       <FanLiveProfileActionSheet
+        isBlocked={isSelectedUserBlocked}
+        isBlockPending={isBlockPending}
         open={isProfileActionSheetOpen}
+        onBlockToggle={handleBlockToggle}
         onClose={() => setIsProfileActionSheetOpen(false)}
         onReport={() => {
+          if (!reportTarget?.targetUserId) {
+            alert(
+              "현재 예시 채팅에는 실제 사용자 ID가 없어 신고할 수 없어요.",
+            );
+            return;
+          }
+
           setIsProfileActionSheetOpen(false);
           setView("report");
         }}
       />
+      <ModalOverlay
+        open={isBlockConfirmOpen}
+        onClose={() => {
+          if (!blockLiveUserMutation.isPending) setIsBlockConfirmOpen(false);
+        }}
+        panelClassName="rounded-[24px]"
+      >
+        <Modal
+          title="이 사용자를 차단할까요?"
+          description={
+            <>
+              이 라이브에서 서로의 메시지를
+              <br />
+              더 이상 볼 수 없어요.
+            </>
+          }
+          cancelDisabled={blockLiveUserMutation.isPending}
+          confirmDisabled={blockLiveUserMutation.isPending}
+          confirmLabel={
+            blockLiveUserMutation.isPending ? "차단 중" : "차단하기"
+          }
+          onCancel={() => setIsBlockConfirmOpen(false)}
+          onConfirm={() => void handleConfirmBlock()}
+        />
+      </ModalOverlay>
       <ModalOverlay
         open={isExitModalOpen}
         onClose={() => {

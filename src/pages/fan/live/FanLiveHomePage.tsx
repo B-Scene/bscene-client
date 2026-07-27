@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { AxiosError } from "axios";
 import { useNavigate } from "react-router-dom";
 import BandImage from "@/assets/Img_Band.png";
@@ -8,6 +8,8 @@ import { BottomNavBar } from "@/components/layout/BottomNavBar";
 import {
   useEnterLiveMutation,
   useLiveHomeQuery,
+  useReplayListQuery,
+  useToggleLiveAlarmMutation,
 } from "@/hooks/api/live/useLive";
 import type { LiveApiResponse } from "@/types/live/live";
 import "./FanLivePage.css";
@@ -16,19 +18,55 @@ import {
   ReplayPreviewCard,
 } from "./components/FanLiveHomeParts";
 
+const formatReplayDuration = (totalSeconds?: number) => {
+  if (totalSeconds === undefined) return undefined;
+
+  const safeSeconds = Math.max(0, Math.floor(totalSeconds));
+  const hours = Math.floor(safeSeconds / 3600);
+  const minutes = Math.floor((safeSeconds % 3600) / 60);
+  const seconds = safeSeconds % 60;
+
+  return [hours, minutes, seconds]
+    .map((value) => String(value).padStart(2, "0"))
+    .join(":");
+};
+
 export function FanLiveHomePage() {
   const navigate = useNavigate();
   const { data, isLoading, isError, refetch } = useLiveHomeQuery();
+  const { data: replayListData } = useReplayListQuery("all", "LATEST");
   const enterLiveMutation = useEnterLiveMutation();
+  const toggleAlarmMutation = useToggleLiveAlarmMutation();
   const [notificationOverrides, setNotificationOverrides] = useState<
     Record<number, boolean>
   >({});
+  const replayDurations = useMemo(() => {
+    return new Map(
+      (replayListData?.pages.flatMap((page) => page.items) ?? []).map(
+        (replay) => [
+          replay.replayId,
+          replay.durationSeconds ?? replay.durationSec,
+        ],
+      ),
+    );
+  }, [replayListData]);
 
-  const toggleNotification = (liveId: number, currentValue: boolean) => {
-    setNotificationOverrides((current) => ({
-      ...current,
-      [liveId]: !currentValue,
-    }));
+  const toggleNotification = async (liveId: number) => {
+    if (toggleAlarmMutation.isPending) return;
+
+    try {
+      const { alarmSet } = await toggleAlarmMutation.mutateAsync(liveId);
+
+      setNotificationOverrides((current) => ({
+        ...current,
+        [liveId]: alarmSet,
+      }));
+    } catch (error) {
+      const apiMessage = (error as AxiosError<LiveApiResponse<null>>).response
+        ?.data?.message;
+
+      alert(apiMessage ?? "라이브 알림을 변경하지 못했어요.");
+    }
   };
 
   const handleEnterLive = async (liveId: number) => {
@@ -118,6 +156,11 @@ export function FanLiveHomePage() {
                       title={replay.title}
                       bandName={replay.bandName}
                       viewCount={replay.viewCount.toLocaleString()}
+                      duration={formatReplayDuration(
+                        replay.durationSeconds ??
+                          replay.durationSec ??
+                          replayDurations.get(replay.replayId),
+                      )}
                       onClick={() =>
                         navigate(`/fan/live/replays/${replay.replayId}`)
                       }
@@ -161,7 +204,7 @@ export function FanLiveHomePage() {
                       }
                       tone="pink"
                       onNotificationClick={() =>
-                        toggleNotification(live.liveId, isNotified)
+                        void toggleNotification(live.liveId)
                       }
                     />
                   );

@@ -33,7 +33,7 @@ const VideoCard = ({
           />
         ) : null}
         {duration ? (
-          <span className="absolute right-1 bottom-1 rounded-[3px] bg-neutral-900 px-1 font-body text-caption6 text-neutral-0">
+          <span className="absolute right-[3px] bottom-[3px] rounded-[2px] bg-neutral-900 py-px pr-1 pl-[3px] font-body text-caption6 text-neutral-0">
             {duration}
           </span>
         ) : null}
