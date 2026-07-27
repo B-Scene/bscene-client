@@ -6,79 +6,23 @@ import { SESSION_FILTERS } from "../data/sessionRecruitmentPosts";
 import type { SessionFilterValues } from "../types";
 
 interface SessionFilterBarProps {
-  values?: SessionFilterValues | SessionFilterValuesLike;
-  filters?: SessionFilterValuesLike;
-  selectedFilters?: SessionFilterValuesLike;
-
-  sort?: SessionRecruitmentSort;
-  onSortChange?: Dispatch<SetStateAction<SessionRecruitmentSort>>;
-
+  values: SessionFilterValues;
+  showSelectedValues?: boolean;
   showBottomBorder?: boolean;
   compactHeight?: boolean;
-  showSelectedValues?: boolean;
-
-  onOpenFilter?: (key?: FilterKey) => void;
-  onFilterClick?: (key: FilterKey) => void;
-  onOpenBottomSheet?: (key: FilterKey) => void;
-
-  onReset?: () => void;
-  onClear?: () => void;
-  onClearFilters?: () => void;
-
-  className?: string;
+  sort: SessionRecruitmentSort;
+  onSortChange: (sort: SessionRecruitmentSort) => void;
+  onOpenFilter: () => void;
 }
-
-const FILTER_ITEMS: Array<{
-  key: FilterKey;
-  valueKeys: FilterKey[];
-  label: string;
-}> = [
-  {
-    key: "part",
-    valueKeys: ["part"],
-    label: "파트",
-  },
-  {
-    key: "skillLevel",
-    valueKeys: ["skillLevel", "skill"],
-    label: "실력대",
-  },
-  {
-    key: "genre",
-    valueKeys: ["genre"],
-    label: "장르",
-  },
-  {
-    key: "region",
-    valueKeys: ["region"],
-    label: "지역",
-  },
-];
-
-const SORT_LABEL_MAP: Record<string, string> = {
-  LATEST: "최신순",
-  POPULAR: "인기순",
-  DEADLINE: "마감임박순",
-  DEADLINE_ASC: "마감임박순",
-  VIEW: "조회순",
-};
 
 export const SessionFilterBar = ({
   values,
-  filters,
-  selectedFilters,
-  sort,
-  onSortChange,
+  showSelectedValues = true,
   showBottomBorder = true,
   compactHeight = false,
-  showSelectedValues = true,
+  sort,
+  onSortChange,
   onOpenFilter,
-  onFilterClick,
-  onOpenBottomSheet,
-  onReset,
-  onClear,
-  onClearFilters,
-  className = "",
 }: SessionFilterBarProps) => {
   const selectedFilters = [
     values.part,
@@ -90,7 +34,7 @@ export const SessionFilterBar = ({
   const sortLabel = sort === "LATEST" ? "최신순" : "마감순";
 
   return (
-    <div
+    <section
       className={[
         "flex w-full items-center gap-2 bg-neutral-0 pl-[22px] pr-[26px]",
         compactHeight ? "h-[53px]" : "h-[48px]",
