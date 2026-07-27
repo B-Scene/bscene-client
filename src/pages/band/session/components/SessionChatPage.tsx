@@ -6,11 +6,7 @@ import {
   useRef,
   useState,
 } from "react";
-import {
-  useLocation,
-  useNavigate,
-  useParams,
-} from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 import BandProfileImage from "@/assets/Img_Band.png";
 import Modal from "@/components/Modal/Modal";
@@ -28,7 +24,6 @@ import { getCurrentChatTime } from "@/features/session/chat/sessionChat.utils";
 import {
   SessionChatDateDivider,
   SessionChatHeader,
-  SessionChatInput,
   SessionChatMessage,
 } from "@/features/session/chat/SessionChatView";
 
@@ -94,6 +89,10 @@ const formatChatDate = (value?: string) => {
   return `${date.getMonth() + 1}월 ${date.getDate()}일 (${
     weekDays[date.getDay()]
   })`;
+};
+
+const getMessageKey = (message: LocalChatMessage) => {
+  return message.clientMsgId ?? message.serverMessageId ?? message.id;
 };
 
 export default function SessionChatPage() {
@@ -173,9 +172,7 @@ export default function SessionChatPage() {
 
         if (optimisticMessageIndex >= 0) {
           const copiedMessages = [...previousMessages];
-
           copiedMessages[optimisticMessageIndex] = nextMessage;
-
           return copiedMessages;
         }
 
@@ -268,10 +265,7 @@ export default function SessionChatPage() {
     if (sent) {
       lastReadMessageIdRef.current = lastServerMessageId;
     }
-  }, [
-    messages,
-    sendRead,
-  ]);
+  }, [messages, sendRead]);
 
   const handleBack = () => {
     navigate(-1);
@@ -296,15 +290,15 @@ export default function SessionChatPage() {
   const handleSendMessage = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (!canSend) {
-      window.alert("현재 이 쪽지방에서는 메시지를 보낼 수 없어요.");
-      return;
-    }
-
     const trimmedMessage = messageInput.trim();
 
     if (!trimmedMessage) {
       messageInputRef.current?.focus();
+      return;
+    }
+
+    if (!canSend) {
+      window.alert("현재 이 쪽지방에서는 메시지를 보낼 수 없어요.");
       return;
     }
 
@@ -315,7 +309,8 @@ export default function SessionChatPage() {
 
     if (!isConnected) {
       window.alert(
-        lastErrorMessage || "쪽지 서버에 연결 중이에요. 잠시 후 다시 시도해주세요.",
+        lastErrorMessage ||
+          "쪽지 서버에 연결 중이에요. 잠시 후 다시 시도해주세요.",
       );
       return;
     }
@@ -324,7 +319,8 @@ export default function SessionChatPage() {
 
     if (!clientMsgId) {
       window.alert(
-        lastErrorMessage || "쪽지를 전송하지 못했어요. 잠시 후 다시 시도해주세요.",
+        lastErrorMessage ||
+          "쪽지를 전송하지 못했어요. 잠시 후 다시 시도해주세요.",
       );
       return;
     }
@@ -348,7 +344,7 @@ export default function SessionChatPage() {
 
   if (chatRoomId <= 0) {
     return (
-      <main className="mx-auto flex h-dvh w-full max-w-[393px] flex-col overflow-hidden bg-neutral-0">
+      <main className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-neutral-0">
         <SessionChatHeader
           senderName="쪽지"
           onBack={handleBack}
@@ -365,7 +361,7 @@ export default function SessionChatPage() {
   }
 
   return (
-    <main className="mx-auto flex h-dvh w-full max-w-[393px] flex-col overflow-hidden bg-neutral-0">
+    <main className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-neutral-0">
       <SessionChatHeader
         senderName={senderName}
         onBack={handleBack}
@@ -406,7 +402,7 @@ export default function SessionChatPage() {
             >
               {messages.map((message) => (
                 <SessionChatMessage
-                  key={message.clientMsgId ?? message.serverMessageId ?? message.id}
+                  key={getMessageKey(message)}
                   message={message}
                   senderName={senderName}
                   profileImageUrl={profileImageUrl || BandProfileImage}
@@ -423,12 +419,33 @@ export default function SessionChatPage() {
         )}
       </div>
 
-      <SessionChatInput
-        inputRef={messageInputRef}
-        value={messageInput}
-        onChange={setMessageInput}
+      <form
         onSubmit={handleSendMessage}
-      />
+        className="flex h-[78px] shrink-0 items-center gap-[10px] border-t border-neutral-200 bg-neutral-0 px-[15px]"
+      >
+        <input
+          ref={messageInputRef}
+          type="text"
+          value={messageInput}
+          onChange={(event) => setMessageInput(event.target.value)}
+          placeholder={
+            canSend
+              ? "메시지 입력하기"
+              : "현재 메시지를 보낼 수 없어요"
+          }
+          disabled={!canSend}
+          className="h-[45px] min-w-0 flex-1 rounded-full border border-neutral-300 bg-neutral-0 px-4 text-[14px] font-medium text-neutral-900 outline-none placeholder:text-neutral-400 disabled:bg-neutral-100 disabled:text-neutral-400"
+        />
+
+        <button
+          type="submit"
+          disabled={!canSend || !messageInput.trim()}
+          className="flex size-[45px] shrink-0 items-center justify-center rounded-full bg-secondary-500 text-[22px] font-bold text-neutral-0 disabled:bg-neutral-300"
+          aria-label="쪽지 보내기"
+        >
+          ➤
+        </button>
+      </form>
 
       <ModalOverlay open={isLeaveModalOpen} onClose={handleLeaveModalClose}>
         <Modal
