@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { createPortal } from "react-dom";
+import { useMemo, useState } from "react";
+import type { AxiosError } from "axios";
 
 import EmptyApplicationHistoryIcon from "@/assets/icons/band/empty-application-history.svg";
 import EmptyScrapHistoryIcon from "@/assets/icons/band/empty-scrap-history.svg";
@@ -30,6 +30,15 @@ import {
   useRemoveSessionRecruitmentInterest,
 } from "@/hooks/api/session/useSessionRecruitment";
 
+import type {
+  ApplicationSubmissionItem,
+  SessionApiResponse,
+} from "@/types/session/sessionApplication";
+import type {
+  InterestedSessionRecruitmentItem,
+  RecentlyViewedSessionRecruitmentItem,
+} from "@/types/session/sessionRecruitment";
+
 interface SessionApplicationHistoryPageProps {
   open: boolean;
   onClose: () => void;
@@ -39,121 +48,121 @@ interface SessionApplicationHistoryPageProps {
   onOpenRecruitment?: (recruitment: RecruitmentHistoryItem) => void;
 }
 
-interface ServerApplicationSubmissionItem {
+interface MappedApplicationHistoryItem extends ApplicationHistoryItem {
   applicationSubmissionId: number;
-  sessionRecruitmentId: number;
   sessionApplicationId: number;
-  checkedAt: string | null;
-  status: string;
-  recruitmentTitle: string;
-  bandName: string;
-  appliedAgo: number | string;
-}
-
-interface ServerRecruitmentHistoryItem {
-  interestId?: number;
-  viewId?: number;
   sessionRecruitmentId: number;
-  dDay: number;
-  isClosed: boolean;
-  isInterested: boolean;
-  recruitmentTitle: string;
-  bandName: string;
-  bandGenre: string;
-  bandRegion: string;
-  postedAgo: number | string;
-  summary: string;
-  part: string;
-  skillLevel: string;
 }
 
-const getContent = <T,>(data: unknown): T[] => {
-  const content = (data as { content?: T[] } | null | undefined)?.content;
-
-  return Array.isArray(content) ? content : [];
-};
+const HISTORY_QUERY_SIZE = 20;
 
 const toApplicationStatus = (status: string): ApplicationHistoryStatus => {
-  if (status.includes("수락")) return "accepted";
-  if (status.includes("거절")) return "rejected";
-  if (status.includes("취소")) return "canceled";
+  if (status === "지원 수락" || status === "ACCEPTED") {
+    return "accepted";
+  }
+
+  if (status === "지원 거절" || status === "REJECTED") {
+    return "rejected";
+  }
+
+  if (status === "지원 취소" || status === "CANCELED" || status === "CANCELLED") {
+    return "canceled";
+  }
 
   return "completed";
 };
 
-const toAppliedAgoLabel = (value: number | string) => {
-  if (typeof value === "number") {
-    if (value <= 0) return "오늘 지원";
-    return `${value}일 전 지원`;
-  }
-
-  if (value.includes("지원")) {
-    return value;
-  }
-
-  return `${value} 지원`;
-};
-
-const toViewedAtLabel = (value: string | null) => {
-  if (!value) return undefined;
-
-  const dateValue = value.includes("T") ? value.split("T")[0] : value;
-  const [, month, day] = dateValue.split("-").map(Number);
-
-  if (!month || !day) {
-    return value;
-  }
-
-  return `${month}월 ${day}일 열람`;
-};
-
 const toDeadlineLabel = (dDay: number) => {
-  if (dDay < 0) return "마감";
-  if (dDay === 0) return "오늘 마감";
+  if (dDay < 0) {
+    return "마감";
+  }
+
+  if (dDay === 0) {
+    return "오늘 마감";
+  }
+
   return `D-${dDay}`;
 };
 
-const mapSubmissionToApplicationHistory = (
-  submission: ServerApplicationSubmissionItem,
-): ApplicationHistoryItem => {
+const toAppliedAgoLabel = (appliedAgo: number) => {
+  if (appliedAgo <= 0) {
+    return "오늘 지원";
+  }
+
+  return `${appliedAgo}일 전 지원`;
+};
+
+const toViewedAtLabel = (checkedAt: string | null) => {
+  if (!checkedAt) {
+    return undefined;
+  }
+
+  const date = new Date(checkedAt);
+
+  if (Number.isNaN(date.getTime())) {
+    return "열람";
+  }
+
+  return `${date.getMonth() + 1}월 ${date.getDate()}일 열람`;
+};
+
+const mapSubmissionToApplication = (
+  submission: ApplicationSubmissionItem,
+): MappedApplicationHistoryItem => {
   const status = toApplicationStatus(submission.status);
-  const isPending = status === "completed";
-  const isAccepted = status === "accepted";
+  const isCompleted = status === "completed";
 
   return {
     id: submission.applicationSubmissionId,
+    applicationSubmissionId: submission.applicationSubmissionId,
+    sessionApplicationId: submission.sessionApplicationId,
+    sessionRecruitmentId: submission.sessionRecruitmentId,
     status,
     title: submission.recruitmentTitle,
     bandName: submission.bandName,
     appliedAgo: toAppliedAgoLabel(submission.appliedAgo),
     viewedAt: toViewedAtLabel(submission.checkedAt),
-    canMessage: isPending || isAccepted,
-    canViewApplication: isPending,
-    canCancel: isPending,
+    canMessage: status === "completed" || status === "accepted",
+    canViewApplication: isCompleted,
+    canCancel: isCompleted,
   };
 };
 
-const mapRecruitmentToHistoryItem = (
-  recruitment: ServerRecruitmentHistoryItem,
-): RecruitmentHistoryItem => {
-  return {
-    id: recruitment.sessionRecruitmentId,
-    deadlineLabel: toDeadlineLabel(recruitment.dDay),
-    isClosed: recruitment.isClosed,
-    title: recruitment.recruitmentTitle,
-    bandName: recruitment.bandName,
-    genre: recruitment.bandGenre,
-    region: recruitment.bandRegion,
-    viewedAgo:
-      typeof recruitment.postedAgo === "number"
-        ? `${recruitment.postedAgo}일 전`
-        : recruitment.postedAgo,
-    description: recruitment.summary,
-    part: recruitment.part,
-    skillLevel: recruitment.skillLevel,
-    bookmarked: recruitment.isInterested,
-  };
-};
+const mapInterestedRecruitmentToHistoryItem = (
+  recruitment: InterestedSessionRecruitmentItem,
+): RecruitmentHistoryItem => ({
+  id: recruitment.sessionRecruitmentId,
+  deadlineLabel: toDeadlineLabel(recruitment.dDay),
+  isClosed: recruitment.isClosed,
+  title: recruitment.recruitmentTitle,
+  bandName: recruitment.bandName,
+  genre: recruitment.bandGenre,
+  region: recruitment.bandRegion,
+  viewedAgo:
+    recruitment.postedAgo <= 0 ? "오늘" : `${recruitment.postedAgo}일 전`,
+  description: recruitment.summary,
+  part: recruitment.part,
+  skillLevel: recruitment.skillLevel,
+  bookmarked: recruitment.isInterested,
+});
+
+const mapRecentlyViewedRecruitmentToHistoryItem = (
+  recruitment: RecentlyViewedSessionRecruitmentItem,
+): RecruitmentHistoryItem => ({
+  id: recruitment.sessionRecruitmentId,
+  deadlineLabel: toDeadlineLabel(recruitment.dDay),
+  isClosed: recruitment.isClosed,
+  title: recruitment.recruitmentTitle,
+  bandName: recruitment.bandName,
+  genre: recruitment.bandGenre,
+  region: recruitment.bandRegion,
+  viewedAgo:
+    recruitment.postedAgo <= 0 ? "오늘" : `${recruitment.postedAgo}일 전`,
+  description: recruitment.summary,
+  part: recruitment.part,
+  skillLevel: recruitment.skillLevel,
+  bookmarked: recruitment.isInterested,
+});
 
 export const SessionApplicationHistoryPage = ({
   open,
@@ -166,17 +175,21 @@ export const SessionApplicationHistoryPage = ({
   const [activeTab, setActiveTab] =
     useState<ApplicationHistoryTab>("application");
 
-  const submissionsQuery = useApplicationSubmissionsQuery({
-    size: 10,
+  const [canceledSubmissionIds, setCanceledSubmissionIds] = useState<
+    Set<number>
+  >(() => new Set());
+
+  const applicationSubmissionsQuery = useApplicationSubmissionsQuery({
+    size: HISTORY_QUERY_SIZE,
   });
 
   const interestedRecruitmentsQuery = useInterestedSessionRecruitmentsQuery({
-    size: 10,
+    size: HISTORY_QUERY_SIZE,
   });
 
   const recentlyViewedRecruitmentsQuery =
     useRecentlyViewedSessionRecruitmentsQuery({
-      size: 10,
+      size: HISTORY_QUERY_SIZE,
     });
 
   const cancelApplicationMutation = useCancelApplicationSubmissionMutation();
@@ -184,96 +197,146 @@ export const SessionApplicationHistoryPage = ({
   const removeInterestMutation = useRemoveSessionRecruitmentInterest();
 
   const applications = useMemo(() => {
-    return getContent<ServerApplicationSubmissionItem>(
-      submissionsQuery.data,
-    ).map(mapSubmissionToApplicationHistory);
-  }, [submissionsQuery.data]);
+    const content = applicationSubmissionsQuery.data?.content ?? [];
+
+    return content.map((submission) => {
+      const mappedApplication = mapSubmissionToApplication(submission);
+
+      if (canceledSubmissionIds.has(mappedApplication.applicationSubmissionId)) {
+        return {
+          ...mappedApplication,
+          status: "canceled" as const,
+          canMessage: false,
+          canViewApplication: false,
+          canCancel: false,
+        };
+      }
+
+      return mappedApplication;
+    });
+  }, [applicationSubmissionsQuery.data?.content, canceledSubmissionIds]);
 
   const scrapItems = useMemo(() => {
-    return getContent<ServerRecruitmentHistoryItem>(
-      interestedRecruitmentsQuery.data,
-    ).map(mapRecruitmentToHistoryItem);
-  }, [interestedRecruitmentsQuery.data]);
+    const content = interestedRecruitmentsQuery.data?.content ?? [];
+
+    return content.map(mapInterestedRecruitmentToHistoryItem);
+  }, [interestedRecruitmentsQuery.data?.content]);
 
   const recentItems = useMemo(() => {
-    return getContent<ServerRecruitmentHistoryItem>(
-      recentlyViewedRecruitmentsQuery.data,
-    ).map(mapRecruitmentToHistoryItem);
-  }, [recentlyViewedRecruitmentsQuery.data]);
+    const content = recentlyViewedRecruitmentsQuery.data?.content ?? [];
 
-  useEffect(() => {
-    if (!open) {
+    return content.map(mapRecentlyViewedRecruitmentToHistoryItem);
+  }, [recentlyViewedRecruitmentsQuery.data?.content]);
+
+  if (!open) {
+    return null;
+  }
+
+  const handleCancelApplication = async (applicationSubmissionId: number) => {
+    if (cancelApplicationMutation.isPending) {
       return;
     }
 
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    try {
+      await cancelApplicationMutation.mutateAsync(applicationSubmissionId);
 
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [open]);
+      setCanceledSubmissionIds((previousIds) => {
+        const nextIds = new Set(previousIds);
+        nextIds.add(applicationSubmissionId);
+        return nextIds;
+      });
+    } catch (error) {
+      const apiMessage = (
+        error as AxiosError<SessionApiResponse<null>>
+      ).response?.data?.message;
 
-  if (!open || typeof document === "undefined") {
-    return null;
-  }
+      window.alert(
+        apiMessage ?? "지원 취소에 실패했어요. 잠시 후 다시 시도해주세요.",
+      );
+    }
+  };
+
+  const handleToggleScrap = async (sessionRecruitmentId: number) => {
+    const selectedRecruitment = scrapItems.find(
+      (item) => item.id === sessionRecruitmentId,
+    );
+
+    if (!selectedRecruitment) {
+      return;
+    }
+
+    try {
+      if (selectedRecruitment.bookmarked) {
+        await removeInterestMutation.mutateAsync(sessionRecruitmentId);
+      } else {
+        await addInterestMutation.mutateAsync(sessionRecruitmentId);
+      }
+    } catch (error) {
+      const apiMessage = (
+        error as AxiosError<SessionApiResponse<null>>
+      ).response?.data?.message;
+
+      window.alert(
+        apiMessage ?? "스크랩 변경에 실패했어요. 잠시 후 다시 시도해주세요.",
+      );
+    }
+  };
+
+  const handleToggleRecentBookmark = async (sessionRecruitmentId: number) => {
+    const selectedRecruitment = recentItems.find(
+      (item) => item.id === sessionRecruitmentId,
+    );
+
+    if (!selectedRecruitment) {
+      return;
+    }
+
+    try {
+      if (selectedRecruitment.bookmarked) {
+        await removeInterestMutation.mutateAsync(sessionRecruitmentId);
+      } else {
+        await addInterestMutation.mutateAsync(sessionRecruitmentId);
+      }
+    } catch (error) {
+      const apiMessage = (
+        error as AxiosError<SessionApiResponse<null>>
+      ).response?.data?.message;
+
+      window.alert(
+        apiMessage ?? "스크랩 변경에 실패했어요. 잠시 후 다시 시도해주세요.",
+      );
+    }
+  };
 
   const handleClose = () => {
     setActiveTab("application");
     onClose();
   };
 
-  const handleCancelApplication = (applicationSubmissionId: number) => {
-    if (cancelApplicationMutation.isPending) {
-      return;
-    }
-
-    cancelApplicationMutation.mutate(applicationSubmissionId);
-  };
-
-  const handleToggleScrap = (sessionRecruitmentId: number) => {
-    if (removeInterestMutation.isPending || addInterestMutation.isPending) {
-      return;
-    }
-
-    removeInterestMutation.mutate(sessionRecruitmentId);
-  };
-
-  const handleToggleRecentBookmark = (sessionRecruitmentId: number) => {
-    if (removeInterestMutation.isPending || addInterestMutation.isPending) {
-      return;
-    }
-
-    const targetRecruitment = recentItems.find(
-      (item) => item.id === sessionRecruitmentId,
-    );
-
-    if (targetRecruitment?.bookmarked) {
-      removeInterestMutation.mutate(sessionRecruitmentId);
-      return;
-    }
-
-    addInterestMutation.mutate(sessionRecruitmentId);
+  const handleBrowseRecruitments = () => {
+    handleClose();
+    onBrowseRecruitments();
   };
 
   const renderApplicationTab = () => {
-    if (submissionsQuery.isLoading) {
+    if (applicationSubmissionsQuery.isLoading) {
       return (
-        <div className="flex min-h-[520px] items-center justify-center text-caption2 text-neutral-500">
+        <div className="flex min-h-[420px] items-center justify-center text-caption2 text-neutral-500">
           지원 내역을 불러오고 있어요
         </div>
       );
     }
 
-    if (submissionsQuery.isError) {
+    if (applicationSubmissionsQuery.isError) {
       return (
-        <div className="flex min-h-[520px] flex-col items-center justify-center text-center">
+        <div className="flex min-h-[420px] flex-col items-center justify-center text-center">
           <p className="text-caption2 text-neutral-500">
             지원 내역을 불러오지 못했어요
           </p>
+
           <button
             type="button"
-            onClick={() => submissionsQuery.refetch()}
+            onClick={() => applicationSubmissionsQuery.refetch()}
             className="mt-3 rounded-[8px] bg-secondary-500 px-4 py-2 text-caption3 text-neutral-0"
           >
             다시 시도
@@ -294,7 +357,7 @@ export const SessionApplicationHistoryPage = ({
               지원해보세요
             </>
           }
-          onBrowseRecruitments={onBrowseRecruitments}
+          onBrowseRecruitments={handleBrowseRecruitments}
         />
       );
     }
@@ -303,15 +366,13 @@ export const SessionApplicationHistoryPage = ({
       <div className="flex flex-col gap-[10px]">
         {applications.map((application) => (
           <ApplicationHistoryCard
-            key={application.id}
+            key={application.applicationSubmissionId}
             application={application}
             onViewApplication={(selectedApplication) =>
               onViewApplication?.(selectedApplication)
             }
             onCancelApplication={handleCancelApplication}
-            onMessage={(selectedApplication) =>
-              onMessage?.(selectedApplication)
-            }
+            onMessage={(selectedApplication) => onMessage?.(selectedApplication)}
           />
         ))}
       </div>
@@ -321,7 +382,7 @@ export const SessionApplicationHistoryPage = ({
   const renderScrapTab = () => {
     if (interestedRecruitmentsQuery.isLoading) {
       return (
-        <div className="flex min-h-[520px] items-center justify-center text-caption2 text-neutral-500">
+        <div className="flex min-h-[420px] items-center justify-center text-caption2 text-neutral-500">
           스크랩한 공고를 불러오고 있어요
         </div>
       );
@@ -329,10 +390,11 @@ export const SessionApplicationHistoryPage = ({
 
     if (interestedRecruitmentsQuery.isError) {
       return (
-        <div className="flex min-h-[520px] flex-col items-center justify-center text-center">
+        <div className="flex min-h-[420px] flex-col items-center justify-center text-center">
           <p className="text-caption2 text-neutral-500">
             스크랩한 공고를 불러오지 못했어요
           </p>
+
           <button
             type="button"
             onClick={() => interestedRecruitmentsQuery.refetch()}
@@ -354,9 +416,11 @@ export const SessionApplicationHistoryPage = ({
               마음에 드는 공고를
               <br />
               스크랩해보세요
+              <br />
+              여기서 모아 볼 수 있어요
             </>
           }
-          onBrowseRecruitments={onBrowseRecruitments}
+          onBrowseRecruitments={handleBrowseRecruitments}
         />
       );
     }
@@ -380,7 +444,7 @@ export const SessionApplicationHistoryPage = ({
   const renderRecentTab = () => {
     if (recentlyViewedRecruitmentsQuery.isLoading) {
       return (
-        <div className="flex min-h-[520px] items-center justify-center text-caption2 text-neutral-500">
+        <div className="flex min-h-[420px] items-center justify-center text-caption2 text-neutral-500">
           최근 본 공고를 불러오고 있어요
         </div>
       );
@@ -388,10 +452,11 @@ export const SessionApplicationHistoryPage = ({
 
     if (recentlyViewedRecruitmentsQuery.isError) {
       return (
-        <div className="flex min-h-[520px] flex-col items-center justify-center text-center">
+        <div className="flex min-h-[420px] flex-col items-center justify-center text-center">
           <p className="text-caption2 text-neutral-500">
             최근 본 공고를 불러오지 못했어요
           </p>
+
           <button
             type="button"
             onClick={() => recentlyViewedRecruitmentsQuery.refetch()}
@@ -415,7 +480,7 @@ export const SessionApplicationHistoryPage = ({
               여기에 표시돼요
             </>
           }
-          onBrowseRecruitments={onBrowseRecruitments}
+          onBrowseRecruitments={handleBrowseRecruitments}
         />
       );
     }
@@ -436,21 +501,18 @@ export const SessionApplicationHistoryPage = ({
     );
   };
 
-  return createPortal(
-    <div className="fixed inset-0 z-[100] flex justify-center bg-neutral-900/70">
-      <main className="flex h-dvh w-full max-w-[393px] flex-col overflow-hidden bg-neutral-0">
-        <ApplicationHistoryHeader onBack={handleClose} onClose={handleClose} />
+  return (
+    <div className="absolute inset-0 z-[99999] flex h-full w-full flex-col overflow-hidden bg-neutral-0">
+      <ApplicationHistoryHeader onBack={handleClose} onClose={handleClose} />
 
-        <ApplicationHistoryTabs activeTab={activeTab} onChange={setActiveTab} />
+      <ApplicationHistoryTabs activeTab={activeTab} onChange={setActiveTab} />
 
-        <section className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-5 py-5">
-          {activeTab === "application" ? renderApplicationTab() : null}
-          {activeTab === "scrap" ? renderScrapTab() : null}
-          {activeTab === "recent" ? renderRecentTab() : null}
-        </section>
-      </main>
-    </div>,
-    document.body,
+      <section className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-5 py-5">
+        {activeTab === "application" ? renderApplicationTab() : null}
+        {activeTab === "scrap" ? renderScrapTab() : null}
+        {activeTab === "recent" ? renderRecentTab() : null}
+      </section>
+    </div>
   );
 };
 
