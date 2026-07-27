@@ -71,21 +71,6 @@ export interface SessionApplicationDetailResponse {
   portfolioLinks: SessionApplicationPortfolioLink[];
 }
 
-export interface MySessionApplicationCareer {
-  sessionApplicationCareerId?: number;
-  name: string;
-  period: string;
-  description: string;
-}
-
-export interface MySessionApplicationPortfolioLink {
-  sessionApplicationLinkId?: number;
-  url: string;
-  title: string | null;
-  thumbnailUrl: string | null;
-  mediaType: string | null;
-}
-
 export interface MySessionApplicationDetailResponse {
   modifiedAt: string;
   profileImageUrl: string | null;
@@ -102,17 +87,17 @@ export interface MySessionApplicationDetailResponse {
   genre: string;
   region: string;
   availableActivities: string[];
-  careers: MySessionApplicationCareer[];
-  portfolioLinks: MySessionApplicationPortfolioLink[];
+  careers: SessionApplicationCareer[];
+  portfolioLinks: SessionApplicationPortfolioLink[];
 }
 
-export interface CreateSessionApplicationCareerRequest {
+export interface SessionApplicationCareerRequest {
   name: string;
   period: string;
   description?: string;
 }
 
-export interface CreateSessionApplicationPortfolioLinkRequest {
+export interface SessionApplicationPortfolioLinkRequest {
   url: string;
 }
 
@@ -126,13 +111,13 @@ export interface CreateSessionApplicationRequest {
   genre: string;
   region: string;
   availableActivities: string[];
-  careers?: CreateSessionApplicationCareerRequest[];
-  portfolioLinks?: CreateSessionApplicationPortfolioLinkRequest[];
+  careers?: SessionApplicationCareerRequest[];
+  portfolioLinks?: SessionApplicationPortfolioLinkRequest[];
 }
 
 export type UpdateSessionApplicationRequest = CreateSessionApplicationRequest;
 
-export interface SaveSessionApplicationResponse {
+export interface CreateSessionApplicationResponse {
   hasApplication: boolean;
   sessionApplicationId: number;
   userId: number;
@@ -150,6 +135,8 @@ export interface SaveSessionApplicationResponse {
   availableActivities: string[];
   careers: SessionApplicationCareer[];
 }
+
+export type UpdateSessionApplicationResponse = CreateSessionApplicationResponse;
 
 export type DeleteSessionApplicationResponse = null;
 
@@ -197,10 +184,7 @@ export interface ApplySessionRecruitmentResponse {
   applicationTitle: string;
 }
 
-export interface ApplicationSubmissionListParams {
-  cursorId?: number;
-  size?: number;
-}
+export type CancelSessionApplicationSubmissionResponse = null;
 
 export interface ApplicationSubmissionItem {
   applicationSubmissionId: number;
@@ -213,11 +197,14 @@ export interface ApplicationSubmissionItem {
   appliedAgo: number;
 }
 
-export interface ApplicationSubmissionListResponse {
+export interface ApplicationSubmissionsParams {
+  cursorId?: number;
+  size?: number;
+}
+
+export interface ApplicationSubmissionsResponse {
   content: ApplicationSubmissionItem[];
   size: number;
   nextCursor: number | null;
   hasNext: boolean;
 }
-
-export type CancelApplicationSubmissionResponse = null;

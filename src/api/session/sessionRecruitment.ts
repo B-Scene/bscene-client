@@ -1,158 +1,154 @@
 import { axiosInstance } from "@/api/axiosInstance";
 import type {
-  ApplicationSubmissionListParams,
-  ApplicationSubmissionListResponse,
-  ApplySessionRecruitmentRequest,
-  ApplySessionRecruitmentResponse,
-  CancelApplicationSubmissionResponse,
-  CreateSessionApplicationRequest,
-  DeleteSessionApplicationResponse,
-  MySessionApplicationDetailResponse,
-  SaveSessionApplicationResponse,
+  CreateSessionRecruitmentRequest,
+  CreateSessionRecruitmentResponse,
+  DeleteSessionRecruitmentResponse,
+  DeleteSessionSearchHistoryResponse,
+  InterestedSessionRecruitmentsResponse,
+  RecentlyViewedSessionRecruitmentsResponse,
   SessionApiResponse,
-  SessionApplicationDetailResponse,
-  SessionApplicationSearchParams,
-  SessionApplicationSearchResponse,
-  SessionApplicationSummaryResponse,
-  UpdateSessionApplicationRequest,
-  UpdateSessionApplicationVisibilityRequest,
-  UpdateSessionApplicationVisibilityResponse,
-} from "@/types/session/sessionApplication";
+  SessionRecruitmentDetailResponse,
+  SessionRecruitmentEditInfoResponse,
+  SessionRecruitmentHistoryParams,
+  SessionRecruitmentInterestResponse,
+  SessionRecruitmentListParams,
+  SessionRecruitmentListResponse,
+  SessionSearchHistoryItem,
+  UpdateSessionRecruitmentRequest,
+  UpdateSessionRecruitmentResponse,
+} from "@/types/session/sessionRecruitment";
 
-const removeEmptyParams = (
-  params:
-    | SessionApplicationSearchParams
-    | ApplicationSubmissionListParams,
+const removeEmptyParams = <
+  T extends Record<string, string | number | boolean | null | undefined>,
+>(
+  params: T,
 ) => {
   return Object.fromEntries(
     Object.entries(params).filter(
-      ([, value]) =>
-        value !== undefined &&
-        value !== null &&
-        value !== "",
+      ([, value]) => value !== undefined && value !== null && value !== "",
     ),
   );
 };
 
-export const getSessionApplicationsSearch = async (
-  params: SessionApplicationSearchParams = {},
+export const getSessionRecruitments = async (
+  params: SessionRecruitmentListParams = {},
 ) => {
   const { data } = await axiosInstance.get<
-    SessionApiResponse<SessionApplicationSearchResponse>
-  >("/sessions/applications/search", {
-    params: removeEmptyParams(params),
+    SessionApiResponse<SessionRecruitmentListResponse>
+  >("/sessions/recruitments", {
+    params: removeEmptyParams(params as Record<string, string | number | boolean | null | undefined>),
   });
 
   return data.result;
 };
 
-export const getSessionApplicationDetail = async (
-  sessionApplicationId: number,
-) => {
-  const { data } = await axiosInstance.get<
-    SessionApiResponse<SessionApplicationDetailResponse>
-  >(`/sessions/applications/${sessionApplicationId}`);
-
-  return data.result;
-};
-
-export const getMySessionApplicationDetail = async (
-  sessionApplicationId: number,
-) => {
-  const { data } = await axiosInstance.get<
-    SessionApiResponse<MySessionApplicationDetailResponse>
-  >(`/sessions/applications/my/${sessionApplicationId}`);
-
-  return data.result;
-};
-
-export const createSessionApplication = async (
-  body: CreateSessionApplicationRequest,
-) => {
-  const { data } = await axiosInstance.post<
-    SessionApiResponse<SaveSessionApplicationResponse>
-  >("/sessions/applications", body);
-
-  return data.result;
-};
-
-export const updateSessionApplication = async (
-  sessionApplicationId: number,
-  body: UpdateSessionApplicationRequest,
-) => {
-  const { data } = await axiosInstance.patch<
-    SessionApiResponse<SaveSessionApplicationResponse>
-  >(`/sessions/applications/${sessionApplicationId}`, body);
-
-  return data.result;
-};
-
-export const deleteSessionApplication = async (
-  sessionApplicationId: number,
-) => {
-  const { data } = await axiosInstance.delete<
-    SessionApiResponse<DeleteSessionApplicationResponse>
-  >(`/sessions/applications/${sessionApplicationId}`);
-
-  return data.result;
-};
-
-export const updateSessionApplicationVisibility = async (
-  sessionApplicationId: number,
-  body: UpdateSessionApplicationVisibilityRequest,
-) => {
-  const { data } = await axiosInstance.patch<
-    SessionApiResponse<UpdateSessionApplicationVisibilityResponse>
-  >(
-    `/sessions/applications/${sessionApplicationId}/visibility`,
-    body,
-  );
-
-  return data.result;
-};
-
-export const getMySessionApplicationSummary = async () => {
-  const { data } = await axiosInstance.get<
-    SessionApiResponse<SessionApplicationSummaryResponse>
-  >("/sessions/applications/summary");
-
-  return data.result;
-};
-
-export const applySessionRecruitment = async (
+export const getSessionRecruitmentDetail = async (
   sessionRecruitmentId: number,
-  body: ApplySessionRecruitmentRequest,
 ) => {
-  const { data } = await axiosInstance.post<
-    SessionApiResponse<ApplySessionRecruitmentResponse>
-  >(
-    `/sessions/recruitments/${sessionRecruitmentId}/applications`,
-    body,
-  );
+  const { data } = await axiosInstance.get<
+    SessionApiResponse<SessionRecruitmentDetailResponse>
+  >(`/sessions/recruitments/${sessionRecruitmentId}`);
 
   return data.result;
 };
 
-export const getApplicationSubmissions = async (
-  params: ApplicationSubmissionListParams = {},
+export const createSessionRecruitment = async (
+  body: CreateSessionRecruitmentRequest,
+) => {
+  const { data } = await axiosInstance.post<
+    SessionApiResponse<CreateSessionRecruitmentResponse>
+  >("/sessions/recruitments", body);
+
+  return data.result;
+};
+
+export const updateSessionRecruitment = async (
+  sessionRecruitmentId: number,
+  body: UpdateSessionRecruitmentRequest,
+) => {
+  const { data } = await axiosInstance.patch<
+    SessionApiResponse<UpdateSessionRecruitmentResponse>
+  >(`/sessions/recruitments/${sessionRecruitmentId}`, body);
+
+  return data.result;
+};
+
+export const getSessionRecruitmentEditInfo = async (
+  sessionRecruitmentId: number,
 ) => {
   const { data } = await axiosInstance.get<
-    SessionApiResponse<ApplicationSubmissionListResponse>
-  >("/sessions/applications/submissions", {
-    params: removeEmptyParams(params),
+    SessionApiResponse<SessionRecruitmentEditInfoResponse>
+  >(`/sessions/recruitments/${sessionRecruitmentId}/edit`);
+
+  return data.result;
+};
+
+export const deleteSessionRecruitment = async (
+  sessionRecruitmentId: number,
+) => {
+  const { data } = await axiosInstance.delete<
+    SessionApiResponse<DeleteSessionRecruitmentResponse>
+  >(`/sessions/recruitments/${sessionRecruitmentId}`);
+
+  return data.result;
+};
+
+export const addSessionRecruitmentInterest = async (
+  sessionRecruitmentId: number,
+) => {
+  const { data } = await axiosInstance.post<
+    SessionApiResponse<SessionRecruitmentInterestResponse>
+  >(`/sessions/recruitments/${sessionRecruitmentId}/interest`);
+
+  return data.result;
+};
+
+export const removeSessionRecruitmentInterest = async (
+  sessionRecruitmentId: number,
+) => {
+  const { data } = await axiosInstance.delete<
+    SessionApiResponse<SessionRecruitmentInterestResponse>
+  >(`/sessions/recruitments/${sessionRecruitmentId}/interest`);
+
+  return data.result;
+};
+
+export const getSessionSearchHistory = async () => {
+  const { data } = await axiosInstance.get<
+    SessionApiResponse<SessionSearchHistoryItem[]>
+  >("/sessions/recruitments/search-history");
+
+  return data.result;
+};
+
+export const deleteSessionSearchHistory = async (keywordId: number) => {
+  const { data } = await axiosInstance.delete<
+    SessionApiResponse<DeleteSessionSearchHistoryResponse>
+  >(`/sessions/recruitments/search-history/${keywordId}`);
+
+  return data.result;
+};
+
+export const getInterestedSessionRecruitments = async (
+  params: SessionRecruitmentHistoryParams = {},
+) => {
+  const { data } = await axiosInstance.get<
+    SessionApiResponse<InterestedSessionRecruitmentsResponse>
+  >("/sessions/recruitments/interests", {
+    params: removeEmptyParams(params as Record<string, string | number | boolean | null | undefined>),
   });
 
   return data.result;
 };
 
-export const cancelApplicationSubmission = async (
-  applicationSubmissionId: number,
+export const getRecentlyViewedSessionRecruitments = async (
+  params: SessionRecruitmentHistoryParams = {},
 ) => {
-  const { data } = await axiosInstance.delete<
-    SessionApiResponse<CancelApplicationSubmissionResponse>
-  >(
-    `/sessions/applications/submissions/${applicationSubmissionId}`,
-  );
+  const { data } = await axiosInstance.get<
+    SessionApiResponse<RecentlyViewedSessionRecruitmentsResponse>
+  >("/sessions/recruitments/recently-viewed", {
+    params: removeEmptyParams(params as Record<string, string | number | boolean | null | undefined>),
+  });
 
   return data.result;
 };

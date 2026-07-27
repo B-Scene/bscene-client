@@ -44,8 +44,7 @@ export type UpdateSessionRecruitmentRequest = Omit<
   "bandMemberId"
 >;
 
-export type UpdateSessionRecruitmentResponse =
-  CreateSessionRecruitmentResponse;
+export type UpdateSessionRecruitmentResponse = CreateSessionRecruitmentResponse;
 
 export interface SessionRecruitmentEditInfoResponse {
   recruitmentTitle: string;
@@ -155,13 +154,6 @@ export interface InterestedSessionRecruitmentItem {
   skillLevel: string;
 }
 
-export interface InterestedSessionRecruitmentsResponse {
-  content: InterestedSessionRecruitmentItem[];
-  size: number;
-  nextCursor: number | null;
-  hasNext: boolean;
-}
-
 export interface RecentlyViewedSessionRecruitmentItem {
   viewId: number;
   sessionRecruitmentId: number;
@@ -178,9 +170,15 @@ export interface RecentlyViewedSessionRecruitmentItem {
   skillLevel: string;
 }
 
-export interface RecentlyViewedSessionRecruitmentsResponse {
-  content: RecentlyViewedSessionRecruitmentItem[];
+export interface SessionRecruitmentHistoryResponse<T> {
+  content: T[];
   size: number;
   nextCursor: number | null;
   hasNext: boolean;
 }
+
+export type InterestedSessionRecruitmentsResponse =
+  SessionRecruitmentHistoryResponse<InterestedSessionRecruitmentItem>;
+
+export type RecentlyViewedSessionRecruitmentsResponse =
+  SessionRecruitmentHistoryResponse<RecentlyViewedSessionRecruitmentItem>;

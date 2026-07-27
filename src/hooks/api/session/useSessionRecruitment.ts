@@ -1,8 +1,4 @@
-import {
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   addSessionRecruitmentInterest,
   createSessionRecruitment,
@@ -31,51 +27,22 @@ interface UpdateSessionRecruitmentVariables {
 
 export const sessionRecruitmentKeys = {
   all: ["sessionRecruitments"] as const,
-  lists: () =>
-    [...sessionRecruitmentKeys.all, "list"] as const,
+  lists: () => [...sessionRecruitmentKeys.all, "list"] as const,
   list: (params: SessionRecruitmentListParams) =>
     [...sessionRecruitmentKeys.lists(), params] as const,
   detail: (sessionRecruitmentId: number) =>
-    [
-      ...sessionRecruitmentKeys.all,
-      "detail",
-      sessionRecruitmentId,
-    ] as const,
+    [...sessionRecruitmentKeys.all, "detail", sessionRecruitmentId] as const,
   editInfo: (sessionRecruitmentId: number) =>
-    [
-      ...sessionRecruitmentKeys.all,
-      "editInfo",
-      sessionRecruitmentId,
-    ] as const,
+    [...sessionRecruitmentKeys.all, "editInfo", sessionRecruitmentId] as const,
   searchHistory: () =>
-    [
-      ...sessionRecruitmentKeys.all,
-      "searchHistory",
-    ] as const,
-  interests: () =>
-    [
-      ...sessionRecruitmentKeys.all,
-      "interests",
-    ] as const,
-  interestList: (
-    params: SessionRecruitmentHistoryParams,
-  ) =>
-    [
-      ...sessionRecruitmentKeys.interests(),
-      params,
-    ] as const,
+    [...sessionRecruitmentKeys.all, "searchHistory"] as const,
+  interests: () => [...sessionRecruitmentKeys.all, "interests"] as const,
+  interestList: (params: SessionRecruitmentHistoryParams) =>
+    [...sessionRecruitmentKeys.interests(), params] as const,
   recentlyViewed: () =>
-    [
-      ...sessionRecruitmentKeys.all,
-      "recentlyViewed",
-    ] as const,
-  recentlyViewedList: (
-    params: SessionRecruitmentHistoryParams,
-  ) =>
-    [
-      ...sessionRecruitmentKeys.recentlyViewed(),
-      params,
-    ] as const,
+    [...sessionRecruitmentKeys.all, "recentlyViewed"] as const,
+  recentlyViewedList: (params: SessionRecruitmentHistoryParams) =>
+    [...sessionRecruitmentKeys.recentlyViewed(), params] as const,
 };
 
 export const useSessionRecruitmentsQuery = (
@@ -94,10 +61,8 @@ export const useSessionRecruitmentDetailQuery = (
   sessionRecruitmentId: number,
 ) => {
   return useQuery({
-    queryKey:
-      sessionRecruitmentKeys.detail(sessionRecruitmentId),
-    queryFn: () =>
-      getSessionRecruitmentDetail(sessionRecruitmentId),
+    queryKey: sessionRecruitmentKeys.detail(sessionRecruitmentId),
+    queryFn: () => getSessionRecruitmentDetail(sessionRecruitmentId),
     enabled: sessionRecruitmentId > 0,
     staleTime: 1000 * 30,
   });
@@ -107,10 +72,8 @@ export const useSessionRecruitmentEditInfoQuery = (
   sessionRecruitmentId: number,
 ) => {
   return useQuery({
-    queryKey:
-      sessionRecruitmentKeys.editInfo(sessionRecruitmentId),
-    queryFn: () =>
-      getSessionRecruitmentEditInfo(sessionRecruitmentId),
+    queryKey: sessionRecruitmentKeys.editInfo(sessionRecruitmentId),
+    queryFn: () => getSessionRecruitmentEditInfo(sessionRecruitmentId),
     enabled: sessionRecruitmentId > 0,
   });
 };
@@ -133,30 +96,17 @@ export const useUpdateSessionRecruitment = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({
-      sessionRecruitmentId,
-      body,
-    }: UpdateSessionRecruitmentVariables) =>
+    mutationFn: ({ sessionRecruitmentId, body }: UpdateSessionRecruitmentVariables) =>
       updateSessionRecruitment(sessionRecruitmentId, body),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({
         queryKey: sessionRecruitmentKeys.lists(),
       });
       queryClient.invalidateQueries({
-        queryKey: sessionRecruitmentKeys.detail(
-          variables.sessionRecruitmentId,
-        ),
+        queryKey: sessionRecruitmentKeys.detail(variables.sessionRecruitmentId),
       });
       queryClient.invalidateQueries({
-        queryKey: sessionRecruitmentKeys.editInfo(
-          variables.sessionRecruitmentId,
-        ),
-      });
-      queryClient.invalidateQueries({
-        queryKey: sessionRecruitmentKeys.recentlyViewed(),
-      });
-      queryClient.invalidateQueries({
-        queryKey: sessionRecruitmentKeys.interests(),
+        queryKey: sessionRecruitmentKeys.editInfo(variables.sessionRecruitmentId),
       });
     },
   });
@@ -173,15 +123,16 @@ export const useDeleteSessionRecruitment = () => {
         queryKey: sessionRecruitmentKeys.lists(),
       });
       queryClient.invalidateQueries({
-        queryKey: sessionRecruitmentKeys.recentlyViewed(),
-      });
-      queryClient.invalidateQueries({
         queryKey: sessionRecruitmentKeys.interests(),
       });
+      queryClient.invalidateQueries({
+        queryKey: sessionRecruitmentKeys.recentlyViewed(),
+      });
       queryClient.removeQueries({
-        queryKey: sessionRecruitmentKeys.detail(
-          sessionRecruitmentId,
-        ),
+        queryKey: sessionRecruitmentKeys.detail(sessionRecruitmentId),
+      });
+      queryClient.removeQueries({
+        queryKey: sessionRecruitmentKeys.editInfo(sessionRecruitmentId),
       });
     },
   });
@@ -193,7 +144,10 @@ export const useAddSessionRecruitmentInterest = () => {
   return useMutation({
     mutationFn: (sessionRecruitmentId: number) =>
       addSessionRecruitmentInterest(sessionRecruitmentId),
-    onSuccess: (result) => {
+    onSuccess: (result, sessionRecruitmentId) => {
+      const targetRecruitmentId =
+        result?.sessionRecruitmentId ?? sessionRecruitmentId;
+
       queryClient.invalidateQueries({
         queryKey: sessionRecruitmentKeys.lists(),
       });
@@ -204,9 +158,7 @@ export const useAddSessionRecruitmentInterest = () => {
         queryKey: sessionRecruitmentKeys.recentlyViewed(),
       });
       queryClient.invalidateQueries({
-        queryKey: sessionRecruitmentKeys.detail(
-          result.sessionRecruitmentId,
-        ),
+        queryKey: sessionRecruitmentKeys.detail(targetRecruitmentId),
       });
     },
   });
@@ -217,10 +169,11 @@ export const useRemoveSessionRecruitmentInterest = () => {
 
   return useMutation({
     mutationFn: (sessionRecruitmentId: number) =>
-      removeSessionRecruitmentInterest(
-        sessionRecruitmentId,
-      ),
-    onSuccess: (result) => {
+      removeSessionRecruitmentInterest(sessionRecruitmentId),
+    onSuccess: (result, sessionRecruitmentId) => {
+      const targetRecruitmentId =
+        result?.sessionRecruitmentId ?? sessionRecruitmentId;
+
       queryClient.invalidateQueries({
         queryKey: sessionRecruitmentKeys.lists(),
       });
@@ -231,9 +184,7 @@ export const useRemoveSessionRecruitmentInterest = () => {
         queryKey: sessionRecruitmentKeys.recentlyViewed(),
       });
       queryClient.invalidateQueries({
-        queryKey: sessionRecruitmentKeys.detail(
-          result.sessionRecruitmentId,
-        ),
+        queryKey: sessionRecruitmentKeys.detail(targetRecruitmentId),
       });
     },
   });
@@ -251,12 +202,10 @@ export const useDeleteSessionSearchHistory = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (keywordId: number) =>
-      deleteSessionSearchHistory(keywordId),
+    mutationFn: (keywordId: number) => deleteSessionSearchHistory(keywordId),
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey:
-          sessionRecruitmentKeys.searchHistory(),
+        queryKey: sessionRecruitmentKeys.searchHistory(),
       });
     },
   });
@@ -264,24 +213,24 @@ export const useDeleteSessionSearchHistory = () => {
 
 export const useInterestedSessionRecruitmentsQuery = (
   params: SessionRecruitmentHistoryParams = {},
+  enabled = true,
 ) => {
   return useQuery({
-    queryKey:
-      sessionRecruitmentKeys.interestList(params),
-    queryFn: () =>
-      getInterestedSessionRecruitments(params),
+    queryKey: sessionRecruitmentKeys.interestList(params),
+    queryFn: () => getInterestedSessionRecruitments(params),
+    enabled,
     staleTime: 1000 * 30,
   });
 };
 
 export const useRecentlyViewedSessionRecruitmentsQuery = (
   params: SessionRecruitmentHistoryParams = {},
+  enabled = true,
 ) => {
   return useQuery({
-    queryKey:
-      sessionRecruitmentKeys.recentlyViewedList(params),
-    queryFn: () =>
-      getRecentlyViewedSessionRecruitments(params),
+    queryKey: sessionRecruitmentKeys.recentlyViewedList(params),
+    queryFn: () => getRecentlyViewedSessionRecruitments(params),
+    enabled,
     staleTime: 1000 * 30,
   });
 };

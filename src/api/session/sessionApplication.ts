@@ -1,36 +1,30 @@
 import { axiosInstance } from "@/api/axiosInstance";
 import type {
-  ApplicationSubmissionListParams,
-  ApplicationSubmissionListResponse,
+  ApplicationSubmissionsParams,
+  ApplicationSubmissionsResponse,
   ApplySessionRecruitmentRequest,
   ApplySessionRecruitmentResponse,
-  CancelApplicationSubmissionResponse,
+  CancelSessionApplicationSubmissionResponse,
   CreateSessionApplicationRequest,
+  CreateSessionApplicationResponse,
   DeleteSessionApplicationResponse,
   MySessionApplicationDetailResponse,
-  SaveSessionApplicationResponse,
   SessionApiResponse,
   SessionApplicationDetailResponse,
   SessionApplicationSearchParams,
   SessionApplicationSearchResponse,
   SessionApplicationSummaryResponse,
   UpdateSessionApplicationRequest,
+  UpdateSessionApplicationResponse,
   UpdateSessionApplicationVisibilityRequest,
   UpdateSessionApplicationVisibilityResponse,
 } from "@/types/session/sessionApplication";
 
-const removeEmptyParams = (
-  params:
-    | SessionApplicationSearchParams
-    | ApplicationSubmissionListParams,
-) => {
+const removeEmptyParams = <T extends object>(params: T) => {
   return Object.fromEntries(
-    Object.entries(params).filter(
-      ([, value]) =>
-        value !== undefined &&
-        value !== null &&
-        value !== "",
-    ),
+    Object.entries(params).filter(([, value]) => {
+      return value !== undefined && value !== null && value !== "";
+    }),
   );
 };
 
@@ -66,11 +60,19 @@ export const getMySessionApplicationDetail = async (
   return data.result;
 };
 
+export const getMySessionApplicationSummary = async () => {
+  const { data } = await axiosInstance.get<
+    SessionApiResponse<SessionApplicationSummaryResponse>
+  >("/sessions/applications/summary");
+
+  return data.result;
+};
+
 export const createSessionApplication = async (
   body: CreateSessionApplicationRequest,
 ) => {
   const { data } = await axiosInstance.post<
-    SessionApiResponse<SaveSessionApplicationResponse>
+    SessionApiResponse<CreateSessionApplicationResponse>
   >("/sessions/applications", body);
 
   return data.result;
@@ -81,7 +83,7 @@ export const updateSessionApplication = async (
   body: UpdateSessionApplicationRequest,
 ) => {
   const { data } = await axiosInstance.patch<
-    SessionApiResponse<SaveSessionApplicationResponse>
+    SessionApiResponse<UpdateSessionApplicationResponse>
   >(`/sessions/applications/${sessionApplicationId}`, body);
 
   return data.result;
@@ -103,18 +105,7 @@ export const updateSessionApplicationVisibility = async (
 ) => {
   const { data } = await axiosInstance.patch<
     SessionApiResponse<UpdateSessionApplicationVisibilityResponse>
-  >(
-    `/sessions/applications/${sessionApplicationId}/visibility`,
-    body,
-  );
-
-  return data.result;
-};
-
-export const getMySessionApplicationSummary = async () => {
-  const { data } = await axiosInstance.get<
-    SessionApiResponse<SessionApplicationSummaryResponse>
-  >("/sessions/applications/summary");
+  >(`/sessions/applications/${sessionApplicationId}/visibility`, body);
 
   return data.result;
 };
@@ -125,19 +116,16 @@ export const applySessionRecruitment = async (
 ) => {
   const { data } = await axiosInstance.post<
     SessionApiResponse<ApplySessionRecruitmentResponse>
-  >(
-    `/sessions/recruitments/${sessionRecruitmentId}/applications`,
-    body,
-  );
+  >(`/sessions/recruitments/${sessionRecruitmentId}/applications`, body);
 
   return data.result;
 };
 
 export const getApplicationSubmissions = async (
-  params: ApplicationSubmissionListParams = {},
+  params: ApplicationSubmissionsParams = {},
 ) => {
   const { data } = await axiosInstance.get<
-    SessionApiResponse<ApplicationSubmissionListResponse>
+    SessionApiResponse<ApplicationSubmissionsResponse>
   >("/sessions/applications/submissions", {
     params: removeEmptyParams(params),
   });
@@ -145,14 +133,12 @@ export const getApplicationSubmissions = async (
   return data.result;
 };
 
-export const cancelApplicationSubmission = async (
+export const cancelSessionApplicationSubmission = async (
   applicationSubmissionId: number,
 ) => {
   const { data } = await axiosInstance.delete<
-    SessionApiResponse<CancelApplicationSubmissionResponse>
-  >(
-    `/sessions/applications/submissions/${applicationSubmissionId}`,
-  );
+    SessionApiResponse<CancelSessionApplicationSubmissionResponse>
+  >(`/sessions/applications/submissions/${applicationSubmissionId}`);
 
   return data.result;
 };
