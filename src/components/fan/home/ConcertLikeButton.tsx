@@ -1,35 +1,43 @@
-import type { KeyboardEvent, MouseEvent } from "react";
+import { useState, type KeyboardEvent, type MouseEvent } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import HeartIcon from "@/assets/icons/Heart.svg";
 import LikedHeartIcon from "@/assets/icons/Union.svg";
-import { useConcertLikeStore } from "@/stores/useConcertLikeStore";
 import {
+  fanHomeKeys,
+  invalidatePerformanceInterestQueries,
   useAddPerformanceInterest,
   useDeletePerformanceInterest,
 } from "@/hooks/api/fan/useFanHome";
 import { isAlreadyInterestedPerformanceError } from "@/api/fan/home";
+import type { FanPerformanceDetailResponse } from "@/types/fan/home";
 
 type ConcertLikeButtonProps = {
   concertId: string;
   concertTitle: string;
+  isInterested?: boolean;
   className?: string;
 };
 
 const ConcertLikeButton = ({
   concertId,
   concertTitle,
+  isInterested,
   className = "",
 }: ConcertLikeButtonProps) => {
-  const isLiked = useConcertLikeStore(
-    (state) => state.likedConcertIds[concertId] ?? false,
-  );
-  const setConcertLiked = useConcertLikeStore((state) => state.setConcertLiked);
+  const queryClient = useQueryClient();
   const addPerformanceInterestMutation = useAddPerformanceInterest();
   const deletePerformanceInterestMutation = useDeletePerformanceInterest();
+  const [isInterestSyncing, setIsInterestSyncing] = useState(false);
+  const performanceId = Number(concertId);
+  const cachedDetail = Number.isFinite(performanceId)
+    ? queryClient.getQueryData<FanPerformanceDetailResponse>(
+        fanHomeKeys.performanceDetail(performanceId),
+      )
+    : undefined;
+  const isLiked = isInterested ?? cachedDetail?.isInterested ?? false;
 
   const handleClick = async (event: MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
-
-    const performanceId = Number(concertId);
 
     if (!Number.isFinite(performanceId) || performanceId <= 0) {
       return;
@@ -38,7 +46,6 @@ const ConcertLikeButton = ({
     if (isLiked) {
       try {
         await deletePerformanceInterestMutation.mutateAsync(performanceId);
-        setConcertLiked(concertId, false);
       } catch {
         return;
       }
@@ -47,10 +54,14 @@ const ConcertLikeButton = ({
 
     try {
       await addPerformanceInterestMutation.mutateAsync(performanceId);
-      setConcertLiked(concertId, true);
     } catch (error) {
       if (isAlreadyInterestedPerformanceError(error)) {
-        setConcertLiked(concertId, true);
+        setIsInterestSyncing(true);
+        try {
+          await invalidatePerformanceInterestQueries(queryClient, performanceId);
+        } finally {
+          setIsInterestSyncing(false);
+        }
       }
       return;
     }
@@ -71,7 +82,8 @@ const ConcertLikeButton = ({
       aria-pressed={isLiked}
       disabled={
         addPerformanceInterestMutation.isPending ||
-        deletePerformanceInterestMutation.isPending
+        deletePerformanceInterestMutation.isPending ||
+        isInterestSyncing
       }
       onClick={(event) => void handleClick(event)}
       onKeyDown={handleKeyDown}
