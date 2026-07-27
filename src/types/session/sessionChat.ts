@@ -98,3 +98,114 @@ export interface ChatRoomDetailResponse {
 }
 
 export type SessionChatRoomDetailResponse = ChatRoomDetailResponse;
+
+export interface ChatWebSocketTicketResponse {
+  ticket: string;
+  subprotocol: string;
+  expiresIn: number;
+}
+
+export interface DirectMessageSendPayload {
+  chatRoomId: number;
+  content: string;
+}
+
+export interface DirectMessageReadPayload {
+  chatRoomId: number;
+  lastReadMessageId: number;
+}
+
+export interface DirectMessageData {
+  chatMessageId: number;
+  chatRoomId: number;
+  senderId: number;
+  senderName: string;
+  profileImageUrl: string | null;
+  content: string;
+  readAt: string | null;
+  createdAt: string;
+}
+
+export interface DirectMessageReadData {
+  chatRoomId: number;
+  readerId: number;
+  lastReadMessageId: number;
+  readAt: string;
+}
+
+export interface DirectMessageErrorData {
+  code: string;
+  message: string;
+}
+
+export interface DirectMessageSendFrame {
+  type: "dm.send";
+  data: DirectMessageSendPayload;
+  clientMsgId: string;
+}
+
+export interface DirectMessageReadFrame {
+  type: "dm.read";
+  data: DirectMessageReadPayload;
+  clientMsgId: null;
+}
+
+export interface DirectMessagePingFrame {
+  type: "ping";
+  data: Record<string, never>;
+  clientMsgId: null;
+}
+
+export interface DirectMessagePushFrame {
+  type: "dm.message";
+  id: number;
+  data: DirectMessageData;
+  clientMsgId: string | null;
+  timeStamp: string;
+}
+
+export interface DirectMessageReadPushFrame {
+  type: "dm.read";
+  id: null;
+  data: DirectMessageReadData;
+  clientMsgId: null;
+  timeStamp: string;
+}
+
+export interface DirectMessagePongFrame {
+  type: "pong";
+  id: null;
+  data: Record<string, never>;
+  clientMsgId: null;
+  timeStamp: string;
+}
+
+export interface DirectMessageSystemEventFrame {
+  type: "system.event";
+  id: null;
+  data: {
+    event: string;
+  };
+  clientMsgId: null;
+  timeStamp: string;
+}
+
+export interface DirectMessageErrorFrame {
+  type: "system.error";
+  id: null;
+  data: DirectMessageErrorData;
+  clientMsgId: string | null;
+  timeStamp: string;
+}
+
+export type DirectMessageClientFrame =
+  | DirectMessageSendFrame
+  | DirectMessageReadFrame
+  | DirectMessagePingFrame;
+
+export type DirectMessageServerFrame =
+  | DirectMessagePushFrame
+  | DirectMessageReadPushFrame
+  | DirectMessagePongFrame
+  | DirectMessageSystemEventFrame
+  | DirectMessageErrorFrame;

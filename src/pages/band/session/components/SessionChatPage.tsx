@@ -1,5 +1,6 @@
 import {
   type FormEvent,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -14,7 +15,14 @@ import {
 import BandProfileImage from "@/assets/Img_Band.png";
 import Modal from "@/components/Modal/Modal";
 import { ModalOverlay } from "@/components/common/Modal/ModalOverlay";
-import { useChatRoomDetailQuery } from "@/hooks/api/session/useSessionChat";
+import {
+  useChatRoomDetailQuery,
+  useSessionDirectMessageSocket,
+} from "@/hooks/api/session/useSessionChat";
+import type {
+  DirectMessageData,
+  DirectMessageErrorFrame,
+} from "@/types/session/sessionChat";
 import type { ChatMessage } from "@/features/session/chat/sessionChat.types";
 import { getCurrentChatTime } from "@/features/session/chat/sessionChat.utils";
 import {
@@ -29,6 +37,12 @@ interface ChatRouteState {
   senderName?: string;
   profileImageUrl?: string | null;
   canSend?: boolean;
+}
+
+interface LocalChatMessage extends ChatMessage {
+  clientMsgId?: string;
+  serverMessageId?: number;
+  pending?: boolean;
 }
 
 const parseChatRoomId = (
@@ -106,16 +120,99 @@ export default function SessionChatPage() {
 
   const canSend = detail?.canSend ?? locationState?.canSend ?? true;
 
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<LocalChatMessage[]>([]);
   const [messageInput, setMessageInput] = useState("");
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
 
   const messageListRef = useRef<HTMLDivElement>(null);
   const messageInputRef = useRef<HTMLInputElement>(null);
+  const lastReadMessageIdRef = useRef(0);
 
   const dateDividerText = useMemo(() => {
     return formatChatDate(detail?.messages?.[0]?.createdAt);
   }, [detail?.messages]);
+
+  const handleSocketMessage = useCallback(
+    (
+      message: DirectMessageData,
+      frame: {
+        clientMsgId: string | null;
+      },
+    ) => {
+      setMessages((previousMessages) => {
+        const alreadyExists = previousMessages.some(
+          (previousMessage) =>
+            previousMessage.serverMessageId === message.chatMessageId,
+        );
+
+        if (alreadyExists) {
+          return previousMessages;
+        }
+
+        const optimisticMessageIndex = frame.clientMsgId
+          ? previousMessages.findIndex(
+              (previousMessage) =>
+                previousMessage.clientMsgId === frame.clientMsgId,
+            )
+          : -1;
+
+        const isMine = optimisticMessageIndex >= 0;
+
+        const nextMessage: LocalChatMessage = {
+          id:
+            optimisticMessageIndex >= 0
+              ? previousMessages[optimisticMessageIndex].id
+              : message.chatMessageId,
+          serverMessageId: message.chatMessageId,
+          clientMsgId: frame.clientMsgId ?? undefined,
+          direction: isMine ? "sent" : "received",
+          content: message.content,
+          time: formatChatTime(message.createdAt),
+          pending: false,
+        };
+
+        if (optimisticMessageIndex >= 0) {
+          const copiedMessages = [...previousMessages];
+
+          copiedMessages[optimisticMessageIndex] = nextMessage;
+
+          return copiedMessages;
+        }
+
+        return [...previousMessages, nextMessage];
+      });
+    },
+    [],
+  );
+
+  const handleSocketError = useCallback((frame: DirectMessageErrorFrame) => {
+    const message =
+      frame.data.message || "쪽지 처리 중 오류가 발생했어요.";
+
+    window.alert(message);
+
+    if (!frame.clientMsgId) {
+      return;
+    }
+
+    setMessages((previousMessages) =>
+      previousMessages.filter(
+        (previousMessage) => previousMessage.clientMsgId !== frame.clientMsgId,
+      ),
+    );
+  }, []);
+
+  const {
+    isConnected,
+    lastErrorMessage,
+    sendMessage,
+    sendRead,
+  } = useSessionDirectMessageSocket({
+    chatRoomId,
+    enabled: chatRoomId > 0,
+    onMessage: handleSocketMessage,
+    onError: handleSocketError,
+  });
 
   useEffect(() => {
     if (!detail) {
@@ -125,9 +222,11 @@ export default function SessionChatPage() {
     setMessages(
       detail.messages.map((message) => ({
         id: message.chatMessageId,
+        serverMessageId: message.chatMessageId,
         direction: message.isMine ? "sent" : "received",
         content: message.content,
         time: formatChatTime(message.createdAt),
+        pending: false,
       })),
     );
   }, [detail]);
@@ -150,6 +249,29 @@ export default function SessionChatPage() {
       window.cancelAnimationFrame(animationFrame);
     };
   }, [messages]);
+
+  useEffect(() => {
+    const lastServerMessageId = messages.reduce((maxMessageId, message) => {
+      return Math.max(maxMessageId, message.serverMessageId ?? 0);
+    }, 0);
+
+    if (lastServerMessageId <= 0) {
+      return;
+    }
+
+    if (lastReadMessageIdRef.current >= lastServerMessageId) {
+      return;
+    }
+
+    const sent = sendRead(lastServerMessageId);
+
+    if (sent) {
+      lastReadMessageIdRef.current = lastServerMessageId;
+    }
+  }, [
+    messages,
+    sendRead,
+  ]);
 
   const handleBack = () => {
     navigate(-1);
@@ -186,11 +308,34 @@ export default function SessionChatPage() {
       return;
     }
 
-    const newMessage: ChatMessage = {
+    if (trimmedMessage.length > 2000) {
+      window.alert("쪽지는 최대 2,000자까지 입력할 수 있어요.");
+      return;
+    }
+
+    if (!isConnected) {
+      window.alert(
+        lastErrorMessage || "쪽지 서버에 연결 중이에요. 잠시 후 다시 시도해주세요.",
+      );
+      return;
+    }
+
+    const clientMsgId = sendMessage(trimmedMessage);
+
+    if (!clientMsgId) {
+      window.alert(
+        lastErrorMessage || "쪽지를 전송하지 못했어요. 잠시 후 다시 시도해주세요.",
+      );
+      return;
+    }
+
+    const newMessage: LocalChatMessage = {
       id: Date.now(),
       direction: "sent",
       content: trimmedMessage,
       time: getCurrentChatTime(),
+      clientMsgId,
+      pending: true,
     };
 
     setMessages((previousMessages) => [...previousMessages, newMessage]);
@@ -261,7 +406,7 @@ export default function SessionChatPage() {
             >
               {messages.map((message) => (
                 <SessionChatMessage
-                  key={message.id}
+                  key={message.clientMsgId ?? message.serverMessageId ?? message.id}
                   message={message}
                   senderName={senderName}
                   profileImageUrl={profileImageUrl || BandProfileImage}
