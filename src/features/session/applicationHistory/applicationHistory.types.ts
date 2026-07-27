@@ -1,5 +1,3 @@
-// src/features/session/applicationHistory/applicationHistory.types.ts
-
 export type ApplicationHistoryTab =
   | "application"
   | "scrap"
@@ -13,6 +11,9 @@ export type ApplicationHistoryStatus =
 
 export interface ApplicationHistoryItem {
   id: number;
+  applicationSubmissionId?: number;
+  sessionRecruitmentId?: number;
+  sessionApplicationId?: number;
   status: ApplicationHistoryStatus;
   title: string;
   bandName: string;
@@ -25,6 +26,8 @@ export interface ApplicationHistoryItem {
 
 export interface RecruitmentHistoryItem {
   id: number;
+  interestId?: number;
+  viewId?: number;
   deadlineLabel: string;
   isClosed: boolean;
   title: string;

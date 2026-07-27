@@ -132,3 +132,53 @@ export interface SessionSearchHistoryItem {
 }
 
 export type DeleteSessionSearchHistoryResponse = null;
+
+export interface SessionRecruitmentHistoryParams {
+  cursorId?: number;
+  size?: number;
+}
+
+export interface InterestedSessionRecruitmentItem {
+  interestId: number;
+  sessionRecruitmentId: number;
+  dDay: number;
+  isClosed: boolean;
+  isInterested: boolean;
+  recruitmentTitle: string;
+  bandName: string;
+  bandGenre: string;
+  bandRegion: string;
+  postedAgo: number;
+  summary: string;
+  part: string;
+  skillLevel: string;
+}
+
+export interface RecentlyViewedSessionRecruitmentItem {
+  viewId: number;
+  sessionRecruitmentId: number;
+  dDay: number;
+  isClosed: boolean;
+  isInterested: boolean;
+  recruitmentTitle: string;
+  bandName: string;
+  bandGenre: string;
+  bandRegion: string;
+  postedAgo: number;
+  summary: string;
+  part: string;
+  skillLevel: string;
+}
+
+export interface SessionRecruitmentHistoryResponse<T> {
+  content: T[];
+  size: number;
+  nextCursor: number | null;
+  hasNext: boolean;
+}
+
+export type InterestedSessionRecruitmentsResponse =
+  SessionRecruitmentHistoryResponse<InterestedSessionRecruitmentItem>;
+
+export type RecentlyViewedSessionRecruitmentsResponse =
+  SessionRecruitmentHistoryResponse<RecentlyViewedSessionRecruitmentItem>;

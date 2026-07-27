@@ -47,9 +47,9 @@ export interface SessionApplicationCareer {
 export interface SessionApplicationPortfolioLink {
   sessionApplicationLinkId: number;
   url: string;
-  title: string;
+  title: string | null;
   thumbnailUrl: string | null;
-  mediaType: string;
+  mediaType: string | null;
 }
 
 export interface SessionApplicationDetailResponse {
@@ -70,6 +70,75 @@ export interface SessionApplicationDetailResponse {
   careers: SessionApplicationCareer[];
   portfolioLinks: SessionApplicationPortfolioLink[];
 }
+
+export interface MySessionApplicationDetailResponse {
+  modifiedAt: string;
+  profileImageUrl: string | null;
+  name: string;
+  defaultPart: string;
+  defaultSkillLevel: string;
+  defaultRegion: string;
+  purpose: string;
+  title: string;
+  oneLineIntro: string;
+  intro: string;
+  part: string;
+  skillLevel: string;
+  genre: string;
+  region: string;
+  availableActivities: string[];
+  careers: SessionApplicationCareer[];
+  portfolioLinks: SessionApplicationPortfolioLink[];
+}
+
+export interface SessionApplicationCareerRequest {
+  name: string;
+  period: string;
+  description?: string;
+}
+
+export interface SessionApplicationPortfolioLinkRequest {
+  url: string;
+}
+
+export interface CreateSessionApplicationRequest {
+  purpose: string;
+  title: string;
+  oneLineIntro: string;
+  intro: string;
+  part: string;
+  skillLevel: string;
+  genre: string;
+  region: string;
+  availableActivities: string[];
+  careers?: SessionApplicationCareerRequest[];
+  portfolioLinks?: SessionApplicationPortfolioLinkRequest[];
+}
+
+export type UpdateSessionApplicationRequest = CreateSessionApplicationRequest;
+
+export interface CreateSessionApplicationResponse {
+  hasApplication: boolean;
+  sessionApplicationId: number;
+  userId: number;
+  nickname: string;
+  title: string;
+  purpose: string;
+  oneLineIntro: string;
+  profileImageUrl: string | null;
+  part: string;
+  skillLevel: string;
+  genre: string;
+  region: string;
+  intro: string;
+  portfolioLinks: SessionApplicationPortfolioLink[];
+  availableActivities: string[];
+  careers: SessionApplicationCareer[];
+}
+
+export type UpdateSessionApplicationResponse = CreateSessionApplicationResponse;
+
+export type DeleteSessionApplicationResponse = null;
 
 export interface UpdateSessionApplicationVisibilityRequest {
   isPublic: boolean;
@@ -102,4 +171,40 @@ export interface SessionApplicationSummaryResponse {
   submissionCount: number;
   inProgressCount: number;
   applications: SessionApplicationSummaryItem[];
+}
+
+export interface ApplySessionRecruitmentRequest {
+  sessionApplicationId: number;
+}
+
+export interface ApplySessionRecruitmentResponse {
+  applicationSubmissionId: number;
+  recruitmentTitle: string;
+  bandName: string;
+  applicationTitle: string;
+}
+
+export type CancelSessionApplicationSubmissionResponse = null;
+
+export interface ApplicationSubmissionItem {
+  applicationSubmissionId: number;
+  sessionRecruitmentId: number;
+  sessionApplicationId: number;
+  checkedAt: string | null;
+  status: string;
+  recruitmentTitle: string;
+  bandName: string;
+  appliedAgo: number;
+}
+
+export interface ApplicationSubmissionsParams {
+  cursorId?: number;
+  size?: number;
+}
+
+export interface ApplicationSubmissionsResponse {
+  content: ApplicationSubmissionItem[];
+  size: number;
+  nextCursor: number | null;
+  hasNext: boolean;
 }
