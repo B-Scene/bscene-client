@@ -8,7 +8,6 @@ import type { SessionApplicationDraft } from "@/features/session/applicationForm
 import { SessionApplicationCard } from "@/features/session/applicationList/SessionApplicationCard";
 import type { ApplicationCardItem } from "@/features/session/applicationList/sessionApplicationList.types";
 import { useSessionApplicationsState } from "@/features/session/applicationList/useSessionApplicationsState";
-import { SessionApplicationHistoryPage } from "@/features/session/applicationHistory/SessionApplicationHistoryPage";
 import type {
   ApplicationHistoryItem,
   RecruitmentHistoryItem,
@@ -29,6 +28,7 @@ import type {
 
 import { MyApplicationDetail } from "./MyApplicationDetail";
 import { SessionApplicationCreatePage } from "./SessionApplicationCreatePage";
+import { SessionApplicationHistoryPage } from "./SessionApplicationHistoryPage";
 
 interface SessionApplicationsScreenProps {
   onEditBasicInfo: () => void;

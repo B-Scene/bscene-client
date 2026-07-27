@@ -462,6 +462,7 @@ export const RecruitmentNoticeScreen = () => {
         sessionApplicationId={
           selectedApplicationId
         }
+        isOwnApplication
         onBack={() =>
           setSelectedApplicationId(null)
         }
@@ -574,12 +575,20 @@ export const RecruitmentNoticeScreen = () => {
           }
           onViewHistoryApplication={(
             application,
-          ) =>
+          ) => {
+            if (
+              !application.sessionApplicationId
+            ) {
+              window.alert(
+                "지원서 정보를 확인할 수 없어요. 잠시 후 다시 시도해주세요.",
+              );
+              return;
+            }
+
             setSelectedApplicationId(
-              application.sessionApplicationId ??
-                application.id,
-            )
-          }
+              application.sessionApplicationId,
+            );
+          }}
           onMessage={handleMessageApplication}
           onOpenRecruitment={
             handleOpenHistoryRecruitment

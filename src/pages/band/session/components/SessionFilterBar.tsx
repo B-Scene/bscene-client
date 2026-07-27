@@ -1,221 +1,80 @@
-import type { Dispatch, SetStateAction } from "react";
-import CloseCircleIcon from "@/assets/icons/band/close-circle.svg";
+import ArrowDownIcon from "@/assets/icons/band/arrow-down-gray.svg";
+import FilterIcon from "@/assets/icons/band/filter.svg";
+import LineIcon from "@/assets/icons/band/Line.svg";
 import type { SessionRecruitmentSort } from "@/types/session/sessionRecruitment";
+import { SESSION_FILTERS } from "../data/sessionRecruitmentPosts";
 import type { SessionFilterValues } from "../types";
 
-type FilterKey = "part" | "skill" | "skillLevel" | "genre" | "region";
-
-interface SessionFilterValuesLike {
-  part?: string;
-  skill?: string;
-  skillLevel?: string;
-  genre?: string;
-  region?: string;
-}
-
 interface SessionFilterBarProps {
-  values?: SessionFilterValues | SessionFilterValuesLike;
-  filters?: SessionFilterValuesLike;
-  selectedFilters?: SessionFilterValuesLike;
-
-  sort?: SessionRecruitmentSort;
-  onSortChange?: Dispatch<SetStateAction<SessionRecruitmentSort>>;
-
+  values: SessionFilterValues;
+  showSelectedValues?: boolean;
   showBottomBorder?: boolean;
   compactHeight?: boolean;
-  showSelectedValues?: boolean;
-
-  onOpenFilter?: (key?: FilterKey) => void;
-  onFilterClick?: (key: FilterKey) => void;
-  onOpenBottomSheet?: (key: FilterKey) => void;
-
-  onReset?: () => void;
-  onClear?: () => void;
-  onClearFilters?: () => void;
-
-  className?: string;
+  sort: SessionRecruitmentSort;
+  onSortChange: (sort: SessionRecruitmentSort) => void;
+  onOpenFilter: () => void;
 }
-
-const FILTER_ITEMS: Array<{
-  key: FilterKey;
-  valueKeys: FilterKey[];
-  label: string;
-}> = [
-  {
-    key: "part",
-    valueKeys: ["part"],
-    label: "파트",
-  },
-  {
-    key: "skillLevel",
-    valueKeys: ["skillLevel", "skill"],
-    label: "실력대",
-  },
-  {
-    key: "genre",
-    valueKeys: ["genre"],
-    label: "장르",
-  },
-  {
-    key: "region",
-    valueKeys: ["region"],
-    label: "지역",
-  },
-];
-
-const SORT_LABEL_MAP: Record<string, string> = {
-  LATEST: "최신순",
-  POPULAR: "인기순",
-  DEADLINE: "마감임박순",
-  DEADLINE_ASC: "마감임박순",
-  VIEW: "조회순",
-};
 
 export const SessionFilterBar = ({
   values,
-  filters,
-  selectedFilters,
-  sort,
-  onSortChange,
+  showSelectedValues = true,
   showBottomBorder = true,
   compactHeight = false,
-  showSelectedValues = true,
+  sort,
+  onSortChange,
   onOpenFilter,
-  onFilterClick,
-  onOpenBottomSheet,
-  onReset,
-  onClear,
-  onClearFilters,
-  className = "",
 }: SessionFilterBarProps) => {
-  const currentValues = values ?? filters ?? selectedFilters ?? {};
-
-  const getSelectedValue = (keys: FilterKey[]) => {
-    for (const key of keys) {
-      const value = currentValues[key as keyof typeof currentValues];
-
-      if (typeof value === "string" && value.trim().length > 0) {
-        return value;
-      }
-    }
-
-    return "";
-  };
-
-  const isDefaultValue = (value: string) => {
-    return value === "" || value === "전체";
-  };
-
-  const hasSelectedFilter = FILTER_ITEMS.some((item) => {
-    const selectedValue = getSelectedValue(item.valueKeys);
-
-    return !isDefaultValue(selectedValue);
-  });
-
-  const handleOpenFilter = (key: FilterKey) => {
-    if (onOpenFilter) {
-      onOpenFilter(key);
-      return;
-    }
-
-    if (onFilterClick) {
-      onFilterClick(key);
-      return;
-    }
-
-    if (onOpenBottomSheet) {
-      onOpenBottomSheet(key);
-    }
-  };
-
-  const handleReset = () => {
-    if (onReset) {
-      onReset();
-      return;
-    }
-
-    if (onClear) {
-      onClear();
-      return;
-    }
-
-    if (onClearFilters) {
-      onClearFilters();
-    }
-  };
-
-  const handleSortClick = () => {
-    if (!onSortChange || !sort) {
-      return;
-    }
-
-    onSortChange((currentSort) => {
-      if (currentSort === "LATEST") {
-        return "DEADLINE" as SessionRecruitmentSort;
-      }
-
-      return "LATEST" as SessionRecruitmentSort;
-    });
-  };
+  const selectedFilters = [
+    values.part,
+    values.skill,
+    values.genre,
+    values.region,
+  ];
+  const filterLabels = showSelectedValues ? selectedFilters : SESSION_FILTERS;
+  const sortLabel = sort === "LATEST" ? "최신순" : "마감순";
 
   return (
-    <div
+    <section
       className={[
-        "w-full bg-neutral-0",
-        showBottomBorder ? "border-b border-neutral-200" : "",
-        className,
+        "flex w-full items-center gap-2 bg-neutral-0 pl-[22px] pr-[26px]",
+        compactHeight ? "h-[53px]" : "h-[48px]",
+        showBottomBorder ? "border-b border-neutral-400" : "",
       ].join(" ")}
     >
-      <div
-        className={[
-          "flex w-full items-center gap-2 overflow-x-auto px-5 scrollbar-hide",
-          compactHeight ? "py-2" : "py-3",
-        ].join(" ")}
+      <button
+        type="button"
+        aria-label={`정렬 기준: ${sortLabel}`}
+        onClick={() =>
+          onSortChange(sort === "LATEST" ? "IMMINENT" : "LATEST")
+        }
+        className="flex h-[22px] w-[62px] shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-full border border-neutral-400 bg-neutral-0 px-2 py-0.5 text-caption2 text-neutral-600"
       >
-        {FILTER_ITEMS.map((item) => {
-          const selectedValue = getSelectedValue(item.valueKeys);
-          const shouldShowSelectedValue =
-            showSelectedValues && !isDefaultValue(selectedValue);
+        {sortLabel}
+        <img src={ArrowDownIcon} alt="" className="h-[7px] w-3 shrink-0" />
+      </button>
 
-          return (
-            <button
-              key={item.key}
-              type="button"
-              onClick={() => handleOpenFilter(item.key)}
-              className={[
-                "flex h-[30px] shrink-0 items-center justify-center rounded-full px-4 text-caption2",
-                shouldShowSelectedValue
-                  ? "bg-secondary-500 text-neutral-0"
-                  : "bg-neutral-300 text-neutral-600",
-              ].join(" ")}
-            >
-              {shouldShowSelectedValue ? selectedValue : item.label}
-            </button>
-          );
-        })}
+      <img src={LineIcon} alt="" className="h-[26px] w-0.5 shrink-0" />
 
-        {sort ? (
-          <button
-            type="button"
-            onClick={handleSortClick}
-            className="flex h-[30px] shrink-0 items-center justify-center rounded-full bg-neutral-300 px-4 text-caption2 text-neutral-600"
-          >
-            {SORT_LABEL_MAP[sort] ?? "최신순"}
-          </button>
-        ) : null}
+      {filterLabels.map((filter, index) => (
+        <button
+          key={`${SESSION_FILTERS[index]}-${index}`}
+          type="button"
+          onClick={onOpenFilter}
+          className="flex h-[22px] min-w-[49px] shrink-0 items-center justify-center whitespace-nowrap rounded-full border border-neutral-400 bg-neutral-0 px-2 py-0.5 text-caption2 text-neutral-600"
+        >
+          {filter}
+        </button>
+      ))}
 
-        {hasSelectedFilter ? (
-          <button
-            type="button"
-            aria-label="필터 초기화"
-            onClick={handleReset}
-            className="flex size-[30px] shrink-0 items-center justify-center"
-          >
-            <img src={CloseCircleIcon} alt="" className="size-5" />
-          </button>
-        ) : null}
-      </div>
-    </div>
+      <button
+        type="button"
+        aria-label="필터 설정"
+        onClick={onOpenFilter}
+        className="ml-auto flex size-[22px] shrink-0 items-center justify-center"
+      >
+        <img src={FilterIcon} alt="" className="size-[22px]" />
+      </button>
+    </section>
   );
 };
 
