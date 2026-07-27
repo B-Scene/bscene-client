@@ -10,6 +10,7 @@ import {
 import type {
   FanHomeConcert,
   PerformanceCalendarDateItem,
+  PerformanceCalendarParams,
 } from "@/types/fan/home";
 
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
@@ -48,6 +49,7 @@ type CalendarPerformance = {
   status: string;
   thumbnailSrc?: string;
   showThumbnail: boolean;
+  isInterested: boolean;
 };
 
 const formatDateKey = (date: Date) =>
@@ -228,6 +230,7 @@ const mapPerformanceToCalendarItem = (
     status: performance.status ?? getDday(date, performance.status),
     thumbnailSrc,
     showThumbnail: Boolean(thumbnailSrc),
+    isInterested: performance.isInterested ?? false,
   };
 };
 
@@ -290,7 +293,7 @@ const ConcertCalendarPage = () => {
     },
   );
   const [hasMovedMonth, setHasMovedMonth] = useState(false);
-  const calendarParams = useMemo(
+  const calendarParams = useMemo<PerformanceCalendarParams>(
     () =>
       hasMovedMonth
         ? {
@@ -561,6 +564,7 @@ const ConcertCalendarPage = () => {
                     <ConcertLikeButton
                       concertId={event.id}
                       concertTitle={event.title}
+                      isInterested={event.isInterested}
                     />
                   }
                   onClick={() => navigate(`/fan/home/concerts/${event.id}`)}

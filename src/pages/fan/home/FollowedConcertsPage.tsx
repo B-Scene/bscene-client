@@ -40,6 +40,7 @@ type ConcertListItem = {
   status: string;
   thumbnailSrc?: string;
   showThumbnail: boolean;
+  isInterested: boolean;
 };
 
 const SORT_TO_API: Record<SortOption, UpcomingPerformanceSort> = {
@@ -203,6 +204,7 @@ const mapPerformanceToConcert = (
     status: concert.status ?? getDday(date, concert.status),
     thumbnailSrc,
     showThumbnail: Boolean(thumbnailSrc),
+    isInterested: concert.isInterested ?? false,
   };
 };
 
@@ -410,6 +412,7 @@ const FollowedConcertsPage = () => {
               <ConcertLikeButton
                 concertId={concert.id}
                 concertTitle={concert.title}
+                isInterested={concert.isInterested}
               />
             }
             onClick={() => navigate(`/fan/home/concerts/${concert.id}`)}

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
 import Modal from "@/components/Modal/Modal";
 import { ModalOverlay } from "@/components/common/Modal/ModalOverlay";
@@ -8,8 +9,8 @@ import HeartIcon from "@/assets/icons/Heart.svg";
 import ShareIcon from "@/assets/icons/ic_share.svg";
 import LikedHeartIcon from "@/assets/icons/Union.svg";
 import BandProfileImage from "@/assets/icons/band/band-default-profile.svg";
-import { useConcertLikeStore } from "@/stores/useConcertLikeStore";
 import {
+  fanHomeKeys,
   useAddPerformanceInterest,
   useDeletePerformanceAlarm,
   useDeletePerformanceInterest,
@@ -355,10 +356,9 @@ const ConcertDetailPage = () => {
   const concertInfoRef = useRef<HTMLElement | null>(null);
   const concertIntroRef = useRef<HTMLElement | null>(null);
   const castingRef = useRef<HTMLElement | null>(null);
+  const queryClient = useQueryClient();
   const [selectedTab, setSelectedTab] =
     useState<ConcertDetailTab>("공연정보");
-  const setConcertLiked = useConcertLikeStore((state) => state.setConcertLiked);
-  const [interestOverride, setInterestOverride] = useState<boolean | null>(null);
   const [notificationOverride, setNotificationOverride] = useState<
     boolean | null
   >(null);
@@ -372,8 +372,7 @@ const ConcertDetailPage = () => {
     Number.isFinite(performanceId) ? performanceId : 0,
   );
   const detail = detailQuery.data;
-  const isLiked =
-    interestOverride ?? detail?.isInterested ?? false;
+  const isLiked = detail?.isInterested ?? false;
   const isNotificationEnabled =
     notificationOverride ?? (detail?.participationStatus != null);
   const showNotificationHint =
@@ -426,8 +425,6 @@ const ConcertDetailPage = () => {
     if (isLiked) {
       try {
         await deletePerformanceInterestMutation.mutateAsync(performanceId);
-        setConcertLiked(concertId, false);
-        setInterestOverride(false);
         setToastMessage("관심 공연을 해제했어요");
       } catch {
         setToastMessage("관심 공연 해제에 실패했어요");
@@ -437,12 +434,20 @@ const ConcertDetailPage = () => {
 
     try {
       await addPerformanceInterestMutation.mutateAsync(performanceId);
-      setConcertLiked(concertId, true);
-      setInterestOverride(true);
     } catch (error) {
       if (isAlreadyInterestedPerformanceError(error)) {
-        setConcertLiked(concertId, true);
-        setInterestOverride(true);
+        void queryClient.invalidateQueries({
+          queryKey: fanHomeKeys.performanceDetail(performanceId),
+        });
+        void queryClient.invalidateQueries({
+          queryKey: fanHomeKeys.main(),
+        });
+        void queryClient.invalidateQueries({
+          queryKey: fanHomeKeys.upcomingPerformancesLists(),
+        });
+        void queryClient.invalidateQueries({
+          queryKey: fanHomeKeys.performancesByDateLists(),
+        });
         return;
       }
 
