@@ -44,7 +44,8 @@ export type UpdateSessionRecruitmentRequest = Omit<
   "bandMemberId"
 >;
 
-export type UpdateSessionRecruitmentResponse = CreateSessionRecruitmentResponse;
+export type UpdateSessionRecruitmentResponse =
+  CreateSessionRecruitmentResponse;
 
 export interface SessionRecruitmentEditInfoResponse {
   recruitmentTitle: string;
@@ -133,13 +134,53 @@ export interface SessionSearchHistoryItem {
 
 export type DeleteSessionSearchHistoryResponse = null;
 
-export interface ApplySessionRecruitmentRequest {
-  sessionApplicationId: number;
+export interface SessionRecruitmentHistoryParams {
+  cursorId?: number;
+  size?: number;
 }
 
-export interface ApplySessionRecruitmentResponse {
-  applicationSubmissionId: number;
+export interface InterestedSessionRecruitmentItem {
+  interestId: number;
+  sessionRecruitmentId: number;
+  dDay: number;
+  isClosed: boolean;
+  isInterested: boolean;
   recruitmentTitle: string;
   bandName: string;
-  applicationTitle: string;
+  bandGenre: string;
+  bandRegion: string;
+  postedAgo: number;
+  summary: string;
+  part: string;
+  skillLevel: string;
+}
+
+export interface InterestedSessionRecruitmentsResponse {
+  content: InterestedSessionRecruitmentItem[];
+  size: number;
+  nextCursor: number | null;
+  hasNext: boolean;
+}
+
+export interface RecentlyViewedSessionRecruitmentItem {
+  viewId: number;
+  sessionRecruitmentId: number;
+  dDay: number;
+  isClosed: boolean;
+  isInterested: boolean;
+  recruitmentTitle: string;
+  bandName: string;
+  bandGenre: string;
+  bandRegion: string;
+  postedAgo: number;
+  summary: string;
+  part: string;
+  skillLevel: string;
+}
+
+export interface RecentlyViewedSessionRecruitmentsResponse {
+  content: RecentlyViewedSessionRecruitmentItem[];
+  size: number;
+  nextCursor: number | null;
+  hasNext: boolean;
 }
