@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   addSessionRecruitmentInterest,
+  applySessionRecruitment,
   createSessionRecruitment,
   deleteSessionRecruitment,
   deleteSessionSearchHistory,
@@ -12,6 +13,7 @@ import {
   updateSessionRecruitment,
 } from "@/api/session/sessionRecruitment";
 import type {
+  ApplySessionRecruitmentRequest,
   CreateSessionRecruitmentRequest,
   SessionRecruitmentListParams,
   UpdateSessionRecruitmentRequest,
@@ -20,6 +22,11 @@ import type {
 interface UpdateSessionRecruitmentVariables {
   sessionRecruitmentId: number;
   body: UpdateSessionRecruitmentRequest;
+}
+
+interface ApplySessionRecruitmentVariables {
+  sessionRecruitmentId: number;
+  body: ApplySessionRecruitmentRequest;
 }
 
 export const sessionRecruitmentKeys = {
@@ -85,10 +92,7 @@ export const useUpdateSessionRecruitment = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({
-      sessionRecruitmentId,
-      body,
-    }: UpdateSessionRecruitmentVariables) =>
+    mutationFn: ({ sessionRecruitmentId, body }: UpdateSessionRecruitmentVariables) =>
       updateSessionRecruitment(sessionRecruitmentId, body),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({
@@ -96,6 +100,11 @@ export const useUpdateSessionRecruitment = () => {
       });
       queryClient.invalidateQueries({
         queryKey: sessionRecruitmentKeys.detail(variables.sessionRecruitmentId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: sessionRecruitmentKeys.editInfo(
+          variables.sessionRecruitmentId,
+        ),
       });
     },
   });
@@ -113,6 +122,9 @@ export const useDeleteSessionRecruitment = () => {
       });
       queryClient.removeQueries({
         queryKey: sessionRecruitmentKeys.detail(sessionRecruitmentId),
+      });
+      queryClient.removeQueries({
+        queryKey: sessionRecruitmentKeys.editInfo(sessionRecruitmentId),
       });
     },
   });
@@ -147,6 +159,28 @@ export const useRemoveSessionRecruitmentInterest = () => {
       });
       queryClient.invalidateQueries({
         queryKey: sessionRecruitmentKeys.detail(result.sessionRecruitmentId),
+      });
+    },
+  });
+};
+
+export const useApplySessionRecruitment = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ sessionRecruitmentId, body }: ApplySessionRecruitmentVariables) =>
+      applySessionRecruitment(sessionRecruitmentId, body),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: sessionRecruitmentKeys.detail(variables.sessionRecruitmentId),
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: sessionRecruitmentKeys.lists(),
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: ["sessionApplications"],
       });
     },
   });

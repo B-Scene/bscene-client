@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   useAddSessionRecruitmentInterest,
+  useApplySessionRecruitment,
   useRemoveSessionRecruitmentInterest,
   useSessionRecruitmentsQuery,
 } from "@/hooks/api/session/useSessionRecruitment";
@@ -10,7 +11,11 @@ import type {
   SessionRecruitmentSort,
 } from "@/types/session/sessionRecruitment";
 import { INITIAL_SESSION_FILTERS } from "../data/sessionRecruitmentPosts";
-import type { SessionFilterValues, SessionRecruitmentPost, SessionTabId } from "../types";
+import type {
+  SessionFilterValues,
+  SessionRecruitmentPost,
+  SessionTabId,
+} from "../types";
 import { FloatingCreateButton } from "./FloatingCreateButton";
 import { RecruitmentPostCard } from "./RecruitmentPostCard";
 import { SessionApplicationsScreen } from "./SessionApplicationsScreen";
@@ -72,19 +77,23 @@ export const RecruitmentNoticeScreen = () => {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [filterValues, setFilterValues] =
     useState<SessionFilterValues>(INITIAL_SESSION_FILTERS);
-  const [sort, setSort] =
-    useState<SessionRecruitmentSort>("LATEST");
+  const [sort, setSort] = useState<SessionRecruitmentSort>("LATEST");
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isBasicProfileEditOpen, setIsBasicProfileEditOpen] = useState(false);
   const [selectedPostId, setSelectedPostId] = useState<number | null>(null);
-  const [selectedApplicationId, setSelectedApplicationId] = useState<number | null>(null);
+  const [selectedApplicationId, setSelectedApplicationId] = useState<
+    number | null
+  >(null);
   const [deletedPostIds, setDeletedPostIds] = useState<number[]>([]);
   const [createdPostIds, setCreatedPostIds] = useState<number[]>([]);
-  const [bookmarkOverrides, setBookmarkOverrides] = useState<Record<number, boolean>>({});
+  const [bookmarkOverrides, setBookmarkOverrides] = useState<
+    Record<number, boolean>
+  >({});
 
   const addInterestMutation = useAddSessionRecruitmentInterest();
   const removeInterestMutation = useRemoveSessionRecruitmentInterest();
+  const applyRecruitmentMutation = useApplySessionRecruitment();
 
   const sessionRecruitmentsQuery = useSessionRecruitmentsQuery({
     size: 20,
@@ -92,7 +101,8 @@ export const RecruitmentNoticeScreen = () => {
   });
 
   const posts = useMemo(() => {
-    const apiPosts = sessionRecruitmentsQuery.data?.content.map(mapRecruitmentToPost) ?? [];
+    const apiPosts =
+      sessionRecruitmentsQuery.data?.content.map(mapRecruitmentToPost) ?? [];
 
     return apiPosts
       .filter((post) => !deletedPostIds.includes(post.id))
@@ -104,11 +114,15 @@ export const RecruitmentNoticeScreen = () => {
 
   const filteredPosts = useMemo(() => {
     return posts.filter((post) => {
-      const matchesPart = filterValues.part === "전체" || post.tags.includes(filterValues.part);
-      const matchesSkill = filterValues.skill === "전체" || post.tags.includes(filterValues.skill);
-      const matchesGenre = filterValues.genre === "전체" || post.genre.includes(filterValues.genre);
+      const matchesPart =
+        filterValues.part === "전체" || post.tags.includes(filterValues.part);
+      const matchesSkill =
+        filterValues.skill === "전체" || post.tags.includes(filterValues.skill);
+      const matchesGenre =
+        filterValues.genre === "전체" || post.genre.includes(filterValues.genre);
       const matchesRegion =
-        filterValues.region === "전체" || post.location.includes(filterValues.region);
+        filterValues.region === "전체" ||
+        post.location.includes(filterValues.region);
 
       return matchesPart && matchesSkill && matchesGenre && matchesRegion;
     });
@@ -127,7 +141,8 @@ export const RecruitmentNoticeScreen = () => {
 
   const handleToggleBookmark = (postId: number) => {
     const currentPost = posts.find((post) => post.id === postId);
-    const currentBookmarked = bookmarkOverrides[postId] ?? currentPost?.bookmarked ?? false;
+    const currentBookmarked =
+      bookmarkOverrides[postId] ?? currentPost?.bookmarked ?? false;
     const nextBookmarked = !currentBookmarked;
 
     setBookmarkOverrides((currentOverrides) => ({
@@ -150,6 +165,18 @@ export const RecruitmentNoticeScreen = () => {
   const handleDeletePost = (postId: number) => {
     setDeletedPostIds((currentIds) => [...currentIds, postId]);
     setSelectedPostId(null);
+  };
+
+  const handleApplyApplication = async (
+    sessionRecruitmentId: number,
+    sessionApplicationId: number,
+  ) => {
+    await applyRecruitmentMutation.mutateAsync({
+      sessionRecruitmentId,
+      body: {
+        sessionApplicationId,
+      },
+    });
   };
 
   if (isCreateOpen) {
@@ -175,7 +202,11 @@ export const RecruitmentNoticeScreen = () => {
   }
 
   if (isBasicProfileEditOpen) {
-    return <SessionBasicProfileEditScreen onBack={() => setIsBasicProfileEditOpen(false)} />;
+    return (
+      <SessionBasicProfileEditScreen
+        onBack={() => setIsBasicProfileEditOpen(false)}
+      />
+    );
   }
 
   if (isSearchOpen) {
@@ -205,6 +236,7 @@ export const RecruitmentNoticeScreen = () => {
         onToggleBookmark={handleToggleBookmark}
         onDeletePost={handleDeletePost}
         onPreviewApplication={setSelectedApplicationId}
+        onApplyApplication={handleApplyApplication}
       />
     );
   }
@@ -215,6 +247,7 @@ export const RecruitmentNoticeScreen = () => {
         onSearch={() => setIsSearchOpen(true)}
         onMessages={() => navigate("/band/session/messages")}
       />
+
       <SessionTabs activeTab={activeTab} onTabChange={setActiveTab} />
 
       {activeTab !== "applications" ? (

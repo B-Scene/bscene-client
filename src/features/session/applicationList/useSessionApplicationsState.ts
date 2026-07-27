@@ -23,7 +23,7 @@ interface UseSessionApplicationsStateParams {
     isPublic: boolean,
   ) => void;
 
-  onServerDelete?: (sessionApplicationId: number) => void;
+  onServerDelete?: (sessionApplicationId: number) => void | Promise<void>;
 }
 
 export const useSessionApplicationsState = ({
@@ -79,12 +79,15 @@ export const useSessionApplicationsState = ({
     setIsApplicationFormOpen(true);
   };
 
-  const handleOpenEditPage = (application: ApplicationCardItem) => {
+  const handleOpenEditPage = (
+    application: ApplicationCardItem,
+    detailDraft?: SessionApplicationDraft,
+  ) => {
     setApplicationFormMode("edit");
 
     setEditingApplicationId(application.sessionApplicationId);
 
-    setEditingInitialValue(application.draft);
+    setEditingInitialValue(detailDraft ?? application.draft);
 
     setIsApplicationFormOpen(true);
   };
@@ -95,76 +98,22 @@ export const useSessionApplicationsState = ({
     setEditingInitialValue(null);
   };
 
-  const handleOpenApplicationDetail = (application: ApplicationCardItem) => {
-    setSelectedApplication(application);
+  const handleOpenApplicationDetail = (
+    application: ApplicationCardItem,
+    detailDraft?: SessionApplicationDraft,
+  ) => {
+    setSelectedApplication(
+      detailDraft
+        ? {
+            ...application,
+            draft: detailDraft,
+          }
+        : application,
+    );
   };
 
   const handleCloseApplicationDetail = () => {
     setSelectedApplication(null);
-  };
-
-  const handleSubmitApplication = (draft: SessionApplicationDraft) => {
-    if (applicationFormMode === "edit" && editingApplicationId !== null) {
-      const currentApplication = applications.find(
-        (application) =>
-          application.sessionApplicationId === editingApplicationId,
-      );
-
-      if (!currentApplication) {
-        return;
-      }
-
-      const updatedApplication: ApplicationCardItem = {
-        ...currentApplication,
-
-        displayDate: `${getCurrentDate()} 수정`,
-
-        title: draft.applicationType,
-        purpose: draft.title,
-
-        draft,
-      };
-
-      if (currentApplication.isLocal) {
-        setLocalApplications((previousApplications) =>
-          previousApplications.map((application) =>
-            application.sessionApplicationId === editingApplicationId
-              ? updatedApplication
-              : application,
-          ),
-        );
-      } else {
-        setApplicationOverrides((previousOverrides) => ({
-          ...previousOverrides,
-
-          [editingApplicationId]: updatedApplication,
-        }));
-      }
-
-      handleCloseApplicationForm();
-      return;
-    }
-
-    const newApplication: ApplicationCardItem = {
-      sessionApplicationId: Date.now(),
-
-      displayDate: `${getCurrentDate()} 작성`,
-
-      title: draft.applicationType,
-      purpose: draft.title,
-
-      isPublic: true,
-      isLocal: true,
-
-      draft,
-    };
-
-    setLocalApplications((previousApplications) => [
-      newApplication,
-      ...previousApplications,
-    ]);
-
-    handleCloseApplicationForm();
   };
 
   const handleToggleVisibility = (
@@ -240,20 +189,7 @@ export const useSessionApplicationsState = ({
     handleOpenApplicationDetail,
     handleCloseApplicationDetail,
 
-    handleSubmitApplication,
     handleToggleVisibility,
     handleDeleteApplication,
   };
-};
-
-const getCurrentDate = () => {
-  const now = new Date();
-
-  const year = now.getFullYear();
-
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-
-  const day = String(now.getDate()).padStart(2, "0");
-
-  return `${year}-${month}-${day}`;
 };

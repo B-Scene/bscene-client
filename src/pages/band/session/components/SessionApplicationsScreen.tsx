@@ -6,6 +6,7 @@ import { StatRow } from "@/components/band/home/StatRow";
 import { EmptyState } from "@/components/common/EmptyState/EmptyState";
 import type { SessionApplicationDraft } from "@/features/session/applicationForm/applicationForm.types";
 import { SessionApplicationCard } from "@/features/session/applicationList/SessionApplicationCard";
+import type { ApplicationCardItem } from "@/features/session/applicationList/sessionApplicationList.types";
 import { useSessionApplicationsState } from "@/features/session/applicationList/useSessionApplicationsState";
 import { SessionApplicationHistoryPage } from "@/features/session/applicationHistory/SessionApplicationHistoryPage";
 import type {
@@ -14,12 +15,15 @@ import type {
 } from "@/features/session/applicationHistory/applicationHistory.types";
 import {
   useCreateSessionApplication,
+  useDeleteSessionApplication,
+  useFetchMySessionApplicationDetail,
   useMySessionApplicationSummaryQuery,
   useUpdateSessionApplication,
   useUpdateSessionApplicationVisibility,
 } from "@/hooks/api/session/useSessionApplication";
 import type {
   CreateSessionApplicationRequest,
+  MySessionApplicationDetailResponse,
   SessionApiResponse,
 } from "@/types/session/sessionApplication";
 
@@ -80,6 +84,33 @@ const createApplicationRequestFromDraft = (
   };
 };
 
+const mapMyApplicationDetailToDraft = (
+  detail: MySessionApplicationDetailResponse,
+): SessionApplicationDraft => {
+  return {
+    applicationType: detail.purpose ?? "",
+    title: detail.title ?? "",
+    shortIntroduction: detail.oneLineIntro ?? "",
+    introduction: detail.intro ?? "",
+    part: detail.part ?? detail.defaultPart ?? "",
+    skillLevel: detail.skillLevel ?? detail.defaultSkillLevel ?? "",
+    genre: detail.genre ?? "",
+    region: detail.region ?? detail.defaultRegion ?? "",
+    activities: detail.availableActivities ?? [],
+    experiences:
+      detail.careers?.map((career, index) => ({
+        id: career.sessionApplicationCareerId ?? Date.now() + index,
+        title: career.name ?? "",
+        period: career.period ?? "",
+        description: career.description ?? "",
+      })) ?? [],
+    portfolioLinks:
+      detail.portfolioLinks && detail.portfolioLinks.length > 0
+        ? detail.portfolioLinks.map((link) => link.url)
+        : [""],
+  };
+};
+
 export const SessionApplicationsScreen = ({
   onEditBasicInfo,
   onViewApplicationHistory,
@@ -99,6 +130,10 @@ export const SessionApplicationsScreen = ({
   const createApplicationMutation = useCreateSessionApplication();
 
   const updateApplicationMutation = useUpdateSessionApplication();
+
+  const deleteApplicationMutation = useDeleteSessionApplication();
+
+  const fetchMySessionApplicationDetail = useFetchMySessionApplicationDetail();
 
   const summary = summaryQuery.data;
 
@@ -136,7 +171,20 @@ export const SessionApplicationsScreen = ({
       });
     },
 
-    onServerDelete: onDeleteApplication,
+    onServerDelete: async (sessionApplicationId) => {
+      try {
+        await deleteApplicationMutation.mutateAsync(sessionApplicationId);
+        onDeleteApplication?.(sessionApplicationId);
+      } catch (error) {
+        const apiMessage = (error as AxiosError<SessionApiResponse<null>>)
+          .response?.data?.message;
+
+        window.alert(
+          apiMessage ??
+            "지원서 삭제에 실패했어요. 잠시 후 다시 시도해주세요.",
+        );
+      }
+    },
   });
 
   const handleOpenApplicationHistory = () => {
@@ -153,6 +201,45 @@ export const SessionApplicationsScreen = ({
     setIsApplicationHistoryOpen(false);
 
     onBrowseRecruitments?.();
+  };
+
+  const handleViewApplication = async (application: ApplicationCardItem) => {
+    try {
+      const detail = await fetchMySessionApplicationDetail(
+        application.sessionApplicationId,
+      );
+
+      handleOpenApplicationDetail(
+        application,
+        mapMyApplicationDetailToDraft(detail),
+      );
+    } catch (error) {
+      const apiMessage = (error as AxiosError<SessionApiResponse<null>>)
+        .response?.data?.message;
+
+      window.alert(
+        apiMessage ??
+          "지원서 상세 정보를 불러오지 못했어요. 잠시 후 다시 시도해주세요.",
+      );
+    }
+  };
+
+  const handleEditApplication = async (application: ApplicationCardItem) => {
+    try {
+      const detail = await fetchMySessionApplicationDetail(
+        application.sessionApplicationId,
+      );
+
+      handleOpenEditPage(application, mapMyApplicationDetailToDraft(detail));
+    } catch (error) {
+      const apiMessage = (error as AxiosError<SessionApiResponse<null>>)
+        .response?.data?.message;
+
+      window.alert(
+        apiMessage ??
+          "지원서 수정 정보를 불러오지 못했어요. 잠시 후 다시 시도해주세요.",
+      );
+    }
   };
 
   const handleCreateApplication = async (draft: SessionApplicationDraft) => {
@@ -259,6 +346,11 @@ export const SessionApplicationsScreen = ({
     },
   ];
 
+  const isApplicationActionPending =
+    createApplicationMutation.isPending ||
+    updateApplicationMutation.isPending ||
+    deleteApplicationMutation.isPending;
+
   return (
     <>
       <section className="flex min-h-[calc(100dvh_-_154px_-_var(--bottom-nav-height))] flex-col bg-neutral-0">
@@ -330,7 +422,8 @@ export const SessionApplicationsScreen = ({
               <button
                 type="button"
                 onClick={handleOpenCreatePage}
-                className="shrink-0 text-caption3 text-secondary-500 underline underline-offset-[3px]"
+                disabled={isApplicationActionPending}
+                className="shrink-0 text-caption3 text-secondary-500 underline underline-offset-[3px] disabled:text-neutral-400"
               >
                 + 지원서 추가
               </button>
@@ -344,8 +437,8 @@ export const SessionApplicationsScreen = ({
                   key={application.sessionApplicationId}
                   application={application}
                   visibilityDisabled={visibilityMutation.isPending}
-                  onView={handleOpenApplicationDetail}
-                  onEdit={handleOpenEditPage}
+                  onView={handleViewApplication}
+                  onEdit={handleEditApplication}
                   onDelete={handleDeleteApplication}
                   onToggleVisibility={handleToggleVisibility}
                 />
