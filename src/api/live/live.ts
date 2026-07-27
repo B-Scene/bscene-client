@@ -175,6 +175,10 @@ const getWhipAuthorization = () => {
   return `Basic ${btoa(`bscene:${getAccessToken()}`)}`;
 };
 
+export const getLivePlaybackAuthorization = () => {
+  return getWhipAuthorization();
+};
+
 const parseErrorMessage = (responseText: string, fallbackMessage: string) => {
   if (!responseText) return fallbackMessage;
 
@@ -216,6 +220,10 @@ export const enterLive = async (
   >(`/lives/${liveId}`);
 
   return unwrapResult(response.data);
+};
+
+export const leaveLive = async (liveId: number): Promise<void> => {
+  await axiosInstance.post<LiveApiResponse<null>>(`/lives/${liveId}/leave`);
 };
 
 export const closeLive = async (

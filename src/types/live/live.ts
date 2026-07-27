@@ -14,7 +14,15 @@ export interface LiveNowItem {
   bandName: string;
   title: string;
   viewerCount: number;
-  isMine: boolean;
+  isMine?: boolean;
+}
+
+export interface LiveReplayItem {
+  replayId: number;
+  thumbnailImageUrl: string | null;
+  title: string;
+  bandName: string;
+  viewCount: number;
 }
 
 export interface ScheduledLiveItem {
@@ -22,11 +30,13 @@ export interface ScheduledLiveItem {
   bandName: string;
   title: string;
   scheduledAt: string;
-  isMine: boolean;
+  notificationEnabled?: boolean;
+  isMine?: boolean;
 }
 
 export interface LiveHomeResponse {
   liveNow: LiveNowItem[];
+  replays: LiveReplayItem[];
   scheduled: ScheduledLiveItem[];
 }
 

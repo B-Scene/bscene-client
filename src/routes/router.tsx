@@ -143,6 +143,10 @@ export const router = createBrowserRouter([
         element: <FanLivePage />,
       },
       {
+        path: "/fan/live/room/:liveId",
+        element: <FanLivePage />,
+      },
+      {
         path: "/fan/live/now",
         element: <FanLiveNowPage />,
       },

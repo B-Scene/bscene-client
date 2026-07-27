@@ -132,7 +132,7 @@ export function BandLiveHome({
       bandName: live.bandName,
       title: live.title,
       scheduledAt: live.scheduledAt,
-      isMine: live.isMine,
+      isMine: Boolean(live.isMine),
     })) ?? [];
 
   const handleEnterLive = async (liveId: number) => {

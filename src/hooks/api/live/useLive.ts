@@ -7,6 +7,7 @@ import {
   getLiveHome,
   getLiveReservation,
   getLiveSummary,
+  leaveLive,
   requestLiveReplay,
   updateLiveReservation,
 } from "@/api/live/live";
@@ -32,6 +33,19 @@ export const useLiveHomeQuery = () => {
   });
 };
 
+export const useEnterLiveQuery = (
+  liveId?: number | null,
+  enabled = true,
+) => {
+  return useQuery({
+    queryKey: liveKeys.enter(liveId ?? 0),
+    queryFn: () => enterLive(liveId as number),
+    enabled: enabled && !!liveId,
+    staleTime: 1000 * 30,
+    retry: false,
+  });
+};
+
 export const useCreateLiveMutation = () => {
   const queryClient = useQueryClient();
 
@@ -46,8 +60,29 @@ export const useCreateLiveMutation = () => {
 };
 
 export const useEnterLiveMutation = () => {
+  const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: (liveId: number) => enterLive(liveId),
+    onSuccess: (data, liveId) => {
+      queryClient.setQueryData(liveKeys.enter(liveId), data);
+    },
+  });
+};
+
+export const useLeaveLiveMutation = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (liveId: number) => leaveLive(liveId),
+    onSuccess: (_, liveId) => {
+      queryClient.removeQueries({
+        queryKey: liveKeys.enter(liveId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: liveKeys.home(),
+      });
+    },
   });
 };
 

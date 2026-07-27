@@ -124,7 +124,8 @@ type ReplayPreviewCardProps = {
   title: string;
   bandName: string;
   viewCount: string;
-  duration: string;
+  duration?: string;
+  onClick?: () => void;
 };
 
 export function ReplayPreviewCard({
@@ -133,14 +134,21 @@ export function ReplayPreviewCard({
   bandName,
   viewCount,
   duration,
+  onClick,
 }: ReplayPreviewCardProps) {
   return (
-    <article className="w-[88px] shrink-0">
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-[88px] shrink-0 text-left"
+    >
       <div className="relative h-[62px] w-[88px] overflow-hidden rounded-[8px] bg-neutral-200">
         <img src={imageSrc} alt="" className="h-full w-full object-cover" />
-        <span className="absolute right-1 bottom-1 rounded-[3px] bg-neutral-900/80 px-1 font-body text-caption6 text-neutral-0">
-          {duration}
-        </span>
+        {duration ? (
+          <span className="absolute right-1 bottom-1 rounded-[3px] bg-neutral-900/80 px-1 font-body text-caption6 text-neutral-0">
+            {duration}
+          </span>
+        ) : null}
       </div>
       <h3 className="mt-2 truncate font-body text-body4 text-neutral-900">
         {title}
@@ -152,6 +160,6 @@ export function ReplayPreviewCard({
         <img src={PlayIcon} alt="" className="size-2.5 opacity-40" />
         {viewCount}
       </p>
-    </article>
+    </button>
   );
 }
