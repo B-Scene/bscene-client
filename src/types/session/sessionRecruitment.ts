@@ -132,3 +132,14 @@ export interface SessionSearchHistoryItem {
 }
 
 export type DeleteSessionSearchHistoryResponse = null;
+
+export interface ApplySessionRecruitmentRequest {
+  sessionApplicationId: number;
+}
+
+export interface ApplySessionRecruitmentResponse {
+  applicationSubmissionId: number;
+  recruitmentTitle: string;
+  bandName: string;
+  applicationTitle: string;
+}

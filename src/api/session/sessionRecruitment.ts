@@ -1,5 +1,7 @@
 import { axiosInstance } from "@/api/axiosInstance";
 import type {
+  ApplySessionRecruitmentRequest,
+  ApplySessionRecruitmentResponse,
   CreateSessionRecruitmentRequest,
   CreateSessionRecruitmentResponse,
   DeleteSessionRecruitmentResponse,
@@ -102,6 +104,17 @@ export const removeSessionRecruitmentInterest = async (
   const { data } = await axiosInstance.delete<
     SessionApiResponse<SessionRecruitmentInterestResponse>
   >(`/sessions/recruitments/${sessionRecruitmentId}/interest`);
+
+  return data.result;
+};
+
+export const applySessionRecruitment = async (
+  sessionRecruitmentId: number,
+  body: ApplySessionRecruitmentRequest,
+) => {
+  const { data } = await axiosInstance.post<
+    SessionApiResponse<ApplySessionRecruitmentResponse>
+  >(`/sessions/recruitments/${sessionRecruitmentId}/applications`, body);
 
   return data.result;
 };

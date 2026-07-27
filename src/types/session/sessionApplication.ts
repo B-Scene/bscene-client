@@ -41,15 +41,15 @@ export interface SessionApplicationCareer {
   sessionApplicationCareerId: number;
   name: string;
   period: string;
-  description: string;
+  description: string | null;
 }
 
 export interface SessionApplicationPortfolioLink {
   sessionApplicationLinkId: number;
   url: string;
-  title: string;
+  title: string | null;
   thumbnailUrl: string | null;
-  mediaType: string;
+  mediaType: string | null;
 }
 
 export interface SessionApplicationDetailResponse {
@@ -69,6 +69,41 @@ export interface SessionApplicationDetailResponse {
   availableActivities: string[];
   careers: SessionApplicationCareer[];
   portfolioLinks: SessionApplicationPortfolioLink[];
+}
+
+export interface MySessionApplicationCareer {
+  sessionApplicationCareerId?: number;
+  name: string;
+  period: string;
+  description: string | null;
+}
+
+export interface MySessionApplicationPortfolioLink {
+  sessionApplicationLinkId?: number;
+  url: string;
+  title: string | null;
+  thumbnailUrl: string | null;
+  mediaType: string | null;
+}
+
+export interface MySessionApplicationDetailResponse {
+  modifiedAt: string;
+  profileImageUrl: string | null;
+  name: string;
+  defaultPart: string | null;
+  defaultSkillLevel: string | null;
+  defaultRegion: string | null;
+  purpose: string;
+  title: string;
+  oneLineIntro: string;
+  intro: string;
+  part: string;
+  skillLevel: string;
+  genre: string;
+  region: string;
+  availableActivities: string[];
+  careers: MySessionApplicationCareer[];
+  portfolioLinks: MySessionApplicationPortfolioLink[];
 }
 
 export interface UpdateSessionApplicationVisibilityRequest {
@@ -103,3 +138,67 @@ export interface SessionApplicationSummaryResponse {
   inProgressCount: number;
   applications: SessionApplicationSummaryItem[];
 }
+
+export interface SessionApplicationCareerRequest {
+  name: string;
+  period: string;
+  description?: string;
+}
+
+export interface SessionApplicationPortfolioLinkRequest {
+  url: string;
+}
+
+export interface CreateSessionApplicationRequest {
+  purpose: string;
+  title: string;
+  oneLineIntro: string;
+  intro: string;
+  part: string;
+  skillLevel: string;
+  genre: string;
+  region: string;
+  availableActivities: string[];
+  careers?: SessionApplicationCareerRequest[];
+  portfolioLinks?: SessionApplicationPortfolioLinkRequest[];
+}
+
+export type UpdateSessionApplicationRequest = CreateSessionApplicationRequest;
+
+export interface CreatedSessionApplicationPortfolioLink {
+  sessionApplicationLinkId: number;
+  url: string;
+  title: string | null;
+  thumbnailUrl: string | null;
+  mediaType: string | null;
+}
+
+export interface CreatedSessionApplicationCareer {
+  sessionApplicationCareerId: number;
+  name: string;
+  period: string;
+  description: string | null;
+}
+
+export interface CreateSessionApplicationResponse {
+  hasApplication: boolean;
+  sessionApplicationId: number;
+  userId: number;
+  nickname: string;
+  title: string;
+  purpose: string;
+  oneLineIntro: string;
+  profileImageUrl: string | null;
+  part: string;
+  skillLevel: string;
+  genre: string;
+  region: string;
+  intro: string;
+  portfolioLinks: CreatedSessionApplicationPortfolioLink[];
+  availableActivities: string[];
+  careers: CreatedSessionApplicationCareer[];
+}
+
+export type UpdateSessionApplicationResponse = CreateSessionApplicationResponse;
+
+export type DeleteSessionApplicationResponse = null;
