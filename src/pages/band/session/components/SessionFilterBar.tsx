@@ -1,152 +1,80 @@
-import CloseCircleIcon from "@/assets/icons/band/close-circle.svg";
-
-type FilterKey = "part" | "skill" | "skillLevel" | "genre" | "region";
-
-interface SessionFilterValuesLike {
-  part?: string;
-  skill?: string;
-  skillLevel?: string;
-  genre?: string;
-  region?: string;
-}
+import ArrowDownIcon from "@/assets/icons/band/arrow-down-gray.svg";
+import FilterIcon from "@/assets/icons/band/filter.svg";
+import LineIcon from "@/assets/icons/band/Line.svg";
+import type { SessionRecruitmentSort } from "@/types/session/sessionRecruitment";
+import { SESSION_FILTERS } from "../data/sessionRecruitmentPosts";
+import type { SessionFilterValues } from "../types";
 
 interface SessionFilterBarProps {
-  values?: SessionFilterValuesLike;
-  filters?: SessionFilterValuesLike;
-  selectedFilters?: SessionFilterValuesLike;
-  onOpenFilter?: (key: FilterKey) => void;
-  onFilterClick?: (key: FilterKey) => void;
-  onOpenBottomSheet?: (key: FilterKey) => void;
-  onReset?: () => void;
-  onClear?: () => void;
-  onClearFilters?: () => void;
-  className?: string;
+  values: SessionFilterValues;
+  showSelectedValues?: boolean;
+  showBottomBorder?: boolean;
+  compactHeight?: boolean;
+  sort: SessionRecruitmentSort;
+  onSortChange: (sort: SessionRecruitmentSort) => void;
+  onOpenFilter: () => void;
 }
-
-const FILTER_ITEMS: Array<{
-  key: FilterKey;
-  valueKeys: FilterKey[];
-  label: string;
-}> = [
-  {
-    key: "part",
-    valueKeys: ["part"],
-    label: "파트",
-  },
-  {
-    key: "skillLevel",
-    valueKeys: ["skillLevel", "skill"],
-    label: "실력대",
-  },
-  {
-    key: "genre",
-    valueKeys: ["genre"],
-    label: "장르",
-  },
-  {
-    key: "region",
-    valueKeys: ["region"],
-    label: "지역",
-  },
-];
 
 export const SessionFilterBar = ({
   values,
-  filters,
-  selectedFilters,
+  showSelectedValues = true,
+  showBottomBorder = true,
+  compactHeight = false,
+  sort,
+  onSortChange,
   onOpenFilter,
-  onFilterClick,
-  onOpenBottomSheet,
-  onReset,
-  onClear,
-  onClearFilters,
-  className = "",
 }: SessionFilterBarProps) => {
-  const currentValues = values ?? filters ?? selectedFilters ?? {};
-
-  const getSelectedValue = (keys: FilterKey[]) => {
-    for (const key of keys) {
-      const value = currentValues[key];
-
-      if (typeof value === "string" && value.trim().length > 0) {
-        return value;
-      }
-    }
-
-    return "";
-  };
-
-  const hasSelectedFilter = FILTER_ITEMS.some((item) =>
-    Boolean(getSelectedValue(item.valueKeys)),
-  );
-
-  const handleOpenFilter = (key: FilterKey) => {
-    if (onOpenFilter) {
-      onOpenFilter(key);
-      return;
-    }
-
-    if (onFilterClick) {
-      onFilterClick(key);
-      return;
-    }
-
-    if (onOpenBottomSheet) {
-      onOpenBottomSheet(key);
-    }
-  };
-
-  const handleReset = () => {
-    if (onReset) {
-      onReset();
-      return;
-    }
-
-    if (onClear) {
-      onClear();
-      return;
-    }
-
-    if (onClearFilters) {
-      onClearFilters();
-    }
-  };
+  const selectedFilters = [
+    values.part,
+    values.skill,
+    values.genre,
+    values.region,
+  ];
+  const filterLabels = showSelectedValues ? selectedFilters : SESSION_FILTERS;
+  const sortLabel = sort === "LATEST" ? "최신순" : "마감순";
 
   return (
-    <div
-      className={`flex w-full items-center gap-2 overflow-x-auto px-5 py-3 scrollbar-hide ${className}`}
+    <section
+      className={[
+        "flex w-full items-center gap-2 bg-neutral-0 pl-[22px] pr-[26px]",
+        compactHeight ? "h-[53px]" : "h-[48px]",
+        showBottomBorder ? "border-b border-neutral-400" : "",
+      ].join(" ")}
     >
-      {FILTER_ITEMS.map((item) => {
-        const selectedValue = getSelectedValue(item.valueKeys);
-        const isSelected = Boolean(selectedValue);
+      <button
+        type="button"
+        aria-label={`정렬 기준: ${sortLabel}`}
+        onClick={() =>
+          onSortChange(sort === "LATEST" ? "IMMINENT" : "LATEST")
+        }
+        className="flex h-[22px] w-[62px] shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-full border border-neutral-400 bg-neutral-0 px-2 py-0.5 text-caption2 text-neutral-600"
+      >
+        {sortLabel}
+        <img src={ArrowDownIcon} alt="" className="h-[7px] w-3 shrink-0" />
+      </button>
 
-        return (
-          <button
-            key={item.key}
-            type="button"
-            onClick={() => handleOpenFilter(item.key)}
-            className={`flex h-[30px] shrink-0 items-center justify-center rounded-full px-4 text-caption2 ${
-              isSelected
-                ? "bg-secondary-500 text-neutral-0"
-                : "bg-neutral-300 text-neutral-600"
-            }`}
-          >
-            {selectedValue || item.label}
-          </button>
-        );
-      })}
+      <img src={LineIcon} alt="" className="h-[26px] w-0.5 shrink-0" />
 
-      {hasSelectedFilter ? (
+      {filterLabels.map((filter, index) => (
         <button
+          key={`${SESSION_FILTERS[index]}-${index}`}
           type="button"
-          aria-label="필터 초기화"
-          onClick={handleReset}
-          className="flex size-[30px] shrink-0 items-center justify-center"
+          onClick={onOpenFilter}
+          className="flex h-[22px] min-w-[49px] shrink-0 items-center justify-center whitespace-nowrap rounded-full border border-neutral-400 bg-neutral-0 px-2 py-0.5 text-caption2 text-neutral-600"
         >
-          <img src={CloseCircleIcon} alt="" className="size-5" />
+          {filter}
         </button>
-      ) : null}
-    </div>
+      ))}
+
+      <button
+        type="button"
+        aria-label="필터 설정"
+        onClick={onOpenFilter}
+        className="ml-auto flex size-[22px] shrink-0 items-center justify-center"
+      >
+        <img src={FilterIcon} alt="" className="size-[22px]" />
+      </button>
+    </section>
   );
 };
 

@@ -8,6 +8,7 @@ interface SessionApplicationCompletePageProps {
   applicationTitle: string;
   onSendMessage: () => void;
   onViewApplication: () => void;
+  onGoToSessionHome: () => void;
 }
 
 export const SessionApplicationCompletePage = ({
@@ -16,6 +17,7 @@ export const SessionApplicationCompletePage = ({
   applicationTitle,
   onSendMessage,
   onViewApplication,
+  onGoToSessionHome,
 }: SessionApplicationCompletePageProps) => {
   return (
     <main className="mx-auto flex h-dvh w-full max-w-[393px] flex-col overflow-hidden bg-neutral-0 pb-[var(--bottom-nav-height)]">
@@ -80,6 +82,14 @@ export const SessionApplicationCompletePage = ({
             지원서 보기
           </button>
         </div>
+
+        <button
+          type="button"
+          onClick={onGoToSessionHome}
+          className="mt-5 text-caption2 text-neutral-600 underline underline-offset-[3px]"
+        >
+          세션 홈으로
+        </button>
       </section>
     </main>
   );
