@@ -56,6 +56,9 @@ export function BandLivePage() {
   const [screen, setScreen] = useState<BandLiveScreen>("home");
   const [activeLive, setActiveLive] = useState<ActiveLive>(null);
   const [endedLiveId, setEndedLiveId] = useState<number | null>(null);
+  const [selectedReservationLiveId, setSelectedReservationLiveId] = useState<
+    number | null
+  >(null);
   const [liveMessages, setLiveMessages] =
     useState<ChatMessage[]>(initialChatMessages);
 
@@ -66,7 +69,10 @@ export function BandLivePage() {
   const handleReceiveLiveChatMessage = useCallback(
     (message: LiveChatMessageData, frame: LiveChatMessageFrame) => {
       setLiveMessages((prevMessages) => {
-        const messageFromServer = mapLiveChatMessageToChatMessage(message, frame);
+        const messageFromServer = mapLiveChatMessageToChatMessage(
+          message,
+          frame,
+        );
 
         const optimisticMessageIndex = frame.clientMsgId
           ? prevMessages.findIndex(
@@ -107,16 +113,14 @@ export function BandLivePage() {
     setScreen("ended");
   }, [activeLive?.liveId]);
 
-  const {
-    connectionStatus,
-    lastErrorMessage: chatErrorMessage,
-    sendMessage,
-  } = useLiveChatSocket({
-    liveId: activeLive?.liveId,
-    enabled: isChatEnabled,
-    onMessage: handleReceiveLiveChatMessage,
-    onLiveEnded: handleLiveEndedFromSocket,
-  });
+  const { lastErrorMessage: chatErrorMessage, sendMessage } = useLiveChatSocket(
+    {
+      liveId: activeLive?.liveId,
+      enabled: isChatEnabled,
+      onMessage: handleReceiveLiveChatMessage,
+      onLiveEnded: handleLiveEndedFromSocket,
+    },
+  );
 
   const handleSendMessage = (message: string) => {
     const clientMsgId = sendMessage(message);
@@ -151,15 +155,34 @@ export function BandLivePage() {
     setLiveMessages([]);
   };
 
+  const handleEditReservation = (liveId: number) => {
+    setSelectedReservationLiveId(liveId);
+    setScreen("editForm");
+  };
+
   const handleGo = (nextScreen: BandLiveScreen) => {
     if (nextScreen === "ended" && activeLive?.liveId) {
       setEndedLiveId(activeLive.liveId);
+    }
+
+    if (nextScreen === "home") {
+      setSelectedReservationLiveId(null);
     }
 
     setScreen(nextScreen);
   };
 
   if (screen === "room") {
+    if (!activeLive) {
+      return (
+        <BandLiveHome
+          go={handleGo}
+          onEnterLive={handleEnterLive}
+          onEditReservation={handleEditReservation}
+        />
+      );
+    }
+
     return (
       <LiveRoom
         go={handleGo}
@@ -171,6 +194,16 @@ export function BandLivePage() {
   }
 
   if (screen === "members") {
+    if (!activeLive) {
+      return (
+        <BandLiveHome
+          go={handleGo}
+          onEnterLive={handleEnterLive}
+          onEditReservation={handleEditReservation}
+        />
+      );
+    }
+
     return (
       <LiveRoom
         go={handleGo}
@@ -183,6 +216,16 @@ export function BandLivePage() {
   }
 
   if (screen === "chat") {
+    if (!activeLive) {
+      return (
+        <BandLiveHome
+          go={handleGo}
+          onEnterLive={handleEnterLive}
+          onEditReservation={handleEditReservation}
+        />
+      );
+    }
+
     return (
       <LiveChatRoom
         go={handleGo}
@@ -194,6 +237,16 @@ export function BandLivePage() {
   }
 
   if (screen === "endConfirm") {
+    if (!activeLive) {
+      return (
+        <BandLiveHome
+          go={handleGo}
+          onEnterLive={handleEnterLive}
+          onEditReservation={handleEditReservation}
+        />
+      );
+    }
+
     return (
       <LiveRoom
         go={handleGo}
@@ -230,14 +283,26 @@ export function BandLivePage() {
   }
 
   if (screen === "editForm") {
-    return <LiveForm mode="edit" go={handleGo} />;
+    return (
+      <LiveForm
+        mode="edit"
+        go={handleGo}
+        reservationLiveId={selectedReservationLiveId}
+      />
+    );
   }
 
   if (screen === "cancelConfirm") {
     return <CancelConfirm go={handleGo} />;
   }
 
-  return <BandLiveHome go={handleGo} onEnterLive={handleEnterLive} />;
+  return (
+    <BandLiveHome
+      go={handleGo}
+      onEnterLive={handleEnterLive}
+      onEditReservation={handleEditReservation}
+    />
+  );
 }
 
 export default BandLivePage;

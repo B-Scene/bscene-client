@@ -1,9 +1,17 @@
 import type { AxiosError } from "axios";
 import LiveHeadIcon from "@/assets/icons/live-head.svg";
 import { BottomNavBar } from "@/components/layout/BottomNavBar";
-import { useEnterLiveMutation, useLiveHomeQuery } from "@/hooks/api/live/useLive";
+import {
+  useEnterLiveMutation,
+  useLiveHomeQuery,
+} from "@/hooks/api/live/useLive";
 import type { LiveApiResponse } from "@/types/live/live";
-import type { ActiveLive, GoLiveScreen, LiveCard, ScheduledLiveCardData } from "./types";
+import type {
+  ActiveLive,
+  GoLiveScreen,
+  LiveCard,
+  ScheduledLiveCardData,
+} from "./types";
 import { LiveIllustration } from "./components/LiveIllustration";
 import { ProfileImage } from "./components/ProfileImage";
 import { SectionHeader } from "./components/SectionHeader";
@@ -28,11 +36,19 @@ function HomeLiveCard({
       </div>
 
       <div className="ml-4 min-w-0 flex-1 pr-[62px]">
-        <strong className="block truncate text-body1 text-neutral-900">{live.title}</strong>
-        <span className="mt-0.5 block truncate text-body3 text-neutral-700">{live.subtitle}</span>
+        <strong className="block truncate text-body1 text-neutral-900">
+          {live.title}
+        </strong>
+        <span className="mt-0.5 block truncate text-body3 text-neutral-700">
+          {live.subtitle}
+        </span>
         <span className="mt-1 block text-caption2 text-secondary-500">
           <span className="inline-flex items-center gap-1.5">
-            <img src={LiveHeadIcon} alt="" className="h-[13px] w-3 object-contain" />
+            <img
+              src={LiveHeadIcon}
+              alt=""
+              className="h-[13px] w-3 object-contain"
+            />
             {live.listeners}
           </span>
         </span>
@@ -65,7 +81,9 @@ function ScheduledLiveCard({
         <strong className="block truncate text-body1 text-neutral-900">
           {live.isMine ? "내 예정 라이브" : live.bandName}
         </strong>
-        <span className="mt-0.5 block truncate text-body3 text-neutral-700">{live.title}</span>
+        <span className="mt-0.5 block truncate text-body3 text-neutral-700">
+          {live.title}
+        </span>
         <span className="mt-1 block text-caption2 text-secondary-500">
           {live.scheduledAt}
         </span>
@@ -87,9 +105,14 @@ function ScheduledLiveCard({
 interface BandLiveHomeProps {
   go: GoLiveScreen;
   onEnterLive: (live: ActiveLive) => void;
+  onEditReservation: (liveId: number) => void;
 }
 
-export function BandLiveHome({ go, onEnterLive }: BandLiveHomeProps) {
+export function BandLiveHome({
+  go,
+  onEnterLive,
+  onEditReservation,
+}: BandLiveHomeProps) {
   const { data, isLoading, isError, refetch } = useLiveHomeQuery();
   const enterLiveMutation = useEnterLiveMutation();
 
@@ -115,11 +138,12 @@ export function BandLiveHome({ go, onEnterLive }: BandLiveHomeProps) {
   const handleEnterLive = async (liveId: number) => {
     try {
       const enteredLive = await enterLiveMutation.mutateAsync(liveId);
+
       onEnterLive(enteredLive);
       go("room");
     } catch (error) {
-      const apiMessage = (error as AxiosError<LiveApiResponse<null>>).response?.data
-        ?.message;
+      const apiMessage = (error as AxiosError<LiveApiResponse<null>>).response
+        ?.data?.message;
 
       alert(apiMessage ?? "라이브 입장에 실패했어요.");
     }
@@ -203,7 +227,7 @@ export function BandLiveHome({ go, onEnterLive }: BandLiveHomeProps) {
                 <ScheduledLiveCard
                   key={live.id}
                   live={live}
-                  onEdit={() => go("editForm")}
+                  onEdit={() => onEditReservation(live.id)}
                 />
               ))
             ) : (
@@ -214,6 +238,7 @@ export function BandLiveHome({ go, onEnterLive }: BandLiveHomeProps) {
           </div>
         </section>
       </div>
+
       <BottomNavBar modeOverride="band" />
     </main>
   );
