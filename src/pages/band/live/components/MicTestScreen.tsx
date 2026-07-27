@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import "@/styles/tokens/color.css";
 import MicIcon from "@/assets/icons/ic_Mic.svg";
 import MicEllipseIcon from "@/assets/icons/Mic_Ellipse.svg";
-import VolumeSpecIcon from "@/assets/icons/band/volumeSpec.svg";
+import LiveStartIcon from "@/assets/icons/band/live-start.svg";
+import LiveStopIcon from "@/assets/icons/band/live-stop.svg";
 import { cx } from "../utils";
 import { TopBar } from "./TopBar";
 
@@ -13,7 +15,13 @@ interface MicTestScreenProps {
 
 const VOLUME_BAR_COUNT = 28;
 const TEST_DURATION_SECONDS = 5;
-const VOLUME_BAR_COLORS = ["#FFF8E9", "#FFE59B", "#FFD45B", "#FBB10E"];
+
+const VOLUME_BAR_COLORS = [
+  "var(--color-secondary-0)",
+  "var(--color-secondary-200)",
+  "var(--color-secondary-400)",
+  "var(--color-secondary-500)",
+];
 
 const formatSeconds = (seconds: number) =>
   `0:${String(seconds).padStart(2, "0")}`;
@@ -33,29 +41,31 @@ export function MicTestScreen({
   const audioContextRef = useRef<AudioContext | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const secondTimerRef = useRef<number | null>(null);
-  const finishTimerRef = useRef<number | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
+  const elapsedSecondsRef = useRef(0);
 
   const progressPercent = Math.min(
     100,
     (elapsedSeconds / TEST_DURATION_SECONDS) * 100,
   );
 
-  const stopMicTest = useCallback(() => {
-    if (animationFrameRef.current !== null) {
-      cancelAnimationFrame(animationFrameRef.current);
-      animationFrameRef.current = null;
-    }
+  const updateElapsedSeconds = useCallback((nextSeconds: number) => {
+    elapsedSecondsRef.current = nextSeconds;
+    setElapsedSeconds(nextSeconds);
+  }, []);
 
+  const clearTimers = useCallback(() => {
     if (secondTimerRef.current !== null) {
       window.clearInterval(secondTimerRef.current);
       secondTimerRef.current = null;
     }
+  }, []);
 
-    if (finishTimerRef.current !== null) {
-      window.clearTimeout(finishTimerRef.current);
-      finishTimerRef.current = null;
+  const stopAudioResources = useCallback(() => {
+    if (animationFrameRef.current !== null) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
     }
 
     if (
@@ -80,129 +90,169 @@ export function MicTestScreen({
     audioContextRef.current = null;
   }, []);
 
+  const stopMicTest = useCallback(() => {
+    clearTimers();
+    stopAudioResources();
+  }, [clearTimers, stopAudioResources]);
+
   const finishMicTest = useCallback(() => {
+    clearTimers();
+    stopAudioResources();
+
     setIsTesting(false);
     setIsCompleted(true);
-    setElapsedSeconds(TEST_DURATION_SECONDS);
-    stopMicTest();
-  }, [stopMicTest]);
-
-  const startMicTest = useCallback(async () => {
-    stopMicTest();
-
-    setIsTesting(true);
-    setIsCompleted(false);
-    setElapsedSeconds(0);
     setVolumeLevel(0);
-    setErrorMessage("");
-    recordedChunksRef.current = [];
+    updateElapsedSeconds(TEST_DURATION_SECONDS);
+  }, [clearTimers, stopAudioResources, updateElapsedSeconds]);
 
-    try {
-      if (!navigator.mediaDevices?.getUserMedia) {
-        throw new Error("이 브라우저에서는 마이크 테스트를 지원하지 않아요.");
+  const pauseMicTest = useCallback(() => {
+    clearTimers();
+    stopAudioResources();
+
+    setIsTesting(false);
+    setVolumeLevel(0);
+  }, [clearTimers, stopAudioResources]);
+
+  const startMicTest = useCallback(
+    async ({ reset = false }: { reset?: boolean } = {}) => {
+      clearTimers();
+      stopAudioResources();
+
+      if (reset || elapsedSecondsRef.current >= TEST_DURATION_SECONDS) {
+        updateElapsedSeconds(0);
+        setVolumeLevel(0);
+        recordedChunksRef.current = [];
       }
 
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
-      });
+      setIsTesting(true);
+      setIsCompleted(false);
+      setErrorMessage("");
 
-      streamRef.current = stream;
-
-      if (typeof MediaRecorder !== "undefined") {
-        const mediaRecorder = new MediaRecorder(stream);
-        mediaRecorderRef.current = mediaRecorder;
-
-        mediaRecorder.ondataavailable = (event) => {
-          if (event.data.size > 0) {
-            recordedChunksRef.current.push(event.data);
-          }
-        };
-
-        mediaRecorder.start();
-      }
-
-      const AudioContextClass =
-        window.AudioContext ||
-        (window as typeof window & {
-          webkitAudioContext?: typeof AudioContext;
-        }).webkitAudioContext;
-
-      if (!AudioContextClass) {
-        throw new Error("이 브라우저에서는 오디오 분석을 지원하지 않아요.");
-      }
-
-      const audioContext = new AudioContextClass();
-      audioContextRef.current = audioContext;
-
-      if (audioContext.state === "suspended") {
-        await audioContext.resume();
-      }
-
-      const source = audioContext.createMediaStreamSource(stream);
-      const analyser = audioContext.createAnalyser();
-
-      analyser.fftSize = 1024;
-      analyser.smoothingTimeConstant = 0.75;
-
-      source.connect(analyser);
-
-      const dataArray = new Uint8Array(analyser.fftSize);
-
-      const updateMeter = () => {
-        analyser.getByteTimeDomainData(dataArray);
-
-        let sum = 0;
-
-        for (const value of dataArray) {
-          const normalizedValue = (value - 128) / 128;
-          sum += normalizedValue * normalizedValue;
+      try {
+        if (!navigator.mediaDevices?.getUserMedia) {
+          throw new Error("이 브라우저에서는 마이크 테스트를 지원하지 않아요.");
         }
 
-        const rms = Math.sqrt(sum / dataArray.length);
-        const amplifiedLevel = Math.round(rms * 130);
-
-        const nextLevel =
-          amplifiedLevel < 2
-            ? 0
-            : Math.min(VOLUME_BAR_COUNT, amplifiedLevel);
-
-        setVolumeLevel(nextLevel);
-
-        animationFrameRef.current = requestAnimationFrame(updateMeter);
-      };
-
-      updateMeter();
-
-      secondTimerRef.current = window.setInterval(() => {
-        setElapsedSeconds((prevSeconds) => {
-          if (prevSeconds >= TEST_DURATION_SECONDS) return prevSeconds;
-          return prevSeconds + 1;
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          },
         });
-      }, 1000);
 
-      finishTimerRef.current = window.setTimeout(() => {
-        finishMicTest();
-      }, TEST_DURATION_SECONDS * 1000);
-    } catch {
-      stopMicTest();
-      setIsTesting(false);
-      setIsCompleted(false);
-      setVolumeLevel(0);
-      setErrorMessage(
-        "마이크 권한을 허용해야 테스트할 수 있어요. 브라우저 설정에서 마이크 권한을 허용해주세요.",
-      );
-    }
-  }, [finishMicTest, stopMicTest]);
+        streamRef.current = stream;
+
+        if (typeof MediaRecorder !== "undefined") {
+          const mediaRecorder = new MediaRecorder(stream);
+          mediaRecorderRef.current = mediaRecorder;
+
+          mediaRecorder.ondataavailable = (event) => {
+            if (event.data.size > 0) {
+              recordedChunksRef.current.push(event.data);
+            }
+          };
+
+          mediaRecorder.start();
+        }
+
+        const AudioContextClass =
+          window.AudioContext ||
+          (window as typeof window & {
+            webkitAudioContext?: typeof AudioContext;
+          }).webkitAudioContext;
+
+        if (!AudioContextClass) {
+          throw new Error("이 브라우저에서는 오디오 분석을 지원하지 않아요.");
+        }
+
+        const audioContext = new AudioContextClass();
+        audioContextRef.current = audioContext;
+
+        if (audioContext.state === "suspended") {
+          await audioContext.resume();
+        }
+
+        const source = audioContext.createMediaStreamSource(stream);
+        const analyser = audioContext.createAnalyser();
+
+        analyser.fftSize = 1024;
+        analyser.smoothingTimeConstant = 0.75;
+
+        source.connect(analyser);
+
+        const dataArray = new Uint8Array(analyser.fftSize);
+
+        const updateMeter = () => {
+          analyser.getByteTimeDomainData(dataArray);
+
+          let sum = 0;
+
+          for (const value of dataArray) {
+            const normalizedValue = (value - 128) / 128;
+            sum += normalizedValue * normalizedValue;
+          }
+
+          const rms = Math.sqrt(sum / dataArray.length);
+          const amplifiedLevel = Math.round(rms * 310);
+
+          const nextLevel =
+            amplifiedLevel < 2
+              ? 0
+              : Math.min(VOLUME_BAR_COUNT, amplifiedLevel);
+
+          setVolumeLevel(nextLevel);
+
+          animationFrameRef.current = requestAnimationFrame(updateMeter);
+        };
+
+        updateMeter();
+
+        secondTimerRef.current = window.setInterval(() => {
+          const nextSeconds = Math.min(
+            TEST_DURATION_SECONDS,
+            elapsedSecondsRef.current + 1,
+          );
+
+          updateElapsedSeconds(nextSeconds);
+
+          if (nextSeconds >= TEST_DURATION_SECONDS) {
+            finishMicTest();
+          }
+        }, 1000);
+      } catch {
+        stopAudioResources();
+
+        setIsTesting(false);
+        setIsCompleted(false);
+        setVolumeLevel(0);
+        setErrorMessage(
+          "마이크 권한을 허용해야 테스트할 수 있어요. 브라우저 설정에서 마이크 권한을 허용해주세요.",
+        );
+      }
+    },
+    [
+      clearTimers,
+      finishMicTest,
+      stopAudioResources,
+      updateElapsedSeconds,
+    ],
+  );
 
   useEffect(() => {
     return () => {
       stopMicTest();
     };
   }, [stopMicTest]);
+
+  const handleTogglePlayback = () => {
+    if (isTesting) {
+      pauseMicTest();
+      return;
+    }
+
+    void startMicTest({ reset: isCompleted });
+  };
 
   const handleBack = () => {
     stopMicTest();
@@ -237,12 +287,11 @@ export function MicTestScreen({
         <div className="mt-[45px] flex flex-col items-center">
           <button
             type="button"
-            onClick={startMicTest}
-            disabled={isTesting}
-            aria-label="마이크 테스트 시작"
+            onClick={handleTogglePlayback}
+            aria-label={isTesting ? "마이크 테스트 멈춤" : "마이크 테스트 시작"}
             className={cx(
               "relative flex h-[135px] w-[135px] items-center justify-center rounded-full transition-transform",
-              isTesting ? "scale-100 cursor-default" : "active:scale-95",
+              isTesting ? "scale-100" : "active:scale-95",
             )}
           >
             <img
@@ -262,7 +311,9 @@ export function MicTestScreen({
           </button>
 
           <span className="mt-4 h-4 text-caption4 font-bold text-secondary-500">
-            {isTesting || isCompleted ? formatSeconds(elapsedSeconds) : ""}
+            {isTesting || isCompleted || elapsedSeconds > 0
+              ? formatSeconds(elapsedSeconds)
+              : ""}
           </span>
         </div>
 
@@ -282,17 +333,15 @@ export function MicTestScreen({
               return (
                 <div
                   key={index}
-                  className={cx(
-                    "w-[7px] rounded-full transition-all duration-100",
-                    isActive
-                      ? "shadow-[0_0_8px_rgba(251,177,14,0.45)]"
-                      : "bg-neutral-200",
-                  )}
+                  className="w-[7px] rounded-full transition-all duration-100"
                   style={{
                     height: isActive ? `${barHeight}px` : "8px",
                     backgroundColor: isActive
                       ? VOLUME_BAR_COLORS[colorIndex]
-                      : undefined,
+                      : "var(--color-neutral-300)",
+                    boxShadow: isActive
+                      ? "0 0 8px var(--color-secondary-300)"
+                      : "none",
                   }}
                 />
               );
@@ -313,13 +362,18 @@ export function MicTestScreen({
         ) : null}
 
         <section className="mt-[34px] flex h-[56px] w-full max-w-[353px] items-center rounded-[10px] bg-secondary-0 px-5 shadow-[0_4px_15px_rgba(20,20,20,0.04)]">
-          <div className="flex size-6 shrink-0 items-center justify-center rounded-full border border-neutral-800">
+          <button
+            type="button"
+            onClick={handleTogglePlayback}
+            aria-label={isTesting ? "마이크 테스트 멈춤" : "마이크 테스트 시작"}
+            className="flex size-6 shrink-0 items-center justify-center"
+          >
             <img
-              src={VolumeSpecIcon}
+              src={isTesting ? LiveStartIcon : LiveStopIcon}
               alt=""
-              className="h-3.5 w-3.5 object-contain"
+              className="size-6 object-contain"
             />
-          </div>
+          </button>
 
           <span className="ml-3 shrink-0 text-caption4 font-bold text-secondary-500">
             {formatSeconds(elapsedSeconds)} /{" "}

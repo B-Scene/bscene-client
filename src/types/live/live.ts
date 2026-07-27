@@ -45,6 +45,7 @@ export interface CreateLiveResponse {
 }
 
 export type PlaybackRole = "BROADCASTER" | "LISTENER";
+
 export type PlaybackProtocol = "WHIP" | "HLS";
 
 export interface LivePlayback {
@@ -57,7 +58,8 @@ export interface EnterLiveResponse {
   liveId: number;
   isLive: boolean;
   startedAt: string;
-  viewerCount: number;
+  viewerCount?: number;
+  viewCount?: number;
   bandProfileImageUrl: string | null;
   bandName: string;
   title: string;
@@ -76,28 +78,51 @@ export interface LiveSummaryResponse {
   closedViewerCount: number;
 }
 
+export interface LiveMemberItem {
+  bandProfileImageUrl: string | null;
+  nickname: string;
+  bandName: string;
+  part: string[];
+  isLeader: boolean;
+}
+
+export interface LiveMembersResponse {
+  members: LiveMemberItem[];
+}
+
+export type LiveReservationCoHostStatus =
+  | "OWNER"
+  | "APPROVED"
+  | "INVITED"
+  | "REJECTED"
+  | null;
+
+export interface LiveReservationCoHostCandidate {
+  bandMemberId: number;
+  bandMemberProfileId: number;
+  bandMemberProfileImageUrl: string | null;
+  nickname: string;
+  part: string;
+  status: LiveReservationCoHostStatus;
+}
+
 export interface LiveReservationResponse {
   liveId: number;
   title: string;
-  description: string;
+  description: string | null;
   thumbnailImageUrl: string | null;
   scheduledAt: string;
-  coHosts: number[];
+  cohostCandidates: LiveReservationCoHostCandidate[];
 }
-
-export type ThumbnailAction = "KEEP" | "REPLACE" | "REMOVE";
 
 export interface UpdateLiveReservationRequest {
   title: string;
-  description?: string;
+  description: string;
+  thumbnailImageUrl: string;
   scheduledAt: string;
-  coHosts: number[];
-  thumbnailAction: ThumbnailAction;
-  thumbnailImage?: File | null;
+  cohosts: number[] | null;
 }
 
 export interface UpdateLiveReservationResponse {
-  liveId: number;
-  scheduledAt: string;
-  thumbnailImageUrl: string | null;
+  liveId?: number;
 }
