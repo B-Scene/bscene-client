@@ -7,20 +7,22 @@ export interface SessionChatApiResponse<T> {
   timeStamp: string;
 }
 
-export type SessionChatContextType = "RECRUITMENT" | "SESSION_SEARCH";
+export type ChatRoomContextType = "RECRUITMENT" | "SESSION_SEARCH";
 
-export type SessionChatRoomFilter = "ALL" | "UNREAD";
+export type ChatRoomListFilter = "ALL" | "UNREAD";
 
-export interface CreateSessionChatRoomRequest {
-  contextType: SessionChatContextType;
+export type SessionChatRoomFilter = ChatRoomListFilter;
+
+export interface CreateChatRoomRequest {
+  contextType: ChatRoomContextType;
   sessionRecruitmentId?: number;
   sessionApplicationId?: number;
   applicationSubmissionId?: number;
 }
 
-export interface CreateSessionChatRoomResponse {
+export interface CreateChatRoomResponse {
   chatRoomId: number;
-  contextType: SessionChatContextType;
+  contextType: ChatRoomContextType;
   contextId: number;
   title: string;
   genre: string;
@@ -30,15 +32,15 @@ export interface CreateSessionChatRoomResponse {
   created: boolean;
 }
 
-export interface SessionChatRoomListParams {
-  filter?: SessionChatRoomFilter;
+export interface ChatRoomsParams {
+  filter?: ChatRoomListFilter;
   cursorId?: number;
   size?: number;
 }
 
-export interface SessionChatRoomListItem {
+export interface ChatRoomListItem {
   chatRoomId: number;
-  contextType: SessionChatContextType;
+  contextType: ChatRoomContextType;
   contextId: number;
   counterpartUserId: number;
   counterpartName: string;
@@ -50,9 +52,49 @@ export interface SessionChatRoomListItem {
   canSend: boolean;
 }
 
-export interface SessionChatRoomListResponse {
-  content: SessionChatRoomListItem[];
+export type SessionChatRoomListItem = ChatRoomListItem;
+
+export interface ChatRoomsResponse {
+  content: ChatRoomListItem[];
   size: number;
   nextCursor: number | null;
   hasNext: boolean;
 }
+
+export type SessionChatRoomsResponse = ChatRoomsResponse;
+
+export interface ChatRoomDetailParams {
+  cursorId?: number;
+  size?: number;
+}
+
+export interface ChatMessageItem {
+  chatMessageId: number;
+  senderUserId: number;
+  senderName: string;
+  content: string;
+  isMine: boolean;
+  isRead: boolean;
+  createdAt: string;
+}
+
+export interface ChatRoomDetailResponse {
+  chatRoomId: number;
+  contextType: ChatRoomContextType;
+  sessionApplicationId: number | null;
+  sessionRecruitmentId: number | null;
+  applicationSubmissionId: number | null;
+  opponentUserId: number;
+  opponentName: string;
+  opponentProfileImageUrl: string | null;
+  part: string;
+  genre: string;
+  region: string;
+  canSend: boolean;
+  messages: ChatMessageItem[];
+  size: number;
+  nextCursor: number | null;
+  hasNext: boolean;
+}
+
+export type SessionChatRoomDetailResponse = ChatRoomDetailResponse;

@@ -1,41 +1,47 @@
 import { axiosInstance } from "@/api/axiosInstance";
 import type {
-  CreateSessionChatRoomRequest,
-  CreateSessionChatRoomResponse,
+  ChatRoomDetailParams,
+  ChatRoomDetailResponse,
+  ChatRoomsParams,
+  ChatRoomsResponse,
+  CreateChatRoomRequest,
+  CreateChatRoomResponse,
   SessionChatApiResponse,
-  SessionChatRoomListParams,
-  SessionChatRoomListResponse,
 } from "@/types/session/sessionChat";
 
-const removeEmptyParams = (
-  params: SessionChatRoomListParams,
-) => {
+const removeEmptyParams = <T extends object>(params: T) => {
   return Object.fromEntries(
-    Object.entries(params).filter(
-      ([, value]) =>
-        value !== undefined &&
-        value !== null &&
-        value !== "",
-    ),
+    Object.entries(params).filter(([, value]) => {
+      return value !== undefined && value !== null && value !== "";
+    }),
   );
 };
 
-export const createSessionChatRoom = async (
-  body: CreateSessionChatRoomRequest,
-) => {
+export const createChatRoom = async (body: CreateChatRoomRequest) => {
   const { data } = await axiosInstance.post<
-    SessionChatApiResponse<CreateSessionChatRoomResponse>
+    SessionChatApiResponse<CreateChatRoomResponse>
   >("/chat/rooms", body);
 
   return data.result;
 };
 
-export const getSessionChatRooms = async (
-  params: SessionChatRoomListParams = {},
+export const getChatRooms = async (params: ChatRoomsParams = {}) => {
+  const { data } = await axiosInstance.get<
+    SessionChatApiResponse<ChatRoomsResponse>
+  >("/chat/rooms", {
+    params: removeEmptyParams(params),
+  });
+
+  return data.result;
+};
+
+export const getChatRoomDetail = async (
+  chatRoomId: number,
+  params: ChatRoomDetailParams = {},
 ) => {
   const { data } = await axiosInstance.get<
-    SessionChatApiResponse<SessionChatRoomListResponse>
-  >("/chat/rooms", {
+    SessionChatApiResponse<ChatRoomDetailResponse>
+  >(`/chat/rooms/${chatRoomId}`, {
     params: removeEmptyParams(params),
   });
 

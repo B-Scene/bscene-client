@@ -11,7 +11,7 @@ import {
   useSessionRecruitmentsQuery,
 } from "@/hooks/api/session/useSessionRecruitment";
 import {
-  useApplySessionApplication,
+  useApplySessionRecruitmentMutation,
 } from "@/hooks/api/session/useSessionApplication";
 import { useCreateSessionChatRoomMutation } from "@/hooks/api/session/useSessionChat";
 import type {
