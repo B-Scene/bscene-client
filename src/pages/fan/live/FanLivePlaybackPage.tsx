@@ -339,7 +339,7 @@ export function FanLivePlaybackPage() {
       <ReplayHeader
         title={replay.title}
         viewCount={replay.viewCount}
-        onExit={() => navigate("/fan/live/replays")}
+        onExit={() => navigate("/fan/live/replays", { replace: true })}
       />
       <FanLiveHero live={replay} top={176} />
 

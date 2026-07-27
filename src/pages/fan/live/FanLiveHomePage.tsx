@@ -19,7 +19,7 @@ import {
 } from "./components/FanLiveHomeParts";
 
 const formatReplayDuration = (totalSeconds?: number) => {
-  if (totalSeconds === undefined) return undefined;
+  if (totalSeconds === undefined) return "00:00:00";
 
   const safeSeconds = Math.max(0, Math.floor(totalSeconds));
   const hours = Math.floor(safeSeconds / 3600);

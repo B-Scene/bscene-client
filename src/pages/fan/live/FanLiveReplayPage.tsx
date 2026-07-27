@@ -77,7 +77,7 @@ export function FanLiveReplayPage() {
     <main className="relative h-full overflow-hidden bg-neutral-0 text-neutral-900">
       <FanLiveListHeader
         title="다시보기"
-        onBack={() => navigate(-1)}
+        onBack={() => navigate("/fan/live", { replace: true })}
         searchValue={searchQuery}
         onSearchChange={setSearchQuery}
       />
