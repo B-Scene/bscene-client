@@ -9,20 +9,13 @@ import {
   useToggleLiveAlarmMutation,
 } from "@/hooks/api/live/useLive";
 import { useInfiniteScrollObserver } from "@/hooks/useInfiniteScrollObserver";
-import type {
-  LiveApiResponse,
-  ScheduledLiveScope,
-} from "@/types/live/live";
+import type { LiveApiResponse } from "@/types/live/live";
 import "./FanLivePage.css";
 import {
   FanLiveFilterTabs,
   FanLiveListHeader,
   type FanLiveFilter,
 } from "./components/FanLiveHomeParts";
-
-const toScope = (filter: FanLiveFilter): ScheduledLiveScope => {
-  return filter === "followed" ? "FOLLOWING" : "ALL";
-};
 
 export function FanLiveScheduledPage() {
   const navigate = useNavigate();
@@ -31,7 +24,7 @@ export function FanLiveScheduledPage() {
   const [notificationOverrides, setNotificationOverrides] = useState<
     Record<number, boolean>
   >({});
-  const scope = toScope(filter);
+  const following = filter === "followed";
   const {
     data,
     fetchNextPage,
@@ -40,7 +33,7 @@ export function FanLiveScheduledPage() {
     isFetchingNextPage,
     isLoading,
     refetch,
-  } = useScheduledLiveQuery(scope);
+  } = useScheduledLiveQuery(following);
   const toggleAlarmMutation = useToggleLiveAlarmMutation();
 
   const scheduledItems = useMemo(
@@ -147,6 +140,7 @@ export function FanLiveScheduledPage() {
             {visibleItems.map((live) => {
               const isNotified =
                 notificationOverrides[live.liveId] ??
+                live.isAlarmSet ??
                 live.alarmSet ??
                 live.notificationEnabled ??
                 false;

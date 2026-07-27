@@ -163,7 +163,7 @@ export function FanLiveReplayPage() {
             <div className="flex flex-col items-center gap-3">
               {visibleItems.map((replay) => (
                 <VideoCard
-                  key={replay.replayId}
+                  key={replay.liveId}
                   imageSrc={replay.thumbnailImageUrl || BandImage}
                   imageAlt={`${replay.bandName} 다시보기 이미지`}
                   title={replay.title}
@@ -172,7 +172,7 @@ export function FanLiveReplayPage() {
                     replay.durationSeconds ?? replay.durationSec ?? 0,
                   )}
                   onClick={() =>
-                    navigate(`/fan/live/replays/${replay.replayId}`)
+                    navigate(`/fan/live/replays/${replay.liveId}`)
                   }
                   ariaLabel={`${replay.title} 다시보기 열기`}
                   timeAgo={

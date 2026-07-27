@@ -159,7 +159,7 @@ export const router = createBrowserRouter([
         element: <FanLiveReplayPage />,
       },
       {
-        path: "/fan/live/replays/:replayId",
+        path: "/fan/live/replays/:liveId",
         element: <FanLivePlaybackPage />,
       },
       {

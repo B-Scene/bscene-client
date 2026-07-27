@@ -18,7 +18,8 @@ export interface LiveNowItem {
 }
 
 export interface LiveReplayItem {
-  replayId: number;
+  liveId: number;
+  replayId?: number;
   thumbnailImageUrl: string | null;
   title: string;
   bandName: string;
@@ -68,26 +69,24 @@ export interface GetLiveNowListParams {
   size?: number;
 }
 
-export type ScheduledLiveScope = "FOLLOWING" | "ALL";
-
 export interface ScheduledLiveListItem {
   liveId: number;
   bandProfileImageUrl: string | null;
   title: string;
   bandName: string;
   scheduledAt: string;
+  isAlarmSet?: boolean;
   alarmSet?: boolean;
   notificationEnabled?: boolean;
 }
 
 export interface ScheduledLiveListResponse {
   items: ScheduledLiveListItem[];
-  nextCursor: number | null;
-  hasNext: boolean;
+  pageInfo: LiveNowPageInfo;
 }
 
 export interface GetScheduledLiveListParams {
-  scope: ScheduledLiveScope;
+  following: boolean;
   cursor?: number;
   size?: number;
 }
@@ -100,7 +99,8 @@ export type ReplayListFilter = "following" | "all";
 export type ReplaySort = "LATEST" | "POPULAR";
 
 export interface ReplayListItem {
-  replayId: number;
+  liveId: number;
+  replayId?: number;
   thumbnailImageUrl?: string | null;
   title: string;
   bandName: string;
@@ -126,7 +126,8 @@ export interface ReplayPlaybackResponse {
   bandName: string;
   bandProfileImageUrl: string | null;
   viewCount: number;
-  durationSeconds: number;
+  durationSec: number;
+  durationSeconds?: number;
   playbackUrl: string;
 }
 

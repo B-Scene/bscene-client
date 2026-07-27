@@ -44,7 +44,7 @@ export function FanLiveHomePage() {
     return new Map(
       (replayListData?.pages.flatMap((page) => page.items) ?? []).map(
         (replay) => [
-          replay.replayId,
+          replay.liveId,
           replay.durationSeconds ?? replay.durationSec,
         ],
       ),
@@ -151,7 +151,7 @@ export function FanLiveHomePage() {
                 <div className="fan-live-home-scroll -mr-5 mt-3 flex gap-3 overflow-x-auto pr-5 pb-1">
                   {data.replays.map((replay) => (
                     <ReplayPreviewCard
-                      key={replay.replayId}
+                      key={replay.liveId}
                       imageSrc={replay.thumbnailImageUrl || BandImage}
                       title={replay.title}
                       bandName={replay.bandName}
@@ -159,10 +159,10 @@ export function FanLiveHomePage() {
                       duration={formatReplayDuration(
                         replay.durationSeconds ??
                           replay.durationSec ??
-                          replayDurations.get(replay.replayId),
+                          replayDurations.get(replay.liveId),
                       )}
                       onClick={() =>
-                        navigate(`/fan/live/replays/${replay.replayId}`)
+                        navigate(`/fan/live/replays/${replay.liveId}`)
                       }
                     />
                   ))}

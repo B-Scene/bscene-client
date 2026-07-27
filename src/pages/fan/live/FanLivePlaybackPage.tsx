@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
 import { useNavigate, useParams } from "react-router-dom";
-import { getLivePlaybackAuthorization } from "@/api/live/live";
+import {
+  getLiveBearerAuthorization,
+  resolveLiveApiUrl,
+} from "@/api/live/live";
 import HeadsetIcon from "@/assets/Headset.svg";
 import FallbackSeekIcon from "@/assets/icons/band/menu-reload.svg";
 import { useReplayPlaybackQuery } from "@/hooks/api/live/useLive";
@@ -114,9 +117,11 @@ function ReplaySeekButton({
 }
 
 function PlaybackToggle({
+  disabled,
   playing,
   onClick,
 }: {
+  disabled: boolean;
   playing: boolean;
   onClick: () => void;
 }) {
@@ -124,8 +129,9 @@ function PlaybackToggle({
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       aria-label={playing ? "일시 정지" : "재생"}
-      className="flex size-[62px] items-center justify-center rounded-full bg-primary-400"
+      className="flex size-[62px] items-center justify-center rounded-full bg-primary-400 disabled:opacity-50"
     >
       {playing ? (
         <span className="flex items-center gap-1.5" aria-hidden="true">
@@ -146,24 +152,30 @@ function PlaybackToggle({
 
 export function FanLivePlaybackPage() {
   const navigate = useNavigate();
-  const { replayId: replayIdParam } = useParams();
-  const replayId = Number(replayIdParam);
-  const hasValidReplayId = Number.isInteger(replayId) && replayId > 0;
+  const { liveId: liveIdParam } = useParams();
+  const liveId = Number(liveIdParam);
+  const hasValidLiveId = Number.isInteger(liveId) && liveId > 0;
   const {
     data: replay,
     isError,
     isLoading,
     refetch,
-  } = useReplayPlaybackQuery(hasValidReplayId ? replayId : null);
+  } = useReplayPlaybackQuery(hasValidLiveId ? liveId : null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const [playing, setPlaying] = useState(false);
+  const [isPlaybackReady, setIsPlaybackReady] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [audioError, setAudioError] = useState("");
 
   const togglePlayback = useCallback(async () => {
     const audio = audioRef.current;
     if (!audio) return;
+
+    if (!isPlaybackReady) {
+      setAudioError("재생 데이터를 불러오는 중이에요.");
+      return;
+    }
 
     if (!audio.paused) {
       audio.pause();
@@ -176,30 +188,30 @@ export function FanLivePlaybackPage() {
     } catch {
       setAudioError("다시보기를 재생하지 못했어요.");
     }
-  }, []);
+  }, [isPlaybackReady]);
 
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio || !replay?.playbackUrl) return;
+    const playbackUrl = resolveLiveApiUrl(replay.playbackUrl);
+
+    setIsPlaybackReady(false);
+    setAudioError("");
 
     if (!Hls.isSupported()) {
-      window.setTimeout(() => {
-        setAudioError("이 브라우저에서는 인증된 HLS 재생을 지원하지 않아요.");
-      }, 0);
-      return;
-    }
+      if (audio.canPlayType("application/vnd.apple.mpegurl")) {
+        audio.src = playbackUrl;
+        audio.load();
 
-    let authorization: string;
+        return () => {
+          audio.pause();
+          audio.removeAttribute("src");
+          audio.load();
+        };
+      }
 
-    try {
-      authorization = getLivePlaybackAuthorization();
-    } catch (error) {
       window.setTimeout(() => {
-        setAudioError(
-          error instanceof Error
-            ? error.message
-            : "오디오 인증 정보를 확인하지 못했어요.",
-        );
+        setAudioError("이 브라우저에서는 HLS 재생을 지원하지 않아요.");
       }, 0);
       return;
     }
@@ -207,30 +219,53 @@ export function FanLivePlaybackPage() {
     const hls = new Hls({
       lowLatencyMode: false,
       backBufferLength: 60,
-      xhrSetup: (xhr) => {
-        xhr.setRequestHeader("Authorization", authorization);
+      xhrSetup: (xhr, url) => {
+        if (url.includes("/api/")) {
+          xhr.withCredentials = true;
+          xhr.setRequestHeader(
+            "Authorization",
+            getLiveBearerAuthorization(),
+          );
+        }
       },
     });
 
     hlsRef.current = hls;
     hls.attachMedia(audio);
     hls.on(Hls.Events.MEDIA_ATTACHED, () => {
-      hls.loadSource(replay.playbackUrl);
+      hls.loadSource(playbackUrl);
+    });
+    hls.on(Hls.Events.MANIFEST_PARSED, () => {
+      setIsPlaybackReady(true);
+      setAudioError("");
     });
     hls.on(Hls.Events.ERROR, (_, data) => {
+      console.error("[Replay HLS error]", {
+        type: data.type,
+        details: data.details,
+        reason: data.reason,
+        fatal: data.fatal,
+        response: data.response,
+      });
+
       if (!data.fatal) return;
 
       if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-        hls.startLoad();
+        setAudioError(
+          data.details === Hls.ErrorDetails.MANIFEST_PARSING_ERROR
+            ? "다시보기 재생 목록 형식이 올바르지 않아요."
+            : "다시보기 데이터를 불러오지 못했어요.",
+        );
         return;
       }
 
       if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
         hls.recoverMediaError();
+        setAudioError("다시보기 미디어를 재생하지 못했어요.");
         return;
       }
 
-      setAudioError("다시보기 오디오 연결이 종료됐어요.");
+      setAudioError("다시보기 스트림을 재생하지 못했어요.");
       hls.destroy();
       hlsRef.current = null;
     });
@@ -244,7 +279,7 @@ export function FanLivePlaybackPage() {
     };
   }, [replay?.playbackUrl]);
 
-  const totalSeconds = replay?.durationSeconds ?? 0;
+  const totalSeconds = replay?.durationSec ?? replay?.durationSeconds ?? 0;
   const progress =
     totalSeconds > 0
       ? Math.min(1, Math.max(0, elapsedSeconds / totalSeconds))
@@ -314,10 +349,22 @@ export function FanLivePlaybackPage() {
         onPlay={() => setPlaying(true)}
         onPause={() => setPlaying(false)}
         onEnded={() => setPlaying(false)}
+        onCanPlay={() => {
+          setIsPlaybackReady(true);
+          setAudioError("");
+        }}
+        onLoadedMetadata={() => setIsPlaybackReady(true)}
         onTimeUpdate={(event) =>
           setElapsedSeconds(event.currentTarget.currentTime)
         }
-        onError={() => setAudioError("다시보기 오디오를 재생하지 못했어요.")}
+        onError={(event) => {
+          const errorCode = event.currentTarget.error?.code;
+          setAudioError(
+            errorCode
+              ? `다시보기 미디어를 재생하지 못했어요. (오류 ${errorCode})`
+              : "다시보기 미디어를 재생하지 못했어요.",
+          );
+        }}
       />
 
       {audioError ? (
@@ -368,6 +415,7 @@ export function FanLivePlaybackPage() {
         <div className="mt-[15px] flex items-center justify-center gap-10">
           <ReplaySeekButton direction="backward" onClick={() => seek(-10)} />
           <PlaybackToggle
+            disabled={!isPlaybackReady}
             playing={playing}
             onClick={() => void togglePlayback()}
           />

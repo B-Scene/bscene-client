@@ -31,7 +31,6 @@ import type {
   ReportLiveUserRequest,
   ReplayListFilter,
   ReplaySort,
-  ScheduledLiveScope,
   UpdateLiveReservationRequest,
 } from "@/types/live/live";
 
@@ -40,12 +39,11 @@ export const liveKeys = {
   home: () => [...liveKeys.all, "home"] as const,
   now: (filter: LiveNowListFilter) =>
     [...liveKeys.all, "liveNow", filter] as const,
-  scheduled: (scope: ScheduledLiveScope) =>
-    [...liveKeys.all, "scheduled", scope] as const,
+  scheduled: (following: boolean) =>
+    [...liveKeys.all, "scheduled", following] as const,
   replays: (filter: ReplayListFilter, sort: ReplaySort) =>
     [...liveKeys.all, "replays", filter, sort] as const,
-  replay: (replayId: number) =>
-    [...liveKeys.all, "replay", replayId] as const,
+  replay: (liveId: number) => [...liveKeys.all, "replay", liveId] as const,
   enter: (liveId: number) => [...liveKeys.all, "enter", liveId] as const,
   summary: (liveId: number) => [...liveKeys.all, "summary", liveId] as const,
   reservation: (liveId: number) =>
@@ -79,18 +77,20 @@ export const useLiveNowQuery = (filter: LiveNowListFilter) => {
   });
 };
 
-export const useScheduledLiveQuery = (scope: ScheduledLiveScope) => {
+export const useScheduledLiveQuery = (following: boolean) => {
   return useInfiniteQuery({
-    queryKey: liveKeys.scheduled(scope),
+    queryKey: liveKeys.scheduled(following),
     queryFn: ({ pageParam }) =>
       getScheduledLiveList({
-        scope,
+        following,
         cursor: pageParam,
         size: LIVE_NOW_PAGE_SIZE,
       }),
     initialPageParam: undefined as number | undefined,
     getNextPageParam: (lastPage) =>
-      lastPage.hasNext ? (lastPage.nextCursor ?? undefined) : undefined,
+      lastPage.pageInfo.hasNext
+        ? (lastPage.pageInfo.nextCursor ?? undefined)
+        : undefined,
   });
 };
 
@@ -128,13 +128,15 @@ export const useReplayListQuery = (
   });
 };
 
-export const useReplayPlaybackQuery = (replayId?: number | null) => {
+export const useReplayPlaybackQuery = (liveId?: number | null) => {
   return useQuery({
-    queryKey: liveKeys.replay(replayId ?? 0),
-    queryFn: () => getReplayPlayback(replayId as number),
-    enabled: !!replayId,
-    staleTime: 1000 * 30,
+    queryKey: liveKeys.replay(liveId ?? 0),
+    queryFn: () => getReplayPlayback(liveId as number),
+    enabled: !!liveId,
+    staleTime: Infinity,
     retry: false,
+    refetchOnReconnect: false,
+    refetchOnWindowFocus: false,
   });
 };
 

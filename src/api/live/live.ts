@@ -140,7 +140,7 @@ const getRtcBaseUrl = () => {
   return "";
 };
 
-const resolveApiUrl = (pathOrUrl: string) => {
+export const resolveLiveApiUrl = (pathOrUrl: string) => {
   if (/^https?:\/\//i.test(pathOrUrl)) {
     return pathOrUrl;
   }
@@ -178,7 +178,24 @@ const unwrapResult = <T>(response: LiveApiResponse<T>) => {
   return response.result;
 };
 
-const getBearerAuthorization = () => {
+const normalizeReplayLiveId = <
+  T extends { liveId?: number; replayId?: number },
+>(
+  replay: T,
+) => {
+  const liveId = replay.liveId ?? replay.replayId;
+
+  if (!liveId) {
+    throw new Error("다시보기의 liveId가 응답에 없습니다.");
+  }
+
+  return {
+    ...replay,
+    liveId,
+  };
+};
+
+export const getLiveBearerAuthorization = () => {
   return `Bearer ${getAccessToken()}`;
 };
 
@@ -210,7 +227,12 @@ export const getLiveHome = async (): Promise<LiveHomeResponse> => {
   const response =
     await axiosInstance.get<LiveApiResponse<LiveHomeResponse>>("/lives/home");
 
-  return unwrapResult(response.data);
+  const result = unwrapResult(response.data);
+
+  return {
+    ...result,
+    replays: result.replays.map(normalizeReplayLiveId),
+  };
 };
 
 export const getLiveNowList = async ({
@@ -231,7 +253,7 @@ export const getLiveNowList = async ({
 };
 
 export const getScheduledLiveList = async ({
-  scope,
+  following,
   cursor,
   size = 10,
 }: GetScheduledLiveListParams): Promise<ScheduledLiveListResponse> => {
@@ -239,7 +261,7 @@ export const getScheduledLiveList = async ({
     LiveApiResponse<ScheduledLiveListResponse>
   >("/lives/scheduled", {
     params: {
-      scope,
+      following,
       cursor,
       size,
     },
@@ -274,15 +296,22 @@ export const getReplayList = async ({
     },
   });
 
-  return unwrapResult(response.data);
+  const result = unwrapResult(response.data);
+
+  return {
+    ...result,
+    items: result.items.map(normalizeReplayLiveId),
+  };
 };
 
 export const getReplayPlayback = async (
-  replayId: number,
+  liveId: number,
 ): Promise<ReplayPlaybackResponse> => {
   const response = await axiosInstance.get<
     LiveApiResponse<ReplayPlaybackResponse>
-  >(`/lives/${replayId}/replay`);
+  >(`/lives/${liveId}/replay`, {
+    withCredentials: true,
+  });
 
   return unwrapResult(response.data);
 };
@@ -483,14 +512,14 @@ export const subscribeViewerCount = async ({
   onViewerCount,
   signal,
 }: SubscribeViewerCountParams): Promise<void> => {
-  const requestUrl = resolveApiUrl(
+  const requestUrl = resolveLiveApiUrl(
     `/lives/${liveId}/viewers?watchOnly=${watchOnly}`,
   );
 
   const response = await fetch(requestUrl, {
     method: "GET",
     headers: {
-      Authorization: getBearerAuthorization(),
+      Authorization: getLiveBearerAuthorization(),
       Accept: "text/event-stream",
     },
     signal,
