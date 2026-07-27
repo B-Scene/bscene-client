@@ -282,7 +282,7 @@ const FollowedConcertsPage = () => {
     isLoading,
     refetch,
   } = upcomingPerformancesQuery;
-  const isRecommendedFallback = fanHomeQuery.data?.hasFollowingBands === false;
+  const isRecommendedFallback = fanHomeQuery.data?.hasFollowingBands !== true;
   const sortButtonClassName = `flex shrink-0 flex-col items-center gap-2.5 rounded-full border px-[10px] py-1 font-body text-caption3 ${
     hasSelectedSort
       ? "border-primary-400 bg-primary-0 text-primary-400"

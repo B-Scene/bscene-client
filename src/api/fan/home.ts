@@ -120,8 +120,8 @@ export const getUpcomingPerformances = async ({
   page = 0,
   size = 10,
 }: UpcomingPerformancesParams = {}) => {
-  const { data } = await axiosInstance.get<
-    FanApiResponse<UpcomingPerformancesResponse | FanHomeConcert[]>
+  const response = await axiosInstance.get<
+    FanApiResponse<UpcomingPerformancesResponse | FanHomeConcert[] | null>
   >("/performances/upcoming", {
     params: {
       sort,
@@ -129,6 +129,18 @@ export const getUpcomingPerformances = async ({
       size,
     },
   });
+  const { data } = response;
+
+  if (!data.isSuccess || data.result == null) {
+    throw new AxiosError(
+      data.message,
+      data.code,
+      response.config,
+      response.request,
+      response,
+    );
+  }
+
   const result = data.result;
 
   if (Array.isArray(result)) {
@@ -154,6 +166,7 @@ export const getUpcomingPerformances = async ({
   return {
     ...result,
     items,
+    page: currentPage,
     hasNext: resolveHasNext({
       explicitHasNext: result.hasNext,
       page: currentPage,

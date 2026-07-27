@@ -1,9 +1,10 @@
-import type { KeyboardEvent, MouseEvent } from "react";
+import { useState, type KeyboardEvent, type MouseEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import HeartIcon from "@/assets/icons/Heart.svg";
 import LikedHeartIcon from "@/assets/icons/Union.svg";
 import {
   fanHomeKeys,
+  invalidatePerformanceInterestQueries,
   useAddPerformanceInterest,
   useDeletePerformanceInterest,
 } from "@/hooks/api/fan/useFanHome";
@@ -26,6 +27,7 @@ const ConcertLikeButton = ({
   const queryClient = useQueryClient();
   const addPerformanceInterestMutation = useAddPerformanceInterest();
   const deletePerformanceInterestMutation = useDeletePerformanceInterest();
+  const [isInterestSyncing, setIsInterestSyncing] = useState(false);
   const performanceId = Number(concertId);
   const cachedDetail = Number.isFinite(performanceId)
     ? queryClient.getQueryData<FanPerformanceDetailResponse>(
@@ -54,18 +56,12 @@ const ConcertLikeButton = ({
       await addPerformanceInterestMutation.mutateAsync(performanceId);
     } catch (error) {
       if (isAlreadyInterestedPerformanceError(error)) {
-        void queryClient.invalidateQueries({
-          queryKey: fanHomeKeys.performanceDetail(performanceId),
-        });
-        void queryClient.invalidateQueries({
-          queryKey: fanHomeKeys.main(),
-        });
-        void queryClient.invalidateQueries({
-          queryKey: fanHomeKeys.upcomingPerformancesLists(),
-        });
-        void queryClient.invalidateQueries({
-          queryKey: fanHomeKeys.performancesByDateLists(),
-        });
+        setIsInterestSyncing(true);
+        try {
+          await invalidatePerformanceInterestQueries(queryClient, performanceId);
+        } finally {
+          setIsInterestSyncing(false);
+        }
       }
       return;
     }
@@ -86,7 +82,8 @@ const ConcertLikeButton = ({
       aria-pressed={isLiked}
       disabled={
         addPerformanceInterestMutation.isPending ||
-        deletePerformanceInterestMutation.isPending
+        deletePerformanceInterestMutation.isPending ||
+        isInterestSyncing
       }
       onClick={(event) => void handleClick(event)}
       onKeyDown={handleKeyDown}

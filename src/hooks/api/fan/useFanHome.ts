@@ -50,22 +50,24 @@ export const fanHomeKeys = {
     [...fanHomeKeys.all, "pendingPerformanceParticipation"] as const,
 };
 
-const invalidatePerformanceInterestQueries = (
+export const invalidatePerformanceInterestQueries = (
   queryClient: QueryClient,
   performanceId: number,
 ) => {
-  void queryClient.invalidateQueries({
-    queryKey: fanHomeKeys.performanceDetail(performanceId),
-  });
-  void queryClient.invalidateQueries({
-    queryKey: fanHomeKeys.main(),
-  });
-  void queryClient.invalidateQueries({
-    queryKey: fanHomeKeys.upcomingPerformancesLists(),
-  });
-  void queryClient.invalidateQueries({
-    queryKey: fanHomeKeys.performancesByDateLists(),
-  });
+  return Promise.all([
+    queryClient.invalidateQueries({
+      queryKey: fanHomeKeys.performanceDetail(performanceId),
+    }),
+    queryClient.invalidateQueries({
+      queryKey: fanHomeKeys.main(),
+    }),
+    queryClient.invalidateQueries({
+      queryKey: fanHomeKeys.upcomingPerformancesLists(),
+    }),
+    queryClient.invalidateQueries({
+      queryKey: fanHomeKeys.performancesByDateLists(),
+    }),
+  ]);
 };
 
 export const useFanHomeQuery = () => {
@@ -216,7 +218,7 @@ export const useAddPerformanceInterest = () => {
   return useMutation({
     mutationFn: addPerformanceInterest,
     onSuccess: (_data, performanceId) => {
-      invalidatePerformanceInterestQueries(queryClient, performanceId);
+      return invalidatePerformanceInterestQueries(queryClient, performanceId);
     },
   });
 };
@@ -227,7 +229,7 @@ export const useDeletePerformanceInterest = () => {
   return useMutation({
     mutationFn: deletePerformanceInterest,
     onSuccess: (_data, performanceId) => {
-      invalidatePerformanceInterestQueries(queryClient, performanceId);
+      return invalidatePerformanceInterestQueries(queryClient, performanceId);
     },
   });
 };

@@ -10,7 +10,7 @@ import ShareIcon from "@/assets/icons/ic_share.svg";
 import LikedHeartIcon from "@/assets/icons/Union.svg";
 import BandProfileImage from "@/assets/icons/band/band-default-profile.svg";
 import {
-  fanHomeKeys,
+  invalidatePerformanceInterestQueries,
   useAddPerformanceInterest,
   useDeletePerformanceAlarm,
   useDeletePerformanceInterest,
@@ -364,6 +364,7 @@ const ConcertDetailPage = () => {
   >(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isShareSheetOpen, setIsShareSheetOpen] = useState(false);
+  const [isInterestSyncing, setIsInterestSyncing] = useState(false);
   const [isNotificationModalOpen, setIsNotificationModalOpen] =
     useState(false);
   const [isNotificationHintDismissed, setIsNotificationHintDismissed] =
@@ -436,18 +437,12 @@ const ConcertDetailPage = () => {
       await addPerformanceInterestMutation.mutateAsync(performanceId);
     } catch (error) {
       if (isAlreadyInterestedPerformanceError(error)) {
-        void queryClient.invalidateQueries({
-          queryKey: fanHomeKeys.performanceDetail(performanceId),
-        });
-        void queryClient.invalidateQueries({
-          queryKey: fanHomeKeys.main(),
-        });
-        void queryClient.invalidateQueries({
-          queryKey: fanHomeKeys.upcomingPerformancesLists(),
-        });
-        void queryClient.invalidateQueries({
-          queryKey: fanHomeKeys.performancesByDateLists(),
-        });
+        setIsInterestSyncing(true);
+        try {
+          await invalidatePerformanceInterestQueries(queryClient, performanceId);
+        } finally {
+          setIsInterestSyncing(false);
+        }
         return;
       }
 
@@ -684,7 +679,8 @@ const ConcertDetailPage = () => {
             aria-pressed={isLiked}
             disabled={
               addPerformanceInterestMutation.isPending ||
-              deletePerformanceInterestMutation.isPending
+              deletePerformanceInterestMutation.isPending ||
+              isInterestSyncing
             }
             onClick={() => void handleLikeClick()}
             className="mt-[38px] flex size-6 shrink-0 items-center justify-center"
