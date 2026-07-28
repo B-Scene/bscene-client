@@ -100,6 +100,7 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
   const setMode = useModeStore((state) => state.setMode);
   const changeUserMode = useChangeUserMode();
   const { data: myProfiles } = useMyProfilesQuery({ type: "all" });
+  const { data: bandProfiles } = useMyProfilesQuery({ type: "band" });
 
   const storedFanAccount = getFanAccountDisplay();
   const fanProfile = myProfiles?.fanProfile ?? null;
@@ -112,7 +113,10 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
     email: fanProfile?.email || storedFanAccount.email,
   };
 
-  const bandAccounts = (myProfiles?.bandProfiles ?? []).map((band) => ({
+  const resolvedBandProfiles =
+    bandProfiles?.bandProfiles.length ? bandProfiles.bandProfiles : myProfiles?.bandProfiles;
+
+  const bandAccounts = (resolvedBandProfiles ?? []).map((band) => ({
     id: `band-${band.bandId}`,
     bandMemberProfileId: band.bandMemberProfileId,
     avatar: band.profileImageUrl || BandAvatar,

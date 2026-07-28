@@ -39,7 +39,14 @@ export interface FanHomeNewsItem {
 }
 
 export interface FanHomeRecommendedBand {
+  band?: FanHomeRecommendedBand;
   bandId?: number;
+  targetBandId?: number;
+  followingBandId?: number;
+  followedBandId?: number;
+  recommendedBandId?: number;
+  bandProfileId?: number;
+  profileId?: number;
   id?: number | string;
   bandName?: string;
   name?: string;
@@ -54,7 +61,18 @@ export interface FanHomeRecommendedBand {
   logoUrl?: string | null;
   genre?: string | null;
   region?: string | null;
+  description?: string | null;
+  bandDescription?: string | null;
+  introduction?: string | null;
+  introduce?: string | null;
+  followerCount?: number;
+  followersCount?: number;
+  followerCnt?: number;
+  followCount?: number;
+  followers?: number;
   isFollowing?: boolean;
+  following?: boolean;
+  followed?: boolean;
 }
 
 export interface FanHomeConcert {

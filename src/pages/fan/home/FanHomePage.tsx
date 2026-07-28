@@ -1,4 +1,4 @@
-import { useMemo, useState, type UIEvent } from "react";
+import { useEffect, useMemo, useState, type UIEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import ArrowIcon from "@/assets/Arrow.svg";
 import SpeakerIcon from "@/assets/speaker.svg";
@@ -6,6 +6,7 @@ import SwapIcon from "@/assets/icons/swap.svg";
 import BandProfileImage from "@/assets/icons/band/band-default-profile.svg";
 import ConcertCard from "@/components/common/Card/ConcertCard";
 import { ModalOverlay } from "@/components/common/Modal/ModalOverlay";
+import { Toast } from "@/components/common/Toast/Toast";
 import Modal from "@/components/Modal/Modal";
 import NewsCard from "@/components/common/Card/NewsCard";
 import { HomeHeader } from "@/components/common/Header/HomeHeader";
@@ -17,12 +18,18 @@ import {
   useFanHomeQuery,
   usePendingPerformanceParticipationQuery,
 } from "@/hooks/api/fan/useFanHome";
+import {
+  useFollowExploreBand,
+  useUnfollowExploreBand,
+} from "@/hooks/api/fan/useFanExplore";
+import { useInterestedPerformancesQuery } from "@/hooks/api/user/useInterestedPerformances";
 import type {
   FanHomeConcert,
   FanHomeNewsItem,
   FanHomeRecommendedBand,
   FanHomeResponse,
 } from "@/types/fan/home";
+import type { InterestedPerformanceItem } from "@/types/user/interestedPerformance";
 
 type HomeVariant = "new" | "recommended" | "main";
 
@@ -54,8 +61,13 @@ type HomeNewsCardItem = {
 
 type HomeBandItem = {
   id: string;
+  bandId: number | null;
   name: string;
   meta: string;
+  genre?: string | null;
+  region?: string | null;
+  description?: string | null;
+  followerCount?: number;
   profileImageSrc: string;
   isFollowing: boolean;
 };
@@ -116,6 +128,44 @@ const getBandProfileImageUrl = (
     item.logoUrl,
     item.imageUrl,
     item.thumbnailUrl,
+  );
+};
+
+const toNumericId = (value?: number | string | null) => {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const parsedValue = Number(value);
+
+    if (Number.isFinite(parsedValue)) {
+      return parsedValue;
+    }
+  }
+
+  return null;
+};
+
+const getRecommendedBandInfo = (item: FanHomeRecommendedBand) =>
+  item.band ?? item;
+
+const getRecommendedBandId = (item: FanHomeRecommendedBand) => {
+  const bandInfo = getRecommendedBandInfo(item);
+
+  return (
+    toNumericId(bandInfo.bandId) ??
+    toNumericId(item.bandId) ??
+    toNumericId(bandInfo.targetBandId) ??
+    toNumericId(item.targetBandId) ??
+    toNumericId(bandInfo.followingBandId) ??
+    toNumericId(item.followingBandId) ??
+    toNumericId(bandInfo.followedBandId) ??
+    toNumericId(item.followedBandId) ??
+    toNumericId(bandInfo.recommendedBandId) ??
+    toNumericId(item.recommendedBandId) ??
+    toNumericId(bandInfo.id) ??
+    toNumericId(item.id)
   );
 };
 
@@ -255,12 +305,51 @@ const mapBandItem = (
   item: FanHomeRecommendedBand,
   index: number,
 ): HomeBandItem => {
+  const bandInfo = getRecommendedBandInfo(item);
+  const bandId = getRecommendedBandId(item);
+  const genre = bandInfo.genre ?? item.genre;
+  const region = bandInfo.region ?? item.region;
+  const name = bandInfo.bandName ?? bandInfo.name ?? item.bandName ?? item.name ?? "밴드명";
+  const description =
+    bandInfo.description ??
+    bandInfo.bandDescription ??
+    bandInfo.introduction ??
+    bandInfo.introduce ??
+    item.description ??
+    item.bandDescription ??
+    item.introduction ??
+    item.introduce;
+  const followerCount =
+    bandInfo.followerCount ??
+    bandInfo.followersCount ??
+    bandInfo.followerCnt ??
+    bandInfo.followCount ??
+    bandInfo.followers ??
+    item.followerCount ??
+    item.followersCount ??
+    item.followerCnt ??
+    item.followCount ??
+    item.followers;
+
   return {
-    id: String(item.bandId ?? item.id ?? `band-${index}`),
-    name: item.bandName ?? item.name ?? "밴드명",
-    meta: compactMeta([item.genre, item.region]) || "장르 · 지역",
-    profileImageSrc: getBandProfileImageUrl(item) ?? BandProfileImage,
-    isFollowing: item.isFollowing ?? false,
+    id: String(bandId ?? bandInfo.id ?? item.id ?? `band-${index}`),
+    bandId,
+    name,
+    meta: compactMeta([genre, region]) || "장르 · 지역",
+    genre,
+    region,
+    description,
+    followerCount,
+    profileImageSrc:
+      getBandProfileImageUrl(bandInfo) ?? getBandProfileImageUrl(item) ?? BandProfileImage,
+    isFollowing:
+      bandInfo.isFollowing ??
+      bandInfo.following ??
+      bandInfo.followed ??
+      item.isFollowing ??
+      item.following ??
+      item.followed ??
+      false,
   };
 };
 
@@ -292,6 +381,32 @@ const mapConcertItem = (
     status: item.status ?? formatDday(item, date),
     thumbnailSrc,
     showThumbnail: Boolean(thumbnailSrc),
+  };
+};
+
+const getInterestedConcertDate = (concert: InterestedPerformanceItem) => {
+  if (concert.performanceDate && concert.startTime) {
+    return toDate(`${concert.performanceDate}T${concert.startTime}`);
+  }
+
+  return toDate(concert.performanceDate);
+};
+
+const mapInterestedConcertItem = (
+  item: InterestedPerformanceItem,
+): HomeConcertItem => {
+  const date = getInterestedConcertDate(item);
+
+  return {
+    id: String(item.performanceId),
+    month: date ? MONTH_LABELS[date.getMonth()] : "TBD",
+    day: date ? String(date.getDate()).padStart(2, "0") : "--",
+    title: item.title,
+    location: item.venue,
+    dateTime: formatDateTime(date),
+    status: formatDday({ performanceDate: item.performanceDate }, date),
+    thumbnailSrc: item.posterImageUrl ?? undefined,
+    showThumbnail: Boolean(item.posterImageUrl),
   };
 };
 
@@ -399,35 +514,169 @@ const EmptyFollowCard = ({ onExploreClick }: { onExploreClick: () => void }) => 
 };
 
 const BandRecommendationStrip = ({ bands }: { bands: HomeBandItem[] }) => {
+  const navigate = useNavigate();
+  const followBandMutation = useFollowExploreBand();
+  const unfollowBandMutation = useUnfollowExploreBand();
+  const [followOverrides, setFollowOverrides] = useState<Record<string, boolean>>({});
+  const [pendingBandId, setPendingBandId] = useState<number | null>(null);
+  const [unfollowTargetId, setUnfollowTargetId] = useState<string | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const unfollowTarget = bands.find((band) => band.id === unfollowTargetId);
+  const isFollowPending =
+    followBandMutation.isPending || unfollowBandMutation.isPending;
+
+  useEffect(() => {
+    if (!toastMessage) return;
+
+    const timerId = window.setTimeout(() => setToastMessage(null), 2000);
+
+    return () => window.clearTimeout(timerId);
+  }, [toastMessage]);
+
+  const confirmUnfollow = async () => {
+    if (!unfollowTarget?.bandId || isFollowPending) return;
+
+    const previousIsFollowing =
+      followOverrides[unfollowTarget.id] ?? unfollowTarget.isFollowing;
+
+    setPendingBandId(unfollowTarget.bandId);
+    setFollowOverrides((currentOverrides) => ({
+      ...currentOverrides,
+      [unfollowTarget.id]: false,
+    }));
+
+    try {
+      await unfollowBandMutation.mutateAsync(unfollowTarget.bandId);
+      setUnfollowTargetId(null);
+      setToastMessage(`${unfollowTarget.name} 팔로우를 취소했어요`);
+    } catch {
+      setFollowOverrides((currentOverrides) => ({
+        ...currentOverrides,
+        [unfollowTarget.id]: previousIsFollowing,
+      }));
+      setToastMessage("팔로우 취소에 실패했어요");
+    } finally {
+      setPendingBandId(null);
+    }
+  };
+
   if (bands.length === 0) return null;
 
   return (
-    <div className="flex gap-5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-      {bands.map((band) => (
-        <article
-          key={band.id}
-          className="flex w-[54px] shrink-0 flex-col items-center text-center"
-        >
-          <img
-            src={band.profileImageSrc}
-            alt=""
-            className="size-[54px] rounded-full object-cover"
-          />
-          <strong className="mt-2 max-w-full truncate font-body text-body4 text-neutral-900">
-            {band.name}
-          </strong>
-          <span className="mt-[5px] max-w-full truncate font-body text-caption4 text-neutral-600">
-            {band.meta}
-          </span>
-          <button
-            type="button"
-            className="mt-2 h-[16px] w-[54px] rounded-full border-[1px] border-primary-400 font-body text-label4 text-primary-400"
-          >
-            {band.isFollowing ? "팔로잉" : "팔로우"}
-          </button>
-        </article>
-      ))}
-    </div>
+    <>
+      <div className="flex gap-5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {bands.map((band) => {
+          const isFollowing = followOverrides[band.id] ?? band.isFollowing;
+          const isBandPending = isFollowPending && pendingBandId === band.bandId;
+
+          return (
+            <article
+              key={band.id}
+              className="flex w-[54px] shrink-0 flex-col items-center text-center"
+            >
+              <button
+                type="button"
+                disabled={band.bandId == null}
+                onClick={() => {
+                  if (band.bandId != null) {
+                    navigate(`/fan/bands/${band.bandId}`, {
+                      state: {
+                        bandPreview: {
+                          bandId: band.bandId,
+                          name: band.name,
+                          bandName: band.name,
+                          genre: band.genre,
+                          region: band.region,
+                          profileImageUrl: band.profileImageSrc,
+                          description: band.description,
+                          introduction: band.description,
+                          followerCount: band.followerCount,
+                          isFollowing,
+                        },
+                      },
+                    });
+                  }
+                }}
+                className="flex w-full flex-col items-center text-center disabled:cursor-default"
+              >
+                <img
+                  src={band.profileImageSrc}
+                  alt=""
+                  className="size-[54px] rounded-full object-cover"
+                />
+                <strong className="mt-2 max-w-full truncate font-body text-body4 text-neutral-900">
+                  {band.name}
+                </strong>
+                <span className="mt-[5px] max-w-full truncate font-body text-caption4 text-neutral-600">
+                  {band.meta}
+                </span>
+              </button>
+              <button
+                type="button"
+                disabled={band.bandId == null || isBandPending}
+                onClick={() => {
+                  if (band.bandId == null || isBandPending) return;
+
+                  if (isFollowing) {
+                    setUnfollowTargetId(band.id);
+                    return;
+                  }
+
+                  setPendingBandId(band.bandId);
+                  setFollowOverrides((currentOverrides) => ({
+                    ...currentOverrides,
+                    [band.id]: true,
+                  }));
+
+                  followBandMutation.mutate(band.bandId, {
+                    onSuccess: () => setToastMessage(`${band.name}를 팔로우했어요`),
+                    onError: () => {
+                      setFollowOverrides((currentOverrides) => ({
+                        ...currentOverrides,
+                        [band.id]: false,
+                      }));
+                      setToastMessage("밴드 팔로우에 실패했어요");
+                    },
+                    onSettled: () => setPendingBandId(null),
+                  });
+                }}
+                className="mt-2 h-[16px] w-[54px] rounded-full border-[1px] border-primary-400 font-body text-label4 text-primary-400 disabled:opacity-60"
+              >
+                {isFollowing ? "팔로잉" : "팔로우"}
+              </button>
+            </article>
+          );
+        })}
+      </div>
+
+      <ModalOverlay
+        open={unfollowTargetId !== null}
+        onClose={() => setUnfollowTargetId(null)}
+      >
+        <Modal
+          title="팔로우를 취소할까요?"
+          description={
+            <>
+              이 밴드의 소식이
+              <br />
+              홈피드에서 사라져요
+            </>
+          }
+          cancelLabel="취소"
+          confirmLabel="확인"
+          onCancel={() => setUnfollowTargetId(null)}
+          onConfirm={() => void confirmUnfollow()}
+        />
+      </ModalOverlay>
+
+      <Toast
+        open={toastMessage !== null}
+        message={toastMessage}
+        onClose={() => setToastMessage(null)}
+        tone={toastMessage?.includes("실패") ? "error" : "success"}
+      />
+    </>
   );
 };
 
@@ -578,8 +827,19 @@ const FanHomePage = () => {
   const completeParticipationMutation = useCompletePerformanceParticipation();
   const deleteParticipationMutation = useDeletePerformanceParticipation();
   const { data: fanHome, isError, isLoading, refetch } = useFanHomeQuery();
+  const interestedPerformancesQuery = useInterestedPerformancesQuery("ALL");
   const variant = getVariant(searchParams.get("variant"));
   const homeData = useMemo(() => mapHomeResponse(fanHome), [fanHome]);
+  const interestedConcerts = useMemo(() => {
+    return (
+      interestedPerformancesQuery.data?.pages
+        .flatMap((page) => page.items)
+        .filter((item) => item.participationStatus !== "COMPLETED")
+        .map(mapInterestedConcertItem) ?? []
+    );
+  }, [interestedPerformancesQuery.data]);
+  const upcomingConcerts =
+    interestedConcerts.length > 0 ? interestedConcerts : homeData.performances;
   const pendingPerformances = useMemo(() => {
     return (pendingParticipationQuery.data?.items ?? []).filter(
       (item) => !answeredPendingPerformanceIds.has(item.performanceId),
@@ -642,6 +902,7 @@ const FanHomePage = () => {
     const isNewHome = variant === "new" || !homeData.hasFollowingBands;
     const isRecommendedPerformances =
       variant === "recommended" || homeData.performanceType === "RECOMMENDED";
+    const hasInterestedConcerts = interestedConcerts.length > 0;
 
     if (isNewHome) {
       return (
@@ -663,11 +924,15 @@ const FanHomePage = () => {
 
           <section className="mt-8">
             <SectionHeader
-              title="이런 공연은 어때요?"
-              description="지금 인기 있는 공연을 추천해드릴게요!"
+              title={hasInterestedConcerts ? "다가오는 공연" : "이런 공연은 어때요?"}
+              description={
+                hasInterestedConcerts
+                  ? undefined
+                  : "지금 인기 있는 공연을 추천해드릴게요!"
+              }
               onMoreClick={() => navigate("/fan/home/concerts")}
             />
-            <ConcertList concerts={homeData.performances} />
+            <ConcertList concerts={upcomingConcerts} />
           </section>
         </>
       );
@@ -686,11 +951,15 @@ const FanHomePage = () => {
 
           <section className="mt-8">
             <SectionHeader
-              title="다가오는 공연이 없어요"
-              description="지금 인기 있는 공연을 추천해드릴게요!"
+              title={hasInterestedConcerts ? "다가오는 공연" : "다가오는 공연이 없어요"}
+              description={
+                hasInterestedConcerts
+                  ? undefined
+                  : "지금 인기 있는 공연을 추천해드릴게요!"
+              }
               onMoreClick={() => navigate("/fan/home/concerts")}
             />
-            <ConcertList concerts={homeData.performances} />
+            <ConcertList concerts={upcomingConcerts} />
           </section>
         </>
       );
@@ -711,11 +980,20 @@ const FanHomePage = () => {
             title="다가오는 공연"
             onMoreClick={() => navigate("/fan/home/concerts")}
           />
-          <ConcertList concerts={homeData.performances} />
+          <ConcertList concerts={upcomingConcerts} />
         </section>
       </>
     );
-  }, [homeData, isError, isLoading, navigate, refetch, variant]);
+  }, [
+    homeData,
+    interestedConcerts.length,
+    isError,
+    isLoading,
+    navigate,
+    refetch,
+    upcomingConcerts,
+    variant,
+  ]);
 
   return (
     <main className="min-h-dvh bg-neutral-0 px-5 pb-[calc(var(--bottom-nav-height)+24px)]">

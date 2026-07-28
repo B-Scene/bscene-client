@@ -1,10 +1,17 @@
 import { useState, type UIEvent } from "react";
+import { isAxiosError } from "axios";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import ArrowLeftIcon from "@/assets/icons/arrow-left.svg";
 import CommentIcon from "@/assets/icons/Comment.svg";
 import HeartIcon from "@/assets/icons/Heart.svg";
 import LikedHeartIcon from "@/assets/icons/Union.svg";
 import BandImage from "@/assets/Img_Band.png";
+import {
+  useFanExplorePostDetailQuery,
+  useLikeFanExplorePost,
+  useUnlikeFanExplorePost,
+} from "@/hooks/api/fan/useFanExplore";
+import type { FanExplorePostMediaType } from "@/types/fan/explore";
 
 const TAGS = ["합주", "인디밴드", "홍대", "공연준비"];
 const BASE_LIKE_COUNT = 412;
@@ -110,25 +117,94 @@ const getImageUrls = (imageUrlsValue: string | null, imageUrl: string | null) =>
   return imageUrl ? [imageUrl] : [];
 };
 
+const getPostMediaType = (type?: string | null): FanExplorePostMediaType => {
+  if (type === "VIDEO") return "VIDEO";
+  if (type === "TEXT") return "TEXT";
+  return "PHOTO";
+};
+
+const toNumericId = (value?: number | string | null) => {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const parsedValue = Number(value);
+
+    return Number.isFinite(parsedValue) ? parsedValue : null;
+  }
+
+  return null;
+};
+
 const FanContentDetailPage = () => {
   const navigate = useNavigate();
   const { contentId } = useParams();
   const [searchParams] = useSearchParams();
-  const bandName = searchParams.get("q") || "WAVY";
+  const postId = Number(contentId);
+  const postDetailQuery = useFanExplorePostDetailQuery(
+    Number.isFinite(postId) ? postId : undefined,
+  );
+  const likePostMutation = useLikeFanExplorePost();
+  const unlikePostMutation = useUnlikeFanExplorePost();
+  const postDetail = postDetailQuery.data;
+  const bandId =
+    toNumericId(postDetail?.band?.bandId) ??
+    toNumericId(postDetail?.band?.id) ??
+    toNumericId(postDetail?.bandId);
+  const bandName =
+    postDetail?.band?.bandName ??
+    postDetail?.band?.name ??
+    postDetail?.bandName ??
+    searchParams.get("q") ??
+    "WAVY";
   const createdAt =
-    searchParams.get("createdAt") ?? DEFAULT_CONTENT_CREATED_AT;
+    postDetail?.createdAt ??
+    searchParams.get("createdAt") ??
+    DEFAULT_CONTENT_CREATED_AT;
   const imageUrl = searchParams.get("imageUrl");
   const imageUrlsValue = searchParams.get("imageUrls");
-  const profileImageUrl = searchParams.get("profileImageUrl");
+  const profileImageUrl =
+    postDetail?.band?.profileImageUrl ??
+    postDetail?.band?.bandProfileImageUrl ??
+    postDetail?.profileImageUrl ??
+    postDetail?.bandProfileImageUrl ??
+    searchParams.get("profileImageUrl");
+  const mediaType = getPostMediaType(
+    postDetail?.type ?? postDetail?.mediaType ?? postDetail?.contentType,
+  );
+  const detailMediaUrls = Array.isArray(postDetail?.mediaUrls)
+    ? postDetail.mediaUrls
+    : [];
   const timeAgo = formatRelativeTime(createdAt);
-  const imageUrls = getImageUrls(imageUrlsValue, imageUrl);
+  const imageUrls =
+    detailMediaUrls.length > 0
+      ? detailMediaUrls
+      : getImageUrls(imageUrlsValue, imageUrl);
   const hasContentImages = imageUrls.length > 0;
+  const shouldRenderMedia = postDetail
+    ? mediaType !== "TEXT" && hasContentImages
+    : true;
   const imageCount = hasContentImages
     ? imageUrls.length
-    : MOCK_CONTENT_IMAGES.length;
+    : postDetail
+      ? 0
+      : MOCK_CONTENT_IMAGES.length;
   const [activeImageIndex, setActiveImageIndex] = useState(0);
-  const [isLiked, setIsLiked] = useState(false);
-  const likeCount = isLiked ? BASE_LIKE_COUNT + 1 : BASE_LIKE_COUNT;
+  const [likeOverride, setLikeOverride] = useState<{
+    isLiked: boolean;
+    likeCount: number;
+  } | null>(null);
+  const isLiked = likeOverride?.isLiked ?? postDetail?.isLiked ?? false;
+  const baseLikeCount = postDetail?.likeCount ?? BASE_LIKE_COUNT;
+  const likeCount = likeOverride?.likeCount ?? baseLikeCount;
+  const isLikePending = likePostMutation.isPending || unlikePostMutation.isPending;
+  const commentCount = postDetail?.commentCount ?? 12;
+  const title = postDetail?.title ?? "2025 봄 정기공연 합주 기록";
+  const content =
+    postDetail?.contentText ??
+    (typeof postDetail?.content === "string" ? postDetail.content : null) ??
+    postDetail?.body ??
+    postDetail?.text ??
+    "다음 공연을 앞두고 멤버들과 합주를 진행했어요.\n새롭게 편곡한 곡과 라이브 셋리스트를 맞춰보며\n무대에서 더 좋은 사운드를 들려드릴 준비를 하고 있습니다.";
+  const tags = Array.isArray(postDetail?.tags) ? postDetail.tags : TAGS;
 
   const handleImageScroll = (event: UIEvent<HTMLDivElement>) => {
     const container = event.currentTarget;
@@ -138,7 +214,58 @@ const FanContentDetailPage = () => {
   };
 
   const handleLikeClick = () => {
-    setIsLiked((currentValue) => !currentValue);
+    if (!Number.isFinite(postId) || isLikePending) {
+      return;
+    }
+
+    const previousLikeOverride = likeOverride;
+
+    if (isLiked) {
+      const optimisticLikeCount = Math.max(0, likeCount - 1);
+
+      setLikeOverride({
+        isLiked: false,
+        likeCount: optimisticLikeCount,
+      });
+
+      unlikePostMutation.mutate(postId, {
+        onSuccess: (result) => {
+          setLikeOverride({
+            isLiked: result.isLiked,
+            likeCount: result.likeCount ?? optimisticLikeCount,
+          });
+        },
+        onError: () => setLikeOverride(previousLikeOverride),
+      });
+      return;
+    }
+
+    const optimisticLikeCount = likeCount + 1;
+
+    setLikeOverride({
+      isLiked: true,
+      likeCount: optimisticLikeCount,
+    });
+
+    likePostMutation.mutate(postId, {
+      onSuccess: (result) => {
+        setLikeOverride({
+          isLiked: result.isLiked,
+          likeCount: result.likeCount ?? optimisticLikeCount,
+        });
+      },
+      onError: (error) => {
+        if (isAxiosError(error) && error.response?.status === 409) {
+          setLikeOverride({
+            isLiked: true,
+            likeCount,
+          });
+          return;
+        }
+
+        setLikeOverride(previousLikeOverride);
+      },
+    });
   };
 
   return (
@@ -175,32 +302,43 @@ const FanContentDetailPage = () => {
           </div>
         </header>
 
-        <div
-          className="mt-[24px] flex h-[422px] w-[338px] max-w-full snap-x snap-mandatory overflow-x-auto bg-neutral-300 text-neutral-700 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-          onScroll={handleImageScroll}
-        >
-          {hasContentImages ? (
-            imageUrls.map((url, index) => (
-              <img
-                key={`${url}-${index}`}
-                src={url}
-                alt={`콘텐츠 이미지 ${index + 1}`}
-                className="h-full w-full shrink-0 snap-center object-cover"
-              />
-            ))
-          ) : (
-            MOCK_CONTENT_IMAGES.map((image) => (
-              <div
-                key={image.id}
-                className={`flex h-full w-full shrink-0 snap-center items-center justify-center text-neutral-700 ${image.className}`}
-              >
-                <ImagePlaceholderIcon />
-              </div>
-            ))
-          )}
-        </div>
+        {shouldRenderMedia ? (
+          <div
+            className="mt-[24px] flex h-[422px] w-[338px] max-w-full snap-x snap-mandatory overflow-x-auto bg-neutral-300 text-neutral-700 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            onScroll={handleImageScroll}
+          >
+            {hasContentImages ? (
+              mediaType === "VIDEO" ? (
+                <video
+                  src={imageUrls[0]}
+                  poster={postDetail?.thumbnailUrl ?? undefined}
+                  controls
+                  className="h-full w-full shrink-0 snap-center object-cover"
+                />
+              ) : (
+                imageUrls.map((url, index) => (
+                  <img
+                    key={`${url}-${index}`}
+                    src={url}
+                    alt={`콘텐츠 이미지 ${index + 1}`}
+                    className="h-full w-full shrink-0 snap-center object-cover"
+                  />
+                ))
+              )
+            ) : (
+              MOCK_CONTENT_IMAGES.map((image) => (
+                <div
+                  key={image.id}
+                  className={`flex h-full w-full shrink-0 snap-center items-center justify-center text-neutral-700 ${image.className}`}
+                >
+                  <ImagePlaceholderIcon />
+                </div>
+              ))
+            )}
+          </div>
+        ) : null}
 
-        {imageCount > 1 ? (
+        {shouldRenderMedia && imageCount > 1 ? (
           <div className="mt-[8px] flex justify-center gap-[4px]">
             {Array.from({ length: imageCount }).map((_, index) => (
               <span
@@ -221,6 +359,7 @@ const FanContentDetailPage = () => {
             aria-label={isLiked ? "좋아요 취소" : "좋아요"}
             aria-pressed={isLiked}
             onClick={handleLikeClick}
+            disabled={isLikePending}
             className="flex items-center gap-[4px] font-body text-caption3 text-neutral-900"
           >
             <img
@@ -232,24 +371,20 @@ const FanContentDetailPage = () => {
           </button>
           <span className="flex items-center gap-[4px] font-body text-caption3 text-neutral-900">
             <img src={CommentIcon} alt="" className="size-[20px]" />
-            12
+            {commentCount}
           </span>
         </div>
 
         <section className="mt-[16px]">
           <h2 className="m-0 font-body text-body1 text-neutral-900">
-            2025 봄 정기공연 합주 기록
+            {title}
           </h2>
-          <p className="m-0 mt-[8px] font-caption2 text-caption2 text-neutral-900">
-            다음 공연을 앞두고 멤버들과 합주를 진행했어요.
-            <br />
-            새롭게 편곡한 곡과 라이브 셋리스트를 맞춰보며
-            <br />
-            무대에서 더 좋은 사운드를 들려드릴 준비를 하고 있습니다.
+          <p className="m-0 mt-[8px] whitespace-pre-line font-caption2 text-caption2 text-neutral-900">
+            {content}
           </p>
 
           <div className="mt-[16px] flex flex-wrap gap-[8px]">
-            {TAGS.map((tag) => (
+            {tags.map((tag) => (
               <span
                 key={tag}
                 className="flex h-[26px] min-w-[51px] items-center justify-center rounded-full bg-primary-50 px-[15px] font-body text-caption3 text-primary-400"
@@ -262,7 +397,9 @@ const FanContentDetailPage = () => {
       </article>
 
       <section className="mt-[24px] inline-flex w-full flex-col items-start gap-[16px] bg-primary-0 pb-[24px] pl-[25px] pr-[26px] pt-[16px]">
-        <h2 className="m-0 font-body text-caption3 text-neutral-900">댓글 12</h2>
+        <h2 className="m-0 font-body text-caption3 text-neutral-900">
+          댓글 {commentCount}
+        </h2>
 
         {COMMENTS.map((comment) => (
           <article key={comment.id} className="flex w-full gap-[16px]">
@@ -296,6 +433,7 @@ const FanContentDetailPage = () => {
           aria-label={isLiked ? "좋아요 취소" : "좋아요"}
           aria-pressed={isLiked}
           onClick={handleLikeClick}
+          disabled={isLikePending}
           className="flex size-[44px] shrink-0 items-center justify-center rounded-full"
         >
           <img
@@ -307,8 +445,24 @@ const FanContentDetailPage = () => {
 
         <button
           type="button"
-          onClick={() => navigate(`/fan/bands/${contentId ?? "band-wavy"}`)}
-          className="flex h-[38px] w-[270px] items-center justify-center rounded-[8px] bg-primary-400 px-[20px] font-body text-body1 text-neutral-0"
+          disabled={bandId == null}
+          onClick={() => {
+            if (bandId != null) {
+              navigate(`/fan/bands/${bandId}`, {
+                state: {
+                  bandPreview: {
+                    bandId,
+                    name: bandName,
+                    bandName,
+                    genre: postDetail?.band?.genre ?? postDetail?.genre,
+                    region: postDetail?.band?.region ?? postDetail?.region,
+                    profileImageUrl,
+                  },
+                },
+              });
+            }
+          }}
+          className="flex h-[38px] w-[270px] items-center justify-center rounded-[8px] bg-primary-400 px-[20px] font-body text-body1 text-neutral-0 disabled:opacity-60"
         >
           밴드 프로필 보기
         </button>

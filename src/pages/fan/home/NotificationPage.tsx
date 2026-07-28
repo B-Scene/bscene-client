@@ -26,7 +26,7 @@ const NotificationPage = () => {
   const hasNotifications = searchParams.get("status") !== "empty";
 
   return (
-    <main className="min-h-dvh bg-primary-0">
+    <main className="mx-auto min-h-dvh w-full max-w-[393px] bg-primary-0">
       <header className="flex h-[60px] items-center justify-between bg-neutral-0 px-[15px]">
         <button
           type="button"

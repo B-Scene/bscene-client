@@ -25,6 +25,7 @@ import type {
   PerformancesByDateParams,
   UpcomingPerformanceSort,
 } from "@/types/fan/home";
+import { interestedPerformancesKeys } from "@/hooks/api/user/useInterestedPerformances";
 
 export const fanHomeKeys = {
   all: ["fanHome"] as const,
@@ -187,13 +188,33 @@ export const useDeletePerformanceAlarm = () => {
 };
 
 export const useAddPerformanceInterest = () => {
+  const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: addPerformanceInterest,
+    onSuccess: (_result, performanceId) =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: fanHomeKeys.all }),
+        queryClient.invalidateQueries({ queryKey: interestedPerformancesKeys.all }),
+        queryClient.invalidateQueries({
+          queryKey: fanHomeKeys.performanceDetail(performanceId),
+        }),
+      ]),
   });
 };
 
 export const useDeletePerformanceInterest = () => {
+  const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: deletePerformanceInterest,
+    onSuccess: (_result, performanceId) =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: fanHomeKeys.all }),
+        queryClient.invalidateQueries({ queryKey: interestedPerformancesKeys.all }),
+        queryClient.invalidateQueries({
+          queryKey: fanHomeKeys.performanceDetail(performanceId),
+        }),
+      ]),
   });
 };
