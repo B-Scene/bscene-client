@@ -1,16 +1,10 @@
-import { useMemo } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ArrowLeftIcon from "@/assets/icons/arrow-left.svg";
 import {
   NotificationToggleList,
   type NotificationToggleItem,
 } from "@/components/band/my/NotificationToggleList";
-import {
-  useNotificationSettingsQuery,
-  useUpdateNotificationSettingMutation,
-} from "@/hooks/api/useNotifications";
-import type { NotificationSettingType } from "@/types/notification";
-import { requestAndRegisterWebPushToken } from "@/utils/webPushNotifications";
 
 const LIVE_ALERT_ITEMS: NotificationToggleItem[] = [
   {
@@ -30,42 +24,16 @@ const LIVE_ALERT_ITEMS: NotificationToggleItem[] = [
   },
 ];
 
-const DEFAULT_VALUES: Record<string, boolean> = {
-  "followed-band-live-start": true,
-  "upcoming-live-reminder": true,
-  "live-replay": false,
-};
-
-const SETTING_TYPE_BY_ID: Record<string, NotificationSettingType> = {
-  "followed-band-live-start": "FAN_FOLLOWED_BAND_LIVE_START",
-  "upcoming-live-reminder": "FAN_SCHEDULED_LIVE_REMINDER",
-  "live-replay": "FAN_LIVE_REPLAY_READY",
-};
-
 const LiveAlertSettingsPage = () => {
   const navigate = useNavigate();
-  const { data: notificationSettings } = useNotificationSettingsQuery("FAN");
-  const updateNotificationSetting = useUpdateNotificationSettingMutation();
-  const values = useMemo(
-    () => ({ ...DEFAULT_VALUES, ...notificationSettings?.values }),
-    [notificationSettings?.values],
-  );
+  const [values, setValues] = useState<Record<string, boolean>>({
+    "followed-band-live-start": true,
+    "upcoming-live-reminder": true,
+    "live-replay": false,
+  });
 
-  const toggle = (id: string, checked: boolean) => {
-    const settingType = SETTING_TYPE_BY_ID[id];
-
-    if (!settingType) return;
-
-    if (checked) {
-      void requestAndRegisterWebPushToken().catch(() => undefined);
-    }
-
-    updateNotificationSetting.mutate({
-      mode: "FAN",
-      settingType,
-      enabled: checked,
-    });
-  };
+  const toggle = (id: string) =>
+    setValues((prev) => ({ ...prev, [id]: !prev[id] }));
 
   return (
     <main className="min-h-dvh bg-neutral-0 px-5 pb-[calc(var(--bottom-nav-height)+24px)]">

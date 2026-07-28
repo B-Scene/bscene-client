@@ -10,7 +10,7 @@ export interface NotificationToggleItem {
 interface NotificationToggleListProps {
   items: NotificationToggleItem[];
   values: Record<string, boolean>;
-  onToggle: (id: string, checked: boolean) => void;
+  onToggle: (id: string) => void;
   tone?: "primary" | "secondary";
 }
 
@@ -33,7 +33,7 @@ export const NotificationToggleList = ({
 
           <ToggleSwitch
             checked={values[item.id] ?? false}
-            onChange={(checked) => onToggle(item.id, checked)}
+            onChange={() => onToggle(item.id)}
             label={item.title}
             tone={tone}
           />
