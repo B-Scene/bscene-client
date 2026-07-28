@@ -3,7 +3,8 @@ import type { AxiosError } from "axios";
 import Hls from "hls.js";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
-  getLivePlaybackAuthorization,
+  getLiveBearerAuthorization,
+  resolveLiveApiUrl,
   subscribeViewerCount,
 } from "@/api/live/live";
 import Modal from "@/components/Modal/Modal";
@@ -251,87 +252,109 @@ export function FanLivePage() {
     return () => controller.abort();
   }, [live?.liveId]);
 
-  useEffect(() => {
-    const audio = audioRef.current;
-    const playback = live?.playback;
+useEffect(() => {
+  const audio = audioRef.current;
+  const playback = live?.playback;
 
-    if (
-      !audio ||
-      !live?.isLive ||
-      playback?.role !== "LISTENER" ||
-      playback.protocol !== "HLS" ||
-      !playback.playbackUrl
-    ) {
-      return;
-    }
+  if (
+    !audio ||
+    !live?.isLive ||
+    !playback ||
+    playback.protocol !== "HLS" ||
+    !playback.playbackUrl
+  ) {
+    return;
+  }
 
-    if (!Hls.isSupported()) {
-      window.setTimeout(() => {
-        setAudioMessage("이 브라우저에서는 인증된 HLS 재생을 지원하지 않아요.");
-      }, 0);
-      return;
-    }
+  if (playback.role !== "LISTENER") {
+    setAudioMessage("청취자 재생 정보가 올바르지 않아요.");
+    return;
+  }
 
-    let authorization: string;
+  if (!Hls.isSupported()) {
+    window.setTimeout(() => {
+      setAudioMessage("이 브라우저에서는 인증된 HLS 재생을 지원하지 않아요.");
+    }, 0);
+    return;
+  }
 
-    try {
-      authorization = getLivePlaybackAuthorization();
-    } catch (error) {
-      window.setTimeout(() => {
-        setAudioMessage(
-          error instanceof Error
-            ? error.message
-            : "오디오 인증 정보를 확인하지 못했어요.",
-        );
-      }, 0);
-      return;
-    }
+  let authorization: string;
 
-    const hls = new Hls({
-      lowLatencyMode: true,
-      backBufferLength: 30,
-      xhrSetup: (xhr) => {
+  try {
+    authorization = getLiveBearerAuthorization();
+  } catch (error) {
+    window.setTimeout(() => {
+      setAudioMessage(
+        error instanceof Error
+          ? error.message
+          : "오디오 인증 정보를 확인하지 못했어요.",
+      );
+    }, 0);
+    return;
+  }
+
+  const playbackUrl = resolveLiveApiUrl(playback.playbackUrl);
+
+  const hls = new Hls({
+    lowLatencyMode: true,
+    backBufferLength: 30,
+    xhrSetup: (xhr, url) => {
+      xhr.withCredentials = true;
+
+      if (url.includes("/api/") || url.includes("api.bscene.app")) {
         xhr.setRequestHeader("Authorization", authorization);
-      },
-    });
-
-    hlsRef.current = hls;
-    hls.attachMedia(audio);
-
-    hls.on(Hls.Events.MEDIA_ATTACHED, () => {
-      hls.loadSource(playback.playbackUrl);
-    });
-
-    hls.on(Hls.Events.MANIFEST_PARSED, () => {
-      void startPlayback();
-    });
-
-    hls.on(Hls.Events.ERROR, (_, data) => {
-      if (!data.fatal) return;
-
-      if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-        hls.startLoad();
-        return;
       }
+    },
+  });
 
-      if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-        hls.recoverMediaError();
-        return;
-      }
+  hlsRef.current = hls;
+  hls.attachMedia(audio);
 
-      setAudioMessage("라이브 오디오 연결이 종료됐어요.");
-      hls.destroy();
-      hlsRef.current = null;
+  hls.on(Hls.Events.MEDIA_ATTACHED, () => {
+    hls.loadSource(playbackUrl);
+  });
+
+  hls.on(Hls.Events.MANIFEST_PARSED, () => {
+    setAudioMessage("");
+    void startPlayback();
+  });
+
+  hls.on(Hls.Events.ERROR, (_, data) => {
+    console.error("[Fan Live HLS error]", {
+      type: data.type,
+      details: data.details,
+      reason: data.reason,
+      fatal: data.fatal,
+      response: data.response,
     });
 
-    return () => {
-      hls.destroy();
-      hlsRef.current = null;
-      audio.pause();
-      audio.removeAttribute("src");
-      audio.load();
-    };
-  }, [live?.isLive, live?.playback, startPlayback]);
+    if (!data.fatal) return;
+
+    if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+      setAudioMessage("라이브 오디오 데이터를 다시 연결하고 있어요.");
+      hls.startLoad();
+      return;
+    }
+
+    if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+      setAudioMessage("라이브 오디오 재생을 복구하고 있어요.");
+      hls.recoverMediaError();
+      return;
+    }
+
+    setAudioMessage("라이브 오디오 연결이 종료됐어요.");
+    hls.destroy();
+    hlsRef.current = null;
+  });
+
+  return () => {
+    hls.destroy();
+    hlsRef.current = null;
+    audio.pause();
+    audio.removeAttribute("src");
+    audio.load();
+  };
+}, [live?.isLive, live?.playback, startPlayback]);
 
   const handleToggleMute = () => {
     const audio = audioRef.current;
