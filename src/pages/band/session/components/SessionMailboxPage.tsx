@@ -1,7 +1,13 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import BandProfileImage from "@/assets/Img_Band.png";
+
 import ArrowLeftIcon from "@/assets/icons/arrow-left.svg";
+import UserDefaultProfileIcon from "@/assets/icons/band/user-default-profile.svg";
+import { useSessionChatRoomsQuery } from "@/hooks/api/session/useSessionChat";
+import type {
+  SessionChatRoomFilter,
+  SessionChatRoomListItem,
+} from "@/types/session/sessionChat";
 
 type MailboxTab = "all" | "unread";
 type MessageStatus = "accepted" | "declined";
@@ -15,46 +21,75 @@ interface MessageItem {
   unreadCount?: number;
   showUnreadDot?: boolean;
   status?: MessageStatus;
+  canSend: boolean;
 }
 
-const MESSAGE_ITEMS: MessageItem[] = [
-  {
-    id: 1,
-    senderName: "정하람",
-    profileImageUrl: BandProfileImage,
+const formatChatTime = (
+  value: string | null,
+) => {
+  if (!value) return "";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value.slice(11, 16);
+  }
+
+  return `${String(date.getHours()).padStart(
+    2,
+    "0",
+  )}:${String(date.getMinutes()).padStart(
+    2,
+    "0",
+  )}`;
+};
+
+const toMessageStatus = (
+  value: string | null,
+): MessageStatus | undefined => {
+  if (!value) return undefined;
+
+  if (
+    value.includes("수락") ||
+    value.toUpperCase() === "ACCEPTED"
+  ) {
+    return "accepted";
+  }
+
+  if (
+    value.includes("거절") ||
+    value.toUpperCase() === "REJECTED"
+  ) {
+    return "declined";
+  }
+
+  return undefined;
+};
+
+const mapChatRoomToMessageItem = (
+  room: SessionChatRoomListItem,
+): MessageItem => {
+  return {
+    id: room.chatRoomId,
+    senderName: room.counterpartName,
+    profileImageUrl:
+      room.counterpartProfileImageUrl ||
+      UserDefaultProfileIcon,
     preview:
-      "드럼 세션 지원 관련해서 연락드려요.\n저는 현재 밴드 어쩌구 활동을 하고 있습니다.",
-    time: "10:00",
-    unreadCount: 2,
-    showUnreadDot: true,
-  },
-  {
-    id: 2,
-    senderName: "정하람",
-    profileImageUrl: BandProfileImage,
-    preview:
-      "드럼 세션 지원 관련해서 연락드려요.\n저는 현재 밴드 어쩌구 활동을 하고 있습니다.",
-    time: "10:00",
-  },
-  {
-    id: 3,
-    senderName: "정하람",
-    profileImageUrl: BandProfileImage,
-    preview:
-      "드럼 세션 지원 관련해서 연락드려요.\n저는 현재 밴드 어쩌구 활동을 하고 있습니다.",
-    time: "10:00",
-    status: "accepted",
-  },
-  {
-    id: 4,
-    senderName: "정하람",
-    profileImageUrl: BandProfileImage,
-    preview:
-      "드럼 세션 지원 관련해서 연락드려요.\n저는 현재 밴드 어쩌구 활동을 하고 있습니다.",
-    time: "10:00",
-    status: "declined",
-  },
-];
+      room.lastMessage ||
+      "아직 주고받은 쪽지가 없어요.",
+    time: formatChatTime(room.lastMessageAt),
+    unreadCount:
+      room.unreadCount > 0
+        ? room.unreadCount
+        : undefined,
+    showUnreadDot: room.unreadCount > 0,
+    status: toMessageStatus(
+      room.applicationStatus,
+    ),
+    canSend: room.canSend,
+  };
+};
 
 export default function SessionMailboxPage() {
   const navigate = useNavigate();
@@ -62,14 +97,24 @@ export default function SessionMailboxPage() {
   const [selectedTab, setSelectedTab] =
     useState<MailboxTab>("all");
 
-  const messages =
-    selectedTab === "all"
-      ? MESSAGE_ITEMS
-      : MESSAGE_ITEMS.filter(
-          (message) =>
-            message.showUnreadDot ||
-            Boolean(message.unreadCount),
-        );
+  const filter: SessionChatRoomFilter =
+    selectedTab === "unread"
+      ? "UNREAD"
+      : "ALL";
+
+  const chatRoomsQuery =
+    useSessionChatRoomsQuery({
+      filter,
+      size: 20,
+    });
+
+  const messages = useMemo(
+    () =>
+      chatRoomsQuery.data?.content.map(
+        mapChatRoomToMessageItem,
+      ) ?? [],
+    [chatRoomsQuery.data],
+  );
 
   const handleMessageClick = (
     message: MessageItem,
@@ -81,6 +126,8 @@ export default function SessionMailboxPage() {
           senderName: message.senderName,
           profileImageUrl:
             message.profileImageUrl,
+          chatRoomId: message.id,
+          canSend: message.canSend,
         },
       },
     );
@@ -106,7 +153,15 @@ export default function SessionMailboxPage() {
           }
           className="mt-6 flex flex-col gap-3 px-[15px] pb-8"
         >
-          {messages.length > 0 ? (
+          {chatRoomsQuery.isLoading ? (
+            <MailboxLoading />
+          ) : chatRoomsQuery.isError ? (
+            <MailboxError
+              onRetry={() =>
+                chatRoomsQuery.refetch()
+              }
+            />
+          ) : messages.length > 0 ? (
             messages.map((message) => (
               <MessageCard
                 key={message.id}
@@ -179,9 +234,7 @@ const MailboxTabBar = ({
 
       <MailboxTabButton
         label="안읽음"
-        selected={
-          selectedTab === "unread"
-        }
+        selected={selectedTab === "unread"}
         onClick={() => onChange("unread")}
       />
     </div>
@@ -287,7 +340,7 @@ const MessageCard = ({
         </div>
 
         <p
-          className={`mt-2 whitespace-pre-line text-[12px] leading-[18px] font-medium ${
+          className={`mt-2 line-clamp-2 whitespace-pre-line text-[12px] leading-[18px] font-medium ${
             isDeclined
               ? "text-neutral-400"
               : "text-neutral-800"
@@ -321,8 +374,7 @@ interface MessageStatusBadgeProps {
 const MessageStatusBadge = ({
   status,
 }: MessageStatusBadgeProps) => {
-  const isAccepted =
-    status === "accepted";
+  const isAccepted = status === "accepted";
 
   return (
     <span
@@ -351,6 +403,36 @@ const EmptyMailbox = ({
           ? "받은 쪽지가 없어요."
           : "읽지 않은 쪽지가 없어요."}
       </p>
+    </div>
+  );
+};
+
+const MailboxLoading = () => {
+  return (
+    <div className="flex min-h-[320px] items-center justify-center text-caption1 text-neutral-500">
+      쪽지함을 불러오고 있어요
+    </div>
+  );
+};
+
+const MailboxError = ({
+  onRetry,
+}: {
+  onRetry: () => void;
+}) => {
+  return (
+    <div className="flex min-h-[320px] flex-col items-center justify-center text-center">
+      <p className="text-caption1 text-neutral-500">
+        쪽지함을 불러오지 못했어요
+      </p>
+
+      <button
+        type="button"
+        onClick={onRetry}
+        className="mt-3 rounded-[8px] bg-secondary-500 px-4 py-2 text-caption2 text-neutral-0"
+      >
+        다시 시도
+      </button>
     </div>
   );
 };

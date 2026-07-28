@@ -4,6 +4,8 @@ import {
   createSessionRecruitment,
   deleteSessionRecruitment,
   deleteSessionSearchHistory,
+  getInterestedSessionRecruitments,
+  getRecentlyViewedSessionRecruitments,
   getSessionRecruitmentDetail,
   getSessionRecruitmentEditInfo,
   getSessionRecruitments,
@@ -13,6 +15,7 @@ import {
 } from "@/api/session/sessionRecruitment";
 import type {
   CreateSessionRecruitmentRequest,
+  SessionRecruitmentHistoryParams,
   SessionRecruitmentListParams,
   UpdateSessionRecruitmentRequest,
 } from "@/types/session/sessionRecruitment";
@@ -31,7 +34,15 @@ export const sessionRecruitmentKeys = {
     [...sessionRecruitmentKeys.all, "detail", sessionRecruitmentId] as const,
   editInfo: (sessionRecruitmentId: number) =>
     [...sessionRecruitmentKeys.all, "editInfo", sessionRecruitmentId] as const,
-  searchHistory: () => [...sessionRecruitmentKeys.all, "searchHistory"] as const,
+  searchHistory: () =>
+    [...sessionRecruitmentKeys.all, "searchHistory"] as const,
+  interests: () => [...sessionRecruitmentKeys.all, "interests"] as const,
+  interestList: (params: SessionRecruitmentHistoryParams) =>
+    [...sessionRecruitmentKeys.interests(), params] as const,
+  recentlyViewed: () =>
+    [...sessionRecruitmentKeys.all, "recentlyViewed"] as const,
+  recentlyViewedList: (params: SessionRecruitmentHistoryParams) =>
+    [...sessionRecruitmentKeys.recentlyViewed(), params] as const,
 };
 
 export const useSessionRecruitmentsQuery = (
@@ -85,10 +96,7 @@ export const useUpdateSessionRecruitment = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({
-      sessionRecruitmentId,
-      body,
-    }: UpdateSessionRecruitmentVariables) =>
+    mutationFn: ({ sessionRecruitmentId, body }: UpdateSessionRecruitmentVariables) =>
       updateSessionRecruitment(sessionRecruitmentId, body),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({
@@ -96,6 +104,9 @@ export const useUpdateSessionRecruitment = () => {
       });
       queryClient.invalidateQueries({
         queryKey: sessionRecruitmentKeys.detail(variables.sessionRecruitmentId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: sessionRecruitmentKeys.editInfo(variables.sessionRecruitmentId),
       });
     },
   });
@@ -111,8 +122,17 @@ export const useDeleteSessionRecruitment = () => {
       queryClient.invalidateQueries({
         queryKey: sessionRecruitmentKeys.lists(),
       });
+      queryClient.invalidateQueries({
+        queryKey: sessionRecruitmentKeys.interests(),
+      });
+      queryClient.invalidateQueries({
+        queryKey: sessionRecruitmentKeys.recentlyViewed(),
+      });
       queryClient.removeQueries({
         queryKey: sessionRecruitmentKeys.detail(sessionRecruitmentId),
+      });
+      queryClient.removeQueries({
+        queryKey: sessionRecruitmentKeys.editInfo(sessionRecruitmentId),
       });
     },
   });
@@ -124,12 +144,21 @@ export const useAddSessionRecruitmentInterest = () => {
   return useMutation({
     mutationFn: (sessionRecruitmentId: number) =>
       addSessionRecruitmentInterest(sessionRecruitmentId),
-    onSuccess: (result) => {
+    onSuccess: (result, sessionRecruitmentId) => {
+      const targetRecruitmentId =
+        result?.sessionRecruitmentId ?? sessionRecruitmentId;
+
       queryClient.invalidateQueries({
         queryKey: sessionRecruitmentKeys.lists(),
       });
       queryClient.invalidateQueries({
-        queryKey: sessionRecruitmentKeys.detail(result.sessionRecruitmentId),
+        queryKey: sessionRecruitmentKeys.interests(),
+      });
+      queryClient.invalidateQueries({
+        queryKey: sessionRecruitmentKeys.recentlyViewed(),
+      });
+      queryClient.invalidateQueries({
+        queryKey: sessionRecruitmentKeys.detail(targetRecruitmentId),
       });
     },
   });
@@ -141,12 +170,21 @@ export const useRemoveSessionRecruitmentInterest = () => {
   return useMutation({
     mutationFn: (sessionRecruitmentId: number) =>
       removeSessionRecruitmentInterest(sessionRecruitmentId),
-    onSuccess: (result) => {
+    onSuccess: (result, sessionRecruitmentId) => {
+      const targetRecruitmentId =
+        result?.sessionRecruitmentId ?? sessionRecruitmentId;
+
       queryClient.invalidateQueries({
         queryKey: sessionRecruitmentKeys.lists(),
       });
       queryClient.invalidateQueries({
-        queryKey: sessionRecruitmentKeys.detail(result.sessionRecruitmentId),
+        queryKey: sessionRecruitmentKeys.interests(),
+      });
+      queryClient.invalidateQueries({
+        queryKey: sessionRecruitmentKeys.recentlyViewed(),
+      });
+      queryClient.invalidateQueries({
+        queryKey: sessionRecruitmentKeys.detail(targetRecruitmentId),
       });
     },
   });
@@ -170,5 +208,29 @@ export const useDeleteSessionSearchHistory = () => {
         queryKey: sessionRecruitmentKeys.searchHistory(),
       });
     },
+  });
+};
+
+export const useInterestedSessionRecruitmentsQuery = (
+  params: SessionRecruitmentHistoryParams = {},
+  enabled = true,
+) => {
+  return useQuery({
+    queryKey: sessionRecruitmentKeys.interestList(params),
+    queryFn: () => getInterestedSessionRecruitments(params),
+    enabled,
+    staleTime: 1000 * 30,
+  });
+};
+
+export const useRecentlyViewedSessionRecruitmentsQuery = (
+  params: SessionRecruitmentHistoryParams = {},
+  enabled = true,
+) => {
+  return useQuery({
+    queryKey: sessionRecruitmentKeys.recentlyViewedList(params),
+    queryFn: () => getRecentlyViewedSessionRecruitments(params),
+    enabled,
+    staleTime: 1000 * 30,
   });
 };
