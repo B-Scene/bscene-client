@@ -341,7 +341,7 @@ export function FanLivePlaybackPage() {
         viewCount={replay.viewCount}
         onExit={() => navigate("/fan/live/replays", { replace: true })}
       />
-      <FanLiveHero live={replay} top={176} />
+      <FanLiveHero live={{ ...replay, bandProfileImageUrl: replay.bandProfileImageUrl ?? null }} top={176} />
 
       <audio
         ref={audioRef}
