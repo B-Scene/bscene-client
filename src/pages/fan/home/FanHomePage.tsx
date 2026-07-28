@@ -431,7 +431,7 @@ const mapHomeResponse = (data?: FanHomeResponse) => {
   ).map(mapConcertItem);
 
   return {
-    hasFollowingBands: data?.hasFollowingBands ?? news.length > 0,
+    hasFollowingBands: data?.hasFollowingBands === true,
     performanceType: data?.performanceType,
     news,
     recommendedBands,

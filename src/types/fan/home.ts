@@ -110,6 +110,7 @@ export interface FanHomeConcert {
   time?: string | null;
   dDay?: number | null;
   status?: string | null;
+  isInterested?: boolean;
   createdAt?: string | null;
   popularity?: number | null;
 }
@@ -259,13 +260,23 @@ export interface UpcomingPerformancesResponse {
   hasNext?: boolean;
   nextPage?: number | null;
   page?: number;
+  size?: number;
+  pageSize?: number;
   totalPages?: number;
+  totalCount?: number;
+  totalElements?: number;
+  total?: number;
 }
 
-export interface PerformanceCalendarParams {
-  year?: number;
-  month?: number;
-}
+export type PerformanceCalendarParams =
+  | {
+      year?: never;
+      month?: never;
+    }
+  | {
+      year: number;
+      month: number;
+    };
 
 export type PerformanceCalendarDateItem =
   | string

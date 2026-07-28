@@ -108,6 +108,8 @@ export const SessionChatMessage = ({
 interface SessionChatInputProps {
   inputRef: RefObject<HTMLInputElement | null>;
   value: string;
+  disabled?: boolean;
+  placeholder?: string;
   onChange: (value: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }
@@ -115,6 +117,8 @@ interface SessionChatInputProps {
 export const SessionChatInput = ({
   inputRef,
   value,
+  disabled = false,
+  placeholder = "메시지 입력하기",
   onChange,
   onSubmit,
 }: SessionChatInputProps) => (
@@ -131,16 +135,18 @@ export const SessionChatInput = ({
       id="chat-message"
       type="text"
       value={value}
+      disabled={disabled}
       onChange={(event) => onChange(event.target.value)}
-      placeholder="메시지 입력하기"
+      placeholder={placeholder}
       autoComplete="off"
-      className="h-9 min-w-0 flex-1 rounded-full border border-neutral-400 bg-neutral-0 px-[18px] text-[12px] leading-[18px] text-neutral-900 outline-none placeholder:text-neutral-500 focus:border-secondary-500"
+      className="h-9 min-w-0 flex-1 rounded-full border border-neutral-400 bg-neutral-0 px-[18px] text-[12px] leading-[18px] text-neutral-900 outline-none placeholder:text-neutral-500 focus:border-secondary-500 disabled:bg-neutral-200 disabled:text-neutral-500"
     />
 
     <button
       type="submit"
       aria-label="메시지 보내기"
-      className="relative flex size-9 shrink-0 items-center justify-center"
+      disabled={disabled}
+      className="relative flex size-9 shrink-0 items-center justify-center disabled:opacity-40"
     >
       <img
         src={ChatSendIcon}

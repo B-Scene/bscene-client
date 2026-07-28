@@ -49,6 +49,7 @@ export const SessionRecruitmentDetailScreen = ({
         applicationTitle={screen.completedApplication.applicationTitle}
         onSendMessage={screen.sendMessage}
         onViewApplication={screen.viewCompletedApplication}
+        onGoToSessionHome={onBack}
       />
     );
   }

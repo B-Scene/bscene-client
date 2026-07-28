@@ -5,11 +5,15 @@ import ArrowLeftIcon from "@/assets/icons/arrow-left.svg";
 import UserDefaultProfileIcon from "@/assets/icons/band/user-default-profile.svg";
 import PlayButtonIcon from "@/assets/icons/band/play-button.svg";
 import Button from "@/components/common/Button/Button";
-import { useSessionApplicationDetailQuery } from "@/hooks/api/session/useSessionApplication";
+import {
+  useMySessionApplicationDetailQuery,
+  useSessionApplicationDetailQuery,
+} from "@/hooks/api/session/useSessionApplication";
 
 interface SessionApplicationDetailScreenProps {
   sessionApplicationId: number;
   onBack: () => void;
+  isOwnApplication?: boolean;
 }
 
 type DetailSectionId =
@@ -57,14 +61,39 @@ const DetailChip = ({
 export const SessionApplicationDetailScreen = ({
   sessionApplicationId,
   onBack,
+  isOwnApplication = false,
 }: SessionApplicationDetailScreenProps) => {
   const navigate = useNavigate();
-  const detailQuery =
+
+  const publicDetailQuery =
     useSessionApplicationDetailQuery(
-      sessionApplicationId,
+      isOwnApplication
+        ? 0
+        : sessionApplicationId,
     );
 
-  const detail = detailQuery.data;
+  const myDetailQuery =
+    useMySessionApplicationDetailQuery(
+      isOwnApplication
+        ? sessionApplicationId
+        : 0,
+    );
+
+  const detailQuery = isOwnApplication
+    ? myDetailQuery
+    : publicDetailQuery;
+
+  const detail = isOwnApplication
+    ? myDetailQuery.data
+      ? {
+          ...myDetailQuery.data,
+          userId: null,
+          nickname:
+            myDetailQuery.data.name ||
+            "닉네임 없음",
+        }
+      : undefined
+    : publicDetailQuery.data;
 
   const [activeSection, setActiveSection] =
     useState<DetailSectionId>(
@@ -386,7 +415,7 @@ export const SessionApplicationDetailScreen = ({
         </>
       ) : null}
 
-      {detail ? (
+      {detail && !isOwnApplication ? (
         <div className="fixed inset-x-0 bottom-0 z-10 mx-auto w-full max-w-[393px] bg-neutral-0 px-5 py-4 shadow-[0_-5px_20px_rgba(0,0,0,0.03)]">
           <Button
             tone="orange"

@@ -171,8 +171,7 @@ export const SessionApplicationHistoryPage = ({
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] bg-neutral-0">
-      <main className="mx-auto flex h-dvh w-full max-w-[393px] flex-col overflow-hidden bg-neutral-0">
+    <main className="fixed inset-0 z-[100] mx-auto flex h-dvh w-full max-w-[393px] flex-col overflow-hidden bg-neutral-0">
         <ApplicationHistoryHeader
           onBack={handleClose}
           onClose={handleClose}
@@ -325,8 +324,7 @@ export const SessionApplicationHistoryPage = ({
             )
           ) : null}
         </section>
-      </main>
-    </div>,
+    </main>,
     document.body,
   );
 };

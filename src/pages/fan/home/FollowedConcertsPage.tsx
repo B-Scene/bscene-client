@@ -40,6 +40,7 @@ type ConcertListItem = {
   status: string;
   thumbnailSrc?: string;
   showThumbnail: boolean;
+  isInterested: boolean;
 };
 
 const SORT_TO_API: Record<SortOption, UpcomingPerformanceSort> = {
@@ -203,6 +204,7 @@ const mapPerformanceToConcert = (
     status: concert.status ?? getDday(date, concert.status),
     thumbnailSrc,
     showThumbnail: Boolean(thumbnailSrc),
+    isInterested: concert.isInterested ?? false,
   };
 };
 
@@ -280,7 +282,7 @@ const FollowedConcertsPage = () => {
     isLoading,
     refetch,
   } = upcomingPerformancesQuery;
-  const isRecommendedFallback = fanHomeQuery.data?.hasFollowingBands === false;
+  const isRecommendedFallback = fanHomeQuery.data?.hasFollowingBands !== true;
   const sortButtonClassName = `flex shrink-0 flex-col items-center gap-2.5 rounded-full border px-[10px] py-1 font-body text-caption3 ${
     hasSelectedSort
       ? "border-primary-400 bg-primary-0 text-primary-400"
@@ -410,6 +412,7 @@ const FollowedConcertsPage = () => {
               <ConcertLikeButton
                 concertId={concert.id}
                 concertTitle={concert.title}
+                isInterested={concert.isInterested}
               />
             }
             onClick={() => navigate(`/fan/home/concerts/${concert.id}`)}

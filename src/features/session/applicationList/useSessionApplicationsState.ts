@@ -1,9 +1,4 @@
-// src/features/session/applicationList/useSessionApplicationsState.ts
-
-import {
-  useMemo,
-  useState,
-} from "react";
+import { useMemo, useState } from "react";
 
 import type {
   SessionApplicationDraft,
@@ -28,9 +23,7 @@ interface UseSessionApplicationsStateParams {
     isPublic: boolean,
   ) => void;
 
-  onServerDelete?: (
-    sessionApplicationId: number,
-  ) => void;
+  onServerDelete?: (sessionApplicationId: number) => void | Promise<void>;
 }
 
 export const useSessionApplicationsState = ({
@@ -38,83 +31,46 @@ export const useSessionApplicationsState = ({
   onServerVisibilityChange,
   onServerDelete,
 }: UseSessionApplicationsStateParams) => {
-  const [
-    isApplicationFormOpen,
-    setIsApplicationFormOpen,
-  ] = useState(false);
+  const [isApplicationFormOpen, setIsApplicationFormOpen] = useState(false);
 
-  const [
-    applicationFormMode,
-    setApplicationFormMode,
-  ] =
-    useState<SessionApplicationFormMode>(
-      "create",
-    );
+  const [applicationFormMode, setApplicationFormMode] =
+    useState<SessionApplicationFormMode>("create");
 
-  const [
-    editingApplicationId,
-    setEditingApplicationId,
-  ] = useState<number | null>(null);
+  const [editingApplicationId, setEditingApplicationId] = useState<
+    number | null
+  >(null);
 
-  const [
-    editingInitialValue,
-    setEditingInitialValue,
-  ] =
-    useState<SessionApplicationDraft | null>(
-      null,
-    );
+  const [editingInitialValue, setEditingInitialValue] =
+    useState<SessionApplicationDraft | null>(null);
 
-  const [
-    selectedApplication,
-    setSelectedApplication,
-  ] =
-    useState<ApplicationCardItem | null>(
-      null,
-    );
+  const [selectedApplication, setSelectedApplication] =
+    useState<ApplicationCardItem | null>(null);
 
-  const [
-    localApplications,
-    setLocalApplications,
-  ] = useState<ApplicationCardItem[]>([]);
+  const [localApplications, setLocalApplications] = useState<
+    ApplicationCardItem[]
+  >([]);
 
-  const [
-    applicationOverrides,
-    setApplicationOverrides,
-  ] = useState<
+  const [applicationOverrides, setApplicationOverrides] = useState<
     Record<number, ApplicationCardItem>
   >({});
 
   const serverApplications = useMemo(
-    () =>
-      mapServerApplications(
-        summary,
-        applicationOverrides,
-      ),
+    () => mapServerApplications(summary, applicationOverrides),
     [applicationOverrides, summary],
   );
 
   const applications = useMemo(
-    () => [
-      ...localApplications,
-      ...serverApplications,
-    ],
-    [
-      localApplications,
-      serverApplications,
-    ],
+    () => [...localApplications, ...serverApplications],
+    [localApplications, serverApplications],
   );
 
-  const selectedApplicationDetail =
-    useMemo(() => {
-      if (!selectedApplication) {
-        return null;
-      }
+  const selectedApplicationDetail = useMemo(() => {
+    if (!selectedApplication) {
+      return null;
+    }
 
-      return mapApplicationToDetail(
-        selectedApplication,
-        summary,
-      );
-    }, [selectedApplication, summary]);
+    return mapApplicationToDetail(selectedApplication, summary);
+  }, [selectedApplication, summary]);
 
   const handleOpenCreatePage = () => {
     setApplicationFormMode("create");
@@ -125,16 +81,13 @@ export const useSessionApplicationsState = ({
 
   const handleOpenEditPage = (
     application: ApplicationCardItem,
+    detailDraft?: SessionApplicationDraft,
   ) => {
     setApplicationFormMode("edit");
 
-    setEditingApplicationId(
-      application.sessionApplicationId,
-    );
+    setEditingApplicationId(application.sessionApplicationId);
 
-    setEditingInitialValue(
-      application.draft,
-    );
+    setEditingInitialValue(detailDraft ?? application.draft);
 
     setIsApplicationFormOpen(true);
   };
@@ -147,95 +100,20 @@ export const useSessionApplicationsState = ({
 
   const handleOpenApplicationDetail = (
     application: ApplicationCardItem,
+    detailDraft?: SessionApplicationDraft,
   ) => {
-    setSelectedApplication(application);
+    setSelectedApplication(
+      detailDraft
+        ? {
+            ...application,
+            draft: detailDraft,
+          }
+        : application,
+    );
   };
 
-  const handleCloseApplicationDetail =
-    () => {
-      setSelectedApplication(null);
-    };
-
-  const handleSubmitApplication = (
-    draft: SessionApplicationDraft,
-  ) => {
-    if (
-      applicationFormMode === "edit" &&
-      editingApplicationId !== null
-    ) {
-      const currentApplication =
-        applications.find(
-          (application) =>
-            application.sessionApplicationId ===
-            editingApplicationId,
-        );
-
-      if (!currentApplication) {
-        return;
-      }
-
-      const updatedApplication: ApplicationCardItem =
-        {
-          ...currentApplication,
-
-          displayDate: `${getCurrentDate()} 수정`,
-
-          title: draft.applicationType,
-          purpose: draft.title,
-
-          draft,
-        };
-
-      if (currentApplication.isLocal) {
-        setLocalApplications(
-          (previousApplications) =>
-            previousApplications.map(
-              (application) =>
-                application.sessionApplicationId ===
-                editingApplicationId
-                  ? updatedApplication
-                  : application,
-            ),
-        );
-      } else {
-        setApplicationOverrides(
-          (previousOverrides) => ({
-            ...previousOverrides,
-
-            [editingApplicationId]:
-              updatedApplication,
-          }),
-        );
-      }
-
-      handleCloseApplicationForm();
-      return;
-    }
-
-    const newApplication: ApplicationCardItem =
-      {
-        sessionApplicationId:
-          Date.now(),
-
-        displayDate: `${getCurrentDate()} 작성`,
-
-        title: draft.applicationType,
-        purpose: draft.title,
-
-        isPublic: true,
-        isLocal: true,
-
-        draft,
-      };
-
-    setLocalApplications(
-      (previousApplications) => [
-        newApplication,
-        ...previousApplications,
-      ],
-    );
-
-    handleCloseApplicationForm();
+  const handleCloseApplicationDetail = () => {
+    setSelectedApplication(null);
   };
 
   const handleToggleVisibility = (
@@ -243,57 +121,43 @@ export const useSessionApplicationsState = ({
     nextChecked: boolean,
   ) => {
     if (application.isLocal) {
-      setLocalApplications(
-        (previousApplications) =>
-          previousApplications.map(
-            (item) =>
-              item.sessionApplicationId ===
-              application.sessionApplicationId
-                ? {
-                    ...item,
-                    isPublic: nextChecked,
-                  }
-                : item,
-          ),
+      setLocalApplications((previousApplications) =>
+        previousApplications.map((item) =>
+          item.sessionApplicationId === application.sessionApplicationId
+            ? {
+                ...item,
+                isPublic: nextChecked,
+              }
+            : item,
+        ),
       );
 
       return;
     }
 
-    setApplicationOverrides(
-      (previousOverrides) => ({
-        ...previousOverrides,
+    setApplicationOverrides((previousOverrides) => ({
+      ...previousOverrides,
 
-        [application.sessionApplicationId]:
-          {
-            ...application,
-            isPublic: nextChecked,
-          },
-      }),
-    );
+      [application.sessionApplicationId]: {
+        ...application,
+        isPublic: nextChecked,
+      },
+    }));
 
-    onServerVisibilityChange(
-      application.sessionApplicationId,
-      nextChecked,
-    );
+    onServerVisibilityChange(application.sessionApplicationId, nextChecked);
   };
 
-  const handleDeleteApplication = (
-    application: ApplicationCardItem,
-  ) => {
+  const handleDeleteApplication = (application: ApplicationCardItem) => {
     if (application.isLocal) {
-      setLocalApplications(
-        (previousApplications) =>
-          previousApplications.filter(
-            (item) =>
-              item.sessionApplicationId !==
-              application.sessionApplicationId,
-          ),
+      setLocalApplications((previousApplications) =>
+        previousApplications.filter(
+          (item) =>
+            item.sessionApplicationId !== application.sessionApplicationId,
+        ),
       );
 
       if (
-        selectedApplication
-          ?.sessionApplicationId ===
+        selectedApplication?.sessionApplicationId ===
         application.sessionApplicationId
       ) {
         setSelectedApplication(null);
@@ -302,21 +166,18 @@ export const useSessionApplicationsState = ({
       return;
     }
 
-    onServerDelete?.(
-      application.sessionApplicationId,
-    );
+    onServerDelete?.(application.sessionApplicationId);
   };
 
   return {
     applications,
-    hasApplications:
-      applications.length > 0,
+    hasApplications: applications.length > 0,
 
-    localApplicationCount:
-      localApplications.length,
+    localApplicationCount: localApplications.length,
 
     isApplicationFormOpen,
     applicationFormMode,
+    editingApplicationId,
     editingInitialValue,
 
     selectedApplicationDetail,
@@ -328,24 +189,7 @@ export const useSessionApplicationsState = ({
     handleOpenApplicationDetail,
     handleCloseApplicationDetail,
 
-    handleSubmitApplication,
     handleToggleVisibility,
     handleDeleteApplication,
   };
-};
-
-const getCurrentDate = () => {
-  const now = new Date();
-
-  const year = now.getFullYear();
-
-  const month = String(
-    now.getMonth() + 1,
-  ).padStart(2, "0");
-
-  const day = String(
-    now.getDate(),
-  ).padStart(2, "0");
-
-  return `${year}-${month}-${day}`;
 };

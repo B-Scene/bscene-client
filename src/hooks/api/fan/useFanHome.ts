@@ -169,6 +169,7 @@ export const usePerformancesByDateInfiniteQuery = (
       if (!lastPage.hasNext) return undefined;
       return lastPage.nextPage ?? pages.length;
     },
+    enabled: Boolean(params.date),
     staleTime: 1000 * 30,
   });
 };
