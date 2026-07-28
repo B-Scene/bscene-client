@@ -31,6 +31,7 @@ export type ScheduledLiveCardData = {
   bandName: string;
   scheduledAt: string;
   isMine: boolean;
+  imageUrl?: string | null;
 };
 
 export type ChatMessage = {

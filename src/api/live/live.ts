@@ -6,19 +6,19 @@ import type {
   CreateLiveResponse,
   EnterLiveResponse,
   GetLiveNowListParams,
-  GetScheduledLiveListParams,
   GetReplayListParams,
+  GetScheduledLiveListParams,
   LiveApiResponse,
   LiveHomeResponse,
   LiveMembersResponse,
   LiveNowListResponse,
   LiveReservationResponse,
+  LiveSummaryResponse,
   ReportLiveUserRequest,
   ReportLiveUserResponse,
   ReplayListResponse,
   ReplayPlaybackResponse,
   ScheduledLiveListResponse,
-  LiveSummaryResponse,
   ToggleLiveAlarmResponse,
   UpdateLiveReservationRequest,
   UpdateLiveReservationResponse,
@@ -30,6 +30,26 @@ interface SubscribeViewerCountParams {
   onViewerCount: (viewerCount: number) => void;
   signal?: AbortSignal;
 }
+
+type MaybePaginatedResponse<T> =
+  | {
+      items?: T[];
+      content?: T[];
+      data?: T[];
+      list?: T[];
+      liveNow?: T[];
+      scheduled?: T[];
+      replays?: T[];
+      pageInfo?: {
+        nextCursor?: number | null;
+        hasNext?: boolean;
+      };
+      nextCursor?: number | null;
+      hasNext?: boolean;
+    }
+  | T[]
+  | null
+  | undefined;
 
 const normalizeToken = (value: string) => {
   return value
@@ -119,12 +139,14 @@ const getAccessToken = () => {
 
 const getApiBaseUrl = () => {
   const baseURL =
-    axiosInstance.defaults.baseURL ?? import.meta.env.VITE_API_BASE_URL ?? "/api";
+    axiosInstance.defaults.baseURL ??
+    import.meta.env.VITE_API_BASE_URL ??
+    "/api";
 
   return String(baseURL).replace(/\/$/, "");
 };
 
-const getRtcBaseUrl = () => {
+const getMediaBaseUrl = () => {
   const apiBaseUrl = getApiBaseUrl();
 
   if (/^https?:\/\//i.test(apiBaseUrl)) {
@@ -140,15 +162,29 @@ const getRtcBaseUrl = () => {
   return "";
 };
 
+const getRtcBaseUrl = getMediaBaseUrl;
+
 export const resolveLiveApiUrl = (pathOrUrl: string) => {
   if (/^https?:\/\//i.test(pathOrUrl)) {
     return pathOrUrl;
   }
 
-  const baseURL = getApiBaseUrl();
   const normalizedPath = pathOrUrl.startsWith("/")
     ? pathOrUrl
     : `/${pathOrUrl}`;
+
+  if (
+    normalizedPath.startsWith("/hls/") ||
+    normalizedPath.startsWith("/rtc/")
+  ) {
+    const mediaBaseUrl = getMediaBaseUrl();
+
+    if (!mediaBaseUrl) return normalizedPath;
+
+    return `${mediaBaseUrl}${normalizedPath}`;
+  }
+
+  const baseURL = getApiBaseUrl();
 
   if (baseURL.endsWith("/api") && normalizedPath.startsWith("/api/")) {
     return `${baseURL}${normalizedPath.slice(4)}`;
@@ -195,6 +231,151 @@ const normalizeReplayLiveId = <
   };
 };
 
+const getPaginatedItems = <T>(result: MaybePaginatedResponse<T>) => {
+  if (!result) return [];
+
+  if (Array.isArray(result)) {
+    return result;
+  }
+
+  return (
+    result.items ??
+    result.content ??
+    result.data ??
+    result.list ??
+    result.liveNow ??
+    result.scheduled ??
+    result.replays ??
+    []
+  );
+};
+
+const getPageInfo = <T>(result: MaybePaginatedResponse<T>) => {
+  if (!result || Array.isArray(result)) {
+    return {
+      nextCursor: null,
+      hasNext: false,
+    };
+  }
+
+  return {
+    nextCursor: result.pageInfo?.nextCursor ?? result.nextCursor ?? null,
+    hasNext: result.pageInfo?.hasNext ?? result.hasNext ?? false,
+  };
+};
+
+const normalizeScheduledAt = (value: string) => {
+  const trimmedValue = value.trim();
+
+  if (!trimmedValue) return trimmedValue;
+
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(trimmedValue)) {
+    return trimmedValue;
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(trimmedValue)) {
+    return `${trimmedValue}:00`;
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}$/.test(trimmedValue)) {
+    return `${trimmedValue.replace(" ", "T")}:00`;
+  }
+
+  const matched = trimmedValue.match(
+    /(\d{4})[.\-/년\s]+(\d{1,2})[.\-/월\s]+(\d{1,2}).*?(\d{1,2}):(\d{2})/,
+  );
+
+  if (!matched) {
+    return trimmedValue;
+  }
+
+  const [, year, month, day, hour, minute] = matched;
+
+  return `${year}-${month.padStart(2, "0")}-${day.padStart(
+    2,
+    "0",
+  )}T${hour.padStart(2, "0")}:${minute}:00`;
+};
+
+const getLiveCoHosts = (
+  request: CreateLiveRequest | UpdateLiveReservationRequest,
+) => {
+  if (Array.isArray(request.coHost)) {
+    return request.coHost;
+  }
+
+  if (Array.isArray(request.cohosts)) {
+    return request.cohosts;
+  }
+
+  if (Array.isArray(request.coHostIds)) {
+    return request.coHostIds;
+  }
+
+  if (Array.isArray(request.cohostIds)) {
+    return request.cohostIds;
+  }
+
+  return [];
+};
+
+const normalizeCreateLiveRequest = (request: CreateLiveRequest) => {
+  const normalizedRequest: {
+    title: string;
+    description?: string;
+    thumbnailImageUrl?: string;
+    scheduledAt?: string;
+    coHost: number[];
+  } = {
+    title: request.title.trim(),
+    coHost: getLiveCoHosts(request),
+  };
+
+  const description = request.description?.trim();
+
+  if (description) {
+    normalizedRequest.description = description;
+  }
+
+  if (request.thumbnailImageUrl) {
+    normalizedRequest.thumbnailImageUrl = request.thumbnailImageUrl;
+  }
+
+  if (request.scheduledAt) {
+    normalizedRequest.scheduledAt = normalizeScheduledAt(request.scheduledAt);
+  }
+
+  return normalizedRequest;
+};
+
+const normalizeUpdateLiveReservationRequest = (
+  request: UpdateLiveReservationRequest,
+) => {
+  const normalizedRequest: {
+    title: string;
+    description?: string;
+    thumbnailImageUrl?: string;
+    scheduledAt: string;
+    coHost: number[];
+  } = {
+    title: request.title.trim(),
+    scheduledAt: normalizeScheduledAt(request.scheduledAt),
+    coHost: getLiveCoHosts(request),
+  };
+
+  const description = request.description?.trim();
+
+  if (description) {
+    normalizedRequest.description = description;
+  }
+
+  if (request.thumbnailImageUrl) {
+    normalizedRequest.thumbnailImageUrl = request.thumbnailImageUrl;
+  }
+
+  return normalizedRequest;
+};
+
 export const getLiveBearerAuthorization = () => {
   return `Bearer ${getAccessToken()}`;
 };
@@ -225,13 +406,16 @@ const parseErrorMessage = (responseText: string, fallbackMessage: string) => {
 
 export const getLiveHome = async (): Promise<LiveHomeResponse> => {
   const response =
-    await axiosInstance.get<LiveApiResponse<LiveHomeResponse>>("/lives/home");
+    await axiosInstance.get<LiveApiResponse<Partial<LiveHomeResponse>>>(
+      "/lives/home",
+    );
 
   const result = unwrapResult(response.data);
 
   return {
-    ...result,
-    replays: result.replays.map(normalizeReplayLiveId),
+    liveNow: result.liveNow ?? [],
+    replays: (result.replays ?? []).map(normalizeReplayLiveId),
+    scheduled: result.scheduled ?? [],
   };
 };
 
@@ -241,7 +425,7 @@ export const getLiveNowList = async ({
   size = 10,
 }: GetLiveNowListParams): Promise<LiveNowListResponse> => {
   const response = await axiosInstance.get<
-    LiveApiResponse<LiveNowListResponse>
+    LiveApiResponse<MaybePaginatedResponse<LiveNowListResponse["items"][number]>>
   >(`/lives/live-now/${filter}`, {
     params: {
       cursor,
@@ -249,7 +433,12 @@ export const getLiveNowList = async ({
     },
   });
 
-  return unwrapResult(response.data);
+  const result = unwrapResult(response.data);
+
+  return {
+    items: getPaginatedItems(result),
+    pageInfo: getPageInfo(result),
+  };
 };
 
 export const getScheduledLiveList = async ({
@@ -258,7 +447,9 @@ export const getScheduledLiveList = async ({
   size = 10,
 }: GetScheduledLiveListParams): Promise<ScheduledLiveListResponse> => {
   const response = await axiosInstance.get<
-    LiveApiResponse<ScheduledLiveListResponse>
+    LiveApiResponse<
+      MaybePaginatedResponse<ScheduledLiveListResponse["items"][number]>
+    >
   >("/lives/scheduled", {
     params: {
       following,
@@ -267,7 +458,12 @@ export const getScheduledLiveList = async ({
     },
   });
 
-  return unwrapResult(response.data);
+  const result = unwrapResult(response.data);
+
+  return {
+    items: getPaginatedItems(result),
+    pageInfo: getPageInfo(result),
+  };
 };
 
 export const toggleLiveAlarm = async (
@@ -287,7 +483,7 @@ export const getReplayList = async ({
   size = 10,
 }: GetReplayListParams): Promise<ReplayListResponse> => {
   const response = await axiosInstance.get<
-    LiveApiResponse<ReplayListResponse>
+    LiveApiResponse<MaybePaginatedResponse<ReplayListResponse["items"][number]>>
   >(`/lives/replays/${filter}`, {
     params: {
       sort,
@@ -299,8 +495,8 @@ export const getReplayList = async ({
   const result = unwrapResult(response.data);
 
   return {
-    ...result,
-    items: result.items.map(normalizeReplayLiveId),
+    items: getPaginatedItems(result).map(normalizeReplayLiveId),
+    pageInfo: getPageInfo(result),
   };
 };
 
@@ -319,9 +515,10 @@ export const getReplayPlayback = async (
 export const createLive = async (
   request: CreateLiveRequest,
 ): Promise<CreateLiveResponse> => {
-  const response = await axiosInstance.post<
-    LiveApiResponse<CreateLiveResponse>
-  >("/lives", request);
+  const response = await axiosInstance.post<LiveApiResponse<CreateLiveResponse>>(
+    "/lives",
+    normalizeCreateLiveRequest(request),
+  );
 
   return unwrapResult(response.data);
 };
@@ -329,9 +526,9 @@ export const createLive = async (
 export const enterLive = async (
   liveId: number,
 ): Promise<EnterLiveResponse> => {
-  const response = await axiosInstance.post<
-    LiveApiResponse<EnterLiveResponse>
-  >(`/lives/${liveId}`);
+  const response = await axiosInstance.post<LiveApiResponse<EnterLiveResponse>>(
+    `/lives/${liveId}`,
+  );
 
   return unwrapResult(response.data);
 };
@@ -371,9 +568,9 @@ export const unblockLiveUser = async (
 export const closeLive = async (
   liveId: number,
 ): Promise<CloseLiveResponse> => {
-  const response = await axiosInstance.post<
-    LiveApiResponse<CloseLiveResponse>
-  >(`/lives/${liveId}/close`);
+  const response = await axiosInstance.post<LiveApiResponse<CloseLiveResponse>>(
+    `/lives/${liveId}/close`,
+  );
 
   return unwrapResult(response.data);
 };
@@ -385,9 +582,9 @@ export const requestLiveReplay = async (liveId: number): Promise<void> => {
 export const getLiveSummary = async (
   liveId: number,
 ): Promise<LiveSummaryResponse> => {
-  const response = await axiosInstance.get<
-    LiveApiResponse<LiveSummaryResponse>
-  >(`/lives/${liveId}/summary`);
+  const response = await axiosInstance.get<LiveApiResponse<LiveSummaryResponse>>(
+    `/lives/${liveId}/summary`,
+  );
 
   return unwrapResult(response.data);
 };
@@ -395,9 +592,9 @@ export const getLiveSummary = async (
 export const getLiveMembers = async (
   liveId: number,
 ): Promise<LiveMembersResponse> => {
-  const response = await axiosInstance.get<
-    LiveApiResponse<LiveMembersResponse>
-  >(`/lives/${liveId}/members`);
+  const response = await axiosInstance.get<LiveApiResponse<LiveMembersResponse>>(
+    `/lives/${liveId}/members`,
+  );
 
   return unwrapResult(response.data);
 };
@@ -421,7 +618,7 @@ export const updateLiveReservation = async ({
 }): Promise<UpdateLiveReservationResponse | null> => {
   const response = await axiosInstance.patch<
     LiveApiResponse<UpdateLiveReservationResponse | null>
-  >(`/lives/${liveId}/reservation`, request);
+  >(`/lives/${liveId}/reservation`, normalizeUpdateLiveReservationRequest(request));
 
   return unwrapResult(response.data);
 };
@@ -499,6 +696,9 @@ export const deleteWhipSession = async (
 ): Promise<void> => {
   const response = await fetch(resolveRtcUrl(sessionUrl), {
     method: "DELETE",
+    headers: {
+      Authorization: getWhipAuthorization(),
+    },
   });
 
   if (!response.ok && response.status !== 204 && response.status !== 404) {
