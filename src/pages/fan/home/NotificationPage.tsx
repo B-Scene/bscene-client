@@ -1,29 +1,226 @@
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import ArrowLeftIcon from "@/assets/icons/arrow-left.svg";
 import BandDefaultProfileImage from "@/assets/icons/band/band-default-profile.svg";
+import {
+  useMarkNotificationAsReadMutation,
+  useNotificationsInfiniteQuery,
+} from "@/hooks/api/useNotifications";
+import { useInfiniteScrollObserver } from "@/hooks/useInfiniteScrollObserver";
+import type { NotificationItem } from "@/types/notification";
 
-const NOTIFICATIONS = [
-  {
-    id: "notification-1",
-    title: "WAVY의 라이브가 지금 시작했어요!",
-    time: "1시간 전",
-  },
-  {
-    id: "notification-2",
-    title: "WAVY의 새로운 공연이 등록되었어요!",
-    time: "7일 전",
-  },
-  {
-    id: "notification-3",
-    title: "WAVY 단독 공연이 내일이에요!",
-    time: "2026.6.8.",
-  },
-];
+const NOTIFICATION_PAGE_SIZE = 20;
+
+const formatNotificationTime = (createdAt: string) => {
+  const createdDate = new Date(createdAt);
+
+  if (Number.isNaN(createdDate.getTime())) return "";
+
+  const diffMinutes = Math.max(
+    0,
+    Math.floor((Date.now() - createdDate.getTime()) / 60_000),
+  );
+
+  if (diffMinutes < 1) return "방금 전";
+  if (diffMinutes < 60) return `${diffMinutes}분 전`;
+
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours}시간 전`;
+
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 7) return `${diffDays}일 전`;
+
+  return `${createdDate.getFullYear()}.${createdDate.getMonth() + 1}.${createdDate.getDate()}.`;
+};
+
+const normalizeDeepLink = (deepLink: string) => {
+  if (/^https?:\/\//i.test(deepLink)) {
+    try {
+      const url = new URL(deepLink);
+
+      if (url.origin === window.location.origin) {
+        return `${url.pathname}${url.search}${url.hash}`;
+      }
+    } catch {
+      return deepLink;
+    }
+
+    return deepLink;
+  }
+
+  return deepLink.startsWith("/") ? deepLink : `/${deepLink}`;
+};
+
+const getRouteSuffix = (path: string) => path.match(/[?#].*$/)?.[0] ?? "";
+
+const getMappedDeepLink = (deepLink: string) => {
+  const path = normalizeDeepLink(deepLink);
+
+  if (/^https?:\/\//i.test(path)) return path;
+
+  const postId = path.match(
+    /\/(?:posts?|contents?|news)\/(\d+)(?=[/?#]|$)/i,
+  )?.[1];
+
+  if (postId) {
+    return `/fan/explore/contents/${postId}${getRouteSuffix(path)}`;
+  }
+
+  const concertId = path.match(
+    /\/(?:performances?|concerts?)\/(\d+)(?=[/?#]|$)/i,
+  )?.[1];
+
+  if (concertId) {
+    return `/fan/home/concerts/${concertId}${getRouteSuffix(path)}`;
+  }
+
+  const liveId = path.match(/\/lives?\/(\d+)(?=[/?#]|$)/i)?.[1];
+
+  if (liveId) {
+    return `/fan/live/room/${liveId}${getRouteSuffix(path)}`;
+  }
+
+  const bandId = path.match(/\/bands?\/(\d+)(?=[/?#]|$)/i)?.[1];
+
+  if (bandId) {
+    return `/fan/bands/${bandId}${getRouteSuffix(path)}`;
+  }
+
+  const knownPrefixes = [
+    "/fan/explore/contents/",
+    "/fan/home/concerts/",
+    "/fan/live/room/",
+    "/fan/bands/",
+    "/band/session/messages/",
+  ];
+
+  if (knownPrefixes.some((prefix) => path.startsWith(prefix))) {
+    return path;
+  }
+
+  return null;
+};
+
+const getNotificationTargetPath = (notification: NotificationItem) => {
+  const deepLink = notification.deepLink?.trim();
+
+  if (deepLink) {
+    const mappedPath = getMappedDeepLink(deepLink);
+
+    if (mappedPath) return mappedPath;
+  }
+
+  if (notification.referenceId == null) return null;
+
+  const type = notification.type.toUpperCase();
+
+  if (type.includes("INVITE")) return null;
+
+  if (
+    type.includes("POST") ||
+    type.includes("CONTENT") ||
+    type.includes("NEWS")
+  ) {
+    return `/fan/explore/contents/${notification.referenceId}`;
+  }
+
+  if (type.includes("PERFORMANCE") || type.includes("CONCERT")) {
+    return `/fan/home/concerts/${notification.referenceId}`;
+  }
+
+  if (type.includes("LIVE")) {
+    return `/fan/live/room/${notification.referenceId}`;
+  }
+
+  return `/fan/explore/contents/${notification.referenceId}`;
+};
+
+const NotificationCard = ({ notification }: { notification: NotificationItem }) => {
+  const navigate = useNavigate();
+  const markNotificationAsRead = useMarkNotificationAsReadMutation();
+  const time = formatNotificationTime(notification.createdAt);
+  const targetPath = getNotificationTargetPath(notification);
+  const canNavigate = Boolean(targetPath);
+
+  const handleClick = () => {
+    if (!notification.isRead) {
+      markNotificationAsRead.mutate(notification.notificationId);
+    }
+
+    if (!targetPath) return;
+
+    if (/^https?:\/\//i.test(targetPath)) {
+      window.location.assign(targetPath);
+      return;
+    }
+
+    navigate(targetPath);
+  };
+
+  return (
+    <article
+      className={`flex w-full flex-col items-start gap-2.5 self-stretch rounded-[12px] bg-neutral-0 px-4 py-3 shadow-[0_0_8px_0_rgba(0,0,0,0.10)] ${
+        canNavigate ? "cursor-pointer" : ""
+      } ${notification.isRead ? "opacity-80" : ""}`}
+      onClick={handleClick}
+    >
+      <div className="flex items-center gap-4 self-stretch">
+        <span className="flex size-[45px] shrink-0 items-center justify-center overflow-hidden rounded-full bg-neutral-400">
+          <img
+            src={BandDefaultProfileImage}
+            alt=""
+            className="h-full w-full object-cover"
+          />
+        </span>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start gap-2">
+            <h2 className="m-0 line-clamp-2 flex-1 font-body text-body1 text-neutral-900">
+              {notification.title}
+            </h2>
+            {!notification.isRead ? (
+              <span
+                aria-label="읽지 않은 알림"
+                className="mt-1 size-2 shrink-0 rounded-full bg-primary-400"
+              />
+            ) : null}
+          </div>
+          {notification.body ? (
+            <p className="m-0 mt-1 line-clamp-2 font-body text-caption2 text-neutral-700">
+              {notification.body}
+            </p>
+          ) : null}
+          {time ? (
+            <p className="m-0 mt-1 font-body text-caption2 text-neutral-600">
+              {time}
+            </p>
+          ) : null}
+        </div>
+      </div>
+    </article>
+  );
+};
 
 const NotificationPage = () => {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const hasNotifications = searchParams.get("status") !== "empty";
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isError,
+    isFetchingNextPage,
+    isLoading,
+    refetch,
+  } = useNotificationsInfiniteQuery(NOTIFICATION_PAGE_SIZE);
+  const notifications = useMemo(
+    () => data?.pages.flatMap((page) => page.items) ?? [],
+    [data],
+  );
+  const hasNotifications = notifications.length > 0;
+  const sentinelRef = useInfiniteScrollObserver({
+    enabled: Boolean(hasNextPage) && !isFetchingNextPage,
+    onIntersect: fetchNextPage,
+  });
 
   return (
     <main className="mx-auto min-h-dvh w-full max-w-[393px] bg-primary-0">
@@ -54,33 +251,42 @@ const NotificationPage = () => {
         <span aria-hidden="true" className="size-6" />
       </header>
 
-      {hasNotifications ? (
+      {isLoading ? (
         <section className="flex flex-col gap-3 pl-[23px] pr-[22px] pt-6">
-          {NOTIFICATIONS.map((notification) => (
-            <article
-              key={notification.id}
-              className="flex w-full flex-col items-start gap-2.5 self-stretch rounded-[12px] bg-neutral-0 px-4 py-3 shadow-[0_0_8px_0_rgba(0,0,0,0.10)]"
-            >
-              <div className="flex items-center gap-4 self-stretch">
-                <span className="flex size-[45px] shrink-0 items-center justify-center overflow-hidden rounded-full bg-neutral-400">
-                  <img
-                    src={BandDefaultProfileImage}
-                    alt=""
-                    className="h-full w-full object-cover"
-                  />
-                </span>
-
-                <div className="min-w-0">
-                  <h2 className="m-0 truncate font-body text-body1 text-neutral-900">
-                    {notification.title}
-                  </h2>
-                  <p className="m-0 mt-1 font-body text-caption2 text-neutral-600">
-                    {notification.time}
-                  </p>
-                </div>
-              </div>
-            </article>
+          {Array.from({ length: 3 }).map((_, index) => (
+            <div
+              key={index}
+              className="h-[93px] rounded-[12px] bg-neutral-0 shadow-[0_0_8px_0_rgba(0,0,0,0.10)]"
+            />
           ))}
+        </section>
+      ) : isError ? (
+        <section className="flex h-[calc(100dvh-60px)] flex-col items-center justify-center px-5 text-center">
+          <h2 className="m-0 font-body text-label1 text-neutral-900">
+            알림을 불러오지 못했어요
+          </h2>
+          <button
+            type="button"
+            onClick={() => void refetch()}
+            className="mt-4 rounded-[8px] bg-primary-400 px-4 py-2 font-body text-caption3 text-neutral-0"
+          >
+            다시 시도
+          </button>
+        </section>
+      ) : hasNotifications ? (
+        <section className="flex flex-col gap-3 pl-[23px] pr-[22px] pt-6">
+          {notifications.map((notification) => (
+            <NotificationCard
+              key={notification.notificationId}
+              notification={notification}
+            />
+          ))}
+          <div ref={sentinelRef} aria-hidden="true" className="h-4" />
+          {isFetchingNextPage ? (
+            <p className="m-0 text-center font-body text-caption2 text-neutral-600">
+              더 불러오는 중이에요
+            </p>
+          ) : null}
         </section>
       ) : (
         <section className="flex h-[calc(100dvh-60px)] flex-col items-center pt-[274px] text-center">

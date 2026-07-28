@@ -1,10 +1,16 @@
-import { useState } from "react";
+import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import ArrowLeftIcon from "@/assets/icons/arrow-left.svg";
 import {
   NotificationToggleList,
   type NotificationToggleItem,
 } from "@/components/band/my/NotificationToggleList";
+import {
+  useNotificationSettingsQuery,
+  useUpdateNotificationSettingMutation,
+} from "@/hooks/api/useNotifications";
+import type { NotificationSettingType } from "@/types/notification";
+import { requestAndRegisterWebPushToken } from "@/utils/webPushNotifications";
 
 const CONCERT_ALERT_ITEMS: NotificationToggleItem[] = [
   {
@@ -24,16 +30,42 @@ const CONCERT_ALERT_ITEMS: NotificationToggleItem[] = [
   },
 ];
 
+const DEFAULT_VALUES: Record<string, boolean> = {
+  "new-concert": true,
+  "concert-reminder": true,
+  "concert-info-change": true,
+};
+
+const SETTING_TYPE_BY_ID: Record<string, NotificationSettingType> = {
+  "new-concert": "FAN_FOLLOWED_BAND_PERFORMANCE",
+  "concert-reminder": "FAN_PERFORMANCE_REMINDER",
+  "concert-info-change": "FAN_PERFORMANCE_UPDATE",
+};
+
 const ConcertAlertSettingsPage = () => {
   const navigate = useNavigate();
-  const [values, setValues] = useState<Record<string, boolean>>({
-    "new-concert": true,
-    "concert-reminder": true,
-    "concert-info-change": true,
-  });
+  const { data: notificationSettings } = useNotificationSettingsQuery("FAN");
+  const updateNotificationSetting = useUpdateNotificationSettingMutation();
+  const values = useMemo(
+    () => ({ ...DEFAULT_VALUES, ...notificationSettings?.values }),
+    [notificationSettings?.values],
+  );
 
-  const toggle = (id: string) =>
-    setValues((prev) => ({ ...prev, [id]: !prev[id] }));
+  const toggle = (id: string, checked: boolean) => {
+    const settingType = SETTING_TYPE_BY_ID[id];
+
+    if (!settingType) return;
+
+    if (checked) {
+      void requestAndRegisterWebPushToken().catch(() => undefined);
+    }
+
+    updateNotificationSetting.mutate({
+      mode: "FAN",
+      settingType,
+      enabled: checked,
+    });
+  };
 
   return (
     <main className="min-h-dvh bg-neutral-0 px-5 pb-[calc(var(--bottom-nav-height)+24px)]">
