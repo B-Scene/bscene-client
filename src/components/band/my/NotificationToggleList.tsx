@@ -12,6 +12,7 @@ interface NotificationToggleListProps {
   values: Record<string, boolean>;
   onToggle: (id: string, checked: boolean) => void;
   tone?: "primary" | "secondary";
+  disabled?: boolean;
 }
 
 export const NotificationToggleList = ({
@@ -19,6 +20,7 @@ export const NotificationToggleList = ({
   values,
   onToggle,
   tone = "secondary",
+  disabled = false,
 }: NotificationToggleListProps) => (
   <div className="flex flex-col gap-4">
     {items.map((item) => (
@@ -36,6 +38,7 @@ export const NotificationToggleList = ({
             onChange={(checked) => onToggle(item.id, checked)}
             label={item.title}
             tone={tone}
+            disabled={disabled}
           />
         </div>
 

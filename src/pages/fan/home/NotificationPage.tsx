@@ -7,139 +7,23 @@ import {
   useNotificationsInfiniteQuery,
 } from "@/hooks/api/useNotifications";
 import { useInfiniteScrollObserver } from "@/hooks/useInfiniteScrollObserver";
+import {
+  FAN_NOTIFICATION_ROUTES,
+  formatNotificationTime,
+  getNotificationTargetPath,
+} from "@/utils/notificationDeepLink";
 import type { NotificationItem } from "@/types/notification";
 
 const NOTIFICATION_PAGE_SIZE = 20;
-
-const formatNotificationTime = (createdAt: string) => {
-  const createdDate = new Date(createdAt);
-
-  if (Number.isNaN(createdDate.getTime())) return "";
-
-  const diffMinutes = Math.max(
-    0,
-    Math.floor((Date.now() - createdDate.getTime()) / 60_000),
-  );
-
-  if (diffMinutes < 1) return "방금 전";
-  if (diffMinutes < 60) return `${diffMinutes}분 전`;
-
-  const diffHours = Math.floor(diffMinutes / 60);
-  if (diffHours < 24) return `${diffHours}시간 전`;
-
-  const diffDays = Math.floor(diffHours / 24);
-  if (diffDays < 7) return `${diffDays}일 전`;
-
-  return `${createdDate.getFullYear()}.${createdDate.getMonth() + 1}.${createdDate.getDate()}.`;
-};
-
-const normalizeDeepLink = (deepLink: string) => {
-  if (/^https?:\/\//i.test(deepLink)) {
-    try {
-      const url = new URL(deepLink);
-
-      if (url.origin === window.location.origin) {
-        return `${url.pathname}${url.search}${url.hash}`;
-      }
-    } catch {
-      return deepLink;
-    }
-
-    return deepLink;
-  }
-
-  return deepLink.startsWith("/") ? deepLink : `/${deepLink}`;
-};
-
-const getRouteSuffix = (path: string) => path.match(/[?#].*$/)?.[0] ?? "";
-
-const getMappedDeepLink = (deepLink: string) => {
-  const path = normalizeDeepLink(deepLink);
-
-  if (/^https?:\/\//i.test(path)) return path;
-
-  const postId = path.match(
-    /\/(?:posts?|contents?|news)\/(\d+)(?=[/?#]|$)/i,
-  )?.[1];
-
-  if (postId) {
-    return `/fan/explore/contents/${postId}${getRouteSuffix(path)}`;
-  }
-
-  const concertId = path.match(
-    /\/(?:performances?|concerts?)\/(\d+)(?=[/?#]|$)/i,
-  )?.[1];
-
-  if (concertId) {
-    return `/fan/home/concerts/${concertId}${getRouteSuffix(path)}`;
-  }
-
-  const liveId = path.match(/\/lives?\/(\d+)(?=[/?#]|$)/i)?.[1];
-
-  if (liveId) {
-    return `/fan/live/room/${liveId}${getRouteSuffix(path)}`;
-  }
-
-  const bandId = path.match(/\/bands?\/(\d+)(?=[/?#]|$)/i)?.[1];
-
-  if (bandId) {
-    return `/fan/bands/${bandId}${getRouteSuffix(path)}`;
-  }
-
-  const knownPrefixes = [
-    "/fan/explore/contents/",
-    "/fan/home/concerts/",
-    "/fan/live/room/",
-    "/fan/bands/",
-    "/band/session/messages/",
-  ];
-
-  if (knownPrefixes.some((prefix) => path.startsWith(prefix))) {
-    return path;
-  }
-
-  return null;
-};
-
-const getNotificationTargetPath = (notification: NotificationItem) => {
-  const deepLink = notification.deepLink?.trim();
-
-  if (deepLink) {
-    const mappedPath = getMappedDeepLink(deepLink);
-
-    if (mappedPath) return mappedPath;
-  }
-
-  if (notification.referenceId == null) return null;
-
-  const type = notification.type.toUpperCase();
-
-  if (type.includes("INVITE")) return null;
-
-  if (
-    type.includes("POST") ||
-    type.includes("CONTENT") ||
-    type.includes("NEWS")
-  ) {
-    return `/fan/explore/contents/${notification.referenceId}`;
-  }
-
-  if (type.includes("PERFORMANCE") || type.includes("CONCERT")) {
-    return `/fan/home/concerts/${notification.referenceId}`;
-  }
-
-  if (type.includes("LIVE")) {
-    return `/fan/live/room/${notification.referenceId}`;
-  }
-
-  return `/fan/explore/contents/${notification.referenceId}`;
-};
 
 const NotificationCard = ({ notification }: { notification: NotificationItem }) => {
   const navigate = useNavigate();
   const markNotificationAsRead = useMarkNotificationAsReadMutation();
   const time = formatNotificationTime(notification.createdAt);
-  const targetPath = getNotificationTargetPath(notification);
+  const targetPath = getNotificationTargetPath(
+    notification,
+    FAN_NOTIFICATION_ROUTES,
+  );
   const canNavigate = Boolean(targetPath);
 
   const handleClick = () => {
@@ -157,12 +41,22 @@ const NotificationCard = ({ notification }: { notification: NotificationItem }) 
     navigate(targetPath);
   };
 
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+
+    event.preventDefault();
+    handleClick();
+  };
+
   return (
     <article
+      role={canNavigate ? "button" : undefined}
+      tabIndex={canNavigate ? 0 : undefined}
       className={`flex w-full flex-col items-start gap-2.5 self-stretch rounded-[12px] bg-neutral-0 px-4 py-3 shadow-[0_0_8px_0_rgba(0,0,0,0.10)] ${
         canNavigate ? "cursor-pointer" : ""
       } ${notification.isRead ? "opacity-80" : ""}`}
       onClick={handleClick}
+      onKeyDown={canNavigate ? handleKeyDown : undefined}
     >
       <div className="flex items-center gap-4 self-stretch">
         <span className="flex size-[45px] shrink-0 items-center justify-center overflow-hidden rounded-full bg-neutral-400">

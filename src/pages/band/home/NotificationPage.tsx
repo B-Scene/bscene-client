@@ -11,7 +11,17 @@ import {
   useMarkNotificationAsReadMutation,
   useNotificationsInfiniteQuery,
 } from "@/hooks/api/useNotifications";
+import {
+  useAcceptBandInviteMutation,
+  useRejectBandInviteMutation,
+} from "@/hooks/api/band/useBandMember";
 import { useInfiniteScrollObserver } from "@/hooks/useInfiniteScrollObserver";
+import {
+  BAND_NOTIFICATION_ROUTES,
+  formatNotificationTime,
+  getNotificationTargetPath,
+} from "@/utils/notificationDeepLink";
+import type { BandMemberPart } from "@/types/band/bandMember";
 import type {
   NotificationBandInvite,
   NotificationItem,
@@ -19,27 +29,12 @@ import type {
 
 const PART_OPTIONS = ["보컬", "기타", "베이스", "드럼", "키보드"];
 const NOTIFICATION_PAGE_SIZE = 20;
-
-const formatNotificationTime = (createdAt: string) => {
-  const createdDate = new Date(createdAt);
-
-  if (Number.isNaN(createdDate.getTime())) return "";
-
-  const diffMinutes = Math.max(
-    0,
-    Math.floor((Date.now() - createdDate.getTime()) / 60_000),
-  );
-
-  if (diffMinutes < 1) return "방금 전";
-  if (diffMinutes < 60) return `${diffMinutes}분 전`;
-
-  const diffHours = Math.floor(diffMinutes / 60);
-  if (diffHours < 24) return `${diffHours}시간 전`;
-
-  const diffDays = Math.floor(diffHours / 24);
-  if (diffDays < 7) return `${diffDays}일 전`;
-
-  return `${createdDate.getFullYear()}.${createdDate.getMonth() + 1}.${createdDate.getDate()}.`;
+const PART_LABEL_TO_ENUM: Record<string, BandMemberPart> = {
+  보컬: "VOCAL",
+  기타: "GUITAR",
+  베이스: "BASS",
+  드럼: "DRUM",
+  키보드: "KEYBOARD",
 };
 
 const getStringField = (
@@ -79,107 +74,8 @@ const getBandInviteImage = (bandInvite: NotificationBandInvite | null) =>
   getStringField(bandInvite, "bandProfileImageUrl") ??
   BandDefaultProfileImage;
 
-const normalizeDeepLink = (deepLink: string) => {
-  if (/^https?:\/\//i.test(deepLink)) {
-    try {
-      const url = new URL(deepLink);
-
-      if (url.origin === window.location.origin) {
-        return `${url.pathname}${url.search}${url.hash}`;
-      }
-    } catch {
-      return deepLink;
-    }
-
-    return deepLink;
-  }
-
-  return deepLink.startsWith("/") ? deepLink : `/${deepLink}`;
-};
-
-const getRouteSuffix = (path: string) => path.match(/[?#].*$/)?.[0] ?? "";
-
-const getMappedDeepLink = (deepLink: string) => {
-  const path = normalizeDeepLink(deepLink);
-
-  if (/^https?:\/\//i.test(path)) return path;
-
-  const postId = path.match(
-    /\/(?:posts?|contents?|news)\/(\d+)(?=[/?#]|$)/i,
-  )?.[1];
-
-  if (postId) {
-    return `/fan/explore/contents/${postId}${getRouteSuffix(path)}`;
-  }
-
-  const concertId = path.match(
-    /\/(?:performances?|concerts?)\/(\d+)(?=[/?#]|$)/i,
-  )?.[1];
-
-  if (concertId) {
-    return `/fan/home/concerts/${concertId}${getRouteSuffix(path)}`;
-  }
-
-  const liveId = path.match(/\/lives?\/(\d+)(?=[/?#]|$)/i)?.[1];
-
-  if (liveId) {
-    return `/fan/live/room/${liveId}${getRouteSuffix(path)}`;
-  }
-
-  const bandId = path.match(/\/bands?\/(\d+)(?=[/?#]|$)/i)?.[1];
-
-  if (bandId) {
-    return `/fan/bands/${bandId}${getRouteSuffix(path)}`;
-  }
-
-  const knownPrefixes = [
-    "/fan/explore/contents/",
-    "/fan/home/concerts/",
-    "/fan/live/room/",
-    "/fan/bands/",
-    "/band/session/messages/",
-  ];
-
-  if (knownPrefixes.some((prefix) => path.startsWith(prefix))) {
-    return path;
-  }
-
-  return null;
-};
-
-const getNotificationTargetPath = (notification: NotificationItem) => {
-  const deepLink = notification.deepLink?.trim();
-
-  if (deepLink) {
-    const mappedPath = getMappedDeepLink(deepLink);
-
-    if (mappedPath) return mappedPath;
-  }
-
-  if (notification.referenceId == null) return null;
-
-  const type = notification.type.toUpperCase();
-
-  if (type.includes("INVITE")) return null;
-
-  if (
-    type.includes("POST") ||
-    type.includes("CONTENT") ||
-    type.includes("NEWS")
-  ) {
-    return `/fan/explore/contents/${notification.referenceId}`;
-  }
-
-  if (type.includes("PERFORMANCE") || type.includes("CONCERT")) {
-    return `/fan/home/concerts/${notification.referenceId}`;
-  }
-
-  if (type.includes("LIVE")) {
-    return `/fan/live/room/${notification.referenceId}`;
-  }
-
-  return `/fan/explore/contents/${notification.referenceId}`;
-};
+const getBandInviteBandId = (notification: NotificationItem) =>
+  getNumberField(notification.bandInvite, "bandId");
 
 const NotificationPage = () => {
   const navigate = useNavigate();
@@ -193,6 +89,8 @@ const NotificationPage = () => {
     refetch,
   } = useNotificationsInfiniteQuery(NOTIFICATION_PAGE_SIZE);
   const markNotificationAsRead = useMarkNotificationAsReadMutation();
+  const acceptBandInvite = useAcceptBandInviteMutation();
+  const rejectBandInvite = useRejectBandInviteMutation();
   const notifications = useMemo(
     () => data?.pages.flatMap((page) => page.items) ?? [],
     [data],
@@ -205,12 +103,19 @@ const NotificationPage = () => {
 
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
   const [isCompleteModalOpen, setIsCompleteModalOpen] = useState(false);
+  const [selectedInviteNotification, setSelectedInviteNotification] =
+    useState<NotificationItem | null>(null);
   const [activityName, setActivityName] = useState("");
   const [part, setPart] = useState("");
   const canConfirmRole = activityName.trim().length > 0 && part.length > 0;
+  const isInviteActionPending =
+    acceptBandInvite.isPending || rejectBandInvite.isPending;
 
   const handleNotificationClick = (notification: NotificationItem) => {
-    const targetPath = getNotificationTargetPath(notification);
+    const targetPath = getNotificationTargetPath(
+      notification,
+      BAND_NOTIFICATION_ROUTES,
+    );
 
     if (!notification.isRead) {
       markNotificationAsRead.mutate(notification.notificationId);
@@ -224,6 +129,47 @@ const NotificationPage = () => {
     }
 
     navigate(targetPath);
+  };
+
+  const handleRejectInvite = async (notification: NotificationItem) => {
+    const bandId = getBandInviteBandId(notification);
+
+    if (bandId == null) return;
+
+    if (!notification.isRead) {
+      markNotificationAsRead.mutate(notification.notificationId);
+    }
+
+    await rejectBandInvite.mutateAsync({ bandId });
+    void refetch();
+  };
+
+  const handleAcceptInviteConfirm = async () => {
+    const notification = selectedInviteNotification;
+    const bandId = notification ? getBandInviteBandId(notification) : null;
+    const partEnum = PART_LABEL_TO_ENUM[part];
+
+    if (!notification || bandId == null || !partEnum || !activityName.trim()) {
+      return;
+    }
+
+    if (!notification.isRead) {
+      markNotificationAsRead.mutate(notification.notificationId);
+    }
+
+    await acceptBandInvite.mutateAsync({
+      bandId,
+      body: {
+        nickname: activityName.trim(),
+        part: partEnum,
+      },
+    });
+    void refetch();
+    setIsRoleModalOpen(false);
+    setIsCompleteModalOpen(true);
+    setSelectedInviteNotification(null);
+    setActivityName("");
+    setPart("");
   };
 
   return (
@@ -283,7 +229,10 @@ const NotificationPage = () => {
             const time = formatNotificationTime(notification.createdAt);
             const isBandInvite =
               notification.type === "BAND_INVITE" && notification.bandInvite;
-            const targetPath = getNotificationTargetPath(notification);
+            const targetPath = getNotificationTargetPath(
+              notification,
+              BAND_NOTIFICATION_ROUTES,
+            );
 
             if (isBandInvite) {
               const bandInvite = notification.bandInvite;
@@ -370,21 +319,19 @@ const NotificationPage = () => {
                     <div className="mx-auto flex w-full max-w-75 gap-5">
                       <button
                         type="button"
+                        disabled={isInviteActionPending}
                         onClick={(event) => {
                           event.stopPropagation();
 
-                          if (!notification.isRead) {
-                            markNotificationAsRead.mutate(
-                              notification.notificationId,
-                            );
-                          }
+                          void handleRejectInvite(notification);
                         }}
-                        className="flex h-7.5 w-35 flex-1 items-center justify-center rounded-md border border-secondary-500 bg-neutral-0 text-caption3 text-secondary-500"
+                        className="flex h-7.5 w-35 flex-1 items-center justify-center rounded-md border border-secondary-500 bg-neutral-0 text-caption3 text-secondary-500 disabled:opacity-60"
                       >
                         거절
                       </button>
                       <button
                         type="button"
+                        disabled={isInviteActionPending}
                         onClick={(event) => {
                           event.stopPropagation();
 
@@ -394,9 +341,10 @@ const NotificationPage = () => {
                             );
                           }
 
+                          setSelectedInviteNotification(notification);
                           setIsRoleModalOpen(true);
                         }}
-                        className="flex h-7.5 w-35 flex-1 items-center justify-center rounded-md bg-secondary-500 text-caption3 text-neutral-0"
+                        className="flex h-7.5 w-35 flex-1 items-center justify-center rounded-md bg-secondary-500 text-caption3 text-neutral-0 disabled:opacity-60"
                       >
                         수락
                       </button>
@@ -474,7 +422,10 @@ const NotificationPage = () => {
 
       <ModalOverlay
         open={isRoleModalOpen}
-        onClose={() => setIsRoleModalOpen(false)}
+        onClose={() => {
+          setIsRoleModalOpen(false);
+          setSelectedInviteNotification(null);
+        }}
         clipContent={false}
       >
         <div className="box-border flex w-88.5 max-w-full flex-col gap-6 rounded-2xl bg-neutral-0 px-4 py-6">
@@ -518,18 +469,18 @@ const NotificationPage = () => {
           <div className="flex gap-2.5">
             <button
               type="button"
-              onClick={() => setIsRoleModalOpen(false)}
+              onClick={() => {
+                setIsRoleModalOpen(false);
+                setSelectedInviteNotification(null);
+              }}
               className="flex h-9.5 flex-1 items-center justify-center rounded-md border border-secondary-500 bg-neutral-0 text-body1 text-secondary-500"
             >
               취소
             </button>
             <button
               type="button"
-              disabled={!canConfirmRole}
-              onClick={() => {
-                setIsRoleModalOpen(false);
-                setIsCompleteModalOpen(true);
-              }}
+              disabled={!canConfirmRole || isInviteActionPending}
+              onClick={() => void handleAcceptInviteConfirm()}
               className="flex h-9.5 flex-1 items-center justify-center rounded-md bg-secondary-500 text-body1 text-neutral-0 disabled:opacity-60"
             >
               확인
