@@ -903,6 +903,7 @@ const FanHomePage = () => {
     const isRecommendedPerformances =
       variant === "recommended" || homeData.performanceType === "RECOMMENDED";
     const hasInterestedConcerts = interestedConcerts.length > 0;
+    const hasUpcomingConcerts = upcomingConcerts.length > 0;
 
     if (isNewHome) {
       return (
@@ -951,11 +952,17 @@ const FanHomePage = () => {
 
           <section className="mt-8">
             <SectionHeader
-              title={hasInterestedConcerts ? "다가오는 공연" : "다가오는 공연이 없어요"}
+              title={
+                hasUpcomingConcerts
+                  ? hasInterestedConcerts
+                    ? "다가오는 공연"
+                    : "이런 공연은 어때요?"
+                  : "다가오는 공연이 없어요"
+              }
               description={
-                hasInterestedConcerts
-                  ? undefined
-                  : "지금 인기 있는 공연을 추천해드릴게요!"
+                !hasInterestedConcerts && hasUpcomingConcerts
+                  ? "지금 인기 있는 공연을 추천해드릴게요!"
+                  : undefined
               }
               onMoreClick={() => navigate("/fan/home/concerts")}
             />

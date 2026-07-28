@@ -241,7 +241,7 @@ export const getMyProfiles = async (
     { params },
   );
 
-  if (!data.isSuccess || data.result == null) {
+  if (data.isSuccess === false) {
     throw new Error(data.message || "프로필 목록을 조회하지 못했어요.");
   }
 

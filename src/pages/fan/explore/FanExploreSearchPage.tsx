@@ -1,10 +1,11 @@
 import type { FormEvent } from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ArrowLeftIcon from "@/assets/icons/arrow-left.svg";
 import CloseIcon from "@/assets/icons/close.svg";
 import TimesCircleIcon from "@/assets/icons/ic_Times Circle.svg";
 import SearchIcon from "@/assets/icons/band/search.svg";
+import { Toast } from "@/components/common/Toast/Toast";
 import {
   useDeleteAllFanExploreRecentSearches,
   useDeleteFanExploreRecentSearch,
@@ -24,6 +25,7 @@ const FanExploreSearchPage = () => {
     getRecentSearches(),
   );
   const [hiddenRecentKeywords, setHiddenRecentKeywords] = useState<string[]>([]);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const recentSearchesQuery = useFanExploreRecentSearchesQuery();
   const deleteRecentSearchMutation = useDeleteFanExploreRecentSearch();
   const deleteAllRecentSearchesMutation =
@@ -85,6 +87,14 @@ const FanExploreSearchPage = () => {
     navigate(`/fan/explore/search/results?q=${encodeURIComponent(trimmedKeyword)}`);
   };
 
+  useEffect(() => {
+    if (!toastMessage) return;
+
+    const timerId = window.setTimeout(() => setToastMessage(null), 2000);
+
+    return () => window.clearTimeout(timerId);
+  }, [toastMessage]);
+
   const updateRecentKeywords = (keywords: string[]) => {
     const hiddenKeywords = baseRecentItems
       .map(({ keyword: recentKeyword }) => recentKeyword)
@@ -109,7 +119,12 @@ const FanExploreSearchPage = () => {
     const nextKeywords = recentKeywords.filter((item) => item !== recentKeyword);
 
     if (recentSearchId != null) {
-      await deleteRecentSearchMutation.mutateAsync(recentSearchId);
+      try {
+        await deleteRecentSearchMutation.mutateAsync(recentSearchId);
+      } catch {
+        setToastMessage("최근 검색어 삭제에 실패했어요");
+        return;
+      }
     }
 
     setHiddenRecentKeywords((currentKeywords) =>
@@ -223,6 +238,12 @@ const FanExploreSearchPage = () => {
           )}
         </section>
       </div>
+      <Toast
+        open={toastMessage !== null}
+        message={toastMessage}
+        onClose={() => setToastMessage(null)}
+        tone="error"
+      />
     </main>
   );
 };

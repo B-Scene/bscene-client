@@ -239,10 +239,6 @@ const FanBandProfilePage = () => {
     location.state as { bandPreview?: FanExploreBandDetail } | null
   )?.bandPreview;
   const currentBandId = bandId;
-  const [followingOverride, setFollowingOverride] = useState<boolean | null>(null);
-  const [followerCountOverride, setFollowerCountOverride] = useState<number | null>(
-    null,
-  );
   const [activeTab, setActiveTab] = useState<ProfileTab>("콘텐츠");
   const [isUnfollowModalOpen, setIsUnfollowModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -280,10 +276,8 @@ const FanBandProfilePage = () => {
     bandDetail?.bandProfileImageUrl ??
     bandDetail?.imageUrl ??
     BandImage;
-  const followerCount =
-    followerCountOverride ?? bandDetail?.followerCount ?? bandDetail?.followers ?? 0;
+  const followerCount = bandDetail?.followerCount ?? bandDetail?.followers ?? 0;
   const isFollowing =
-    followingOverride ??
     bandDetail?.isFollowing ??
     bandDetail?.following ??
     false;
@@ -336,8 +330,6 @@ const FanBandProfilePage = () => {
 
     try {
       await followBandMutation.mutateAsync(numericBandId);
-      setFollowingOverride(true);
-      setFollowerCountOverride((count) => (count ?? followerCount) + 1);
       setToastMessage(`${bandName}를 팔로우했어요`);
     } catch {
       setToastMessage("밴드 팔로우에 실패했어요");
@@ -347,15 +339,9 @@ const FanBandProfilePage = () => {
   const confirmUnfollow = async () => {
     if (!canToggleFollow || isFollowPending) return;
 
-    const nextIsFollowing = !isFollowing;
-
     try {
       await unfollowBandMutation.mutateAsync(numericBandId);
 
-      setFollowingOverride(nextIsFollowing);
-      setFollowerCountOverride((count) =>
-        Math.max(0, (count ?? followerCount) - 1),
-      );
       setIsUnfollowModalOpen(false);
       setToastMessage(`${bandName} 팔로우를 취소했어요`);
     } catch {
