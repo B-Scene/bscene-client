@@ -1,12 +1,18 @@
-import { useState } from "react";
+import { useMemo } from "react";
 import { Header } from "@/components/band/home/Header";
 import { useActiveBandId } from "@/hooks/api/user/useMyProfiles";
 import { useBandQuery } from "@/hooks/api/band/useBand";
+import {
+  useNotificationSettingsQuery,
+  useUpdateNotificationSettingMutation,
+} from "@/hooks/api/useNotifications";
 import { NotificationBandBanner } from "@/components/band/my/NotificationBandBanner";
 import {
   NotificationToggleList,
   type NotificationToggleItem,
 } from "@/components/band/my/NotificationToggleList";
+import type { NotificationSettingType } from "@/types/notification";
+import { requestAndRegisterWebPushToken } from "@/utils/webPushNotifications";
 
 const RECRUIT_ALERT_ITEMS: NotificationToggleItem[] = [
   {
@@ -26,19 +32,45 @@ const RECRUIT_ALERT_ITEMS: NotificationToggleItem[] = [
   },
 ];
 
+const DEFAULT_VALUES: Record<string, boolean> = {
+  "new-applicant": true,
+  "application-status": true,
+  "recruit-deadline": false,
+};
+
+const SETTING_TYPE_BY_ID: Record<string, NotificationSettingType> = {
+  "new-applicant": "BAND_NEW_SESSION_APPLICATION",
+  "application-status": "BAND_SESSION_APPLICATION_STATUS",
+  "recruit-deadline": "BAND_SESSION_RECRUITMENT_DEADLINE",
+};
+
 const RecruitAlertSettingsPage = () => {
   const activeBandId = useActiveBandId();
   const { data: band } = useBandQuery(activeBandId ?? NaN);
+  const { data: notificationSettings } = useNotificationSettingsQuery("BAND");
+  const updateNotificationSetting = useUpdateNotificationSettingMutation();
   const bandName = band?.name ?? "";
 
-  const [values, setValues] = useState<Record<string, boolean>>({
-    "new-applicant": true,
-    "application-status": true,
-    "recruit-deadline": false,
-  });
+  const values = useMemo(
+    () => ({ ...DEFAULT_VALUES, ...notificationSettings?.values }),
+    [notificationSettings?.values],
+  );
 
-  const toggle = (id: string) =>
-    setValues((prev) => ({ ...prev, [id]: !prev[id] }));
+  const toggle = (id: string, checked: boolean) => {
+    const settingType = SETTING_TYPE_BY_ID[id];
+
+    if (!settingType) return;
+
+    if (checked) {
+      void requestAndRegisterWebPushToken().catch(() => undefined);
+    }
+
+    updateNotificationSetting.mutate({
+      mode: "BAND",
+      settingType,
+      enabled: checked,
+    });
+  };
 
   return (
     <main className="min-h-dvh bg-neutral-0 pb-24">
