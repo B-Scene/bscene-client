@@ -81,7 +81,7 @@ const NotificationPage = () => {
   const canConfirmRole = activityName.trim().length > 0 && part.length > 0;
 
   return (
-    <main className="min-h-dvh bg-secondary-0">
+    <main className="mx-auto min-h-dvh w-full max-w-[393px] bg-secondary-0">
       <header className="flex h-[60px] items-center justify-between bg-neutral-0 px-[15px]">
         <button
           type="button"

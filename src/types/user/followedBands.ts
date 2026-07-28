@@ -13,12 +13,34 @@ export interface GetFollowedBandsParams {
 }
 
 export interface FollowedBandItem {
-  bandId: number;
-  name: string;
-  genre: string;
-  region: string;
-  profileImageUrl: string | null;
-  followerCount: number;
+  band?: {
+    bandId?: number;
+    id?: number | string;
+    name?: string;
+    bandName?: string;
+    genre?: string | null;
+    region?: string | null;
+    profileImageUrl?: string | null;
+    bandProfileImageUrl?: string | null;
+    imageUrl?: string | null;
+    followerCount?: number;
+    followers?: number;
+  };
+  bandId?: number;
+  targetBandId?: number;
+  followingBandId?: number;
+  followedBandId?: number;
+  followId?: number;
+  id?: number | string;
+  name?: string;
+  bandName?: string;
+  genre?: string | null;
+  region?: string | null;
+  profileImageUrl?: string | null;
+  bandProfileImageUrl?: string | null;
+  imageUrl?: string | null;
+  followerCount?: number;
+  followers?: number;
 }
 
 export interface FollowedBandsResponse {

@@ -30,6 +30,7 @@ import FanExplorePage from "@/pages/fan/explore/FanExplorePage";
 import FanExploreSearchPage from "@/pages/fan/explore/FanExploreSearchPage";
 import FanExploreSearchResultPage from "@/pages/fan/explore/FanExploreSearchResultPage";
 import FanExploreConcertMorePage from "@/pages/fan/explore/FanExploreConcertMorePage";
+import FanExploreContentMorePage from "@/pages/fan/explore/FanExploreContentMorePage";
 import FanContentDetailPage from "@/pages/fan/explore/FanContentDetailPage";
 import FanBandProfilePage from "@/pages/fan/explore/FanBandProfilePage";
 import FollowedBandNewsPage from "@/pages/fan/home/FollowedBandNewsPage";
@@ -239,6 +240,10 @@ export const router = createBrowserRouter([
       {
         path: "/fan/explore/search/results/concerts",
         element: <FanExploreConcertMorePage />,
+      },
+      {
+        path: "/fan/explore/search/results/contents",
+        element: <FanExploreContentMorePage />,
       },
       {
         path: "/fan/bands/:bandId",
