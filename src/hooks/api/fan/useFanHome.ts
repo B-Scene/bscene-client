@@ -3,6 +3,7 @@ import {
   useMutation,
   useQuery,
   useQueryClient,
+  type QueryClient,
 } from "@tanstack/react-query";
 import {
   addPerformanceInterest,
@@ -38,12 +39,35 @@ export const fanHomeKeys = {
     [...fanHomeKeys.all, "followingPosts", size] as const,
   upcomingPerformances: (sort: UpcomingPerformanceSort, size: number) =>
     [...fanHomeKeys.all, "upcomingPerformances", sort, size] as const,
+  upcomingPerformancesLists: () =>
+    [...fanHomeKeys.all, "upcomingPerformances"] as const,
   performanceCalendar: ({ year, month }: PerformanceCalendarParams) =>
     [...fanHomeKeys.all, "performanceCalendar", year ?? null, month ?? null] as const,
   performancesByDate: (date: string | undefined, size: number) =>
     [...fanHomeKeys.all, "performancesByDate", date ?? null, size] as const,
+  performancesByDateLists: () =>
+    [...fanHomeKeys.all, "performancesByDate"] as const,
   pendingPerformanceParticipation: () =>
     [...fanHomeKeys.all, "pendingPerformanceParticipation"] as const,
+};
+
+export const invalidatePerformanceInterestQueries = (
+  queryClient: QueryClient,
+  performanceId: number,
+) => {
+  return Promise.all([
+    queryClient.invalidateQueries({ queryKey: fanHomeKeys.all }),
+    queryClient.invalidateQueries({ queryKey: interestedPerformancesKeys.all }),
+    queryClient.invalidateQueries({
+      queryKey: fanHomeKeys.performanceDetail(performanceId),
+    }),
+    queryClient.invalidateQueries({
+      queryKey: fanHomeKeys.upcomingPerformancesLists(),
+    }),
+    queryClient.invalidateQueries({
+      queryKey: fanHomeKeys.performancesByDateLists(),
+    }),
+  ]);
 };
 
 export const useFanHomeQuery = () => {
@@ -193,13 +217,7 @@ export const useAddPerformanceInterest = () => {
   return useMutation({
     mutationFn: addPerformanceInterest,
     onSuccess: (_result, performanceId) =>
-      Promise.all([
-        queryClient.invalidateQueries({ queryKey: fanHomeKeys.all }),
-        queryClient.invalidateQueries({ queryKey: interestedPerformancesKeys.all }),
-        queryClient.invalidateQueries({
-          queryKey: fanHomeKeys.performanceDetail(performanceId),
-        }),
-      ]),
+      invalidatePerformanceInterestQueries(queryClient, performanceId),
   });
 };
 
@@ -209,12 +227,6 @@ export const useDeletePerformanceInterest = () => {
   return useMutation({
     mutationFn: deletePerformanceInterest,
     onSuccess: (_result, performanceId) =>
-      Promise.all([
-        queryClient.invalidateQueries({ queryKey: fanHomeKeys.all }),
-        queryClient.invalidateQueries({ queryKey: interestedPerformancesKeys.all }),
-        queryClient.invalidateQueries({
-          queryKey: fanHomeKeys.performanceDetail(performanceId),
-        }),
-      ]),
+      invalidatePerformanceInterestQueries(queryClient, performanceId),
   });
 };
