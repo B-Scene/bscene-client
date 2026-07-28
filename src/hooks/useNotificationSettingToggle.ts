@@ -24,12 +24,13 @@ export const useNotificationSettingToggle = ({
   const updateSetting = useUpdateNotificationSettingMutation();
   const [isRegisteringPushToken, setIsRegisteringPushToken] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const hasLoadedSettings = Boolean(settingsQuery.data);
   const values = useMemo(
     () => ({
       ...defaultValues,
-      ...(settingsQuery.data ? settingsQuery.data.values : {}),
+      ...(hasLoadedSettings ? settingsQuery.data?.values : {}),
     }),
-    [defaultValues, settingsQuery.data],
+    [defaultValues, hasLoadedSettings, settingsQuery.data?.values],
   );
   const isDisabled =
     settingsQuery.isLoading ||

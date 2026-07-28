@@ -1,17 +1,18 @@
 import { axiosInstance } from "@/api/axiosInstance";
 import type { ApiResponse } from "@/types/auth/auth";
 import type {
-  DeletePushTokenRequest,
   GetNotificationsParams,
+  GetNotificationSettingsParams,
+  DeletePushTokenRequest,
   NotificationBandInvite,
   NotificationItem,
-  NotificationSettingType,
   NotificationSettingsMode,
+  NotificationSettingType,
   NotificationSettingsResponse,
   NotificationsPageResponse,
   RegisterPushTokenRequest,
   SendTestNotificationRequest,
-  UpdateNotificationSettingParams,
+  UpdateNotificationSettingRequest,
 } from "@/types/notification";
 
 type RawRecord = Record<string, unknown>;
@@ -23,7 +24,6 @@ const toNumberOrNull = (value: unknown): number | null => {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value === "string") {
     const parsed = Number(value);
-
     return Number.isFinite(parsed) ? parsed : null;
   }
 
@@ -35,6 +35,9 @@ const toStringOrNull = (value: unknown): string | null =>
 
 const toBoolean = (value: unknown, fallback = false): boolean =>
   typeof value === "boolean" ? value : fallback;
+
+const toBooleanOrNull = (value: unknown): boolean | null =>
+  typeof value === "boolean" ? value : null;
 
 const toNotificationMode = (value: unknown): NotificationSettingsMode | null => {
   if (typeof value !== "string") return null;
@@ -159,95 +162,152 @@ export const NOTIFICATION_SETTING_KEY_BY_TYPE: Record<
   BAND_LIVE_START_STATUS: "live-start-status",
 };
 
+export const getNotificationSettingKey = (settingType: string) => {
+  const mappedKey =
+    NOTIFICATION_SETTING_KEY_BY_TYPE[settingType as NotificationSettingType];
+
+  return mappedKey ?? normalizeSettingKey(settingType);
+};
+
+const getSettingBoolean = (value: unknown): boolean | null => {
+  if (typeof value === "boolean") return value;
+  if (!isRecord(value)) return null;
+
+  return (
+    toBooleanOrNull(value.enabled) ??
+    toBooleanOrNull(value.isEnabled) ??
+    toBooleanOrNull(value.value) ??
+    toBooleanOrNull(value.checked) ??
+    toBooleanOrNull(value.on)
+  );
+};
+
+const getSettingItemKey = (item: RawRecord): string | null => {
+  const key =
+    toStringOrNull(item.key) ??
+    toStringOrNull(item.settingKey) ??
+    toStringOrNull(item.type) ??
+    toStringOrNull(item.name) ??
+    toStringOrNull(item.id);
+
+  return key ? getNotificationSettingKey(key) : null;
+};
+
+const getSettingsSource = (result: unknown): unknown => {
+  if (!isRecord(result)) return result;
+
+  return (
+    result.settings ??
+    result.notificationSettings ??
+    result.items ??
+    result.content ??
+    result.data ??
+    result
+  );
+};
+
 const normalizeNotificationSettings = (
   result: unknown,
 ): NotificationSettingsResponse => {
-  const record = isRecord(result) ? result : {};
-  const valuesSource = isRecord(record.values) ? record.values : record;
-  const values = Object.entries(valuesSource).reduce<Record<string, boolean>>(
-    (acc, [key, value]) => {
-      if (typeof value !== "boolean") return acc;
+  const source = getSettingsSource(result);
+  const values: Record<string, boolean> = {};
 
-      const mappedKey =
-        NOTIFICATION_SETTING_KEY_BY_TYPE[key as NotificationSettingType] ??
-        normalizeSettingKey(key);
+  if (Array.isArray(source)) {
+    source.forEach((item) => {
+      if (!isRecord(item)) return;
 
-      acc[mappedKey] = value;
-      return acc;
-    },
-    {},
-  );
+      const key = getSettingItemKey(item);
+      const value = getSettingBoolean(item);
+
+      if (key && value !== null) {
+        values[key] = value;
+      }
+    });
+  } else if (isRecord(source)) {
+    Object.entries(source).forEach(([key, value]) => {
+      const normalizedKey = getNotificationSettingKey(key);
+      const normalizedValue = getSettingBoolean(value);
+
+      if (normalizedValue !== null) {
+        values[normalizedKey] = normalizedValue;
+      }
+    });
+  }
 
   return {
-    mode:
-      record.mode === "FAN" || record.mode === "BAND"
-        ? (record.mode as NotificationSettingsMode)
-        : null,
+    mode: isRecord(result) ? toNotificationMode(result.mode) : null,
     values,
   };
 };
 
-export const getNotifications = async ({
-  cursor,
-  size = 20,
-}: GetNotificationsParams = {}) => {
+export const getNotifications = async (
+  params: GetNotificationsParams = {},
+): Promise<NotificationsPageResponse> => {
   const { data } = await axiosInstance.get<ApiResponse<unknown>>(
     "/notifications",
-    {
-      params: { cursor, size },
-    },
+    { params },
   );
+
+  if (data.isSuccess === false) {
+    throw new Error(data.message || "알림 목록을 불러오지 못했어요");
+  }
 
   return normalizeNotificationsPage(data.result);
 };
 
-export const markNotificationAsRead = async (notificationId: number) => {
-  const { data } = await axiosInstance.patch<ApiResponse<null>>(
-    `/notifications/${notificationId}/read`,
-  );
-
-  return data.result;
-};
-
-export const getNotificationSettings = async (
-  mode: NotificationSettingsMode,
-) => {
+export const getNotificationSettings = async ({
+  mode,
+}: GetNotificationSettingsParams): Promise<NotificationSettingsResponse> => {
   const { data } = await axiosInstance.get<ApiResponse<unknown>>(
     "/users/me/notification-settings",
     { params: { mode } },
   );
 
+  if (data.isSuccess === false) {
+    throw new Error("알림 설정을 불러오지 못했어요");
+  }
+
   return normalizeNotificationSettings(data.result);
 };
 
 export const updateNotificationSetting = async ({
-  mode,
   settingType,
   enabled,
-}: UpdateNotificationSettingParams) => {
-  const { data } = await axiosInstance.patch<ApiResponse<null>>(
+}: UpdateNotificationSettingRequest) => {
+  const { data } = await axiosInstance.patch<ApiResponse<unknown>>(
     `/users/me/notification-settings/${settingType}`,
     { enabled },
-    { params: { mode } },
   );
+
+  if (data.isSuccess === false) {
+    throw new Error(data.message || "알림 설정을 변경하지 못했어요");
+  }
 
   return data.result;
 };
 
 export const registerPushToken = async (body: RegisterPushTokenRequest) => {
-  const { data } = await axiosInstance.post<ApiResponse<null>>(
+  const { data } = await axiosInstance.post<ApiResponse<unknown>>(
     "/notifications/tokens",
     body,
   );
+
+  if (data.isSuccess === false) {
+    throw new Error(data.message || "푸시 알림 토큰을 등록하지 못했어요");
+  }
 
   return data.result;
 };
 
 export const deletePushToken = async (body: DeletePushTokenRequest) => {
-  const { data } = await axiosInstance.delete<ApiResponse<null>>(
+  const { data } = await axiosInstance.delete<ApiResponse<unknown>>(
     "/notifications/tokens",
     { data: body },
   );
+
+  if (data.isSuccess === false) {
+    throw new Error(data.message || "푸시 알림 토큰을 삭제하지 못했어요");
+  }
 
   return data.result;
 };
@@ -255,10 +315,26 @@ export const deletePushToken = async (body: DeletePushTokenRequest) => {
 export const sendTestNotification = async (
   body: SendTestNotificationRequest,
 ) => {
-  const { data } = await axiosInstance.post<ApiResponse<null>>(
+  const { data } = await axiosInstance.post<ApiResponse<unknown>>(
     "/notifications/test",
     body,
   );
+
+  if (data.isSuccess === false) {
+    throw new Error(data.message || "테스트 알림을 보내지 못했어요");
+  }
+
+  return data.result;
+};
+
+export const markNotificationAsRead = async (notificationId: number) => {
+  const { data } = await axiosInstance.patch<ApiResponse<unknown>>(
+    `/notifications/${notificationId}/read`,
+  );
+
+  if (data.isSuccess === false) {
+    throw new Error(data.message || "알림을 읽음 처리하지 못했어요");
+  }
 
   return data.result;
 };

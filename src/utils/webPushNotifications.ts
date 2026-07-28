@@ -1,38 +1,78 @@
-import { getToken, onMessage } from "firebase/messaging";
-import { registerPushToken } from "@/api/notification";
 import {
+  deleteToken,
+  getToken,
+  onMessage,
+  type MessagePayload,
+} from "firebase/messaging";
+import { deletePushToken, registerPushToken } from "@/api/notification";
+import {
+  firebaseConfig,
   firebaseVapidKey,
   getFirebaseMessaging,
   hasFirebaseMessagingConfig,
 } from "@/lib/firebase";
 
-const STORED_FCM_TOKEN_KEY = "bscene:fcm-token";
+const FCM_TOKEN_STORAGE_KEY = "fcmRegistrationToken";
+const FIREBASE_MESSAGING_SW_PATH = "/firebase-messaging-sw.js";
+const FIREBASE_MESSAGING_SW_SCOPE = "/firebase-cloud-messaging-push-scope";
 
-export const getStoredWebPushToken = () =>
-  window.localStorage.getItem(STORED_FCM_TOKEN_KEY);
+type PushPermissionResult = NotificationPermission | "unsupported";
+
+const getFirebaseMessagingServiceWorkerUrl = () => {
+  const params = new URLSearchParams({
+    apiKey: String(firebaseConfig.apiKey ?? ""),
+    authDomain: String(firebaseConfig.authDomain ?? ""),
+    projectId: String(firebaseConfig.projectId ?? ""),
+    storageBucket: String(firebaseConfig.storageBucket ?? ""),
+    messagingSenderId: String(firebaseConfig.messagingSenderId ?? ""),
+    appId: String(firebaseConfig.appId ?? ""),
+  });
+
+  return `${FIREBASE_MESSAGING_SW_PATH}?${params.toString()}`;
+};
+
+export const isWebPushAvailable = () =>
+  typeof window !== "undefined" &&
+  "Notification" in window &&
+  "serviceWorker" in navigator &&
+  hasFirebaseMessagingConfig;
+
+export const requestWebPushPermission =
+  async (): Promise<PushPermissionResult> => {
+    if (!isWebPushAvailable()) return "unsupported";
+
+    if (Notification.permission !== "default") {
+      return Notification.permission;
+    }
+
+    return Notification.requestPermission();
+  };
+
+export const registerFirebaseMessagingServiceWorker = async () => {
+  if (!isWebPushAvailable()) return null;
+
+  return navigator.serviceWorker.register(getFirebaseMessagingServiceWorkerUrl(), {
+    scope: FIREBASE_MESSAGING_SW_SCOPE,
+    updateViaCache: "none",
+  });
+};
 
 export const requestAndRegisterWebPushToken = async () => {
-  if (!("Notification" in window) || !("serviceWorker" in navigator)) {
-    return null;
-  }
-
-  const permission =
-    Notification.permission === "granted"
-      ? "granted"
-      : await Notification.requestPermission();
+  const permission = await requestWebPushPermission();
 
   if (permission !== "granted") return null;
 
   const messaging = await getFirebaseMessaging();
+  const serviceWorkerRegistration =
+    await registerFirebaseMessagingServiceWorker();
 
-  if (!messaging || !firebaseVapidKey) return null;
+  if (!messaging || !serviceWorkerRegistration || !firebaseVapidKey) {
+    return null;
+  }
 
-  const registration = await navigator.serviceWorker.register(
-    "/firebase-messaging-sw.js",
-  );
   const token = await getToken(messaging, {
     vapidKey: firebaseVapidKey,
-    serviceWorkerRegistration: registration,
+    serviceWorkerRegistration,
   });
 
   if (!token) return null;
@@ -41,45 +81,56 @@ export const requestAndRegisterWebPushToken = async () => {
     token,
     platform: "WEB",
   });
-  window.localStorage.setItem(STORED_FCM_TOKEN_KEY, token);
+
+  localStorage.setItem(FCM_TOKEN_STORAGE_KEY, token);
 
   return token;
 };
 
-export const listenForegroundPushNotifications = (
-  onReceive?: (payload: unknown) => void,
-) => {
-  let unsubscribe: (() => void) | null = null;
-  let isActive = true;
+export const deleteRegisteredWebPushToken = async () => {
+  const storedToken = localStorage.getItem(FCM_TOKEN_STORAGE_KEY);
 
-  void getFirebaseMessaging().then((messaging) => {
-    if (!isActive || !messaging) return;
+  if (storedToken) {
+    await deletePushToken({ token: storedToken });
+  }
 
-    unsubscribe = onMessage(messaging, (payload) => {
-      onReceive?.(payload);
-    });
-  });
+  const messaging = await getFirebaseMessaging();
 
-  return () => {
-    isActive = false;
-    unsubscribe?.();
-  };
+  if (messaging) {
+    await deleteToken(messaging);
+  }
+
+  localStorage.removeItem(FCM_TOKEN_STORAGE_KEY);
 };
 
-export const getWebPushDebugStatus = async () => {
+export const onForegroundPushMessage = async (
+  handler: (payload: MessagePayload) => void,
+) => {
+  const messaging = await getFirebaseMessaging();
+
+  if (!messaging) return () => undefined;
+
+  return onMessage(messaging, handler);
+};
+
+export const getWebPushDebugInfo = async () => {
   const registrations = "serviceWorker" in navigator
     ? await navigator.serviceWorker.getRegistrations()
     : [];
+  const storedToken = localStorage.getItem(FCM_TOKEN_STORAGE_KEY);
 
   return {
-    available: "Notification" in window && "serviceWorker" in navigator,
-    permission: "Notification" in window ? Notification.permission : "unsupported",
-    hasFirebaseMessagingConfig: hasFirebaseMessagingConfig(),
+    available: isWebPushAvailable(),
+    permission:
+      typeof Notification === "undefined" ? "unsupported" : Notification.permission,
+    hasFirebaseMessagingConfig,
     hasVapidKey: Boolean(firebaseVapidKey),
-    storedTokenPrefix: getStoredWebPushToken()?.slice(0, 16) ?? null,
+    storedTokenPrefix: storedToken ? storedToken.slice(0, 16) : null,
     serviceWorkers: registrations.map((registration) => ({
       scope: registration.scope,
-      active: Boolean(registration.active),
+      activeScriptURL: registration.active?.scriptURL ?? null,
+      installingScriptURL: registration.installing?.scriptURL ?? null,
+      waitingScriptURL: registration.waiting?.scriptURL ?? null,
     })),
   };
 };

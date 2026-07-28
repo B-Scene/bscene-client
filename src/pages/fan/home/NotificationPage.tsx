@@ -138,7 +138,19 @@ const NotificationPage = () => {
           <img src={ArrowLeftIcon} alt="" className="size-6" />
         </button>
 
-        <h1 className="m-0 font-body text-label2 text-neutral-900">알림</h1>
+        <h1
+          className="m-0"
+          style={{
+            color: "var(--Gray-Scale-900, #1D1A1A)",
+            fontFamily: "Pretendard",
+            fontSize: "20px",
+            fontStyle: "normal",
+            fontWeight: 600,
+            lineHeight: "28px",
+          }}
+        >
+          알림
+        </h1>
 
         <span aria-hidden="true" className="size-6" />
       </header>
@@ -148,7 +160,7 @@ const NotificationPage = () => {
           {Array.from({ length: 3 }).map((_, index) => (
             <div
               key={index}
-              className="h-[93px] rounded-xl bg-neutral-0 shadow-[0_0_8px_0_rgba(0,0,0,0.10)]"
+              className="h-[93px] rounded-[12px] bg-neutral-0 shadow-[0_0_8px_0_rgba(0,0,0,0.10)]"
             />
           ))}
         </section>
@@ -173,10 +185,10 @@ const NotificationPage = () => {
               notification={notification}
             />
           ))}
-          <div ref={sentinelRef} className="h-1" />
+          <div ref={sentinelRef} aria-hidden="true" className="h-4" />
           {isFetchingNextPage ? (
             <p className="m-0 text-center font-body text-caption2 text-neutral-600">
-              알림을 더 불러오고 있어요
+              더 불러오는 중이에요
             </p>
           ) : null}
         </section>

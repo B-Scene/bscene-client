@@ -59,15 +59,23 @@ export type NotificationSettingType =
 
 export type NotificationSettingsValues = Record<string, boolean>;
 
+export interface GetNotificationSettingsParams {
+  mode: NotificationSettingsMode;
+}
+
 export interface NotificationSettingsResponse {
   mode: NotificationSettingsMode | null;
   values: NotificationSettingsValues;
 }
 
-export interface UpdateNotificationSettingParams {
-  mode: NotificationSettingsMode;
+export interface UpdateNotificationSettingRequest {
   settingType: NotificationSettingType;
   enabled: boolean;
+}
+
+export interface UpdateNotificationSettingParams
+  extends UpdateNotificationSettingRequest {
+  mode: NotificationSettingsMode;
 }
 
 export type PushTokenPlatform = "WEB";

@@ -3,29 +3,28 @@ import {
   useMutation,
   useQuery,
   useQueryClient,
+  type InfiniteData,
 } from "@tanstack/react-query";
 import {
-  NOTIFICATION_SETTING_KEY_BY_TYPE,
   deletePushToken,
-  getNotificationSettings,
   getNotifications,
+  getNotificationSettings,
+  getNotificationSettingKey,
   markNotificationAsRead,
   registerPushToken,
   sendTestNotification,
   updateNotificationSetting,
 } from "@/api/notification";
 import type {
-  DeletePushTokenRequest,
   NotificationSettingsResponse,
   NotificationSettingsMode,
-  RegisterPushTokenRequest,
-  SendTestNotificationRequest,
+  NotificationsPageResponse,
+  UpdateNotificationSettingParams,
 } from "@/types/notification";
 
 export const notificationKeys = {
   all: ["notifications"] as const,
-  lists: () => [...notificationKeys.all, "list"] as const,
-  list: (size: number) => [...notificationKeys.lists(), { size }] as const,
+  list: (size: number) => [...notificationKeys.all, "list", size] as const,
   settings: (mode: NotificationSettingsMode) =>
     [...notificationKeys.all, "settings", mode] as const,
 };
@@ -45,23 +44,31 @@ export const useNotificationsInfiniteQuery = (size = 20) => {
   });
 };
 
-export const useMarkNotificationAsReadMutation = () => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: markNotificationAsRead,
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: notificationKeys.lists() }),
-  });
-};
-
 export const useNotificationSettingsQuery = (
   mode: NotificationSettingsMode,
 ) => {
   return useQuery({
     queryKey: notificationKeys.settings(mode),
-    queryFn: () => getNotificationSettings(mode),
-    staleTime: 1000 * 30,
+    queryFn: () => getNotificationSettings({ mode }),
+    staleTime: 1000 * 60,
+  });
+};
+
+export const useRegisterPushTokenMutation = () => {
+  return useMutation({
+    mutationFn: registerPushToken,
+  });
+};
+
+export const useDeletePushTokenMutation = () => {
+  return useMutation({
+    mutationFn: deletePushToken,
+  });
+};
+
+export const useSendTestNotificationMutation = () => {
+  return useMutation({
+    mutationFn: sendTestNotification,
   });
 };
 
@@ -69,7 +76,8 @@ export const useUpdateNotificationSettingMutation = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: updateNotificationSetting,
+    mutationFn: ({ settingType, enabled }: UpdateNotificationSettingParams) =>
+      updateNotificationSetting({ settingType, enabled }),
     onMutate: async ({ mode, settingType, enabled }) => {
       const queryKey = notificationKeys.settings(mode);
 
@@ -77,40 +85,63 @@ export const useUpdateNotificationSettingMutation = () => {
 
       const previousSettings =
         queryClient.getQueryData<NotificationSettingsResponse>(queryKey);
+      const settingKey = getNotificationSettingKey(settingType);
 
-      queryClient.setQueryData<NotificationSettingsResponse>(queryKey, {
-        mode,
-        values: {
-          ...(previousSettings?.values ?? {}),
-          [NOTIFICATION_SETTING_KEY_BY_TYPE[settingType]]: enabled,
-        },
-      });
+      queryClient.setQueryData<NotificationSettingsResponse>(
+        queryKey,
+        (currentSettings) => ({
+          mode: currentSettings?.mode ?? mode,
+          values: {
+            ...currentSettings?.values,
+            [settingKey]: enabled,
+          },
+        }),
+      );
 
       return { previousSettings, queryKey };
     },
     onError: (_error, _variables, context) => {
-      if (!context) return;
-
-      queryClient.setQueryData(context.queryKey, context.previousSettings);
+      if (context?.previousSettings) {
+        queryClient.setQueryData(context.queryKey, context.previousSettings);
+      }
     },
   });
 };
 
-export const useRegisterPushTokenMutation = () => {
-  return useMutation({
-    mutationFn: (body: RegisterPushTokenRequest) => registerPushToken(body),
-  });
-};
+export const useMarkNotificationAsReadMutation = () => {
+  const queryClient = useQueryClient();
 
-export const useDeletePushTokenMutation = () => {
   return useMutation({
-    mutationFn: (body: DeletePushTokenRequest) => deletePushToken(body),
-  });
-};
+    mutationFn: markNotificationAsRead,
+    onMutate: async (notificationId) => {
+      await queryClient.cancelQueries({ queryKey: notificationKeys.all });
 
-export const useSendTestNotificationMutation = () => {
-  return useMutation({
-    mutationFn: (body: SendTestNotificationRequest) =>
-      sendTestNotification(body),
+      queryClient.setQueriesData<InfiniteData<NotificationsPageResponse>>(
+        { queryKey: notificationKeys.all },
+        (currentData) => {
+          if (!currentData) return currentData;
+
+          const readAt = new Date().toISOString();
+
+          return {
+            ...currentData,
+            pages: currentData.pages.map((page) => ({
+              ...page,
+              items: page.items.map((notification) =>
+                notification.notificationId === notificationId
+                  ? {
+                      ...notification,
+                      isRead: true,
+                      readAt: notification.readAt ?? readAt,
+                    }
+                  : notification,
+              ),
+            })),
+          };
+        },
+      );
+    },
+    onSettled: () =>
+      queryClient.invalidateQueries({ queryKey: notificationKeys.all }),
   });
 };

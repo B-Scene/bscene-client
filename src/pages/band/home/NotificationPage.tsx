@@ -194,7 +194,19 @@ const NotificationPage = () => {
           <img src={ArrowLeftIcon} alt="" className="size-6" />
         </button>
 
-        <h1 className="m-0 font-body text-label2 text-neutral-900">알림</h1>
+        <h1
+          className="m-0"
+          style={{
+            color: "var(--Gray-Scale-900, #1D1A1A)",
+            fontFamily: "Pretendard",
+            fontSize: "20px",
+            fontStyle: "normal",
+            fontWeight: 600,
+            lineHeight: "28px",
+          }}
+        >
+          알림
+        </h1>
 
         <span aria-hidden="true" className="size-6" />
       </header>
@@ -248,8 +260,11 @@ const NotificationPage = () => {
                 <article
                   key={notification.notificationId}
                   className={`flex w-full flex-col gap-4 self-stretch rounded-xl bg-neutral-0 px-4 py-6 shadow-[0_0_8px_0_rgba(0,0,0,0.10)] ${
+                    targetPath ? "cursor-pointer" : ""
+                  } ${
                     notification.isRead ? "opacity-80" : ""
                   }`}
+                  onClick={() => handleNotificationClick(notification)}
                 >
                   <div className="mx-auto flex w-full max-w-71.5 items-start gap-4">
                     <img
@@ -263,17 +278,22 @@ const NotificationPage = () => {
                         {notification.title ||
                           `${bandName}에서 멤버 초대를 보냈어요`}
                       </h2>
-                      {notification.body ? (
+                      {notification.body || position ? (
                         <p className="font-body text-caption2 text-neutral-600">
-                          {notification.body}
+                          {notification.body ||
+                            `${position} 포지션으로 함께 활동해 주세요`}
                         </p>
                       ) : null}
-                      {time ? (
-                        <p className="font-body text-caption2 text-neutral-600">
-                          {time}
-                        </p>
-                      ) : null}
+                      <p className="font-body text-caption2 text-neutral-600">
+                        {time}
+                      </p>
                     </div>
+                    {!notification.isRead ? (
+                      <span
+                        aria-label="읽지 않은 알림"
+                        className="mt-1 size-2 shrink-0 rounded-full bg-secondary-500"
+                      />
+                    ) : null}
                   </div>
 
                   <div className="h-px bg-neutral-400" />
@@ -310,7 +330,11 @@ const NotificationPage = () => {
                       <button
                         type="button"
                         disabled={isInviteActionPending}
-                        onClick={() => void handleRejectInvite(notification)}
+                        onClick={(event) => {
+                          event.stopPropagation();
+
+                          void handleRejectInvite(notification);
+                        }}
                         className="flex h-7.5 w-35 flex-1 items-center justify-center rounded-md border border-secondary-500 bg-neutral-0 text-caption3 text-secondary-500 disabled:opacity-60"
                       >
                         거절
@@ -318,7 +342,9 @@ const NotificationPage = () => {
                       <button
                         type="button"
                         disabled={isInviteActionPending}
-                        onClick={() => {
+                        onClick={(event) => {
+                          event.stopPropagation();
+
                           if (!notification.isRead) {
                             markNotificationAsRead.mutate(
                               notification.notificationId,
@@ -384,11 +410,10 @@ const NotificationPage = () => {
               </article>
             );
           })}
-
-          <div ref={sentinelRef} className="h-1" />
+          <div ref={sentinelRef} aria-hidden="true" className="h-4" />
           {isFetchingNextPage ? (
             <p className="m-0 text-center font-body text-caption2 text-neutral-600">
-              알림을 더 불러오고 있어요
+              더 불러오는 중이에요
             </p>
           ) : null}
         </section>
@@ -486,7 +511,7 @@ const NotificationPage = () => {
               초대가 완료되었습니다
             </h3>
             <p className="m-0 font-body text-caption2 text-neutral-600">
-              이제 밴드 멤버로 활동할 수 있어요.
+              이제 WAVY의 멤버로 활동할 수 있어요.
               <br />내 밴드와 밴드 프로필 관리에서 확인해 주세요.
             </p>
           </div>

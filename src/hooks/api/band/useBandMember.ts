@@ -78,17 +78,6 @@ export const useAcceptBandInvite = (bandId: number) => {
   });
 };
 
-export const useRejectBandInvite = (bandId: number) => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: () => rejectBandInvite(bandId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: bandMemberKeys.lists(bandId) });
-    },
-  });
-};
-
 export const useAcceptBandInviteMutation = () => {
   const queryClient = useQueryClient();
 
@@ -104,6 +93,17 @@ export const useAcceptBandInviteMutation = () => {
       queryClient.invalidateQueries({ queryKey: bandMemberKeys.lists(bandId) });
       queryClient.invalidateQueries({ queryKey: bandMemberProfileKeys.all });
       queryClient.invalidateQueries({ queryKey: myProfilesKeys.all });
+    },
+  });
+};
+
+export const useRejectBandInvite = (bandId: number) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => rejectBandInvite(bandId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: bandMemberKeys.lists(bandId) });
     },
   });
 };

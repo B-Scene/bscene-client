@@ -1,46 +1,78 @@
-importScripts("https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js");
-importScripts("https://www.gstatic.com/firebasejs/10.13.2/firebase-messaging-compat.js");
+/* global firebase */
 
-firebase.initializeApp({
-  apiKey: "AIzaSyDfgFDjyvqgZMP0MxPq1mMSBo4KPyPoBZk",
-  authDomain: "bscene-2b878.firebaseapp.com",
-  projectId: "bscene-2b878",
-  storageBucket: "bscene-2b878.firebasestorage.app",
-  messagingSenderId: "1039012909710",
-  appId: "1:1039012909710:web:6c0607dd662d7c56662fdf",
-  measurementId: "G-97HB912NQN",
-});
+const firebaseConfig = Object.fromEntries(
+  new URL(self.location.href).searchParams.entries(),
+);
 
-const messaging = firebase.messaging();
+if (
+  firebaseConfig.apiKey &&
+  firebaseConfig.projectId &&
+  firebaseConfig.messagingSenderId &&
+  firebaseConfig.appId
+) {
+  importScripts("https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js");
+  importScripts("https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-compat.js");
 
-messaging.onBackgroundMessage((payload) => {
-  const title = payload.notification?.title || "BScene";
-  const options = {
-    body: payload.notification?.body,
-    icon: "/favicon/favicon-96x96.png",
-    data: payload.data,
-  };
+  firebase.initializeApp(firebaseConfig);
 
-  self.registration.showNotification(title, options);
-});
+  const messaging = firebase.messaging();
+
+  messaging.onBackgroundMessage((payload) => {
+    if ("BroadcastChannel" in self) {
+      const channel = new BroadcastChannel("bscene-push");
+      channel.postMessage(payload);
+      channel.close();
+    }
+
+    console.info("[BScene Push SW] background message", payload);
+
+    const notification = payload.notification || {};
+    const data = payload.data || {};
+    const title = notification.title || data.title || "B:Scene";
+    const options = {
+      body: notification.body || data.body,
+      icon: notification.icon || "/favicon/favicon-96x96.png",
+      badge: "/favicon/favicon-96x96.png",
+      data: {
+        deepLink:
+          data.deepLink ||
+          data.link ||
+          payload.fcmOptions?.link ||
+          payload.webpush?.fcmOptions?.link ||
+          "/",
+      },
+    };
+
+    self.registration.showNotification(title, options);
+  });
+}
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
 
-  const targetUrl = event.notification.data?.deepLink || "/";
+  const deepLink = event.notification.data?.deepLink || "/";
 
   event.waitUntil(
     self.clients
-      .matchAll({ type: "window", includeUncontrolled: true })
+      .matchAll({
+        type: "window",
+        includeUncontrolled: true,
+      })
       .then((clientList) => {
-        for (const client of clientList) {
-          if ("focus" in client) {
-            client.navigate(targetUrl);
-            return client.focus();
+        const existingClient = clientList.find((client) => {
+          try {
+            return new URL(client.url).origin === self.location.origin;
+          } catch {
+            return false;
           }
+        });
+
+        if (existingClient) {
+          existingClient.focus();
+          return existingClient.navigate(deepLink);
         }
 
-        return self.clients.openWindow(targetUrl);
+        return self.clients.openWindow(deepLink);
       }),
   );
 });

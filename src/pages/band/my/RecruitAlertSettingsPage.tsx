@@ -1,12 +1,12 @@
 import { Header } from "@/components/band/home/Header";
 import { useActiveBandId } from "@/hooks/api/user/useMyProfiles";
 import { useBandQuery } from "@/hooks/api/band/useBand";
+import { useNotificationSettingToggle } from "@/hooks/useNotificationSettingToggle";
 import { NotificationBandBanner } from "@/components/band/my/NotificationBandBanner";
 import {
   NotificationToggleList,
   type NotificationToggleItem,
 } from "@/components/band/my/NotificationToggleList";
-import { useNotificationSettingToggle } from "@/hooks/useNotificationSettingToggle";
 import type { NotificationSettingType } from "@/types/notification";
 
 const RECRUIT_ALERT_ITEMS: NotificationToggleItem[] = [
