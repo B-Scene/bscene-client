@@ -4,8 +4,13 @@ import { BottomNavBar } from "@/components/layout/BottomNavBar";
 import {
   useEnterLiveMutation,
   useLiveHomeQuery,
+  useScheduledLiveQuery,
 } from "@/hooks/api/live/useLive";
-import type { LiveApiResponse } from "@/types/live/live";
+import type {
+  LiveApiResponse,
+  ScheduledLiveItem,
+  ScheduledLiveListItem,
+} from "@/types/live/live";
 import type {
   ActiveLive,
   GoLiveScreen,
@@ -75,7 +80,7 @@ function ScheduledLiveCard({
 }) {
   return (
     <article className="flex h-[88px] items-center rounded-[10px] bg-neutral-0 px-4 shadow-[0_4px_15px_rgba(20,20,20,0.08)]">
-      <ProfileImage />
+      <ProfileImage src={live.imageUrl ?? undefined} />
 
       <div className="ml-4 min-w-0 flex-1">
         <strong className="block truncate text-body1 text-neutral-900">
@@ -108,12 +113,48 @@ interface BandLiveHomeProps {
   onEditReservation: (liveId: number) => void;
 }
 
+const getScheduledImageUrl = (
+  live: ScheduledLiveItem | ScheduledLiveListItem,
+) => {
+  return (
+    live.bandProfileImageUrl ??
+    live.thumbnailImageUrl ??
+    null
+  );
+};
+
+const mapScheduledToCard = (
+  live: ScheduledLiveItem | ScheduledLiveListItem,
+): ScheduledLiveCardData => {
+  return {
+    id: live.liveId,
+    bandName: live.bandName,
+    title: live.title,
+    scheduledAt: live.scheduledAt,
+    isMine: Boolean(live.isMine),
+    imageUrl: getScheduledImageUrl(live),
+  };
+};
+
 export function BandLiveHome({
   go,
   onEnterLive,
   onEditReservation,
 }: BandLiveHomeProps) {
-  const { data, isLoading, isError, refetch } = useLiveHomeQuery();
+  const {
+    data,
+    isLoading: isHomeLoading,
+    isError: isHomeError,
+    refetch: refetchHome,
+  } = useLiveHomeQuery();
+
+  const {
+    data: scheduledListData,
+    isLoading: isScheduledLoading,
+    isError: isScheduledError,
+    refetch: refetchScheduled,
+  } = useScheduledLiveQuery(false);
+
   const enterLiveMutation = useEnterLiveMutation();
 
   const liveNowCards: LiveCard[] =
@@ -126,14 +167,34 @@ export function BandLiveHome({
       isMine: live.isMine,
     })) ?? [];
 
-  const scheduledCards: ScheduledLiveCardData[] =
-    data?.scheduled.map((live) => ({
-      id: live.liveId,
-      bandName: live.bandName,
-      title: live.title,
-      scheduledAt: live.scheduledAt,
-      isMine: Boolean(live.isMine),
-    })) ?? [];
+  const scheduledFromHome = data?.scheduled ?? [];
+  const scheduledFromList =
+    scheduledListData?.pages.flatMap((page) => page.items ?? []) ?? [];
+
+  const mergedScheduledMap = new Map<
+    number,
+    ScheduledLiveItem | ScheduledLiveListItem
+  >();
+
+  scheduledFromList.forEach((live) => {
+    mergedScheduledMap.set(live.liveId, live);
+  });
+
+  scheduledFromHome.forEach((live) => {
+    mergedScheduledMap.set(live.liveId, live);
+  });
+
+  const scheduledCards = Array.from(mergedScheduledMap.values()).map(
+    mapScheduledToCard,
+  );
+
+  const isLoading = isHomeLoading || isScheduledLoading;
+  const isError = isHomeError && isScheduledError;
+
+  const handleRetry = () => {
+    void refetchHome();
+    void refetchScheduled();
+  };
 
   const handleEnterLive = async (liveId: number) => {
     try {
@@ -191,7 +252,7 @@ export function BandLiveHome({
             </p>
             <button
               type="button"
-              onClick={() => refetch()}
+              onClick={handleRetry}
               className="mt-3 rounded-lg bg-secondary-500 px-4 py-2 text-caption3 text-neutral-0"
             >
               다시 불러오기

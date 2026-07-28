@@ -259,14 +259,29 @@ export function ChatComposer({
 export function LiveActionBar({
   go,
   audioStatus,
+  isMicMuted,
+  micVolume,
+  onMicVolumeChange,
   onToggleBroadcast,
 }: {
   go: GoLiveScreen;
   audioStatus: LiveAudioStatus;
+  isMicMuted: boolean;
+  micVolume: number;
+  onMicVolumeChange: (volume: number) => void;
   onToggleBroadcast: () => void;
 }) {
   const isBroadcasting = audioStatus === "connected";
   const isAudioConnecting = audioStatus === "connecting";
+  const displayVolume = Math.round(micVolume);
+
+  const micButtonLabel = isAudioConnecting
+    ? "마이크 연결 중"
+    : isBroadcasting
+      ? isMicMuted
+        ? "마이크 음소거 해제"
+        : "마이크 음소거"
+      : "마이크 송출 시작";
 
   return (
     <div className="fixed bottom-3 left-1/2 z-30 h-[62px] w-[calc(100%-40px)] max-w-[353px] -translate-x-1/2 rounded-[24px] bg-neutral-0 shadow-[0_4px_15px_rgba(20,20,20,0.10)]">
@@ -282,8 +297,8 @@ export function LiveActionBar({
 
         <button
           type="button"
-          aria-label={isBroadcasting ? "마이크 송출 중지" : "마이크 송출 시작"}
-          aria-pressed={isBroadcasting}
+          aria-label={micButtonLabel}
+          aria-pressed={isBroadcasting && !isMicMuted}
           onClick={onToggleBroadcast}
           disabled={isAudioConnecting || audioStatus === "unsupported"}
           className={[
@@ -297,10 +312,30 @@ export function LiveActionBar({
             alt=""
             className={[
               "size-10",
-              isBroadcasting ? "opacity-100" : "opacity-50",
+              isBroadcasting && !isMicMuted ? "opacity-100" : "opacity-45",
+              isMicMuted ? "grayscale" : "",
             ].join(" ")}
           />
         </button>
+
+        {isBroadcasting ? (
+          <div className="absolute bottom-1 left-1/2 flex w-[122px] -translate-x-1/2 items-center gap-1">
+            <input
+              type="range"
+              min={0}
+              max={150}
+              step={5}
+              value={displayVolume}
+              onChange={(event) => onMicVolumeChange(Number(event.target.value))}
+              aria-label="마이크 볼륨"
+              className="h-1 min-w-0 flex-1 cursor-pointer accent-secondary-500"
+            />
+
+            <span className="w-8 text-right text-[9px] leading-none font-medium text-neutral-600">
+              {displayVolume}%
+            </span>
+          </div>
+        ) : null}
 
         <button
           type="button"

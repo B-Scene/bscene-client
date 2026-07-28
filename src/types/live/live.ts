@@ -10,17 +10,19 @@ export interface LiveApiResponse<T> {
 
 export interface LiveNowItem {
   liveId: number;
-  bandProfileImageUrl: string | null;
+  bandProfileImageUrl?: string | null;
+  thumbnailImageUrl?: string | null;
   bandName: string;
   title: string;
   viewerCount: number;
+  viewCount?: number;
   isMine?: boolean;
 }
 
 export interface LiveReplayItem {
   liveId: number;
   replayId?: number;
-  thumbnailImageUrl: string | null;
+  thumbnailImageUrl?: string | null;
   title: string;
   bandName: string;
   viewCount: number;
@@ -30,10 +32,14 @@ export interface LiveReplayItem {
 
 export interface ScheduledLiveItem {
   liveId: number;
+  bandProfileImageUrl?: string | null;
+  thumbnailImageUrl?: string | null;
   bandName: string;
   title: string;
   scheduledAt: string;
   notificationEnabled?: boolean;
+  isAlarmSet?: boolean;
+  alarmSet?: boolean;
   isMine?: boolean;
 }
 
@@ -47,10 +53,13 @@ export type LiveNowListFilter = "following" | "all";
 
 export interface LiveNowListItem {
   liveId: number;
-  bandProfileImageUrl: string | null;
+  bandProfileImageUrl?: string | null;
+  thumbnailImageUrl?: string | null;
   title: string;
   bandName: string;
   viewCount: number;
+  viewerCount?: number;
+  isMine?: boolean;
 }
 
 export interface LiveNowPageInfo {
@@ -71,13 +80,15 @@ export interface GetLiveNowListParams {
 
 export interface ScheduledLiveListItem {
   liveId: number;
-  bandProfileImageUrl: string | null;
+  bandProfileImageUrl?: string | null;
+  thumbnailImageUrl?: string | null;
   title: string;
   bandName: string;
   scheduledAt: string;
   isAlarmSet?: boolean;
   alarmSet?: boolean;
   notificationEnabled?: boolean;
+  isMine?: boolean;
 }
 
 export interface ScheduledLiveListResponse {
@@ -96,6 +107,7 @@ export interface ToggleLiveAlarmResponse {
 }
 
 export type ReplayListFilter = "following" | "all";
+
 export type ReplaySort = "LATEST" | "POPULAR";
 
 export interface ReplayListItem {
@@ -124,7 +136,8 @@ export interface GetReplayListParams {
 export interface ReplayPlaybackResponse {
   title: string;
   bandName: string;
-  bandProfileImageUrl: string | null;
+  bandProfileImageUrl?: string | null;
+  thumbnailImageUrl?: string | null;
   viewCount: number;
   durationSec: number;
   durationSeconds?: number;
@@ -133,16 +146,22 @@ export interface ReplayPlaybackResponse {
 
 export interface CreateLiveRequest {
   title: string;
-  description?: string;
-  thumbnailImageUrl?: string;
+  description?: string | null;
+  thumbnailImageUrl?: string | null;
   scheduledAt?: string | null;
-  coHost: number[];
+  coHost?: number[];
+  cohosts?: number[] | null;
+  coHostIds?: number[] | null;
+  cohostIds?: number[] | null;
 }
 
 export interface CreateLiveResponse {
   audioStreamId: number;
   path: string;
   title: string;
+  liveId?: number;
+  startedAt?: string;
+  playback?: LivePlayback;
 }
 
 export type PlaybackRole = "BROADCASTER" | "LISTENER";
@@ -242,10 +261,13 @@ export interface LiveReservationResponse {
 
 export interface UpdateLiveReservationRequest {
   title: string;
-  description: string;
-  thumbnailImageUrl: string;
+  description?: string | null;
+  thumbnailImageUrl?: string | null;
   scheduledAt: string;
-  cohosts: number[] | null;
+  coHost?: number[] | null;
+  cohosts?: number[] | null;
+  coHostIds?: number[] | null;
+  cohostIds?: number[] | null;
 }
 
 export interface UpdateLiveReservationResponse {

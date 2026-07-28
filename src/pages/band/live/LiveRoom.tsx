@@ -34,6 +34,14 @@ type LiveAudioStatus =
   | "error"
   | "unsupported";
 
+const MIC_VOLUME_MIN = 0;
+const MIC_VOLUME_MAX = 150;
+const DEFAULT_MIC_VOLUME = 100;
+
+const clampMicVolume = (volume: number) => {
+  return Math.min(MIC_VOLUME_MAX, Math.max(MIC_VOLUME_MIN, Math.round(volume)));
+};
+
 const parseStartedAt = (startedAt?: string | null) => {
   if (!startedAt) return null;
 
@@ -143,6 +151,15 @@ const waitForIceGatheringComplete = (
   });
 };
 
+const getAudioContextConstructor = () => {
+  return (
+    window.AudioContext ??
+    (window as Window & typeof globalThis & {
+      webkitAudioContext?: typeof AudioContext;
+    }).webkitAudioContext
+  );
+};
+
 export function LiveRoom({
   go,
   live,
@@ -164,6 +181,9 @@ export function LiveRoom({
   );
   const [audioStatus, setAudioStatus] = useState<LiveAudioStatus>("idle");
   const [audioErrorMessage, setAudioErrorMessage] = useState("");
+  const [micInfoMessage, setMicInfoMessage] = useState("");
+  const [micVolume, setMicVolume] = useState(DEFAULT_MIC_VOLUME);
+  const [isMicMuted, setIsMicMuted] = useState(false);
   const [listenerAudioMessage, setListenerAudioMessage] = useState("");
   const [showListenerPlayButton, setShowListenerPlayButton] = useState(false);
   const [liveMembers, setLiveMembers] = useState<LiveMemberItem[]>([]);
@@ -172,8 +192,14 @@ export function LiveRoom({
   const audioStatusRef = useRef<LiveAudioStatus>("idle");
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const micStreamRef = useRef<MediaStream | null>(null);
+  const processedMicStreamRef = useRef<MediaStream | null>(null);
   const whipSessionUrlRef = useRef<string | null>(null);
   const listenerAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  const micVolumeRef = useRef(DEFAULT_MIC_VOLUME);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const micSourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const micGainNodeRef = useRef<GainNode | null>(null);
 
   const isListenerPlayback =
     live?.isLive && playbackRole === "LISTENER" && Boolean(playbackUrl);
@@ -181,6 +207,27 @@ export function LiveRoom({
   const setAudioStatusSafe = useCallback((nextStatus: LiveAudioStatus) => {
     audioStatusRef.current = nextStatus;
     setAudioStatus(nextStatus);
+  }, []);
+
+  const handleMicVolumeChange = useCallback((nextVolume: number) => {
+    const safeVolume = clampMicVolume(nextVolume);
+
+    micVolumeRef.current = safeVolume;
+    setMicVolume(safeVolume);
+
+    const gainNode = micGainNodeRef.current;
+    const audioContext = audioContextRef.current;
+
+    if (!gainNode) return;
+
+    const gainValue = safeVolume / 100;
+
+    if (audioContext && audioContext.state !== "closed") {
+      gainNode.gain.setTargetAtTime(gainValue, audioContext.currentTime, 0.01);
+      return;
+    }
+
+    gainNode.gain.value = gainValue;
   }, []);
 
   const cleanupWhipBroadcast = useCallback(async () => {
@@ -201,12 +248,69 @@ export function LiveRoom({
 
     micStreamRef.current?.getTracks().forEach((track) => track.stop());
     micStreamRef.current = null;
+
+    processedMicStreamRef.current?.getTracks().forEach((track) => track.stop());
+    processedMicStreamRef.current = null;
+
+    try {
+      micSourceNodeRef.current?.disconnect();
+    } catch {
+      // 이미 끊긴 노드는 무시
+    }
+
+    try {
+      micGainNodeRef.current?.disconnect();
+    } catch {
+      // 이미 끊긴 노드는 무시
+    }
+
+    micSourceNodeRef.current = null;
+    micGainNodeRef.current = null;
+
+    const audioContext = audioContextRef.current;
+    audioContextRef.current = null;
+
+    if (audioContext && audioContext.state !== "closed") {
+      try {
+        await audioContext.close();
+      } catch {
+        // 이미 닫힌 AudioContext면 무시
+      }
+    }
+
+    setIsMicMuted(false);
+    setMicInfoMessage("");
   }, []);
 
   const stopWhipBroadcast = useCallback(async () => {
     await cleanupWhipBroadcast();
     setAudioStatusSafe("idle");
   }, [cleanupWhipBroadcast, setAudioStatusSafe]);
+
+  const toggleMicTrackOnly = useCallback(() => {
+    const originalTracks = micStreamRef.current?.getAudioTracks() ?? [];
+    const processedTracks = processedMicStreamRef.current?.getAudioTracks() ?? [];
+    const allAudioTracks = [...originalTracks, ...processedTracks];
+
+    if (allAudioTracks.length === 0) {
+      setAudioErrorMessage("마이크 트랙을 찾을 수 없어요. 송출을 다시 시작해주세요.");
+      return;
+    }
+
+    setIsMicMuted((currentMuted) => {
+      const nextMuted = !currentMuted;
+
+      allAudioTracks.forEach((track) => {
+        track.enabled = !nextMuted;
+      });
+
+      setMicInfoMessage(
+        nextMuted ? "마이크가 음소거됐어요. 다시 누르면 송출돼요." : "",
+      );
+
+      return nextMuted;
+    });
+  }, []);
 
   const startWhipBroadcast = useCallback(async () => {
     if (!live?.liveId) return;
@@ -235,6 +339,7 @@ export function LiveRoom({
     }
 
     setAudioErrorMessage("");
+    setMicInfoMessage("");
 
     try {
       await cleanupWhipBroadcast();
@@ -254,10 +359,42 @@ export function LiveRoom({
         video: false,
       });
 
-      const peerConnection = new RTCPeerConnection();
+      micStreamRef.current = micStream;
 
-      micStream.getAudioTracks().forEach((track) => {
-        peerConnection.addTrack(track, micStream);
+      const peerConnection = new RTCPeerConnection();
+      peerConnectionRef.current = peerConnection;
+
+      let broadcastStream = micStream;
+
+      const AudioContextConstructor = getAudioContextConstructor();
+
+      if (AudioContextConstructor) {
+        const audioContext = new AudioContextConstructor();
+
+        if (audioContext.state === "suspended") {
+          await audioContext.resume();
+        }
+
+        const sourceNode = audioContext.createMediaStreamSource(micStream);
+        const gainNode = audioContext.createGain();
+        const destinationNode = audioContext.createMediaStreamDestination();
+
+        gainNode.gain.value = micVolumeRef.current / 100;
+
+        sourceNode.connect(gainNode);
+        gainNode.connect(destinationNode);
+
+        audioContextRef.current = audioContext;
+        micSourceNodeRef.current = sourceNode;
+        micGainNodeRef.current = gainNode;
+        processedMicStreamRef.current = destinationNode.stream;
+
+        broadcastStream = destinationNode.stream;
+      }
+
+      broadcastStream.getAudioTracks().forEach((track) => {
+        track.enabled = true;
+        peerConnection.addTrack(track, broadcastStream);
       });
 
       const offer = await peerConnection.createOffer();
@@ -287,10 +424,9 @@ export function LiveRoom({
         sdp: sdpAnswer,
       });
 
-      peerConnectionRef.current = peerConnection;
-      micStreamRef.current = micStream;
       whipSessionUrlRef.current = sessionUrl;
 
+      setIsMicMuted(false);
       setAudioStatusSafe("connected");
     } catch (error) {
       await cleanupWhipBroadcast();
@@ -346,13 +482,17 @@ export function LiveRoom({
   }, []);
 
   const handleToggleBroadcast = useCallback(() => {
-    if (audioStatus === "connected" || audioStatus === "connecting") {
-      void stopWhipBroadcast();
+    if (audioStatus === "connecting") {
+      return;
+    }
+
+    if (audioStatus === "connected") {
+      toggleMicTrackOnly();
       return;
     }
 
     void startWhipBroadcast();
-  }, [audioStatus, startWhipBroadcast, stopWhipBroadcast]);
+  }, [audioStatus, startWhipBroadcast, toggleMicTrackOnly]);
 
   const handleConfirmEndLive = async () => {
     if (!live?.liveId) {
@@ -467,6 +607,12 @@ export function LiveRoom({
         </p>
       ) : null}
 
+      {!audioErrorMessage && micInfoMessage ? (
+        <p className="absolute top-[56px] left-1/2 z-20 w-[calc(100%-40px)] max-w-[353px] -translate-x-1/2 rounded-lg bg-secondary-500 px-3 py-2 text-center text-caption3 text-neutral-0">
+          {micInfoMessage}
+        </p>
+      ) : null}
+
       {isListenerPlayback ? (
         <audio
           ref={listenerAudioRef}
@@ -494,6 +640,9 @@ export function LiveRoom({
       <LiveActionBar
         go={go}
         audioStatus={audioStatus}
+        isMicMuted={isMicMuted}
+        micVolume={micVolume}
+        onMicVolumeChange={handleMicVolumeChange}
         onToggleBroadcast={handleToggleBroadcast}
       />
 
