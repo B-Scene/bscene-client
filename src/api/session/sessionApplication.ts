@@ -1,5 +1,6 @@
 import { axiosInstance } from "@/api/axiosInstance";
 import type {
+  ApplicationSubmissionDetailResponse,
   ApplicationSubmissionsParams,
   ApplicationSubmissionsResponse,
   ApplySessionRecruitmentRequest,
@@ -129,6 +130,16 @@ export const getApplicationSubmissions = async (
   >("/sessions/applications/submissions", {
     params: removeEmptyParams(params),
   });
+
+  return data.result;
+};
+
+export const getApplicationSubmissionDetail = async (
+  applicationSubmissionId: number,
+) => {
+  const { data } = await axiosInstance.get<
+    SessionApiResponse<ApplicationSubmissionDetailResponse>
+  >(`/sessions/recruitments/submissions/${applicationSubmissionId}`);
 
   return data.result;
 };
