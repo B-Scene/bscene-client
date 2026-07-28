@@ -440,7 +440,7 @@ function FanLiveMemberRow({ member }: { member: LiveMemberItem }) {
   return (
     <article className="fan-live-member-row flex h-[60px] items-center gap-2.5 rounded-lg bg-neutral-0 p-3">
       <img
-        src={member.bandProfileImageUrl ?? UserProfileIcon}
+        src={member.bandProfileImageUrl || UserProfileIcon}
         alt={`${member.nickname} 프로필`}
         className="size-[38px] shrink-0 rounded-full object-cover"
       />

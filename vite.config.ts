@@ -39,7 +39,7 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       proxy: {
-        '^/(?:hls/)?[0-9a-fA-F-]{36}/': {
+        '^/(?:(?:hls|rtc)/)?[0-9a-fA-F-]{36}/': {
           target: apiOrigin,
           changeOrigin: true,
           followRedirects: true,

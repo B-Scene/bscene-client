@@ -70,10 +70,31 @@ axiosInstance.interceptors.response.use(
   async (error: AxiosError<ApiResponse<unknown>>) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & {
       _retry?: boolean;
+      _tokenRetry?: boolean;
     };
 
     if (error.response?.status !== 401 || originalRequest._retry) {
       return Promise.reject(error);
+    }
+
+    const authorization =
+      originalRequest.headers.Authorization ??
+      originalRequest.headers.get?.("Authorization");
+    const requestAccessToken =
+      typeof authorization === "string"
+        ? authorization.replace(/^Bearer\s+/i, "").trim()
+        : "";
+    const currentAccessToken = localStorage.getItem("accessToken");
+
+    if (
+      currentAccessToken &&
+      requestAccessToken &&
+      currentAccessToken !== requestAccessToken &&
+      !originalRequest._tokenRetry
+    ) {
+      originalRequest._tokenRetry = true;
+      originalRequest.headers.Authorization = `Bearer ${currentAccessToken}`;
+      return axiosInstance(originalRequest);
     }
 
     originalRequest._retry = true;
