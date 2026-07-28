@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import ArrowLeftIcon from "@/assets/icons/arrow-left.svg";
 import BandDefaultProfileImage from "@/assets/icons/band/band-default-profile.svg";
 import InviteAlertIcon from "@/assets/icons/band/invite-alert.svg";
@@ -7,78 +7,180 @@ import CheckIcon from "@/assets/icons/band/Monochrome.svg";
 import { Input } from "@/components/common/Input/Input";
 import { ModalOverlay } from "@/components/common/Modal/ModalOverlay";
 import { Select } from "@/components/common/Select/Select";
+import {
+  useMarkNotificationAsReadMutation,
+  useNotificationsInfiniteQuery,
+} from "@/hooks/api/useNotifications";
+import {
+  useAcceptBandInviteMutation,
+  useRejectBandInviteMutation,
+} from "@/hooks/api/band/useBandMember";
+import { useInfiniteScrollObserver } from "@/hooks/useInfiniteScrollObserver";
+import {
+  BAND_NOTIFICATION_ROUTES,
+  formatNotificationTime,
+  getNotificationTargetPath,
+  isNotificationForMode,
+  isPostRegistrationNotification,
+} from "@/utils/notificationDeepLink";
+import type { BandMemberPart } from "@/types/band/bandMember";
+import type {
+  NotificationBandInvite,
+  NotificationItem,
+} from "@/types/notification";
 
 const PART_OPTIONS = ["보컬", "기타", "베이스", "드럼", "키보드"];
+const NOTIFICATION_PAGE_SIZE = 20;
+const PART_LABEL_TO_ENUM: Record<string, BandMemberPart> = {
+  보컬: "VOCAL",
+  기타: "GUITAR",
+  베이스: "BASS",
+  드럼: "DRUM",
+  키보드: "KEYBOARD",
+};
 
-type NotificationItem =
-  | {
-      id: string;
-      type: "info";
-      title: string;
-      time: string;
-    }
-  | {
-      id: string;
-      type: "invite";
-      bandName: string;
-      position: string;
-      time: string;
-      bandTag: string;
-      role: string;
-    }
-  | {
-      id: string;
-      type: "live-invite";
-      bandName: string;
-      time: string;
-    };
+const getStringField = (
+  value: NotificationBandInvite | null,
+  field: string,
+): string | null => {
+  const fieldValue = value?.[field];
 
-const NOTIFICATIONS: NotificationItem[] = [
-  {
-    id: "notification-invite-1",
-    type: "invite",
-    bandName: "WAVY",
-    position: "보컬",
-    time: "1시간 전",
-    bandTag: "인디팝 · 서울 · 멤버 5명",
-    role: "밴드 멤버 · 보컬",
-  },
-  {
-    id: "notification-live-invite-1",
-    type: "live-invite",
-    bandName: "WAVY",
-    time: "1분 전",
-  },
-  {
-    id: "notification-1",
-    type: "info",
-    title: "WAVY의 라이브가 지금 시작했어요!",
-    time: "1시간 전",
-  },
-  {
-    id: "notification-2",
-    type: "info",
-    title: "WAVY의 새로운 공연이 등록되었어요!",
-    time: "7일 전",
-  },
-  {
-    id: "notification-3",
-    type: "info",
-    title: "WAVY 단독 공연이 내일이에요!",
-    time: "2026.6.8.",
-  },
-];
+  return typeof fieldValue === "string" && fieldValue.length > 0
+    ? fieldValue
+    : null;
+};
+
+const getNumberField = (
+  value: NotificationBandInvite | null,
+  field: string,
+): number | null => {
+  const fieldValue = value?.[field];
+
+  return typeof fieldValue === "number" && Number.isFinite(fieldValue)
+    ? fieldValue
+    : null;
+};
+
+const formatBandTag = (bandInvite: NotificationBandInvite | null) => {
+  const genre = getStringField(bandInvite, "genre");
+  const region = getStringField(bandInvite, "region");
+  const memberCount = getNumberField(bandInvite, "memberCount");
+
+  return [genre, region, memberCount != null ? `멤버 ${memberCount}명` : null]
+    .filter(Boolean)
+    .join(" · ");
+};
+
+const getBandInviteImage = (bandInvite: NotificationBandInvite | null) =>
+  getStringField(bandInvite, "profileImageUrl") ??
+  getStringField(bandInvite, "bandProfileImageUrl") ??
+  BandDefaultProfileImage;
+
+const getBandInviteBandId = (notification: NotificationItem) =>
+  getNumberField(notification.bandInvite, "bandId");
 
 const NotificationPage = () => {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const hasNotifications = searchParams.get("status") !== "empty";
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isError,
+    isFetchingNextPage,
+    isLoading,
+    refetch,
+  } = useNotificationsInfiniteQuery(NOTIFICATION_PAGE_SIZE);
+  const markNotificationAsRead = useMarkNotificationAsReadMutation();
+  const acceptBandInvite = useAcceptBandInviteMutation();
+  const rejectBandInvite = useRejectBandInviteMutation();
+  const notifications = useMemo(
+    () =>
+      data?.pages
+        .flatMap((page) => page.items)
+        .filter(
+          (notification) =>
+            isNotificationForMode(notification, "BAND") &&
+            !isPostRegistrationNotification(notification),
+        ) ??
+      [],
+    [data],
+  );
+  const hasNotifications = notifications.length > 0;
+  const sentinelRef = useInfiniteScrollObserver({
+    enabled: Boolean(hasNextPage) && !isFetchingNextPage,
+    onIntersect: fetchNextPage,
+  });
 
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
   const [isCompleteModalOpen, setIsCompleteModalOpen] = useState(false);
+  const [selectedInviteNotification, setSelectedInviteNotification] =
+    useState<NotificationItem | null>(null);
   const [activityName, setActivityName] = useState("");
   const [part, setPart] = useState("");
   const canConfirmRole = activityName.trim().length > 0 && part.length > 0;
+  const isInviteActionPending =
+    acceptBandInvite.isPending || rejectBandInvite.isPending;
+
+  const handleNotificationClick = (notification: NotificationItem) => {
+    const targetPath = getNotificationTargetPath(
+      notification,
+      BAND_NOTIFICATION_ROUTES,
+    );
+
+    if (!notification.isRead) {
+      markNotificationAsRead.mutate(notification.notificationId);
+    }
+
+    if (!targetPath) return;
+
+    if (/^https?:\/\//i.test(targetPath)) {
+      window.location.assign(targetPath);
+      return;
+    }
+
+    navigate(targetPath);
+  };
+
+  const handleRejectInvite = async (notification: NotificationItem) => {
+    const bandId = getBandInviteBandId(notification);
+
+    if (bandId == null) return;
+
+    if (!notification.isRead) {
+      markNotificationAsRead.mutate(notification.notificationId);
+    }
+
+    await rejectBandInvite.mutateAsync({ bandId });
+    void refetch();
+  };
+
+  const handleAcceptInviteConfirm = async () => {
+    const notification = selectedInviteNotification;
+    const bandId = notification ? getBandInviteBandId(notification) : null;
+    const partEnum = PART_LABEL_TO_ENUM[part];
+
+    if (!notification || bandId == null || !partEnum || !activityName.trim()) {
+      return;
+    }
+
+    if (!notification.isRead) {
+      markNotificationAsRead.mutate(notification.notificationId);
+    }
+
+    await acceptBandInvite.mutateAsync({
+      bandId,
+      body: {
+        nickname: activityName.trim(),
+        part: partEnum,
+      },
+    });
+    void refetch();
+    setIsRoleModalOpen(false);
+    setIsCompleteModalOpen(true);
+    setSelectedInviteNotification(null);
+    setActivityName("");
+    setPart("");
+  };
 
   return (
     <main className="mx-auto min-h-dvh w-full max-w-[393px] bg-secondary-0">
@@ -92,31 +194,62 @@ const NotificationPage = () => {
           <img src={ArrowLeftIcon} alt="" className="size-6" />
         </button>
 
-        <h1
-          className="m-0"
-          style={{
-            color: "var(--Gray-Scale-900, #1D1A1A)",
-            fontFamily: "Pretendard",
-            fontSize: "20px",
-            fontStyle: "normal",
-            fontWeight: 600,
-            lineHeight: "28px",
-          }}
-        >
-          알림
-        </h1>
+        <h1 className="m-0 font-body text-label2 text-neutral-900">알림</h1>
 
         <span aria-hidden="true" className="size-6" />
       </header>
 
-      {hasNotifications ? (
+      {isLoading ? (
         <section className="flex flex-col gap-3 pl-[23px] pr-[22px] pt-6 pb-6">
-          {NOTIFICATIONS.map((notification) => {
-            if (notification.type === "live-invite") {
+          {Array.from({ length: 3 }).map((_, index) => (
+            <div
+              key={index}
+              className="h-[93px] rounded-xl bg-neutral-0 shadow-[0_0_8px_0_rgba(0,0,0,0.10)]"
+            />
+          ))}
+        </section>
+      ) : isError ? (
+        <section className="flex h-[calc(100dvh-60px)] flex-col items-center justify-center px-5 text-center">
+          <h2 className="m-0 font-body text-label1 text-neutral-900">
+            알림을 불러오지 못했어요
+          </h2>
+          <button
+            type="button"
+            onClick={() => void refetch()}
+            className="mt-4 rounded-[8px] bg-secondary-500 px-4 py-2 font-body text-caption3 text-neutral-0"
+          >
+            다시 시도
+          </button>
+        </section>
+      ) : hasNotifications ? (
+        <section className="flex flex-col gap-3 pl-[23px] pr-[22px] pt-6 pb-6">
+          {notifications.map((notification) => {
+            const time = formatNotificationTime(notification.createdAt);
+            const isBandInvite =
+              notification.type === "BAND_INVITE" && notification.bandInvite;
+            const targetPath = getNotificationTargetPath(
+              notification,
+              BAND_NOTIFICATION_ROUTES,
+            );
+
+            if (isBandInvite) {
+              const bandInvite = notification.bandInvite;
+              const bandName =
+                getStringField(bandInvite, "bandName") ?? "밴드";
+              const position =
+                getStringField(bandInvite, "position") ??
+                getStringField(bandInvite, "part");
+              const role =
+                getStringField(bandInvite, "role") ??
+                (position ? `밴드 멤버 · ${position}` : "밴드 멤버");
+              const bandTag = formatBandTag(bandInvite);
+
               return (
                 <article
-                  key={notification.id}
-                  className="flex w-full flex-col gap-4 self-stretch rounded-xl bg-neutral-0 px-4 py-6 shadow-[0_0_8px_0_rgba(0,0,0,0.10)]"
+                  key={notification.notificationId}
+                  className={`flex w-full flex-col gap-4 self-stretch rounded-xl bg-neutral-0 px-4 py-6 shadow-[0_0_8px_0_rgba(0,0,0,0.10)] ${
+                    notification.isRead ? "opacity-80" : ""
+                  }`}
                 >
                   <div className="mx-auto flex w-full max-w-71.5 items-start gap-4">
                     <img
@@ -126,105 +259,94 @@ const NotificationPage = () => {
                     />
 
                     <div className="flex min-w-0 flex-1 flex-col gap-2">
-                      <h2 className="font-body text-body1 text-neutral-900">
-                        {notification.bandName}에서 라이브 초대를 보냈어요
+                      <h2 className="line-clamp-2 font-body text-body1 text-neutral-900">
+                        {notification.title ||
+                          `${bandName}에서 멤버 초대를 보냈어요`}
                       </h2>
-                      <p className="font-body text-caption2 text-neutral-600">
-                        {notification.time}
-                      </p>
+                      {notification.body ? (
+                        <p className="font-body text-caption2 text-neutral-600">
+                          {notification.body}
+                        </p>
+                      ) : null}
+                      {time ? (
+                        <p className="font-body text-caption2 text-neutral-600">
+                          {time}
+                        </p>
+                      ) : null}
                     </div>
                   </div>
 
-                  <div className="mx-auto flex w-full max-w-75 gap-5">
-                    <button
-                      type="button"
-                      className="flex h-7.5 w-35 flex-1 items-center justify-center rounded-md border border-secondary-500 bg-neutral-0 text-caption3 text-secondary-500"
-                    >
-                      거절
-                    </button>
-                    <button
-                      type="button"
-                      className="flex h-7.5 w-35 flex-1 items-center justify-center rounded-md bg-secondary-500 text-caption3 text-neutral-0"
-                    >
-                      수락
-                    </button>
+                  <div className="h-px bg-neutral-400" />
+
+                  <div className="mx-auto flex w-full max-w-71.5 items-center gap-3">
+                    <img
+                      src={getBandInviteImage(bandInvite)}
+                      alt=""
+                      className="size-10 shrink-0 rounded-full object-cover"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="m-0 font-body text-body6 text-neutral-900">
+                        {bandName}
+                      </p>
+                      {bandTag ? (
+                        <p className="m-0 truncate font-body text-caption2 text-neutral-600">
+                          {bandTag}
+                        </p>
+                      ) : null}
+                    </div>
                   </div>
+
+                  <div className="mx-auto flex w-full max-w-71.5 items-center gap-3 rounded-md border border-neutral-300 px-4 py-3">
+                    <span className="font-body text-caption3 text-neutral-500">
+                      역할
+                    </span>
+                    <span className="font-body text-body6 text-secondary-500">
+                      {role}
+                    </span>
+                  </div>
+
+                  {notification.actionable ? (
+                    <div className="mx-auto flex w-full max-w-75 gap-5">
+                      <button
+                        type="button"
+                        disabled={isInviteActionPending}
+                        onClick={() => void handleRejectInvite(notification)}
+                        className="flex h-7.5 w-35 flex-1 items-center justify-center rounded-md border border-secondary-500 bg-neutral-0 text-caption3 text-secondary-500 disabled:opacity-60"
+                      >
+                        거절
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isInviteActionPending}
+                        onClick={() => {
+                          if (!notification.isRead) {
+                            markNotificationAsRead.mutate(
+                              notification.notificationId,
+                            );
+                          }
+
+                          setSelectedInviteNotification(notification);
+                          setIsRoleModalOpen(true);
+                        }}
+                        className="flex h-7.5 w-35 flex-1 items-center justify-center rounded-md bg-secondary-500 text-caption3 text-neutral-0 disabled:opacity-60"
+                      >
+                        수락
+                      </button>
+                    </div>
+                  ) : null}
                 </article>
               );
             }
 
-            return notification.type === "invite" ? (
+            const canNavigate = Boolean(targetPath);
+
+            return (
               <article
-                key={notification.id}
-                className="flex w-full flex-col gap-4 self-stretch rounded-xl bg-neutral-0 px-4 py-6 shadow-[0_0_8px_0_rgba(0,0,0,0.10)]"
-              >
-                <div className="mx-auto flex w-full max-w-71.5 items-start gap-4">
-                  <img
-                    src={InviteAlertIcon}
-                    alt=""
-                    className="shrink-0 rounded-full object-cover"
-                  />
-
-                  <div className="flex min-w-0 flex-1 flex-col gap-2">
-                    <h2 className="font-body text-body1 text-neutral-900">
-                      {notification.bandName}에서 멤버 초대를 보냈어요
-                    </h2>
-                    <p className="font-body text-caption2 text-neutral-600">
-                      {notification.position} 포지션으로 함께 활동해 주세요
-                    </p>
-                    <p className="font-body text-caption2 text-neutral-600">
-                      {notification.time}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="h-px bg-neutral-400" />
-
-                <div className="mx-auto flex w-full max-w-71.5 items-center gap-3">
-                  <img
-                    src={BandDefaultProfileImage}
-                    alt=""
-                    className="size-10 shrink-0 rounded-full object-cover"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="m-0 font-body text-body6 text-neutral-900">
-                      {notification.bandName}
-                    </p>
-                    <p className="m-0 truncate font-body text-caption2 text-neutral-600">
-                      {notification.bandTag}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mx-auto flex w-full max-w-71.5 items-center gap-3 rounded-md border border-neutral-300 px-4 py-3">
-                  <span className="font-body text-caption3 text-neutral-500">
-                    역할
-                  </span>
-                  <span className="font-body text-body6 text-secondary-500">
-                    {notification.role}
-                  </span>
-                </div>
-
-                <div className="mx-auto flex w-full max-w-75 gap-5">
-                  <button
-                    type="button"
-                    className="flex h-7.5 w-35 flex-1 items-center justify-center rounded-md border border-secondary-500 bg-neutral-0 text-caption3 text-secondary-500"
-                  >
-                    거절
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsRoleModalOpen(true)}
-                    className="flex h-7.5 w-35 flex-1 items-center justify-center rounded-md bg-secondary-500 text-caption3 text-neutral-0"
-                  >
-                    수락
-                  </button>
-                </div>
-              </article>
-            ) : (
-              <article
-                key={notification.id}
-                className="flex w-full flex-col items-start gap-2.5 self-stretch rounded-xl bg-neutral-0 px-4 py-3 shadow-[0_0_8px_0_rgba(0,0,0,0.10)]"
+                key={notification.notificationId}
+                className={`flex w-full flex-col items-start gap-2.5 self-stretch rounded-xl bg-neutral-0 px-4 py-3 shadow-[0_0_8px_0_rgba(0,0,0,0.10)] ${
+                  canNavigate ? "cursor-pointer" : ""
+                } ${notification.isRead ? "opacity-80" : ""}`}
+                onClick={() => handleNotificationClick(notification)}
               >
                 <div className="flex items-center gap-4 self-stretch">
                   <span className="flex size-11.25 shrink-0 items-center justify-center overflow-hidden rounded-full bg-neutral-400">
@@ -235,18 +357,40 @@ const NotificationPage = () => {
                     />
                   </span>
 
-                  <div className="min-w-0">
-                    <h2 className="m-0 truncate font-body text-body1 text-neutral-900">
-                      {notification.title}
-                    </h2>
-                    <p className="m-0 mt-1 font-body text-caption2 text-neutral-600">
-                      {notification.time}
-                    </p>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start gap-2">
+                      <h2 className="m-0 line-clamp-2 flex-1 font-body text-body1 text-neutral-900">
+                        {notification.title}
+                      </h2>
+                      {!notification.isRead ? (
+                        <span
+                          aria-label="읽지 않은 알림"
+                          className="mt-1 size-2 shrink-0 rounded-full bg-secondary-500"
+                        />
+                      ) : null}
+                    </div>
+                    {notification.body ? (
+                      <p className="m-0 mt-1 line-clamp-2 font-body text-caption2 text-neutral-700">
+                        {notification.body}
+                      </p>
+                    ) : null}
+                    {time ? (
+                      <p className="m-0 mt-1 font-body text-caption2 text-neutral-600">
+                        {time}
+                      </p>
+                    ) : null}
                   </div>
                 </div>
               </article>
             );
           })}
+
+          <div ref={sentinelRef} className="h-1" />
+          {isFetchingNextPage ? (
+            <p className="m-0 text-center font-body text-caption2 text-neutral-600">
+              알림을 더 불러오고 있어요
+            </p>
+          ) : null}
         </section>
       ) : (
         <section className="flex h-[calc(100dvh-60px)] flex-col items-center pt-[274px] text-center">
@@ -263,7 +407,10 @@ const NotificationPage = () => {
 
       <ModalOverlay
         open={isRoleModalOpen}
-        onClose={() => setIsRoleModalOpen(false)}
+        onClose={() => {
+          setIsRoleModalOpen(false);
+          setSelectedInviteNotification(null);
+        }}
         clipContent={false}
       >
         <div className="box-border flex w-88.5 max-w-full flex-col gap-6 rounded-2xl bg-neutral-0 px-4 py-6">
@@ -307,18 +454,18 @@ const NotificationPage = () => {
           <div className="flex gap-2.5">
             <button
               type="button"
-              onClick={() => setIsRoleModalOpen(false)}
+              onClick={() => {
+                setIsRoleModalOpen(false);
+                setSelectedInviteNotification(null);
+              }}
               className="flex h-9.5 flex-1 items-center justify-center rounded-md border border-secondary-500 bg-neutral-0 text-body1 text-secondary-500"
             >
               취소
             </button>
             <button
               type="button"
-              disabled={!canConfirmRole}
-              onClick={() => {
-                setIsRoleModalOpen(false);
-                setIsCompleteModalOpen(true);
-              }}
+              disabled={!canConfirmRole || isInviteActionPending}
+              onClick={() => void handleAcceptInviteConfirm()}
               className="flex h-9.5 flex-1 items-center justify-center rounded-md bg-secondary-500 text-body1 text-neutral-0 disabled:opacity-60"
             >
               확인
@@ -339,7 +486,7 @@ const NotificationPage = () => {
               초대가 완료되었습니다
             </h3>
             <p className="m-0 font-body text-caption2 text-neutral-600">
-              이제 WAVY의 멤버로 활동할 수 있어요.
+              이제 밴드 멤버로 활동할 수 있어요.
               <br />내 밴드와 밴드 프로필 관리에서 확인해 주세요.
             </p>
           </div>

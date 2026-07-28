@@ -1,4 +1,9 @@
-import { useState, type UIEvent } from "react";
+import {
+  useState,
+  type FormEvent,
+  type KeyboardEvent,
+  type UIEvent,
+} from "react";
 import { isAxiosError } from "axios";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import ArrowLeftIcon from "@/assets/icons/arrow-left.svg";
@@ -7,14 +12,23 @@ import HeartIcon from "@/assets/icons/Heart.svg";
 import LikedHeartIcon from "@/assets/icons/Union.svg";
 import BandImage from "@/assets/Img_Band.png";
 import {
+  useCreateFanExplorePostComment,
+  useDeleteFanExplorePostComment,
   useFanExplorePostDetailQuery,
+  useFanExplorePostCommentsQuery,
   useLikeFanExplorePost,
   useUnlikeFanExplorePost,
+  useUpdateFanExplorePostComment,
 } from "@/hooks/api/fan/useFanExplore";
+import { getStoredAuthUser } from "@/utils/authUser";
+import { getApiErrorMessage } from "@/utils/getApiErrorMessage";
+import { useInfiniteScrollObserver } from "@/hooks/useInfiniteScrollObserver";
+import type { NormalizedFanExplorePostComment } from "@/types/fan/explore";
 import type { FanExplorePostMediaType } from "@/types/fan/explore";
 
 const TAGS = ["합주", "인디밴드", "홍대", "공연준비"];
 const BASE_LIKE_COUNT = 412;
+const COMMENT_PAGE_SIZE = 10;
 const DEFAULT_CONTENT_CREATED_AT = new Date(
   Date.now() - 3 * 60 * 60 * 1000,
 ).toISOString();
@@ -22,27 +36,6 @@ const MOCK_CONTENT_IMAGES = [
   { id: "image-1", className: "bg-neutral-300" },
   { id: "image-2", className: "bg-primary-50" },
   { id: "image-3", className: "bg-neutral-200" },
-];
-
-const COMMENTS = [
-  {
-    id: "comment-1",
-    author: "정하람",
-    time: "1시간 전",
-    content: "이번 편곡 진짜 기대돼요! 공연도 꼭 보러 갈게요.",
-  },
-  {
-    id: "comment-2",
-    author: "정유하",
-    time: "42분 전",
-    content: "합주 분위기가 너무 좋아 보여요. 새 곡도 기다릴게요.",
-  },
-  {
-    id: "comment-3",
-    author: "나영우",
-    time: "42분 전",
-    content: "앨범 발매 언제하나요?",
-  },
 ];
 
 const ImagePlaceholderIcon = () => (
@@ -134,9 +127,26 @@ const toNumericId = (value?: number | string | null) => {
   return null;
 };
 
+const getCommentMutationErrorMessage = (
+  error: unknown,
+  fallbackMessage: string,
+) => {
+  if (isAxiosError(error)) {
+    if (error.response?.status === 403) {
+      return "본인이 작성한 댓글만 수정하거나 삭제할 수 있어요.";
+    }
+
+    if (error.response?.status === 404) {
+      return "댓글을 찾을 수 없어요.";
+    }
+  }
+
+  return getApiErrorMessage(error, fallbackMessage);
+};
+
 const ContentDetailHeader = ({ onBack }: { onBack: () => void }) => {
   return (
-    <header className="flex h-[48px] items-center px-[15px]">
+    <header className="flex h-[48px] items-center bg-neutral-0 px-[15px]">
       <button
         type="button"
         aria-label="뒤로가기"
@@ -173,22 +183,141 @@ const ContentDetailLoading = ({ onBack }: { onBack: () => void }) => {
   );
 };
 
+interface CommentItemProps {
+  comment: NormalizedFanExplorePostComment;
+  isEditable: boolean;
+  isEditing: boolean;
+  editValue: string;
+  isPending: boolean;
+  onStartEdit: () => void;
+  onCancelEdit: () => void;
+  onEditValueChange: (value: string) => void;
+  onSubmitEdit: () => void;
+  onDelete: () => void;
+}
+
+const CommentItem = ({
+  comment,
+  isEditable,
+  isEditing,
+  editValue,
+  isPending,
+  onStartEdit,
+  onCancelEdit,
+  onEditValueChange,
+  onSubmitEdit,
+  onDelete,
+}: CommentItemProps) => {
+  return (
+    <article className="flex w-full gap-[16px]">
+      <img
+        src={comment.profileImageUrl ?? BandImage}
+        alt=""
+        className="size-[35px] shrink-0 rounded-full object-cover"
+      />
+
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-[6px]">
+          <strong className="font-body text-caption3 text-neutral-900">
+            {comment.authorName}
+          </strong>
+          {comment.createdAt ? (
+            <span className="font-body text-caption4 text-neutral-500">
+              {formatRelativeTime(comment.createdAt)}
+            </span>
+          ) : null}
+        </div>
+
+        {isEditing ? (
+          <div className="mt-[6px] flex flex-col gap-[8px]">
+            <textarea
+              value={editValue}
+              onChange={(event) => onEditValueChange(event.target.value)}
+              maxLength={500}
+              className="min-h-[48px] w-full resize-none rounded-[8px] border border-neutral-300 bg-neutral-0 px-[10px] py-[8px] font-body text-caption2 text-neutral-900 outline-none focus:border-primary-400"
+            />
+            <div className="flex justify-end gap-[8px]">
+              <button
+                type="button"
+                onClick={onCancelEdit}
+                disabled={isPending}
+                className="font-body text-caption3 text-neutral-600 disabled:opacity-50"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={onSubmitEdit}
+                disabled={isPending || !editValue.trim()}
+                className="font-body text-caption3 text-primary-400 disabled:text-neutral-500"
+              >
+                저장
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <p className="m-0 font-body text-caption2 text-neutral-700">
+              {comment.content}
+            </p>
+            {isEditable ? (
+              <div className="mt-[6px] flex gap-[10px]">
+                <button
+                  type="button"
+                  onClick={onStartEdit}
+                  className="font-body text-caption4 text-neutral-600"
+                >
+                  수정
+                </button>
+                <button
+                  type="button"
+                  onClick={onDelete}
+                  disabled={isPending}
+                  className="font-body text-caption4 text-neutral-600 disabled:opacity-50"
+                >
+                  삭제
+                </button>
+              </div>
+            ) : null}
+          </>
+        )}
+      </div>
+    </article>
+  );
+};
+
 const FanContentDetailPage = () => {
   const navigate = useNavigate();
   const { contentId } = useParams();
   const [searchParams] = useSearchParams();
   const postId = Number(contentId);
+  const validPostId = Number.isFinite(postId) ? postId : undefined;
   const postDetailQuery = useFanExplorePostDetailQuery(
-    Number.isFinite(postId) ? postId : undefined,
+    validPostId,
   );
+  const commentsQuery = useFanExplorePostCommentsQuery(validPostId, {
+    size: COMMENT_PAGE_SIZE,
+  });
   const likePostMutation = useLikeFanExplorePost();
   const unlikePostMutation = useUnlikeFanExplorePost();
+  const createCommentMutation = useCreateFanExplorePostComment();
+  const updateCommentMutation = useUpdateFanExplorePostComment();
+  const deleteCommentMutation = useDeleteFanExplorePostComment();
   const postDetail = postDetailQuery.data;
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [likeOverride, setLikeOverride] = useState<{
     isLiked: boolean;
     likeCount: number;
   } | null>(null);
+  const [commentDraft, setCommentDraft] = useState("");
+  const [editingCommentId, setEditingCommentId] = useState<number | null>(null);
+  const [editingCommentDraft, setEditingCommentDraft] = useState("");
+  const [commentErrorMessage, setCommentErrorMessage] = useState("");
+  const currentUser = getStoredAuthUser();
+  const commentSentinelRef = useInfiniteScrollObserver({
+    enabled: Boolean(commentsQuery.hasNextPage) && !commentsQuery.isFetchingNextPage,
+    onIntersect: commentsQuery.fetchNextPage,
+  });
 
   if (postDetailQuery.isLoading) {
     return <ContentDetailLoading onBack={() => navigate(-1)} />;
@@ -263,14 +392,24 @@ const FanContentDetailPage = () => {
   const baseLikeCount = postDetail?.likeCount ?? BASE_LIKE_COUNT;
   const likeCount = likeOverride?.likeCount ?? baseLikeCount;
   const isLikePending = likePostMutation.isPending || unlikePostMutation.isPending;
-  const commentCount = postDetail?.commentCount ?? 12;
+  const myComments = commentsQuery.data?.pages[0]?.myComments ?? [];
+  const comments =
+    commentsQuery.data?.pages.flatMap((page) => page.items) ?? [];
+  const commentCount =
+    postDetail?.commentCount ?? myComments.length + comments.length;
+  const isCommentMutationPending =
+    createCommentMutation.isPending ||
+    updateCommentMutation.isPending ||
+    deleteCommentMutation.isPending;
   const title = postDetail?.title ?? "2025 봄 정기공연 합주 기록";
-  const content =
-    postDetail?.contentText ??
-    (typeof postDetail?.content === "string" ? postDetail.content : null) ??
-    postDetail?.body ??
-    postDetail?.text ??
-    "다음 공연을 앞두고 멤버들과 합주를 진행했어요.\n새롭게 편곡한 곡과 라이브 셋리스트를 맞춰보며\n무대에서 더 좋은 사운드를 들려드릴 준비를 하고 있습니다.";
+  const content = postDetail
+    ? (postDetail.contentText ??
+      (typeof postDetail.content === "string" ? postDetail.content : null) ??
+      postDetail.body ??
+      postDetail.text ??
+      "")
+    : "다음 공연을 앞두고 멤버들과 합주를 진행했어요.\n새롭게 편곡한 곡과 라이브 셋리스트를 맞춰보며\n무대에서 더 좋은 사운드를 들려드릴 준비를 하고 있습니다.";
+  const hasContent = content.trim().length > 0;
   const tags = Array.isArray(postDetail?.tags) ? postDetail.tags : TAGS;
 
   const handleImageScroll = (event: UIEvent<HTMLDivElement>) => {
@@ -325,11 +464,97 @@ const FanContentDetailPage = () => {
     });
   };
 
+  const handleSubmitComment = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const contentValue = commentDraft.trim();
+
+    if (!validPostId || !contentValue || createCommentMutation.isPending) {
+      return;
+    }
+
+    setCommentErrorMessage("");
+
+    try {
+      await createCommentMutation.mutateAsync({
+        postId: validPostId,
+        body: { content: contentValue },
+      });
+      setCommentDraft("");
+    } catch (error) {
+      setCommentErrorMessage(
+        getApiErrorMessage(
+          error,
+          "댓글을 등록하지 못했어요. 잠시 후 다시 시도해주세요.",
+        ),
+      );
+    }
+  };
+
+  const handleStartEditComment = (comment: NormalizedFanExplorePostComment) => {
+    setCommentErrorMessage("");
+    setEditingCommentId(comment.commentId);
+    setEditingCommentDraft(comment.content);
+  };
+
+  const handleSubmitEditComment = async () => {
+    const contentValue = editingCommentDraft.trim();
+
+    if (
+      !validPostId ||
+      editingCommentId == null ||
+      !contentValue ||
+      updateCommentMutation.isPending
+    ) {
+      return;
+    }
+
+    setCommentErrorMessage("");
+
+    try {
+      await updateCommentMutation.mutateAsync({
+        postId: validPostId,
+        commentId: editingCommentId,
+        body: { content: contentValue },
+      });
+      setEditingCommentId(null);
+      setEditingCommentDraft("");
+    } catch (error) {
+      setCommentErrorMessage(
+        getCommentMutationErrorMessage(
+          error,
+          "댓글을 수정하지 못했어요. 잠시 후 다시 시도해주세요.",
+        ),
+      );
+    }
+  };
+
+  const handleDeleteComment = async (commentId: number) => {
+    if (!validPostId || deleteCommentMutation.isPending) return;
+    if (!window.confirm("댓글을 삭제할까요?")) return;
+
+    setCommentErrorMessage("");
+
+    try {
+      await deleteCommentMutation.mutateAsync({
+        postId: validPostId,
+        commentId,
+      });
+    } catch (error) {
+      setCommentErrorMessage(
+        getCommentMutationErrorMessage(
+          error,
+          "댓글을 삭제하지 못했어요. 잠시 후 다시 시도해주세요.",
+        ),
+      );
+    }
+  };
+
   return (
-    <main className="min-h-dvh bg-neutral-0">
+    <main className="min-h-dvh bg-primary-0">
       <ContentDetailHeader onBack={() => navigate(-1)} />
 
-      <article className="px-[25px] pt-[24px]">
+      <article className="bg-neutral-0 px-[25px] pt-[24px]">
         <header className="flex items-center gap-[16px]">
           <div className="flex size-[42px] shrink-0 items-center justify-center overflow-hidden rounded-full bg-neutral-300 text-neutral-600">
             {profileImageUrl ? (
@@ -410,11 +635,13 @@ const FanContentDetailPage = () => {
             disabled={isLikePending}
             className="flex items-center gap-[4px] font-body text-caption3 text-neutral-900"
           >
-            <img
-              src={isLiked ? LikedHeartIcon : HeartIcon}
-              alt=""
-              className={isLiked ? "h-[17px] w-[20px]" : "size-[20px]"}
-            />
+            <span className="flex size-[24px] shrink-0 items-center justify-center">
+              <img
+                src={isLiked ? LikedHeartIcon : HeartIcon}
+                alt=""
+                className="size-[25px]"
+              />
+            </span>
             {likeCount}
           </button>
           <span className="flex items-center gap-[4px] font-body text-caption3 text-neutral-900">
@@ -427,9 +654,11 @@ const FanContentDetailPage = () => {
           <h2 className="m-0 font-body text-body1 text-neutral-900">
             {title}
           </h2>
-          <p className="m-0 mt-[8px] whitespace-pre-line font-caption2 text-caption2 text-neutral-900">
-            {content}
-          </p>
+          {hasContent ? (
+            <p className="m-0 mt-[8px] whitespace-pre-line font-caption2 text-caption2 text-neutral-900">
+              {content}
+            </p>
+          ) : null}
 
           <div className="mt-[16px] flex flex-wrap gap-[8px]">
             {tags.map((tag) => (
@@ -449,28 +678,135 @@ const FanContentDetailPage = () => {
           댓글 {commentCount}
         </h2>
 
-        {COMMENTS.map((comment) => (
-          <article key={comment.id} className="flex w-full gap-[16px]">
-            <img
-              src={BandImage}
-              alt=""
-              className="size-[35px] shrink-0 rounded-full object-cover"
-            />
-            <div className="min-w-0">
-              <div className="flex items-center gap-[6px]">
-                <strong className="font-body text-caption3 text-neutral-900">
-                  {comment.author}
-                </strong>
-                <span className="font-body text-caption4 text-neutral-500">
-                  {comment.time}
-                </span>
+        <form
+          onSubmit={handleSubmitComment}
+          className="flex w-full flex-col gap-[8px]"
+        >
+          <textarea
+            value={commentDraft}
+            onChange={(event) => setCommentDraft(event.target.value)}
+            onKeyDown={(event: KeyboardEvent<HTMLTextAreaElement>) => {
+              if (event.key !== "Enter" || event.shiftKey) return;
+
+              event.preventDefault();
+              event.currentTarget.form?.requestSubmit();
+            }}
+            maxLength={500}
+            placeholder="댓글을 입력해주세요"
+            className="min-h-[48px] w-full resize-none rounded-[8px] border border-neutral-300 bg-neutral-0 px-[12px] py-[8px] font-body text-caption2 text-neutral-900 outline-none placeholder:text-neutral-500 focus:border-primary-400"
+          />
+          <div className="flex items-center justify-between">
+            <span className="font-body text-caption4 text-neutral-500">
+              {commentDraft.length}/500
+            </span>
+            <button
+              type="submit"
+              disabled={!commentDraft.trim() || createCommentMutation.isPending}
+              className="flex h-[32px] min-w-[68px] items-center justify-center rounded-[8px] bg-primary-400 px-[14px] font-body text-caption3 text-neutral-0 disabled:bg-neutral-400"
+            >
+              등록
+            </button>
+          </div>
+        </form>
+
+        {commentErrorMessage ? (
+          <p className="m-0 font-body text-caption3 text-secondary-500">
+            {commentErrorMessage}
+          </p>
+        ) : null}
+
+        {commentsQuery.isLoading ? (
+          <p className="m-0 font-body text-caption2 text-neutral-600">
+            댓글을 불러오고 있어요
+          </p>
+        ) : commentsQuery.isError ? (
+          <div className="flex w-full items-center justify-between gap-[12px]">
+            <p className="m-0 font-body text-caption2 text-neutral-600">
+              댓글을 불러오지 못했어요
+            </p>
+            <button
+              type="button"
+              onClick={() => void commentsQuery.refetch()}
+              className="font-body text-caption3 text-primary-400"
+            >
+              다시 시도
+            </button>
+          </div>
+        ) : myComments.length > 0 || comments.length > 0 ? (
+          <>
+            {myComments.length > 0 ? (
+              <div className="flex w-full flex-col gap-[12px]">
+                <h3 className="m-0 font-body text-caption3 text-neutral-700">
+                  내 댓글
+                </h3>
+                {myComments.map((comment) => (
+                  <CommentItem
+                    key={`my-comment-${comment.commentId}`}
+                    comment={comment}
+                    isEditable
+                    isEditing={editingCommentId === comment.commentId}
+                    editValue={editingCommentDraft}
+                    isPending={isCommentMutationPending}
+                    onStartEdit={() => handleStartEditComment(comment)}
+                    onCancelEdit={() => {
+                      setEditingCommentId(null);
+                      setEditingCommentDraft("");
+                    }}
+                    onEditValueChange={setEditingCommentDraft}
+                    onSubmitEdit={() => void handleSubmitEditComment()}
+                    onDelete={() => void handleDeleteComment(comment.commentId)}
+                  />
+                ))}
               </div>
-              <p className="m-0 font-body text-caption2 text-neutral-700">
-                {comment.content}
+            ) : null}
+
+            {comments.length > 0 ? (
+              <div className="flex w-full flex-col gap-[12px]">
+                {myComments.length > 0 ? (
+                  <h3 className="m-0 font-body text-caption3 text-neutral-700">
+                    전체 댓글
+                  </h3>
+                ) : null}
+                {comments.map((comment) => {
+                  const isEditable =
+                    comment.isMine ||
+                    (currentUser?.userId != null &&
+                      comment.authorId === currentUser.userId);
+
+                  return (
+                    <CommentItem
+                      key={comment.commentId}
+                      comment={comment}
+                      isEditable={isEditable}
+                      isEditing={editingCommentId === comment.commentId}
+                      editValue={editingCommentDraft}
+                      isPending={isCommentMutationPending}
+                      onStartEdit={() => handleStartEditComment(comment)}
+                      onCancelEdit={() => {
+                        setEditingCommentId(null);
+                        setEditingCommentDraft("");
+                      }}
+                      onEditValueChange={setEditingCommentDraft}
+                      onSubmitEdit={() => void handleSubmitEditComment()}
+                      onDelete={() => void handleDeleteComment(comment.commentId)}
+                    />
+                  );
+                })}
+              </div>
+            ) : null}
+
+            <div ref={commentSentinelRef} className="h-[1px] w-full" />
+            {commentsQuery.isFetchingNextPage ? (
+              <p className="m-0 font-body text-caption2 text-neutral-600">
+                댓글을 더 불러오고 있어요
               </p>
-            </div>
-          </article>
-        ))}
+            ) : null}
+          </>
+        ) : (
+          <p className="m-0 font-body text-caption2 text-neutral-600">
+            아직 댓글이 없어요
+          </p>
+        )}
       </section>
 
       <div aria-hidden="true" className="h-[86px] bg-primary-0" />

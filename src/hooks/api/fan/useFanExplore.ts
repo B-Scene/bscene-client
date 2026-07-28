@@ -5,10 +5,13 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import {
+  createFanExplorePostComment,
   deleteAllFanExploreRecentSearches,
   deleteFanExploreRecentSearch,
+  deleteFanExplorePostComment,
   followExploreBand,
   getFanExploreBandDetail,
+  getFanExplorePostComments,
   getFanExplorePostDetail,
   getFanExploreRecentSearches,
   getRecommendedExploreBands,
@@ -18,12 +21,15 @@ import {
   searchFanExplorePerformances,
   unlikeFanExplorePost,
   unfollowExploreBand,
+  updateFanExplorePostComment,
 } from "@/api/fan/explore";
 import type {
   FanExplorePostDetail,
   FanExplorePostLikeResponse,
+  FanExplorePostCommentsParams,
   FanExploreRecommendationParams,
   FanExploreSearchParams,
+  UpsertFanExplorePostCommentRequest,
 } from "@/types/fan/explore";
 import { fanHomeKeys } from "@/hooks/api/fan/useFanHome";
 import { followedBandsKeys } from "@/hooks/api/user/useFollowedBands";
@@ -36,6 +42,8 @@ export const fanExploreKeys = {
     [...fanExploreKeys.all, "bandDetail", bandId] as const,
   postDetail: (postId: number) =>
     [...fanExploreKeys.all, "postDetail", postId] as const,
+  postComments: (postId: number, params: Omit<FanExplorePostCommentsParams, "cursor">) =>
+    [...fanExploreKeys.all, "postComments", postId, params] as const,
   searches: () => [...fanExploreKeys.all, "search"] as const,
   search: (params: FanExploreSearchParams) =>
     [...fanExploreKeys.all, "search", params] as const,
@@ -182,6 +190,75 @@ export const useLikeFanExplorePost = () => {
 
 export const useUnlikeFanExplorePost = () => {
   return useFanExplorePostLikeMutation(unlikeFanExplorePost, false);
+};
+
+export const useFanExplorePostCommentsQuery = (
+  postId?: number,
+  params: Omit<FanExplorePostCommentsParams, "cursor"> = {},
+) => {
+  return useInfiniteQuery({
+    queryKey: fanExploreKeys.postComments(postId ?? 0, params),
+    queryFn: ({ pageParam }) =>
+      getFanExplorePostComments(postId as number, {
+        ...params,
+        cursor: pageParam,
+      }),
+    initialPageParam: undefined as number | undefined,
+    getNextPageParam: (lastPage) =>
+      lastPage.hasNext ? (lastPage.nextCursor ?? undefined) : undefined,
+    enabled: typeof postId === "number" && Number.isFinite(postId) && postId > 0,
+    staleTime: 1000 * 30,
+  });
+};
+
+const invalidatePostCommentQueries = (
+  queryClient: ReturnType<typeof useQueryClient>,
+  postId: number,
+) => {
+  return Promise.all([
+    queryClient.invalidateQueries({
+      queryKey: [...fanExploreKeys.all, "postComments", postId],
+    }),
+    queryClient.invalidateQueries({ queryKey: fanExploreKeys.postDetail(postId) }),
+    queryClient.invalidateQueries({ queryKey: fanExploreKeys.searches() }),
+    queryClient.invalidateQueries({ queryKey: fanExploreKeys.searchContentsLists() }),
+  ]);
+};
+
+export const useCreateFanExplorePostComment = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      postId,
+      body,
+    }: {
+      postId: number;
+      body: UpsertFanExplorePostCommentRequest;
+    }) => createFanExplorePostComment(postId, body),
+    onSuccess: (_result, { postId }) =>
+      invalidatePostCommentQueries(queryClient, postId),
+  });
+};
+
+export const useUpdateFanExplorePostComment = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: updateFanExplorePostComment,
+    onSuccess: (_result, { postId }) =>
+      invalidatePostCommentQueries(queryClient, postId),
+  });
+};
+
+export const useDeleteFanExplorePostComment = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: deleteFanExplorePostComment,
+    onSuccess: (_result, { postId }) =>
+      invalidatePostCommentQueries(queryClient, postId),
+  });
 };
 
 export const useFanExploreSearchQuery = (params: FanExploreSearchParams) => {

@@ -7,6 +7,9 @@ import type {
   FanExploreContent,
   FanExplorePageResponse,
   FanExplorePerformance,
+  FanExplorePostComment,
+  FanExplorePostCommentsResponse,
+  FanExplorePostCommentsParams,
   FanExplorePostDetail,
   FanExplorePostLikeResponse,
   FanExploreRecentSearch,
@@ -16,9 +19,11 @@ import type {
   NormalizedFanExploreBandsResponse,
   NormalizedFanExploreContentsResponse,
   NormalizedFanExplorePerformancesResponse,
+  NormalizedFanExplorePostComment,
   NormalizedFanExploreRecentSearch,
   NormalizedFanExploreRecentSearchesResponse,
   NormalizedFanExploreSearchResponse,
+  UpsertFanExplorePostCommentRequest,
 } from "@/types/fan/explore";
 
 type FanExplorePageLike<T> = Omit<FanExplorePageResponse<T>, "results"> & {
@@ -73,6 +78,15 @@ type FanExploreContentAlias = FanExploreContent & {
   postedAt?: string | null;
   uploadedAt?: string | null;
   updatedAt?: string | null;
+  registeredAt?: string | null;
+};
+
+type FanExplorePostCommentAlias = FanExplorePostComment & {
+  profileImage?: string | null;
+  avatarUrl?: string | null;
+  imageUrl?: string | null;
+  createdDate?: string | null;
+  createdTime?: string | null;
   registeredAt?: string | null;
 };
 
@@ -457,6 +471,9 @@ const toNumericId = (value?: number | string | null) => {
   return undefined;
 };
 
+const toStringOrNull = (value?: unknown) =>
+  typeof value === "string" && value.trim() ? value.trim() : null;
+
 const toStringArray = (value?: unknown): string[] => {
   if (Array.isArray(value)) return value.flatMap(toStringArray);
   if (!value) return [];
@@ -613,6 +630,114 @@ const normalizePostLike = (
   return {
     isLiked: result?.isLiked ?? result?.liked ?? intendedLiked,
     likeCount: result?.likeCount ?? result?.likes,
+  };
+};
+
+const normalizePostComment = (
+  result: FanExplorePostComment,
+): NormalizedFanExplorePostComment => {
+  const rawResult = result as FanExplorePostCommentAlias;
+  const commentInfo = (result.comment ?? result) as FanExplorePostCommentAlias;
+  const authorInfo =
+    result.author ?? result.user ?? result.member ?? result.writer ?? {};
+  const commentId =
+    toNumericId(result.commentId) ??
+    toNumericId(result.id) ??
+    toNumericId(commentInfo.commentId) ??
+    toNumericId(commentInfo.id) ??
+    0;
+  const authorId =
+    toNumericId(result.authorId) ??
+    toNumericId(result.userId) ??
+    toNumericId(result.memberId) ??
+    toNumericId(result.writerId) ??
+    toNumericId(authorInfo.authorId) ??
+    toNumericId(authorInfo.userId) ??
+    toNumericId(authorInfo.memberId) ??
+    toNumericId(authorInfo.writerId) ??
+    toNumericId(authorInfo.id) ??
+    null;
+
+  return {
+    commentId,
+    authorId,
+    authorName:
+      toStringOrNull(result.authorName) ??
+      toStringOrNull(result.nickname) ??
+      toStringOrNull(result.userName) ??
+      toStringOrNull(result.memberName) ??
+      toStringOrNull(result.writerName) ??
+      toStringOrNull(result.name) ??
+      toStringOrNull(authorInfo.authorName) ??
+      toStringOrNull(authorInfo.nickname) ??
+      toStringOrNull(authorInfo.userName) ??
+      toStringOrNull(authorInfo.memberName) ??
+      toStringOrNull(authorInfo.writerName) ??
+      toStringOrNull(authorInfo.name) ??
+      "익명",
+    profileImageUrl:
+      toStringOrNull(result.profileImageUrl) ??
+      toStringOrNull(result.authorProfileImageUrl) ??
+      toStringOrNull(result.userProfileImageUrl) ??
+      toStringOrNull(result.memberProfileImageUrl) ??
+      toStringOrNull(result.writerProfileImageUrl) ??
+      toStringOrNull(rawResult.profileImage) ??
+      toStringOrNull(rawResult.avatarUrl) ??
+      toStringOrNull(rawResult.imageUrl) ??
+      toStringOrNull(authorInfo.profileImageUrl) ??
+      toStringOrNull(authorInfo.authorProfileImageUrl) ??
+      toStringOrNull(authorInfo.userProfileImageUrl) ??
+      toStringOrNull(authorInfo.memberProfileImageUrl) ??
+      toStringOrNull(authorInfo.writerProfileImageUrl) ??
+      null,
+    content:
+      toStringOrNull(result.content) ??
+      toStringOrNull(result.body) ??
+      toStringOrNull(result.text) ??
+      toStringOrNull(result.commentText) ??
+      "",
+    createdAt:
+      toStringOrNull(result.createdAt) ??
+      toStringOrNull(rawResult.createdDate) ??
+      toStringOrNull(rawResult.createdTime) ??
+      toStringOrNull(rawResult.registeredAt),
+    updatedAt: toStringOrNull(result.updatedAt),
+    isMine:
+      result.isMine ??
+      result.mine ??
+      result.owner ??
+      result.editable ??
+      false,
+  };
+};
+
+const normalizePostComments = (
+  result: FanExplorePageResponse<FanExplorePostComment> | FanExplorePostComment[],
+): FanExplorePostCommentsResponse => {
+  if (Array.isArray(result)) {
+    return {
+      items: result.map(normalizePostComment),
+      myComments: [],
+      hasNext: false,
+      nextCursor: null,
+    };
+  }
+
+  const rawMyComments = Array.isArray(result.myComments)
+    ? result.myComments
+    : [];
+  const nextCursor =
+    typeof result.nextCursor === "number"
+      ? result.nextCursor
+      : typeof result.nextCursor === "string"
+        ? Number(result.nextCursor)
+        : null;
+
+  return {
+    items: getSectionItems(result).map(normalizePostComment),
+    myComments: rawMyComments.map(normalizePostComment),
+    hasNext: result.hasNext ?? nextCursor != null,
+    nextCursor: Number.isFinite(nextCursor) ? nextCursor : null,
   };
 };
 
@@ -839,6 +964,69 @@ export const unlikeFanExplorePost = async (
     FanExploreApiResponse<FanExplorePostLikeResponse>
   >(`/posts/${postId}/likes`);
   return normalizePostLike(assertMutationSuccess(response), false);
+};
+
+export const getFanExplorePostComments = async (
+  postId: number,
+  { cursor, size = 10 }: FanExplorePostCommentsParams = {},
+): Promise<FanExplorePostCommentsResponse> => {
+  const response = await axiosInstance.get<
+    FanExploreApiResponse<
+      FanExplorePageResponse<FanExplorePostComment> | FanExplorePostComment[]
+    >
+  >(`/posts/${postId}/comments`, {
+    params: removeEmptyParams({
+      cursor,
+      size,
+    }),
+  });
+
+  return normalizePostComments(assertSuccess(response));
+};
+
+export const createFanExplorePostComment = async (
+  postId: number,
+  body: UpsertFanExplorePostCommentRequest,
+) => {
+  const response = await axiosInstance.post<
+    FanExploreApiResponse<FanExplorePostComment | null>
+  >(`/posts/${postId}/comments`, body);
+
+  const result = assertMutationSuccess(response);
+
+  return result ? normalizePostComment(result) : null;
+};
+
+export const updateFanExplorePostComment = async ({
+  postId,
+  commentId,
+  body,
+}: {
+  postId: number;
+  commentId: number;
+  body: UpsertFanExplorePostCommentRequest;
+}) => {
+  const response = await axiosInstance.patch<
+    FanExploreApiResponse<FanExplorePostComment | null>
+  >(`/posts/${postId}/comments/${commentId}`, body);
+
+  const result = assertMutationSuccess(response);
+
+  return result ? normalizePostComment(result) : null;
+};
+
+export const deleteFanExplorePostComment = async ({
+  postId,
+  commentId,
+}: {
+  postId: number;
+  commentId: number;
+}) => {
+  const response = await axiosInstance.delete<FanExploreApiResponse<null>>(
+    `/posts/${postId}/comments/${commentId}`,
+  );
+
+  return assertMutationSuccess(response);
 };
 
 export const searchFanExplore = async ({
