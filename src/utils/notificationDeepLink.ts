@@ -287,19 +287,11 @@ export const isPostRegistrationNotification = (
   notification: NotificationItem,
 ) => {
   const type = notification.type.toUpperCase();
-  const title = notification.title;
-  const body = notification.body;
 
   return (
     type.includes("POST") ||
     type.includes("CONTENT") ||
-    type.includes("NEWS") ||
-    title.includes("게시물") ||
-    title.includes("게시글") ||
-    title.includes("콘텐츠") ||
-    body.includes("게시물") ||
-    body.includes("게시글") ||
-    body.includes("콘텐츠")
+    type.includes("NEWS")
   );
 };
 

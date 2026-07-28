@@ -185,7 +185,7 @@ export interface FanExplorePostComment {
 }
 
 export interface NormalizedFanExplorePostComment {
-  commentId: number;
+  commentId: number | null;
   authorId: number | null;
   authorName: string;
   profileImageUrl: string | null;

@@ -645,7 +645,7 @@ const normalizePostComment = (
     toNumericId(result.id) ??
     toNumericId(commentInfo.commentId) ??
     toNumericId(commentInfo.id) ??
-    0;
+    null;
   const authorId =
     toNumericId(result.authorId) ??
     toNumericId(result.userId) ??

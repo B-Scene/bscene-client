@@ -286,6 +286,12 @@ const CommentItem = ({
   );
 };
 
+const getCommentKey = (
+  prefix: string,
+  comment: NormalizedFanExplorePostComment,
+  index: number,
+) => `${prefix}-${comment.commentId ?? `missing-${index}`}`;
+
 const FanContentDetailPage = () => {
   const navigate = useNavigate();
   const { contentId } = useParams();
@@ -392,9 +398,17 @@ const FanContentDetailPage = () => {
   const baseLikeCount = postDetail?.likeCount ?? BASE_LIKE_COUNT;
   const likeCount = likeOverride?.likeCount ?? baseLikeCount;
   const isLikePending = likePostMutation.isPending || unlikePostMutation.isPending;
-  const myComments = commentsQuery.data?.pages[0]?.myComments ?? [];
   const comments =
     commentsQuery.data?.pages.flatMap((page) => page.items) ?? [];
+  const commentIds = new Set(
+    comments
+      .map((comment) => comment.commentId)
+      .filter((commentId): commentId is number => commentId !== null),
+  );
+  const myComments = (commentsQuery.data?.pages[0]?.myComments ?? []).filter(
+    (comment) =>
+      comment.commentId === null || !commentIds.has(comment.commentId),
+  );
   const commentCount =
     postDetail?.commentCount ?? myComments.length + comments.length;
   const isCommentMutationPending =
@@ -492,6 +506,8 @@ const FanContentDetailPage = () => {
   };
 
   const handleStartEditComment = (comment: NormalizedFanExplorePostComment) => {
+    if (comment.commentId === null) return;
+
     setCommentErrorMessage("");
     setEditingCommentId(comment.commentId);
     setEditingCommentDraft(comment.content);
@@ -529,8 +545,9 @@ const FanContentDetailPage = () => {
     }
   };
 
-  const handleDeleteComment = async (commentId: number) => {
-    if (!validPostId || deleteCommentMutation.isPending) return;
+  const handleDeleteComment = async (commentId: number | null) => {
+    if (!validPostId || commentId === null || deleteCommentMutation.isPending)
+      return;
     if (!window.confirm("댓글을 삭제할까요?")) return;
 
     setCommentErrorMessage("");
@@ -686,7 +703,12 @@ const FanContentDetailPage = () => {
             value={commentDraft}
             onChange={(event) => setCommentDraft(event.target.value)}
             onKeyDown={(event: KeyboardEvent<HTMLTextAreaElement>) => {
-              if (event.key !== "Enter" || event.shiftKey) return;
+              if (
+                event.nativeEvent.isComposing ||
+                event.key !== "Enter" ||
+                event.shiftKey
+              )
+                return;
 
               event.preventDefault();
               event.currentTarget.form?.requestSubmit();
@@ -739,12 +761,15 @@ const FanContentDetailPage = () => {
                 <h3 className="m-0 font-body text-caption3 text-neutral-700">
                   내 댓글
                 </h3>
-                {myComments.map((comment) => (
+                {myComments.map((comment, index) => (
                   <CommentItem
-                    key={`my-comment-${comment.commentId}`}
+                    key={getCommentKey("my-comment", comment, index)}
                     comment={comment}
-                    isEditable
-                    isEditing={editingCommentId === comment.commentId}
+                    isEditable={comment.commentId !== null}
+                    isEditing={
+                      comment.commentId !== null &&
+                      editingCommentId === comment.commentId
+                    }
                     editValue={editingCommentDraft}
                     isPending={isCommentMutationPending}
                     onStartEdit={() => handleStartEditComment(comment)}
@@ -767,18 +792,22 @@ const FanContentDetailPage = () => {
                     전체 댓글
                   </h3>
                 ) : null}
-                {comments.map((comment) => {
+                {comments.map((comment, index) => {
                   const isEditable =
-                    comment.isMine ||
-                    (currentUser?.userId != null &&
-                      comment.authorId === currentUser.userId);
+                    comment.commentId !== null &&
+                    (comment.isMine ||
+                      (currentUser?.userId != null &&
+                        comment.authorId === currentUser.userId));
 
                   return (
                     <CommentItem
-                      key={comment.commentId}
+                      key={getCommentKey("comment", comment, index)}
                       comment={comment}
                       isEditable={isEditable}
-                      isEditing={editingCommentId === comment.commentId}
+                      isEditing={
+                        comment.commentId !== null &&
+                        editingCommentId === comment.commentId
+                      }
                       editValue={editingCommentDraft}
                       isPending={isCommentMutationPending}
                       onStartEdit={() => handleStartEditComment(comment)}
