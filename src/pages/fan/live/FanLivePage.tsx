@@ -2,10 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { AxiosError } from "axios";
 import Hls from "hls.js";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { reissueAccessToken } from "@/api/axiosInstance";
 import {
   getLiveMembers,
-  getLivePlaybackAuthorization,
   getLiveBearerAuthorization,
   resolveLiveApiUrl,
   subscribeViewerCount,
@@ -89,26 +87,6 @@ const formatChatTime = (sentAt: string) => {
     minute: "2-digit",
     hour12: false,
   });
-};
-
-const resolveHlsPlaybackUrl = (playbackUrl: string) => {
-  if (!import.meta.env.DEV) return playbackUrl;
-
-  try {
-    const url = new URL(playbackUrl, window.location.origin);
-    const apiUrl = new URL(
-      import.meta.env.VITE_API_BASE_URL,
-      window.location.origin,
-    );
-
-    if (url.origin !== apiUrl.origin || !url.pathname.startsWith("/hls/")) {
-      return playbackUrl;
-    }
-
-    return `${url.pathname}${url.search}${url.hash}`;
-  } catch {
-    return playbackUrl;
-  }
 };
 
 export function FanLivePage() {
@@ -617,7 +595,7 @@ export function FanLivePage() {
         }
         onExit={() => setIsExitModalOpen(true)}
       />
-      <FanLiveHero live={live} />
+      <FanLiveHero isAudioActive={Boolean(live?.isLive && !isMuted)} live={live} />
 
       <audio
         ref={audioRef}

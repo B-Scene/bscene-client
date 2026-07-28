@@ -64,14 +64,26 @@ export function FanLiveHeader({
 
 const waveHeights = [5, 5, 15, 35, 65, 100, 65, 35, 15, 5, 5];
 
-function Waveform() {
+function Waveform({
+  isActive,
+  side,
+}: {
+  isActive: boolean;
+  side: "left" | "right";
+}) {
   return (
     <div className="flex h-[100px] w-[103px] shrink-0 items-center gap-[7px]" aria-hidden="true">
       {waveHeights.map((height, index) => (
         <span
-          key={`${height}-${index}`}
-          className="w-[3px] shrink-0 rounded-full bg-gradient-to-b from-primary-100 via-primary-300 to-primary-400"
-          style={{ height }}
+          key={`${side}-${height}-${index}`}
+          className={`live-audio-wave-bar w-[3px] shrink-0 rounded-full bg-gradient-to-b from-primary-100 via-primary-300 to-primary-400 ${
+            isActive ? "is-active" : ""
+          }`}
+          style={{
+            height,
+            animationDelay: `-${(index * 113 + (side === "right" ? 170 : 0)) % 760}ms`,
+            animationDuration: `${620 + ((index * 137 + (side === "right" ? 90 : 0)) % 480)}ms`,
+          }}
         />
       ))}
     </div>
@@ -79,9 +91,11 @@ function Waveform() {
 }
 
 export function FanLiveHero({
+  isAudioActive = false,
   live,
   top = 90,
 }: {
+  isAudioActive?: boolean;
   live?: FanLiveHeroData;
   top?: number;
 }) {
@@ -91,13 +105,13 @@ export function FanLiveHero({
       style={{ top }}
     >
       <div className="flex h-[160px] items-center justify-center gap-2.5">
-        <Waveform />
+        <Waveform isActive={isAudioActive} side="left" />
         <img
           src={live?.bandProfileImageUrl || BandImage}
           alt={`${live?.bandName ?? "밴드"} 프로필`}
           className="fan-live-profile-image size-[160px] shrink-0 rounded-full border-2 border-neutral-0 object-cover"
         />
-        <Waveform />
+        <Waveform isActive={isAudioActive} side="right" />
       </div>
 
       <div className="mt-8 flex h-20 flex-col items-center gap-[5px]">

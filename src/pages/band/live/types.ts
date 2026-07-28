@@ -2,6 +2,8 @@ import type { EnterLiveResponse } from "@/types/live/live";
 
 export type BandLiveScreen =
   | "home"
+  | "liveNowList"
+  | "scheduledList"
   | "room"
   | "members"
   | "chat"

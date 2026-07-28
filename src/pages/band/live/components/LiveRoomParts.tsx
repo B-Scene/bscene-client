@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import AirplaneIcon from "@/assets/icons/airplane.svg";
 import BadgeIcon from "@/assets/icons/Badge.svg";
 import BtnSendIcon from "@/assets/icons/Btn_send.svg";
@@ -83,10 +83,16 @@ export function LiveRoomHeader({
   );
 }
 
-export function LiveRoomHero({ live }: { live: ActiveLive }) {
+export function LiveRoomHero({
+  isAudioActive,
+  live,
+}: {
+  isAudioActive: boolean;
+  live: ActiveLive;
+}) {
   return (
     <section className="relative h-[282px] shrink-0 text-center">
-      <Waveform />
+      <Waveform isActive={isAudioActive} />
 
       <div className="relative z-10 flex justify-center pt-[18px]">
         <ProfileImage size="lg" src={live?.bandProfileImageUrl ?? undefined} />
@@ -110,7 +116,7 @@ export function LiveRoomHero({ live }: { live: ActiveLive }) {
   );
 }
 
-function Waveform() {
+function Waveform({ isActive }: { isActive: boolean }) {
   const bars = [4, 7, 15, 34, 63, 92, 71, 46, 25, 12, 7, 4];
 
   return (
@@ -119,8 +125,14 @@ function Waveform() {
         {bars.map((height, index) => (
           <span
             key={`left-${height}-${index}`}
-            className="w-0.5 rounded-full bg-gradient-to-b from-secondary-200 via-secondary-500 to-secondary-500"
-            style={{ height }}
+            className={`live-audio-wave-bar w-0.5 rounded-full bg-gradient-to-b from-secondary-200 via-secondary-500 to-secondary-500 ${
+              isActive ? "is-active" : ""
+            }`}
+            style={{
+              height,
+              animationDelay: `-${(index * 127) % 780}ms`,
+              animationDuration: `${640 + ((index * 149) % 460)}ms`,
+            }}
           />
         ))}
       </div>
@@ -129,8 +141,14 @@ function Waveform() {
         {[...bars].reverse().map((height, index) => (
           <span
             key={`right-${height}-${index}`}
-            className="w-0.5 rounded-full bg-gradient-to-b from-secondary-200 via-secondary-500 to-secondary-500"
-            style={{ height }}
+            className={`live-audio-wave-bar w-0.5 rounded-full bg-gradient-to-b from-secondary-200 via-secondary-500 to-secondary-500 ${
+              isActive ? "is-active" : ""
+            }`}
+            style={{
+              height,
+              animationDelay: `-${(index * 109 + 190) % 780}ms`,
+              animationDuration: `${660 + ((index * 131 + 80) % 440)}ms`,
+            }}
           />
         ))}
       </div>
@@ -143,66 +161,75 @@ function VerifiedBadge() {
 }
 
 function ChatBubble({ chat }: { chat: ChatMessage }) {
-  if (chat.highlighted) {
-    return (
-      <article className="grid grid-cols-[44px_minmax(0,1fr)_38px] items-start gap-2">
-        <div className="relative mt-1 flex size-11 shrink-0 items-start justify-center">
-          <img src={FBandProfileIcon} alt="" className="size-11 object-contain" />
-        </div>
-
-        <div className="col-span-2 min-w-0">
-          <div className="relative flex min-h-[73px] w-[calc(100%+16px)] flex-col items-start gap-1.5 rounded-2xl border border-secondary-300 bg-secondary-100/25 py-[7px] pr-[68px] pl-[11px]">
-            <strong className="block text-caption3 text-neutral-900">
-              {chat.sender}
-            </strong>
-
-            <p className="whitespace-pre-line text-body3 font-medium text-neutral-900">
-              {chat.message}
-            </p>
-
-            <time className="absolute right-[16px] top-1/2 -translate-y-1/2 text-caption4 text-neutral-600">
-              {chat.time}
-            </time>
-          </div>
-        </div>
-      </article>
-    );
-  }
-
   return (
     <article className="grid grid-cols-[44px_minmax(0,1fr)_38px] items-start gap-2">
-      <div className="relative mt-1 flex size-11 shrink-0 items-start justify-center">
+      <div className="relative row-span-2 mt-1 flex size-11 shrink-0 items-start justify-center">
         <img
-          src={chat.senderProfileImageUrl ?? ProfileIcon}
+          src={
+            chat.highlighted
+              ? FBandProfileIcon
+              : (chat.senderProfileImageUrl ?? ProfileIcon)
+          }
           alt=""
-          className="size-10 rounded-full object-cover"
+          className={
+            chat.highlighted
+              ? "size-11 object-contain"
+              : "size-10 rounded-full object-cover"
+          }
         />
       </div>
 
-      <div className="min-w-0">
-        <strong className="block text-caption3 text-neutral-900">
-          {chat.sender}
-        </strong>
+      <strong className="min-w-0 truncate text-caption3 text-neutral-900">
+        {chat.sender}
+      </strong>
+      <span />
 
-        <p className="mt-1 flex h-7 w-[191px] max-w-full items-center whitespace-nowrap rounded-xl bg-neutral-0 py-[5px] pr-[35px] pl-[11px] text-body3 text-neutral-900">
-          {chat.message}
-        </p>
-      </div>
+      <p
+        className={`mt-1 min-h-7 max-w-[191px] break-words whitespace-pre-wrap rounded-xl px-[11px] py-1 text-body3 text-neutral-900 ${
+          chat.highlighted
+            ? "border border-secondary-300 bg-secondary-100/25"
+            : "bg-neutral-0"
+        } ${chat.pending ? "opacity-60" : ""}`}
+      >
+        {chat.message}
+      </p>
 
-      <time className="mt-9 justify-self-end text-caption4 text-neutral-600">
+      <time className="mt-[13px] justify-self-end text-caption4 text-neutral-600">
         {chat.time}
       </time>
     </article>
   );
 }
 
-export function RoomMessageArea({ messages }: { messages: ChatMessage[] }) {
+export function RoomMessageArea({
+  composerOpen,
+  messages,
+}: {
+  composerOpen: boolean;
+  messages: ChatMessage[];
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const scrollContainer = scrollRef.current;
+    if (!scrollContainer) return;
+
+    scrollContainer.scrollTop = scrollContainer.scrollHeight;
+  }, [messages]);
+
   return (
-    <section className="min-h-0 flex-1 overflow-hidden bg-secondary-0 px-6 pt-3.5 pb-[150px]">
-      <div className="grid gap-3.5">
-        {messages.map((chat) => (
-          <ChatBubble key={chat.id} chat={chat} />
-        ))}
+    <section className="min-h-0 flex-1 basis-0 overflow-hidden bg-secondary-0">
+      <div
+        ref={scrollRef}
+        className={`h-full overflow-x-hidden overflow-y-auto px-6 pt-3.5 ${
+          composerOpen ? "pb-[150px]" : "pb-[90px]"
+        }`}
+      >
+        <div className="grid gap-3.5">
+          {messages.map((chat) => (
+            <ChatBubble key={chat.id} chat={chat} />
+          ))}
+        </div>
       </div>
     </section>
   );
@@ -234,9 +261,10 @@ export function ChatComposer({
       <input
         aria-label="메시지 입력"
         value={message}
+        maxLength={500}
         onChange={(event) => setMessage(event.target.value)}
         placeholder="메시지 입력하기"
-        className="h-9 min-w-0 flex-1 rounded-full border border-neutral-400 bg-neutral-0 px-5 text-caption2 text-neutral-900 outline-none placeholder:text-neutral-400"
+        className="h-9 min-w-0 flex-1 rounded-full border border-neutral-400 bg-neutral-0 px-5 text-caption2 text-neutral-900 outline-none placeholder:text-neutral-400 focus:border-secondary-400"
       />
 
       <button
@@ -258,6 +286,7 @@ export function ChatComposer({
 
 export function LiveActionBar({
   go,
+  chatOpen,
   audioStatus,
   isMicMuted,
   micVolume,
@@ -265,6 +294,7 @@ export function LiveActionBar({
   onToggleBroadcast,
 }: {
   go: GoLiveScreen;
+  chatOpen: boolean;
   audioStatus: LiveAudioStatus;
   isMicMuted: boolean;
   micVolume: number;
@@ -339,7 +369,8 @@ export function LiveActionBar({
 
         <button
           type="button"
-          onClick={() => go("chat")}
+          aria-pressed={chatOpen}
+          onClick={() => go(chatOpen ? "room" : "chat")}
           className="flex w-10 flex-col items-center gap-1 text-label4 text-neutral-900"
         >
           <img src={ChatIcon} alt="" className="size-[23px]" />
