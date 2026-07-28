@@ -9,6 +9,52 @@ export const axiosInstance = axios.create({
   },
 });
 
+let reissueRequest: Promise<ReissueResponse> | null = null;
+
+const clearAuthAndRedirectToLogin = () => {
+  localStorage.removeItem("accessToken");
+  localStorage.removeItem("refreshToken");
+  window.location.href = "/login";
+};
+
+export const reissueAccessToken = async (): Promise<ReissueResponse> => {
+  if (reissueRequest) return reissueRequest;
+
+  const refreshToken = localStorage.getItem("refreshToken");
+
+  if (!refreshToken) {
+    clearAuthAndRedirectToLogin();
+    throw new Error("refreshToken이 없습니다.");
+  }
+
+  const request = axios
+    .post<ApiResponse<ReissueResponse>>(
+      `${import.meta.env.VITE_API_BASE_URL}/auth/reissue`,
+      { refreshToken },
+      {
+        headers: {
+          "Content-Type": "application/json",
+        },
+      },
+    )
+    .then(({ data }) => {
+      localStorage.setItem("accessToken", data.result.accessToken);
+      localStorage.setItem("refreshToken", data.result.refreshToken);
+
+      return data.result;
+    })
+    .catch((error: unknown) => {
+      clearAuthAndRedirectToLogin();
+      throw error;
+    });
+
+  reissueRequest = request.finally(() => {
+    reissueRequest = null;
+  });
+
+  return reissueRequest;
+};
+
 axiosInstance.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const accessToken = localStorage.getItem("accessToken");
 
@@ -32,36 +78,13 @@ axiosInstance.interceptors.response.use(
 
     originalRequest._retry = true;
 
-    const refreshToken = localStorage.getItem("refreshToken");
-
-    if (!refreshToken) {
-      localStorage.removeItem("accessToken");
-      localStorage.removeItem("refreshToken");
-      window.location.href = "/login";
-      return Promise.reject(error);
-    }
-
     try {
-      const { data } = await axios.post<ApiResponse<ReissueResponse>>(
-        `${import.meta.env.VITE_API_BASE_URL}/auth/reissue`,
-        { refreshToken },
-        {
-          headers: {
-            "Content-Type": "application/json",
-          },
-        },
-      );
+      const { accessToken } = await reissueAccessToken();
 
-      localStorage.setItem("accessToken", data.result.accessToken);
-      localStorage.setItem("refreshToken", data.result.refreshToken);
-
-      originalRequest.headers.Authorization = `Bearer ${data.result.accessToken}`;
+      originalRequest.headers.Authorization = `Bearer ${accessToken}`;
 
       return axiosInstance(originalRequest);
     } catch (reissueError) {
-      localStorage.removeItem("accessToken");
-      localStorage.removeItem("refreshToken");
-      window.location.href = "/login";
       return Promise.reject(reissueError);
     }
   },

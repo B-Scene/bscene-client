@@ -2,7 +2,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { AxiosError } from "axios";
 import Hls from "hls.js";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { reissueAccessToken } from "@/api/axiosInstance";
 import {
+  getLiveMembers,
   getLivePlaybackAuthorization,
   subscribeViewerCount,
 } from "@/api/live/live";
@@ -19,6 +21,7 @@ import { useLiveChatSocket } from "@/hooks/api/live/useLiveChatSocket";
 import type {
   EnterLiveResponse,
   LiveApiResponse,
+  LiveMemberItem,
   ReportLiveUserRequest,
 } from "@/types/live/live";
 import type {
@@ -86,6 +89,26 @@ const formatChatTime = (sentAt: string) => {
   });
 };
 
+const resolveHlsPlaybackUrl = (playbackUrl: string) => {
+  if (!import.meta.env.DEV) return playbackUrl;
+
+  try {
+    const url = new URL(playbackUrl, window.location.origin);
+    const apiUrl = new URL(
+      import.meta.env.VITE_API_BASE_URL,
+      window.location.origin,
+    );
+
+    if (url.origin !== apiUrl.origin || !url.pathname.startsWith("/hls/")) {
+      return playbackUrl;
+    }
+
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return playbackUrl;
+  }
+};
+
 export function FanLivePage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -117,6 +140,9 @@ export function FanLivePage() {
   const [isMuted, setIsMuted] = useState(false);
   const [audioMessage, setAudioMessage] = useState("");
   const [isMemberSheetOpen, setIsMemberSheetOpen] = useState(false);
+  const [liveMembers, setLiveMembers] = useState<LiveMemberItem[]>([]);
+  const [isMembersLoading, setIsMembersLoading] = useState(false);
+  const [hasMembersError, setHasMembersError] = useState(false);
   const [hasOpenedChat, setHasOpenedChat] = useState(false);
   const [isChatComposerOpen, setIsChatComposerOpen] = useState(false);
   const [isProfileActionSheetOpen, setIsProfileActionSheetOpen] =
@@ -140,6 +166,10 @@ export function FanLivePage() {
     (message: LiveChatMessageData, frame: LiveChatMessageFrame) => {
       if (blockedUserIds.has(message.senderId)) return;
 
+      const isBandMember =
+        message.senderName === live?.bandName ||
+        liveMembers.some((member) => member.nickname === message.senderName);
+
       const confirmedMessage: FanChatMessage = {
         id: message.messageId,
         senderId: message.senderId,
@@ -147,7 +177,7 @@ export function FanLivePage() {
         message: message.content,
         time: formatChatTime(message.sentAt),
         profileImageUrl: message.senderProfileImageUrl,
-        band: message.senderName === live?.bandName,
+        band: isBandMember,
       };
 
       setChatMessages((current) => {
@@ -168,7 +198,7 @@ export function FanLivePage() {
         );
       });
     },
-    [blockedUserIds, live?.bandName],
+    [blockedUserIds, live?.bandName, liveMembers],
   );
 
   const {
@@ -252,6 +282,49 @@ export function FanLivePage() {
   }, [live?.liveId]);
 
   useEffect(() => {
+    if (!live?.liveId) return;
+
+    let isMounted = true;
+
+    setLiveMembers([]);
+    setIsMembersLoading(true);
+    setHasMembersError(false);
+
+    getLiveMembers(live.liveId)
+      .then((response) => {
+        if (!isMounted) return;
+
+        const memberNames = new Set(
+          response.members.map((member) => member.nickname),
+        );
+
+        setLiveMembers(response.members);
+        setChatMessages((current) =>
+          current.map((chat) => ({
+            ...chat,
+            band:
+              chat.sender === live.bandName || memberNames.has(chat.sender),
+          })),
+        );
+      })
+      .catch(() => {
+        if (!isMounted) return;
+
+        setLiveMembers([]);
+        setHasMembersError(true);
+      })
+      .finally(() => {
+        if (!isMounted) return;
+
+        setIsMembersLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [live?.bandName, live?.liveId]);
+
+  useEffect(() => {
     const audio = audioRef.current;
     const playback = live?.playback;
 
@@ -272,10 +345,8 @@ export function FanLivePage() {
       return;
     }
 
-    let authorization: string;
-
     try {
-      authorization = getLivePlaybackAuthorization();
+      getLivePlaybackAuthorization();
     } catch (error) {
       window.setTimeout(() => {
         setAudioMessage(
@@ -287,11 +358,19 @@ export function FanLivePage() {
       return;
     }
 
+    const playbackUrl = resolveHlsPlaybackUrl(playback.playbackUrl);
+    let isRecoveringAuthorization = false;
+    let authorizationRecoveryAttempts = 0;
+
     const hls = new Hls({
       lowLatencyMode: true,
       backBufferLength: 30,
       xhrSetup: (xhr) => {
-        xhr.setRequestHeader("Authorization", authorization);
+        xhr.withCredentials = true;
+        xhr.setRequestHeader(
+          "Authorization",
+          getLivePlaybackAuthorization(),
+        );
       },
     });
 
@@ -299,10 +378,11 @@ export function FanLivePage() {
     hls.attachMedia(audio);
 
     hls.on(Hls.Events.MEDIA_ATTACHED, () => {
-      hls.loadSource(playback.playbackUrl);
+      hls.loadSource(playbackUrl);
     });
 
     hls.on(Hls.Events.MANIFEST_PARSED, () => {
+      authorizationRecoveryAttempts = 0;
       void startPlayback();
     });
 
@@ -310,6 +390,42 @@ export function FanLivePage() {
       if (!data.fatal) return;
 
       if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+        if (data.response?.code === 401) {
+          if (isRecoveringAuthorization) return;
+
+          if (authorizationRecoveryAttempts >= 1) {
+            setAudioMessage(
+              "오디오 인증에 실패했어요. 라이브방에 다시 입장해 주세요.",
+            );
+            hls.destroy();
+            hlsRef.current = null;
+            return;
+          }
+
+          isRecoveringAuthorization = true;
+          authorizationRecoveryAttempts += 1;
+          hls.stopLoad();
+
+          void reissueAccessToken()
+            .then(() => {
+              if (hlsRef.current !== hls) return;
+
+              isRecoveringAuthorization = false;
+              hls.loadSource(playbackUrl);
+            })
+            .catch(() => {
+              if (hlsRef.current !== hls) return;
+
+              isRecoveringAuthorization = false;
+              setAudioMessage(
+                "로그인 정보가 만료되어 오디오를 다시 연결하지 못했어요.",
+              );
+              hls.destroy();
+              hlsRef.current = null;
+            });
+          return;
+        }
+
         hls.startLoad();
         return;
       }
@@ -568,6 +684,9 @@ export function FanLivePage() {
         onToggleChat={handleToggleChat}
       />
       <FanLiveMemberSheet
+        hasError={hasMembersError}
+        isLoading={isMembersLoading}
+        members={liveMembers}
         open={isMemberSheetOpen}
         onClose={() => setIsMemberSheetOpen(false)}
       />
