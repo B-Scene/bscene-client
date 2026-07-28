@@ -6,9 +6,13 @@ import type {
 } from "@/types/live/liveChat";
 import { initialChatMessages } from "./data";
 import { BandLiveHome } from "./BandLiveHome";
+import {
+  BandLiveNowListPage,
+  BandLiveScheduledListPage,
+} from "./BandLiveListPages";
 import { EndedLive } from "./EndedLive";
 import { CancelConfirm, LiveForm } from "./LiveForm";
-import { LiveChatRoom, LiveRoom } from "./LiveRoom";
+import { LiveRoom } from "./LiveRoom";
 import type { ActiveLive, BandLiveScreen, ChatMessage } from "./types";
 
 const toChatTime = (value?: string) => {
@@ -111,7 +115,7 @@ export function BandLivePage() {
     }
 
     setScreen("ended");
-  }, [activeLive?.liveId]);
+  }, [activeLive]);
 
   const { lastErrorMessage: chatErrorMessage, sendMessage } = useLiveChatSocket(
     {
@@ -172,7 +176,25 @@ export function BandLivePage() {
     setScreen(nextScreen);
   };
 
-  if (screen === "room") {
+  if (screen === "liveNowList") {
+    return (
+      <BandLiveNowListPage
+        go={handleGo}
+        onEnterLive={handleEnterLive}
+      />
+    );
+  }
+
+  if (screen === "scheduledList") {
+    return (
+      <BandLiveScheduledListPage
+        go={handleGo}
+        onEditReservation={handleEditReservation}
+      />
+    );
+  }
+
+  if (screen === "room" || screen === "chat") {
     if (!activeLive) {
       return (
         <BandLiveHome
@@ -189,6 +211,7 @@ export function BandLivePage() {
         live={activeLive}
         messages={liveMessages}
         onSendMessage={handleSendMessage}
+        chatOpen={screen === "chat"}
       />
     );
   }
@@ -211,27 +234,6 @@ export function BandLivePage() {
         messages={liveMessages}
         onSendMessage={handleSendMessage}
         overlay="members"
-      />
-    );
-  }
-
-  if (screen === "chat") {
-    if (!activeLive) {
-      return (
-        <BandLiveHome
-          go={handleGo}
-          onEnterLive={handleEnterLive}
-          onEditReservation={handleEditReservation}
-        />
-      );
-    }
-
-    return (
-      <LiveChatRoom
-        go={handleGo}
-        live={activeLive}
-        messages={liveMessages}
-        onSendMessage={handleSendMessage}
       />
     );
   }

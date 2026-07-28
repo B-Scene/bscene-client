@@ -10,7 +10,7 @@ import UsersIcon from "@/assets/icons/users.svg";
 import VolumeIcon from "@/assets/icons/Volume.svg";
 import UserProfileIcon from "@/assets/icons/band/user-default-profile.svg";
 import { useSlideUpSheet } from "@/hooks/useSlideUpSheet";
-import type { EnterLiveResponse } from "@/types/live/live";
+import type { EnterLiveResponse, LiveMemberItem } from "@/types/live/live";
 
 type FanLiveHeroData = Pick<
   EnterLiveResponse,
@@ -64,14 +64,26 @@ export function FanLiveHeader({
 
 const waveHeights = [5, 5, 15, 35, 65, 100, 65, 35, 15, 5, 5];
 
-function Waveform() {
+function Waveform({
+  isActive,
+  side,
+}: {
+  isActive: boolean;
+  side: "left" | "right";
+}) {
   return (
     <div className="flex h-[100px] w-[103px] shrink-0 items-center gap-[7px]" aria-hidden="true">
       {waveHeights.map((height, index) => (
         <span
-          key={`${height}-${index}`}
-          className="w-[3px] shrink-0 rounded-full bg-gradient-to-b from-primary-100 via-primary-300 to-primary-400"
-          style={{ height }}
+          key={`${side}-${height}-${index}`}
+          className={`live-audio-wave-bar w-[3px] shrink-0 rounded-full bg-gradient-to-b from-primary-100 via-primary-300 to-primary-400 ${
+            isActive ? "is-active" : ""
+          }`}
+          style={{
+            height,
+            animationDelay: `-${(index * 113 + (side === "right" ? 170 : 0)) % 760}ms`,
+            animationDuration: `${620 + ((index * 137 + (side === "right" ? 90 : 0)) % 480)}ms`,
+          }}
         />
       ))}
     </div>
@@ -79,9 +91,11 @@ function Waveform() {
 }
 
 export function FanLiveHero({
+  isAudioActive = false,
   live,
   top = 90,
 }: {
+  isAudioActive?: boolean;
   live?: FanLiveHeroData;
   top?: number;
 }) {
@@ -91,13 +105,13 @@ export function FanLiveHero({
       style={{ top }}
     >
       <div className="flex h-[160px] items-center justify-center gap-2.5">
-        <Waveform />
+        <Waveform isActive={isAudioActive} side="left" />
         <img
           src={live?.bandProfileImageUrl || BandImage}
           alt={`${live?.bandName ?? "밴드"} 프로필`}
           className="fan-live-profile-image size-[160px] shrink-0 rounded-full border-2 border-neutral-0 object-cover"
         />
-        <Waveform />
+        <Waveform isActive={isAudioActive} side="right" />
       </div>
 
       <div className="mt-8 flex h-20 flex-col items-center gap-[5px]">
@@ -244,8 +258,8 @@ function FanChatAvatar({
   return (
     <div className="relative size-10 shrink-0">
       <img
-        src={BandImage}
-        alt="WAVY"
+        src={profileImageUrl || BandImage}
+        alt=""
         className="size-10 rounded-full border border-primary-300 object-cover"
       />
       <span className="absolute -right-0.5 -bottom-0.5 flex size-3.5 items-center justify-center rounded-full bg-neutral-0">
@@ -408,42 +422,53 @@ export function FanLiveChatArea({
   );
 }
 
-const fanLiveMembers = [
-  { id: 1, name: "이름", role: "파트", host: true },
-  { id: 2, name: "이름", role: "파트", host: false },
-  { id: 3, name: "이름", role: "파트", host: false },
-  { id: 4, name: "이름", role: "파트", host: false },
-];
+const MEMBER_PART_LABELS: Record<string, string> = {
+  VOCAL: "보컬",
+  GUITAR: "기타",
+  BASS: "베이스",
+  DRUM: "드럼",
+  KEYBOARD: "키보드",
+};
 
-function FanLiveMemberRow({
-  name,
-  role,
-  host,
-}: {
-  name: string;
-  role: string;
-  host: boolean;
-}) {
+const formatMemberParts = (parts: string[]) => {
+  if (parts.length === 0) return "파트 미정";
+
+  return parts.map((part) => MEMBER_PART_LABELS[part] ?? part).join(", ");
+};
+
+function FanLiveMemberRow({ member }: { member: LiveMemberItem }) {
   return (
     <article className="fan-live-member-row flex h-[60px] items-center gap-2.5 rounded-lg bg-neutral-0 p-3">
       <img
-        src={UserProfileIcon}
-        alt=""
-        className="size-[38px] shrink-0 object-contain"
+        src={member.bandProfileImageUrl || UserProfileIcon}
+        alt={`${member.nickname} 프로필`}
+        className="size-[38px] shrink-0 rounded-full object-cover"
       />
       <div className="min-w-0 flex-1 text-left">
-        <strong className="block truncate text-caption3 text-neutral-900">{name}</strong>
-        <span className="block truncate text-caption2 text-neutral-600">{role}</span>
+        <strong className="block truncate text-caption3 text-neutral-900">
+          {member.nickname}
+        </strong>
+        <span className="block truncate text-caption2 text-neutral-600">
+          {formatMemberParts(member.part)}
+        </span>
       </div>
-      {host ? <span className="shrink-0 text-caption3 text-neutral-900">진행자</span> : null}
+      {member.isLeader ? (
+        <span className="shrink-0 text-caption3 text-neutral-900">리더</span>
+      ) : null}
     </article>
   );
 }
 
 export function FanLiveMemberSheet({
+  hasError,
+  isLoading,
+  members,
   open,
   onClose,
 }: {
+  hasError: boolean;
+  isLoading: boolean;
+  members: LiveMemberItem[];
   open: boolean;
   onClose: () => void;
 }) {
@@ -490,10 +515,33 @@ export function FanLiveMemberSheet({
           멤버
         </h2>
 
-        <div className="mx-5 mt-[13px] grid gap-2.5">
-          {fanLiveMembers.map((member) => (
-            <FanLiveMemberRow key={member.id} {...member} />
-          ))}
+        <div className="mx-5 mt-[13px] grid max-h-[250px] gap-2.5 overflow-y-auto">
+          {isLoading ? (
+            <p className="py-6 text-center text-caption2 text-neutral-500">
+              멤버를 불러오는 중이에요.
+            </p>
+          ) : null}
+
+          {!isLoading && hasError ? (
+            <p className="py-6 text-center text-caption2 text-neutral-500">
+              멤버를 불러오지 못했어요.
+            </p>
+          ) : null}
+
+          {!isLoading && !hasError && members.length === 0 ? (
+            <p className="py-6 text-center text-caption2 text-neutral-500">
+              표시할 멤버가 없어요.
+            </p>
+          ) : null}
+
+          {!isLoading && !hasError
+            ? members.map((member, index) => (
+                <FanLiveMemberRow
+                  key={`${member.nickname}-${member.bandName}-${index}`}
+                  member={member}
+                />
+              ))
+            : null}
         </div>
 
         <div className="mx-auto mt-[13px] h-1 w-[132px] rounded-full bg-neutral-300" />

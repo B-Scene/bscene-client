@@ -24,9 +24,9 @@ interface LiveRoomProps {
   live: ActiveLive;
   messages: ChatMessage[];
   onSendMessage: (message: string) => void;
+  chatOpen?: boolean;
   overlay?: "members" | "endConfirm";
 }
-
 type LiveAudioStatus =
   | "idle"
   | "connecting"
@@ -165,6 +165,7 @@ export function LiveRoom({
   live,
   messages,
   onSendMessage,
+  chatOpen = false,
   overlay,
 }: LiveRoomProps) {
   const closeLiveMutation = useCloseLiveMutation();
@@ -592,14 +593,21 @@ export function LiveRoom({
   }, [isListenerPlayback, startListenerPlayback, stopListenerPlayback]);
 
   return (
-    <main className="relative flex min-h-dvh flex-col overflow-hidden bg-neutral-0 text-neutral-900">
+    <main className="relative flex h-dvh min-h-0 flex-col overflow-hidden bg-neutral-0 text-neutral-900">
       <LiveRoomHeader
         go={go}
         viewerCount={viewerCount}
         durationSeconds={durationSeconds}
       />
 
-      <LiveRoomHero live={live} />
+      <LiveRoomHero
+        isAudioActive={
+          isListenerPlayback
+            ? !showListenerPlayButton
+            : audioStatus === "connected" && !isMicMuted
+        }
+        live={live}
+      />
 
       {audioErrorMessage ? (
         <p className="absolute top-[56px] left-1/2 z-20 w-[calc(100%-40px)] max-w-[353px] -translate-x-1/2 rounded-lg bg-error px-3 py-2 text-center text-caption3 text-neutral-0">
@@ -634,11 +642,12 @@ export function LiveRoom({
         </button>
       ) : null}
 
-      <RoomMessageArea messages={messages} />
-      <ChatComposer onSendMessage={onSendMessage} />
+      <RoomMessageArea composerOpen={chatOpen} messages={messages} />
+      {chatOpen ? <ChatComposer onSendMessage={onSendMessage} /> : null}
 
       <LiveActionBar
         go={go}
+        chatOpen={chatOpen}
         audioStatus={audioStatus}
         isMicMuted={isMicMuted}
         micVolume={micVolume}
@@ -674,21 +683,5 @@ export function LiveRoom({
         </ModalOverlay>
       ) : null}
     </main>
-  );
-}
-
-export function LiveChatRoom({
-  go,
-  live,
-  messages,
-  onSendMessage,
-}: Omit<LiveRoomProps, "overlay">) {
-  return (
-    <LiveRoom
-      go={go}
-      live={live}
-      messages={messages}
-      onSendMessage={onSendMessage}
-    />
   );
 }

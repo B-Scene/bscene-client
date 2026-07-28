@@ -1,11 +1,18 @@
 import IconFrameIcon from "@/assets/icons/Icon Frame.svg";
 
-export function SectionHeader({ title }: { title: string }) {
+export function SectionHeader({
+  onClick,
+  title,
+}: {
+  onClick?: () => void;
+  title: string;
+}) {
   return (
     <div className="flex items-center justify-between">
       <h2 className="text-label1 leading-6 text-neutral-900">{title}</h2>
       <button
         type="button"
+        onClick={onClick}
         className="mr-5 flex items-center gap-1 text-body2 text-neutral-400"
       >
         전체보기

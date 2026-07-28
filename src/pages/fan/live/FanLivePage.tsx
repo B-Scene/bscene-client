@@ -3,6 +3,7 @@ import type { AxiosError } from "axios";
 import Hls from "hls.js";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
+  getLiveMembers,
   getLiveBearerAuthorization,
   resolveLiveApiUrl,
   subscribeViewerCount,
@@ -20,6 +21,7 @@ import { useLiveChatSocket } from "@/hooks/api/live/useLiveChatSocket";
 import type {
   EnterLiveResponse,
   LiveApiResponse,
+  LiveMemberItem,
   ReportLiveUserRequest,
 } from "@/types/live/live";
 import type {
@@ -118,6 +120,9 @@ export function FanLivePage() {
   const [isMuted, setIsMuted] = useState(false);
   const [audioMessage, setAudioMessage] = useState("");
   const [isMemberSheetOpen, setIsMemberSheetOpen] = useState(false);
+  const [liveMembers, setLiveMembers] = useState<LiveMemberItem[]>([]);
+  const [isMembersLoading, setIsMembersLoading] = useState(false);
+  const [hasMembersError, setHasMembersError] = useState(false);
   const [hasOpenedChat, setHasOpenedChat] = useState(false);
   const [isChatComposerOpen, setIsChatComposerOpen] = useState(false);
   const [isProfileActionSheetOpen, setIsProfileActionSheetOpen] =
@@ -141,6 +146,10 @@ export function FanLivePage() {
     (message: LiveChatMessageData, frame: LiveChatMessageFrame) => {
       if (blockedUserIds.has(message.senderId)) return;
 
+      const isBandMember =
+        message.senderName === live?.bandName ||
+        liveMembers.some((member) => member.nickname === message.senderName);
+
       const confirmedMessage: FanChatMessage = {
         id: message.messageId,
         senderId: message.senderId,
@@ -148,7 +157,7 @@ export function FanLivePage() {
         message: message.content,
         time: formatChatTime(message.sentAt),
         profileImageUrl: message.senderProfileImageUrl,
-        band: message.senderName === live?.bandName,
+        band: isBandMember,
       };
 
       setChatMessages((current) => {
@@ -169,7 +178,7 @@ export function FanLivePage() {
         );
       });
     },
-    [blockedUserIds, live?.bandName],
+    [blockedUserIds, live?.bandName, liveMembers],
   );
 
   const {
@@ -252,9 +261,52 @@ export function FanLivePage() {
     return () => controller.abort();
   }, [live?.liveId]);
 
-useEffect(() => {
-  const audio = audioRef.current;
-  const playback = live?.playback;
+  useEffect(() => {
+    if (!live?.liveId) return;
+
+    let isMounted = true;
+
+    setLiveMembers([]);
+    setIsMembersLoading(true);
+    setHasMembersError(false);
+
+    getLiveMembers(live.liveId)
+      .then((response) => {
+        if (!isMounted) return;
+
+        const memberNames = new Set(
+          response.members.map((member) => member.nickname),
+        );
+
+        setLiveMembers(response.members);
+        setChatMessages((current) =>
+          current.map((chat) => ({
+            ...chat,
+            band:
+              chat.sender === live.bandName || memberNames.has(chat.sender),
+          })),
+        );
+      })
+      .catch(() => {
+        if (!isMounted) return;
+
+        setLiveMembers([]);
+        setHasMembersError(true);
+      })
+      .finally(() => {
+        if (!isMounted) return;
+
+        setIsMembersLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [live?.bandName, live?.liveId]);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    const playback = live?.playback;
 
   if (
     !audio ||
@@ -543,7 +595,7 @@ useEffect(() => {
         }
         onExit={() => setIsExitModalOpen(true)}
       />
-      <FanLiveHero live={live} />
+      <FanLiveHero isAudioActive={Boolean(live?.isLive && !isMuted)} live={live} />
 
       <audio
         ref={audioRef}
@@ -591,6 +643,9 @@ useEffect(() => {
         onToggleChat={handleToggleChat}
       />
       <FanLiveMemberSheet
+        hasError={hasMembersError}
+        isLoading={isMembersLoading}
+        members={liveMembers}
         open={isMemberSheetOpen}
         onClose={() => setIsMemberSheetOpen(false)}
       />

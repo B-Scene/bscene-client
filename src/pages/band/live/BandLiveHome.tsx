@@ -22,7 +22,7 @@ import { ProfileImage } from "./components/ProfileImage";
 import { SectionHeader } from "./components/SectionHeader";
 import { TopBar } from "./components/TopBar";
 
-function HomeLiveCard({
+export function HomeLiveCard({
   live,
   onEnter,
   disabled,
@@ -71,7 +71,7 @@ function HomeLiveCard({
   );
 }
 
-function ScheduledLiveCard({
+export function ScheduledLiveCard({
   live,
   onEdit,
 }: {
@@ -89,7 +89,7 @@ function ScheduledLiveCard({
         <span className="mt-0.5 block truncate text-body3 text-neutral-700">
           {live.title}
         </span>
-        <span className="mt-1 block text-caption2 text-secondary-500">
+        <span className="mt-1 block truncate text-caption2 text-secondary-500">
           {live.scheduledAt}
         </span>
       </div>
@@ -225,7 +225,9 @@ export function BandLiveHome({
             <p className="mt-2 text-caption2 text-neutral-700">
               목소리만으로 팬들과 실시간 소통,
               <br />
-              팔로워가 없어도 바로 시작할 수 있어요.
+              팔로워가 없어도 바로
+              <br />
+              시작할 수 있어요.
             </p>
             <button
               type="button"
@@ -261,7 +263,10 @@ export function BandLiveHome({
         ) : null}
 
         <section className="mt-8">
-          <SectionHeader title="진행 중인 라이브" />
+          <SectionHeader
+            title="진행 중인 라이브"
+            onClick={() => go("liveNowList")}
+          />
           <div className="mt-3 grid gap-3">
             {liveNowCards.length > 0 ? (
               liveNowCards.map((live) => (
@@ -281,7 +286,10 @@ export function BandLiveHome({
         </section>
 
         <section className="mt-8">
-          <SectionHeader title="예정된 라이브" />
+          <SectionHeader
+            title="예정된 라이브"
+            onClick={() => go("scheduledList")}
+          />
           <div className="mt-3 grid gap-3">
             {scheduledCards.length > 0 ? (
               scheduledCards.map((live) => (
