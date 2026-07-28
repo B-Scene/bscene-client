@@ -38,6 +38,24 @@ const toBoolean = (value: unknown, fallback = false): boolean =>
 const toBooleanOrNull = (value: unknown): boolean | null =>
   typeof value === "boolean" ? value : null;
 
+const normalizeServerDateTime = (value: unknown): string => {
+  const dateTime = toStringOrNull(value)?.trim();
+
+  if (!dateTime) return "";
+
+  const isoDateTime = dateTime.includes("T")
+    ? dateTime
+    : dateTime.replace(" ", "T");
+
+  if (/Z$/i.test(isoDateTime)) return isoDateTime.replace(/z$/, "Z");
+  if (/[+-]\d{2}:\d{2}$/.test(isoDateTime)) return isoDateTime;
+  if (/[+-]\d{4}$/.test(isoDateTime)) {
+    return isoDateTime.replace(/([+-]\d{2})(\d{2})$/, "$1:$2");
+  }
+
+  return /\d[ T]\d/.test(dateTime) ? `${isoDateTime}+09:00` : isoDateTime;
+};
+
 const normalizeBandInvite = (value: unknown): NotificationBandInvite | null =>
   isRecord(value) ? value : null;
 
@@ -61,7 +79,7 @@ const normalizeNotification = (
     body: toStringOrNull(item.body) ?? "",
     isRead: toBoolean(item.isRead),
     readAt: toStringOrNull(item.readAt),
-    createdAt: toStringOrNull(item.createdAt) ?? "",
+    createdAt: normalizeServerDateTime(item.createdAt),
     actionable: toBoolean(item.actionable),
     bandInvite: normalizeBandInvite(item.bandInvite),
   };

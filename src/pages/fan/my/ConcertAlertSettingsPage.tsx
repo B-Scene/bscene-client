@@ -1,16 +1,11 @@
-import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import ArrowLeftIcon from "@/assets/icons/arrow-left.svg";
 import {
   NotificationToggleList,
   type NotificationToggleItem,
 } from "@/components/band/my/NotificationToggleList";
-import {
-  useNotificationSettingsQuery,
-  useUpdateNotificationSettingMutation,
-} from "@/hooks/api/useNotifications";
+import { useNotificationSettingToggle } from "@/hooks/useNotificationSettingToggle";
 import type { NotificationSettingType } from "@/types/notification";
-import { requestAndRegisterWebPushToken } from "@/utils/webPushNotifications";
 
 const CONCERT_ALERT_ITEMS: NotificationToggleItem[] = [
   {
@@ -44,28 +39,12 @@ const SETTING_TYPE_BY_ID: Record<string, NotificationSettingType> = {
 
 const ConcertAlertSettingsPage = () => {
   const navigate = useNavigate();
-  const { data: notificationSettings } = useNotificationSettingsQuery("FAN");
-  const updateNotificationSetting = useUpdateNotificationSettingMutation();
-  const values = useMemo(
-    () => ({ ...DEFAULT_VALUES, ...notificationSettings?.values }),
-    [notificationSettings?.values],
-  );
-
-  const toggle = (id: string, checked: boolean) => {
-    const settingType = SETTING_TYPE_BY_ID[id];
-
-    if (!settingType) return;
-
-    if (checked) {
-      void requestAndRegisterWebPushToken().catch(() => undefined);
-    }
-
-    updateNotificationSetting.mutate({
+  const { values, isDisabled, statusMessage, toggle } =
+    useNotificationSettingToggle({
       mode: "FAN",
-      settingType,
-      enabled: checked,
+      defaultValues: DEFAULT_VALUES,
+      settingTypeById: SETTING_TYPE_BY_ID,
     });
-  };
 
   return (
     <main className="min-h-dvh bg-neutral-0 px-5 pb-[calc(var(--bottom-nav-height)+24px)]">
@@ -92,12 +71,19 @@ const ConcertAlertSettingsPage = () => {
         </p>
       </div>
 
+      {statusMessage ? (
+        <p className="m-0 mt-3 text-center font-body text-caption2 text-neutral-600">
+          {statusMessage}
+        </p>
+      ) : null}
+
       <div className="mt-6">
         <NotificationToggleList
           items={CONCERT_ALERT_ITEMS}
           values={values}
           onToggle={toggle}
           tone="primary"
+          disabled={isDisabled}
         />
       </div>
     </main>

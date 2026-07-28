@@ -1,18 +1,13 @@
-import { useMemo } from "react";
 import { Header } from "@/components/band/home/Header";
 import { useActiveBandId } from "@/hooks/api/user/useMyProfiles";
 import { useBandQuery } from "@/hooks/api/band/useBand";
-import {
-  useNotificationSettingsQuery,
-  useUpdateNotificationSettingMutation,
-} from "@/hooks/api/useNotifications";
+import { useNotificationSettingToggle } from "@/hooks/useNotificationSettingToggle";
 import { NotificationBandBanner } from "@/components/band/my/NotificationBandBanner";
 import {
   NotificationToggleList,
   type NotificationToggleItem,
 } from "@/components/band/my/NotificationToggleList";
 import type { NotificationSettingType } from "@/types/notification";
-import { requestAndRegisterWebPushToken } from "@/utils/webPushNotifications";
 
 const LIVE_ALERT_ITEMS: NotificationToggleItem[] = [
   {
@@ -40,30 +35,13 @@ const SETTING_TYPE_BY_ID: Record<string, NotificationSettingType> = {
 const LiveAlertSettingsPage = () => {
   const activeBandId = useActiveBandId();
   const { data: band } = useBandQuery(activeBandId ?? NaN);
-  const { data: notificationSettings } = useNotificationSettingsQuery("BAND");
-  const updateNotificationSetting = useUpdateNotificationSettingMutation();
   const bandName = band?.name ?? "";
-
-  const values = useMemo(
-    () => ({ ...DEFAULT_VALUES, ...notificationSettings?.values }),
-    [notificationSettings?.values],
-  );
-
-  const toggle = (id: string, checked: boolean) => {
-    const settingType = SETTING_TYPE_BY_ID[id];
-
-    if (!settingType) return;
-
-    if (checked) {
-      void requestAndRegisterWebPushToken().catch(() => undefined);
-    }
-
-    updateNotificationSetting.mutate({
+  const { values, isDisabled, statusMessage, toggle } =
+    useNotificationSettingToggle({
       mode: "BAND",
-      settingType,
-      enabled: checked,
+      defaultValues: DEFAULT_VALUES,
+      settingTypeById: SETTING_TYPE_BY_ID,
     });
-  };
 
   return (
     <main className="min-h-dvh bg-neutral-0 pb-24">
@@ -75,11 +53,18 @@ const LiveAlertSettingsPage = () => {
           description="현재 선택된 밴드의 라이브 운영 알림"
         />
 
+        {statusMessage ? (
+          <p className="m-0 mt-3 text-center font-body text-caption2 text-neutral-600">
+            {statusMessage}
+          </p>
+        ) : null}
+
         <div className="mt-6">
           <NotificationToggleList
             items={LIVE_ALERT_ITEMS}
             values={values}
             onToggle={toggle}
+            disabled={isDisabled}
           />
         </div>
       </div>
