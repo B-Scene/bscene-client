@@ -134,6 +134,45 @@ const toNumericId = (value?: number | string | null) => {
   return null;
 };
 
+const ContentDetailHeader = ({ onBack }: { onBack: () => void }) => {
+  return (
+    <header className="flex h-[48px] items-center px-[15px]">
+      <button
+        type="button"
+        aria-label="뒤로가기"
+        onClick={onBack}
+        className="flex size-6 items-center justify-center"
+      >
+        <img src={ArrowLeftIcon} alt="" className="size-6" />
+      </button>
+    </header>
+  );
+};
+
+const ContentDetailLoading = ({ onBack }: { onBack: () => void }) => {
+  return (
+    <main className="min-h-dvh bg-neutral-0">
+      <ContentDetailHeader onBack={onBack} />
+      <article className="animate-pulse px-[25px] pt-[24px]">
+        <div className="flex items-center gap-[16px]">
+          <div className="size-[42px] rounded-full bg-neutral-300" />
+          <div className="min-w-0 flex-1">
+            <div className="h-[18px] w-[120px] rounded bg-neutral-300" />
+            <div className="mt-[8px] h-[12px] w-[72px] rounded bg-neutral-300" />
+          </div>
+        </div>
+        <div className="mt-[24px] h-[422px] w-[338px] max-w-full bg-neutral-300" />
+        <div className="mt-[24px] flex gap-[24px]">
+          <div className="h-[20px] w-[48px] rounded bg-neutral-300" />
+          <div className="h-[20px] w-[48px] rounded bg-neutral-300" />
+        </div>
+        <div className="mt-[16px] h-[20px] w-[220px] rounded bg-neutral-300" />
+        <div className="mt-[12px] h-[56px] w-full rounded bg-neutral-300" />
+      </article>
+    </main>
+  );
+};
+
 const FanContentDetailPage = () => {
   const navigate = useNavigate();
   const { contentId } = useParams();
@@ -145,6 +184,39 @@ const FanContentDetailPage = () => {
   const likePostMutation = useLikeFanExplorePost();
   const unlikePostMutation = useUnlikeFanExplorePost();
   const postDetail = postDetailQuery.data;
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [likeOverride, setLikeOverride] = useState<{
+    isLiked: boolean;
+    likeCount: number;
+  } | null>(null);
+
+  if (postDetailQuery.isLoading) {
+    return <ContentDetailLoading onBack={() => navigate(-1)} />;
+  }
+
+  if (postDetailQuery.isError || !postDetail) {
+    return (
+      <main className="min-h-dvh bg-neutral-0">
+        <ContentDetailHeader onBack={() => navigate(-1)} />
+        <section className="flex min-h-[420px] flex-col items-center justify-center px-[25px] text-center">
+          <h1 className="m-0 font-body text-label1 text-neutral-900">
+            콘텐츠를 불러오지 못했어요
+          </h1>
+          <p className="m-0 mt-[8px] font-body text-caption2 text-neutral-600">
+            잠시 후 다시 시도해주세요
+          </p>
+          <button
+            type="button"
+            onClick={() => void postDetailQuery.refetch()}
+            className="mt-[20px] flex h-[38px] items-center justify-center rounded-[8px] bg-primary-400 px-[20px] font-body text-body1 text-neutral-0"
+          >
+            다시 시도
+          </button>
+        </section>
+      </main>
+    );
+  }
+
   const bandId =
     toNumericId(postDetail?.band?.bandId) ??
     toNumericId(postDetail?.band?.id) ??
@@ -187,11 +259,6 @@ const FanContentDetailPage = () => {
     : postDetail
       ? 0
       : MOCK_CONTENT_IMAGES.length;
-  const [activeImageIndex, setActiveImageIndex] = useState(0);
-  const [likeOverride, setLikeOverride] = useState<{
-    isLiked: boolean;
-    likeCount: number;
-  } | null>(null);
   const isLiked = likeOverride?.isLiked ?? postDetail?.isLiked ?? false;
   const baseLikeCount = postDetail?.likeCount ?? BASE_LIKE_COUNT;
   const likeCount = likeOverride?.likeCount ?? baseLikeCount;
@@ -229,12 +296,7 @@ const FanContentDetailPage = () => {
       });
 
       unlikePostMutation.mutate(postId, {
-        onSuccess: (result) => {
-          setLikeOverride({
-            isLiked: result.isLiked,
-            likeCount: result.likeCount ?? optimisticLikeCount,
-          });
-        },
+        onSuccess: () => setLikeOverride(null),
         onError: () => setLikeOverride(previousLikeOverride),
       });
       return;
@@ -248,12 +310,7 @@ const FanContentDetailPage = () => {
     });
 
     likePostMutation.mutate(postId, {
-      onSuccess: (result) => {
-        setLikeOverride({
-          isLiked: result.isLiked,
-          likeCount: result.likeCount ?? optimisticLikeCount,
-        });
-      },
+      onSuccess: () => setLikeOverride(null),
       onError: (error) => {
         if (isAxiosError(error) && error.response?.status === 409) {
           setLikeOverride({
@@ -270,16 +327,7 @@ const FanContentDetailPage = () => {
 
   return (
     <main className="min-h-dvh bg-neutral-0">
-      <header className="flex h-[48px] items-center px-[15px]">
-        <button
-          type="button"
-          aria-label="뒤로가기"
-          onClick={() => navigate(-1)}
-          className="flex size-6 items-center justify-center"
-        >
-          <img src={ArrowLeftIcon} alt="" className="size-6" />
-        </button>
-      </header>
+      <ContentDetailHeader onBack={() => navigate(-1)} />
 
       <article className="px-[25px] pt-[24px]">
         <header className="flex items-center gap-[16px]">

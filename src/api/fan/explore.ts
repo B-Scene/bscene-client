@@ -22,8 +22,8 @@ import type {
 } from "@/types/fan/explore";
 
 type FanExplorePageLike<T> = Omit<FanExplorePageResponse<T>, "results"> & {
-  sections?: FanExplorePageResponse<T>;
-  results?: T[] | FanExplorePageResponse<T>;
+  sections?: FanExplorePageLike<T>;
+  results?: T[] | FanExplorePageResponse<T> | FanExplorePageLike<T>;
   bandSection?: FanExplorePageResponse<T> | T[];
   performanceSection?: FanExplorePageResponse<T> | T[];
   postSection?: FanExplorePageResponse<T> | T[];
@@ -34,6 +34,15 @@ type FanExplorePageLike<T> = Omit<FanExplorePageResponse<T>, "results"> & {
   PERFORMANCE?: FanExplorePageResponse<T> | T[];
   POST?: FanExplorePageResponse<T> | T[];
 };
+type FanExploreSectionKey<T> = keyof FanExplorePageLike<T>;
+const PERFORMANCE_SECTION_KEYS: Array<FanExploreSectionKey<FanExplorePerformance>> = [
+  "performances",
+  "concerts",
+];
+const CONTENT_SECTION_KEYS: Array<FanExploreSectionKey<FanExploreContent>> = [
+  "contents",
+  "posts",
+];
 
 type FanExploreContentAlias = FanExploreContent & {
   bandGenre?: string | null;
@@ -89,7 +98,7 @@ const assertMutationSuccess = <T>(
   response: Awaited<
     ReturnType<typeof axiosInstance.post<FanExploreApiResponse<T>>>
   >,
-) => {
+): T | null => {
   const { data } = response;
 
   if (!data.isSuccess) {
@@ -102,12 +111,17 @@ const assertMutationSuccess = <T>(
     );
   }
 
+  if (data.result == null) {
+    return null;
+  }
+
   return data.result;
 };
 
 const normalizeCursorPage = <T>(
   result: FanExplorePageResponse<T> | T[],
   fallbackCursor: string | number | undefined,
+  expectedSectionKeys?: Array<FanExploreSectionKey<T>>,
 ) => {
   if (Array.isArray(result)) {
     return {
@@ -118,7 +132,7 @@ const normalizeCursorPage = <T>(
     };
   }
 
-  const items = getSectionItems(result);
+  const items = getSectionItems(result, expectedSectionKeys);
 
   return {
     ...result,
@@ -148,12 +162,52 @@ const normalizeNumberCursorPage = <T>(
   };
 };
 
-const getSectionItems = <T>(section?: FanExplorePageResponse<T> | T[]) => {
+const getSectionItems = <T>(
+  section?: FanExplorePageResponse<T> | T[],
+  sectionKeys?: Array<FanExploreSectionKey<T>>,
+) => {
   if (!section) return [];
   if (Array.isArray(section)) return section;
 
   const page = section as unknown as FanExplorePageLike<T>;
+  const getArrayFromKeys = (keys: Array<FanExploreSectionKey<T>>) => {
+    for (const key of keys) {
+      const value = page[key];
+
+      if (Array.isArray(value)) {
+        return value;
+      }
+    }
+
+    return undefined;
+  };
+  const getNestedSectionFromKeys = (keys: Array<FanExploreSectionKey<T>>) => {
+    for (const key of keys) {
+      const value = page[key];
+
+      if (value && typeof value === "object" && !Array.isArray(value)) {
+        return value;
+      }
+    }
+
+    return undefined;
+  };
+  const commonPageKeys: Array<FanExploreSectionKey<T>> = [
+    "items",
+    "content",
+    "data",
+    "list",
+    "results",
+  ];
+  const expectedKeys = sectionKeys ?? [];
+  const expectedArray = getArrayFromKeys(expectedKeys);
+
+  if (expectedArray) {
+    return expectedArray;
+  }
+
   const nestedSection =
+    getNestedSectionFromKeys(expectedKeys) ??
     page.sections ??
     page.results ??
     page.bandSection ??
@@ -171,15 +225,23 @@ const getSectionItems = <T>(section?: FanExplorePageResponse<T> | T[]) => {
     typeof nestedSection === "object" &&
     !Array.isArray(nestedSection)
   ) {
-    return getSectionItems(nestedSection as FanExplorePageResponse<T>);
+    return getSectionItems(
+      nestedSection as FanExplorePageResponse<T>,
+      sectionKeys,
+    );
+  }
+
+  const commonPageArray = getArrayFromKeys(commonPageKeys);
+
+  if (commonPageArray) {
+    return commonPageArray;
+  }
+
+  if (expectedKeys.length > 0) {
+    return [];
   }
 
   return (
-    page.items ??
-    page.content ??
-    page.data ??
-    page.list ??
-    (Array.isArray(page.results) ? page.results : undefined) ??
     page.bands ??
     page.performances ??
     page.concerts ??
@@ -544,12 +606,13 @@ const normalizePostDetail = (
 };
 
 const normalizePostLike = (
-  result: FanExplorePostLikeResponse,
+  result: FanExplorePostLikeResponse | null | undefined,
+  intendedLiked: boolean,
 ): Required<Pick<FanExplorePostLikeResponse, "isLiked">> &
   Pick<FanExplorePostLikeResponse, "likeCount"> => {
   return {
-    isLiked: result.isLiked ?? result.liked ?? true,
-    likeCount: result.likeCount ?? result.likes,
+    isLiked: result?.isLiked ?? result?.liked ?? intendedLiked,
+    likeCount: result?.likeCount ?? result?.likes,
   };
 };
 
@@ -763,7 +826,7 @@ export const likeFanExplorePost = async (
     FanExploreApiResponse<FanExplorePostLikeResponse>
   >(`/posts/${postId}/likes`);
 
-  return normalizePostLike(assertMutationSuccess(response));
+  return normalizePostLike(assertMutationSuccess(response), true);
 };
 
 export const unlikeFanExplorePost = async (
@@ -775,19 +838,7 @@ export const unlikeFanExplorePost = async (
   const response = await axiosInstance.delete<
     FanExploreApiResponse<FanExplorePostLikeResponse>
   >(`/posts/${postId}/likes`);
-  const { data } = response;
-
-  if (!data.isSuccess) {
-    throw new AxiosError(
-      data.message,
-      data.code,
-      response.config,
-      response.request,
-      response,
-    );
-  }
-
-  return normalizePostLike(data.result);
+  return normalizePostLike(assertMutationSuccess(response), false);
 };
 
 export const searchFanExplore = async ({
@@ -919,7 +970,11 @@ export const searchFanExplorePerformances = async ({
     }),
   });
 
-  return normalizeCursorPage(assertSuccess(response), cursor);
+  return normalizeCursorPage(
+    assertSuccess(response),
+    cursor,
+    PERFORMANCE_SECTION_KEYS,
+  );
 };
 
 export const searchFanExploreContents = async ({
@@ -944,7 +999,11 @@ export const searchFanExploreContents = async ({
     }),
   });
 
-  const normalized = normalizeCursorPage(assertSuccess(response), cursor);
+  const normalized = normalizeCursorPage(
+    assertSuccess(response),
+    cursor,
+    CONTENT_SECTION_KEYS,
+  );
 
   return {
     ...normalized,

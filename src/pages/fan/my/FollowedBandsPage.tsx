@@ -33,22 +33,28 @@ const FollowedBandsPage = () => {
   const [removedBandIds, setRemovedBandIds] = useState<Set<number>>(
     () => new Set(),
   );
+  const [removedBandIdsUpdatedAt, setRemovedBandIdsUpdatedAt] = useState(0);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const { data, fetchNextPage, hasNextPage, isFetchingNextPage } =
+  const { data, dataUpdatedAt, fetchNextPage, hasNextPage, isFetchingNextPage } =
     useFollowedBandsQuery();
 
   const rawTotalCount = data?.pages[0]?.totalCount ?? 0;
+  const shouldApplyRemovedBandIds = removedBandIdsUpdatedAt > dataUpdatedAt;
+  const activeRemovedBandIds = useMemo(
+    () => (shouldApplyRemovedBandIds ? removedBandIds : new Set<number>()),
+    [removedBandIds, shouldApplyRemovedBandIds],
+  );
   const bands = useMemo(
     () =>
       (data?.pages.flatMap((page) => page.items) ?? []).filter((band) => {
         const bandId = getBandId(band);
 
-        return bandId == null || !removedBandIds.has(bandId);
+        return bandId == null || !activeRemovedBandIds.has(bandId);
       }),
-    [data, removedBandIds],
+    [activeRemovedBandIds, data],
   );
-  const totalCount = Math.max(0, rawTotalCount - removedBandIds.size);
+  const totalCount = Math.max(0, rawTotalCount - activeRemovedBandIds.size);
   const unfollowTarget = bands.find(
     (band) => getBandId(band) === unfollowTargetId,
   );
@@ -72,12 +78,28 @@ const FollowedBandsPage = () => {
     const bandInfo = unfollowTarget?.band ?? unfollowTarget;
     const bandName = bandInfo?.name ?? bandInfo?.bandName ?? "밴드";
 
+    setRemovedBandIds((currentIds) => {
+      const nextIds = new Set(
+        shouldApplyRemovedBandIds ? currentIds : undefined,
+      );
+      nextIds.add(unfollowTargetId);
+      return nextIds;
+    });
+    setRemovedBandIdsUpdatedAt(Date.now());
+    setUnfollowTargetId(null);
+
     try {
       await unfollowBandMutation.mutateAsync(unfollowTargetId);
-      setRemovedBandIds((currentIds) => new Set(currentIds).add(unfollowTargetId));
-      setUnfollowTargetId(null);
       setToastMessage(`${bandName} 팔로우를 취소했어요`);
     } catch {
+      setRemovedBandIds((currentIds) => {
+        const nextIds = new Set(
+          shouldApplyRemovedBandIds ? currentIds : undefined,
+        );
+        nextIds.delete(unfollowTargetId);
+        return nextIds;
+      });
+      setRemovedBandIdsUpdatedAt(Date.now());
       setToastMessage("팔로우 취소에 실패했어요");
     }
   };
