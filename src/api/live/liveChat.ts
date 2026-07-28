@@ -19,14 +19,14 @@ export const createLiveChatWebSocketUrl = ({
   liveId: number;
   ticket: string;
 }) => {
-  const baseURL = axiosInstance.defaults.baseURL ?? import.meta.env.VITE_API_BASE_URL;
+  const baseURL =
+    axiosInstance.defaults.baseURL ?? import.meta.env.VITE_API_BASE_URL ?? "/api";
+  const url = new URL(String(baseURL), window.location.origin);
+  const basePath = url.pathname.replace(/\/$/, "");
 
-  const normalizedBaseURL = String(baseURL).replace(/\/$/, "");
-  const wsBaseURL = normalizedBaseURL
-    .replace(/^https:\/\//, "wss://")
-    .replace(/^http:\/\//, "ws://");
+  url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+  url.pathname = `${basePath}/ws/lives/${liveId}/chat`;
+  url.search = new URLSearchParams({ ticket }).toString();
 
-  return `${wsBaseURL}/ws/lives/${liveId}/chat?ticket=${encodeURIComponent(
-    ticket,
-  )}`;
+  return url.toString();
 };

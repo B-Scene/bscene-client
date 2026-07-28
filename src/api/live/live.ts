@@ -1,14 +1,25 @@
 import { axiosInstance } from "@/api/axiosInstance";
 import type {
+  BlockLiveUserRequest,
   CloseLiveResponse,
   CreateLiveRequest,
   CreateLiveResponse,
   EnterLiveResponse,
+  GetLiveNowListParams,
+  GetScheduledLiveListParams,
+  GetReplayListParams,
   LiveApiResponse,
   LiveHomeResponse,
   LiveMembersResponse,
+  LiveNowListResponse,
   LiveReservationResponse,
+  ReportLiveUserRequest,
+  ReportLiveUserResponse,
+  ReplayListResponse,
+  ReplayPlaybackResponse,
+  ScheduledLiveListResponse,
   LiveSummaryResponse,
+  ToggleLiveAlarmResponse,
   UpdateLiveReservationRequest,
   UpdateLiveReservationResponse,
 } from "@/types/live/live";
@@ -129,7 +140,7 @@ const getRtcBaseUrl = () => {
   return "";
 };
 
-const resolveApiUrl = (pathOrUrl: string) => {
+export const resolveLiveApiUrl = (pathOrUrl: string) => {
   if (/^https?:\/\//i.test(pathOrUrl)) {
     return pathOrUrl;
   }
@@ -167,12 +178,33 @@ const unwrapResult = <T>(response: LiveApiResponse<T>) => {
   return response.result;
 };
 
-const getBearerAuthorization = () => {
+const normalizeReplayLiveId = <
+  T extends { liveId?: number; replayId?: number },
+>(
+  replay: T,
+) => {
+  const liveId = replay.liveId ?? replay.replayId;
+
+  if (!liveId) {
+    throw new Error("다시보기의 liveId가 응답에 없습니다.");
+  }
+
+  return {
+    ...replay,
+    liveId,
+  };
+};
+
+export const getLiveBearerAuthorization = () => {
   return `Bearer ${getAccessToken()}`;
 };
 
 const getWhipAuthorization = () => {
   return `Basic ${btoa(`bscene:${getAccessToken()}`)}`;
+};
+
+export const getLivePlaybackAuthorization = () => {
+  return getWhipAuthorization();
 };
 
 const parseErrorMessage = (responseText: string, fallbackMessage: string) => {
@@ -195,6 +227,92 @@ export const getLiveHome = async (): Promise<LiveHomeResponse> => {
   const response =
     await axiosInstance.get<LiveApiResponse<LiveHomeResponse>>("/lives/home");
 
+  const result = unwrapResult(response.data);
+
+  return {
+    ...result,
+    replays: result.replays.map(normalizeReplayLiveId),
+  };
+};
+
+export const getLiveNowList = async ({
+  filter,
+  cursor,
+  size = 10,
+}: GetLiveNowListParams): Promise<LiveNowListResponse> => {
+  const response = await axiosInstance.get<
+    LiveApiResponse<LiveNowListResponse>
+  >(`/lives/live-now/${filter}`, {
+    params: {
+      cursor,
+      size,
+    },
+  });
+
+  return unwrapResult(response.data);
+};
+
+export const getScheduledLiveList = async ({
+  following,
+  cursor,
+  size = 10,
+}: GetScheduledLiveListParams): Promise<ScheduledLiveListResponse> => {
+  const response = await axiosInstance.get<
+    LiveApiResponse<ScheduledLiveListResponse>
+  >("/lives/scheduled", {
+    params: {
+      following,
+      cursor,
+      size,
+    },
+  });
+
+  return unwrapResult(response.data);
+};
+
+export const toggleLiveAlarm = async (
+  liveId: number,
+): Promise<ToggleLiveAlarmResponse> => {
+  const response = await axiosInstance.post<
+    LiveApiResponse<ToggleLiveAlarmResponse>
+  >(`/lives/${liveId}/alarm`);
+
+  return unwrapResult(response.data);
+};
+
+export const getReplayList = async ({
+  filter,
+  sort,
+  cursor,
+  size = 10,
+}: GetReplayListParams): Promise<ReplayListResponse> => {
+  const response = await axiosInstance.get<
+    LiveApiResponse<ReplayListResponse>
+  >(`/lives/replays/${filter}`, {
+    params: {
+      sort,
+      cursor,
+      size,
+    },
+  });
+
+  const result = unwrapResult(response.data);
+
+  return {
+    ...result,
+    items: result.items.map(normalizeReplayLiveId),
+  };
+};
+
+export const getReplayPlayback = async (
+  liveId: number,
+): Promise<ReplayPlaybackResponse> => {
+  const response = await axiosInstance.get<
+    LiveApiResponse<ReplayPlaybackResponse>
+  >(`/lives/${liveId}/replay`, {
+    withCredentials: true,
+  });
+
   return unwrapResult(response.data);
 };
 
@@ -216,6 +334,38 @@ export const enterLive = async (
   >(`/lives/${liveId}`);
 
   return unwrapResult(response.data);
+};
+
+export const leaveLive = async (liveId: number): Promise<void> => {
+  await axiosInstance.post<LiveApiResponse<null>>(`/lives/${liveId}/leave`);
+};
+
+export const reportLiveUser = async ({
+  liveId,
+  request,
+}: {
+  liveId: number;
+  request: ReportLiveUserRequest;
+}): Promise<ReportLiveUserResponse> => {
+  const response = await axiosInstance.post<
+    LiveApiResponse<ReportLiveUserResponse>
+  >(`/lives/${liveId}/reports`, request);
+
+  return unwrapResult(response.data);
+};
+
+export const blockLiveUser = async (
+  request: BlockLiveUserRequest,
+): Promise<void> => {
+  await axiosInstance.post<LiveApiResponse<null>>("/users/blocks", request);
+};
+
+export const unblockLiveUser = async (
+  request: BlockLiveUserRequest,
+): Promise<void> => {
+  await axiosInstance.delete<LiveApiResponse<null>>("/users/blocks", {
+    data: request,
+  });
 };
 
 export const closeLive = async (
@@ -362,14 +512,14 @@ export const subscribeViewerCount = async ({
   onViewerCount,
   signal,
 }: SubscribeViewerCountParams): Promise<void> => {
-  const requestUrl = resolveApiUrl(
+  const requestUrl = resolveLiveApiUrl(
     `/lives/${liveId}/viewers?watchOnly=${watchOnly}`,
   );
 
   const response = await fetch(requestUrl, {
     method: "GET",
     headers: {
-      Authorization: getBearerAuthorization(),
+      Authorization: getLiveBearerAuthorization(),
       Accept: "text/event-stream",
     },
     signal,

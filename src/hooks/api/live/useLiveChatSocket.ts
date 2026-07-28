@@ -20,6 +20,10 @@ interface UseLiveChatSocketOptions {
   onErrorFrame?: (message: string) => void;
 }
 
+const HEARTBEAT_INTERVAL_MS = 15_000;
+const HEARTBEAT_TIMEOUT_MS = 35_000;
+const MAX_RECONNECT_DELAY_MS = 10_000;
+
 const createClientMsgId = () => {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return crypto.randomUUID();
@@ -38,15 +42,38 @@ export function useLiveChatSocket({
 }: UseLiveChatSocketOptions) {
   const socketRef = useRef<WebSocket | null>(null);
   const pingTimerRef = useRef<number | null>(null);
+  const reconnectTimerRef = useRef<number | null>(null);
+  const reconnectAttemptsRef = useRef(0);
+  const lastPongAtRef = useRef(0);
+  const callbacksRef = useRef({
+    onMessage,
+    onConnected,
+    onLiveEnded,
+    onErrorFrame,
+  });
 
   const [connectionStatus, setConnectionStatus] =
     useState<LiveChatConnectionStatus>("idle");
   const [lastErrorMessage, setLastErrorMessage] = useState("");
 
-  const clearPingTimer = useCallback(() => {
+  useEffect(() => {
+    callbacksRef.current = {
+      onMessage,
+      onConnected,
+      onLiveEnded,
+      onErrorFrame,
+    };
+  }, [onConnected, onErrorFrame, onLiveEnded, onMessage]);
+
+  const clearTimers = useCallback(() => {
     if (pingTimerRef.current !== null) {
       window.clearInterval(pingTimerRef.current);
       pingTimerRef.current = null;
+    }
+
+    if (reconnectTimerRef.current !== null) {
+      window.clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
     }
   }, []);
 
@@ -76,20 +103,18 @@ export function useLiveChatSocket({
       }
 
       const clientMsgId = createClientMsgId();
-
       const isSent = sendFrame({
         type: "live-chat.send",
-        data: {
-          content: trimmedContent,
-        },
+        data: { content: trimmedContent },
         clientMsgId,
       });
 
       if (!isSent) {
-        setLastErrorMessage("채팅 서버에 연결 중이에요. 잠시 후 다시 시도해주세요.");
+        setLastErrorMessage("채팅 서버에 연결 중이에요.");
         return null;
       }
 
+      setLastErrorMessage("");
       return clientMsgId;
     },
     [sendFrame],
@@ -97,27 +122,37 @@ export function useLiveChatSocket({
 
   useEffect(() => {
     if (!enabled || !liveId) {
-      setConnectionStatus("idle");
-      clearPingTimer();
-
-      if (socketRef.current) {
-        socketRef.current.close();
-        socketRef.current = null;
-      }
-
+      clearTimers();
+      socketRef.current?.close();
+      socketRef.current = null;
       return;
     }
 
-    let isAlive = true;
+    let active = true;
+    let liveEnded = false;
+
+    const scheduleReconnect = () => {
+      if (!active || liveEnded || reconnectTimerRef.current !== null) return;
+
+      const delay = Math.min(
+        1_000 * 2 ** reconnectAttemptsRef.current,
+        MAX_RECONNECT_DELAY_MS,
+      );
+      reconnectAttemptsRef.current += 1;
+      reconnectTimerRef.current = window.setTimeout(() => {
+        reconnectTimerRef.current = null;
+        void connect();
+      }, delay);
+    };
 
     const connect = async () => {
+      if (!active || liveEnded) return;
+
       try {
         setConnectionStatus("connecting");
-        setLastErrorMessage("");
-
         const ticketResult = await getLiveChatTicket(liveId);
 
-        if (!isAlive) return;
+        if (!active || liveEnded) return;
 
         const socket = new WebSocket(
           createLiveChatWebSocketUrl({
@@ -130,46 +165,62 @@ export function useLiveChatSocket({
         socketRef.current = socket;
 
         socket.onopen = () => {
-          if (!isAlive) return;
+          if (!active) return;
 
+          reconnectAttemptsRef.current = 0;
+          lastPongAtRef.current = Date.now();
           setConnectionStatus("open");
-          onConnected?.();
+          setLastErrorMessage("");
 
-          clearPingTimer();
+          if (pingTimerRef.current !== null) {
+            window.clearInterval(pingTimerRef.current);
+          }
+
           pingTimerRef.current = window.setInterval(() => {
+            if (Date.now() - lastPongAtRef.current > HEARTBEAT_TIMEOUT_MS) {
+              socket.close();
+              return;
+            }
+
             sendFrame({
               type: "ping",
               data: {},
               clientMsgId: null,
             });
-          }, 15000);
+          }, HEARTBEAT_INTERVAL_MS);
         };
 
         socket.onmessage = (event) => {
           try {
-            const frame = JSON.parse(event.data) as LiveChatServerFrame;
+            const frame = JSON.parse(String(event.data)) as LiveChatServerFrame;
 
             if (frame.type === "live-chat.message") {
-              onMessage(frame.data, frame);
+              callbacksRef.current.onMessage(frame.data, frame);
+              return;
+            }
+
+            if (frame.type === "pong") {
+              lastPongAtRef.current = Date.now();
               return;
             }
 
             if (frame.type === "system.event") {
               if (frame.data.event === "connected") {
-                onConnected?.();
+                callbacksRef.current.onConnected?.();
                 return;
               }
 
               if (frame.data.event === "live-ended") {
-                onLiveEnded?.();
+                liveEnded = true;
+                callbacksRef.current.onLiveEnded?.();
+                socket.close(1000);
                 return;
               }
             }
 
             if (frame.type === "system.error") {
-              const message = frame.data.message;
-              setLastErrorMessage(message);
-              onErrorFrame?.(message);
+              setLastErrorMessage(frame.data.message);
+              callbacksRef.current.onErrorFrame?.(frame.data.message);
             }
           } catch {
             setLastErrorMessage("채팅 메시지 처리 중 오류가 발생했어요.");
@@ -177,53 +228,50 @@ export function useLiveChatSocket({
         };
 
         socket.onerror = () => {
+          if (!active) return;
           setConnectionStatus("error");
           setLastErrorMessage("채팅 서버 연결 중 오류가 발생했어요.");
         };
 
         socket.onclose = () => {
-          clearPingTimer();
+          if (pingTimerRef.current !== null) {
+            window.clearInterval(pingTimerRef.current);
+            pingTimerRef.current = null;
+          }
 
-          if (!isAlive) return;
+          if (socketRef.current === socket) {
+            socketRef.current = null;
+          }
+
+          if (!active) return;
 
           setConnectionStatus("closed");
+          scheduleReconnect();
         };
       } catch (error) {
-        if (!isAlive) return;
-
-        setConnectionStatus("error");
+        if (!active) return;
 
         const message =
           error instanceof Error
             ? error.message
             : "라이브 채팅 연결에 실패했어요.";
 
+        setConnectionStatus("error");
         setLastErrorMessage(message);
-        onErrorFrame?.(message);
+        callbacksRef.current.onErrorFrame?.(message);
+        scheduleReconnect();
       }
     };
 
-    connect();
+    void connect();
 
     return () => {
-      isAlive = false;
-      clearPingTimer();
-
-      if (socketRef.current) {
-        socketRef.current.close();
-        socketRef.current = null;
-      }
+      active = false;
+      clearTimers();
+      socketRef.current?.close();
+      socketRef.current = null;
     };
-  }, [
-    clearPingTimer,
-    enabled,
-    liveId,
-    onConnected,
-    onErrorFrame,
-    onLiveEnded,
-    onMessage,
-    sendFrame,
-  ]);
+  }, [clearTimers, enabled, liveId, sendFrame]);
 
   return {
     connectionStatus,

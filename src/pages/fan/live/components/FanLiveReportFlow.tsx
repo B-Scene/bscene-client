@@ -3,40 +3,54 @@ import ArrowLeftIcon from "@/assets/icons/arrow-left.svg";
 import CircleCheckIcon from "@/assets/icons/circle_check.svg";
 import Button from "@/components/common/Button/Button";
 import { BottomNavBar } from "@/components/layout/BottomNavBar";
+import type { ReportLiveUserRequest } from "@/types/live/live";
 
 const REPORT_REASONS = [
   {
+    type: "SPAM",
     title: "스팸 또는 홍보성 게시물",
     description: "의도와 관계없이 반복적인 홍보, 광고, 도배성 메시지",
   },
   {
+    type: "ABUSE",
     title: "욕설 및 혐오 표현",
     description: "특정 개인이나 집단에 대한 욕설, 비하, 혐오 표현",
   },
   {
+    type: "SEXUAL",
     title: "성적으로 불쾌한 내용",
     description: "선정적이거나 성적으로 불쾌감을 주는 표현",
   },
   {
+    type: "VIOLENCE",
     title: "폭력적이거나 위험한 내용",
     description: "폭력, 자해, 범죄 조장 등 위험한 행동을 유도하는 내용",
   },
   {
+    type: "COPYRIGHT",
     title: "저작권 침해",
     description: "무단으로 사용된 음원, 영상, 이미지 등 저작권 침해",
   },
   {
+    type: "ETC",
     title: "기타",
     description: "위 항목에 해당하지 않는 기타 문제",
   },
 ] as const;
 
 interface ReportPageProps {
+  isSubmitting: boolean;
   onBack: () => void;
-  onComplete: () => void;
+  onSubmit: (
+    request: Omit<ReportLiveUserRequest, "targetUserId" | "chatMessage">,
+  ) => Promise<void>;
 }
 
-export function FanLiveReportPage({ onBack, onComplete }: ReportPageProps) {
+export function FanLiveReportPage({
+  isSubmitting,
+  onBack,
+  onSubmit,
+}: ReportPageProps) {
   const [selectedReason, setSelectedReason] = useState(0);
   const [details, setDetails] = useState("");
 
@@ -46,6 +60,7 @@ export function FanLiveReportPage({ onBack, onComplete }: ReportPageProps) {
         <button
           type="button"
           onClick={onBack}
+          disabled={isSubmitting}
           aria-label="라이브로 돌아가기"
           className="absolute left-[15px] flex size-6 items-center justify-center"
         >
@@ -58,7 +73,10 @@ export function FanLiveReportPage({ onBack, onComplete }: ReportPageProps) {
         className="fan-live-chat-scroll flex h-[calc(100%-48px)] flex-col overflow-y-auto px-5 pt-8 pb-5"
         onSubmit={(event) => {
           event.preventDefault();
-          onComplete();
+          void onSubmit({
+            reportType: REPORT_REASONS[selectedReason].type,
+            comment: details.trim() || null,
+          });
         }}
       >
         <section>
@@ -119,8 +137,12 @@ export function FanLiveReportPage({ onBack, onComplete }: ReportPageProps) {
           </div>
         </section>
 
-        <Button type="submit" className="mt-4 w-full shrink-0">
-          신고하기
+        <Button
+          type="submit"
+          disabled={isSubmitting}
+          className="mt-4 w-full shrink-0"
+        >
+          {isSubmitting ? "신고 중" : "신고하기"}
         </Button>
       </form>
       <BottomNavBar modeOverride="fan" activeColorModeOverride="fan" />

@@ -10,6 +10,8 @@ type ModalProps = {
   cancelLabel?: ReactNode;
   confirmLabel?: ReactNode;
   showCancel?: boolean;
+  cancelDisabled?: boolean;
+  confirmDisabled?: boolean;
   onCancel?: ButtonHTMLAttributes<HTMLButtonElement>["onClick"];
   onConfirm?: ButtonHTMLAttributes<HTMLButtonElement>["onClick"];
 };
@@ -27,6 +29,8 @@ const Modal = ({
   cancelLabel = "취소",
   confirmLabel = "나가기",
   showCancel = true,
+  cancelDisabled = false,
+  confirmDisabled = false,
   onCancel,
   onConfirm,
 }: ModalProps) => {
@@ -47,11 +51,23 @@ const Modal = ({
 
       <div className="mt-[20px] flex w-[249px] items-center justify-center gap-[8px]">
         {showCancel ? (
-          <Button onClick={onCancel} size="modal" tone={tone} variant="outline">
+          <Button
+            disabled={cancelDisabled}
+            onClick={onCancel}
+            size="modal"
+            tone={tone}
+            variant="outline"
+          >
             {cancelLabel}
           </Button>
         ) : null}
-        <Button onClick={onConfirm} size="modal" tone={tone} variant="solid">
+        <Button
+          disabled={confirmDisabled}
+          onClick={onConfirm}
+          size="modal"
+          tone={tone}
+          variant="solid"
+        >
           {confirmLabel}
         </Button>
       </div>
