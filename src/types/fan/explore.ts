@@ -149,6 +149,68 @@ export interface FanExplorePostLikeResponse {
   likes?: number;
 }
 
+export interface FanExplorePostComment {
+  comment?: FanExplorePostComment;
+  author?: FanExplorePostComment;
+  user?: FanExplorePostComment;
+  member?: FanExplorePostComment;
+  writer?: FanExplorePostComment;
+  commentId?: number | string;
+  id?: number | string;
+  userId?: number | string;
+  memberId?: number | string;
+  authorId?: number | string;
+  writerId?: number | string;
+  nickname?: string | null;
+  authorName?: string | null;
+  userName?: string | null;
+  memberName?: string | null;
+  writerName?: string | null;
+  name?: string | null;
+  profileImageUrl?: string | null;
+  authorProfileImageUrl?: string | null;
+  userProfileImageUrl?: string | null;
+  memberProfileImageUrl?: string | null;
+  writerProfileImageUrl?: string | null;
+  content?: string | null;
+  body?: string | null;
+  text?: string | null;
+  commentText?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  isMine?: boolean;
+  mine?: boolean;
+  owner?: boolean;
+  editable?: boolean;
+}
+
+export interface NormalizedFanExplorePostComment {
+  commentId: number | null;
+  authorId: number | null;
+  authorName: string;
+  profileImageUrl: string | null;
+  content: string;
+  createdAt: string | null;
+  updatedAt: string | null;
+  isMine: boolean;
+}
+
+export interface FanExplorePostCommentsResponse {
+  items: NormalizedFanExplorePostComment[];
+  myComments: NormalizedFanExplorePostComment[];
+  hasNext: boolean;
+  nextCursor: number | null;
+}
+
+export interface FanExplorePostCommentsParams {
+  cursor?: number;
+  size?: number;
+}
+
+export interface UpsertFanExplorePostCommentRequest {
+  content: string;
+}
+
 export interface FanExploreBand {
   band?: FanExploreBand;
   bandId?: number;
@@ -264,6 +326,7 @@ export interface FanExplorePageResponse<T> {
   searchHistory?: T[];
   histories?: T[];
   searches?: T[];
+  myComments?: T[];
   totalCount?: number;
   totalElements?: number;
   total?: number;

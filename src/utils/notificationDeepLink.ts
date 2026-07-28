@@ -1,6 +1,7 @@
 import type { NotificationItem } from "@/types/notification";
 
 type RouteBuilder = (id: string | number, suffix: string) => string;
+export type NotificationMode = "FAN" | "BAND";
 
 export interface NotificationRouteMapping {
   post: RouteBuilder;
@@ -167,31 +168,23 @@ export const getMappedDeepLink = (
     /\/(?:posts?|contents?|news)\/(\d+)(?=[/?#]|$)/i,
   )?.[1];
 
-  if (postId) {
-    return routes.post(postId, suffix);
-  }
+  if (postId) return routes.post(postId, suffix);
 
   const concertId = path.match(
     /\/(?:performances?|concerts?)\/(\d+)(?=[/?#]|$)/i,
   )?.[1];
 
-  if (concertId) {
-    return routes.concert(concertId, suffix);
-  }
+  if (concertId) return routes.concert(concertId, suffix);
 
   const liveId = path.match(/\/lives?\/(\d+)(?=[/?#]|$)/i)?.[1];
 
-  if (liveId) {
-    return routes.live(liveId, suffix);
-  }
+  if (liveId) return routes.live(liveId, suffix);
 
   const messageId = path.match(
     /\/(?:session\/messages?|messages?|chat\/rooms?|chat-rooms?|chatrooms?)\/(\d+)(?=[/?#]|$)/i,
   )?.[1];
 
-  if (messageId && routes.message) {
-    return routes.message(messageId, suffix);
-  }
+  if (messageId && routes.message) return routes.message(messageId, suffix);
 
   const applicationId = path.match(
     /\/(?:applications?|apply-submissions?)\/(\d+)(?=[/?#]|$)/i,
@@ -211,9 +204,7 @@ export const getMappedDeepLink = (
 
   const bandId = path.match(/\/bands?\/(\d+)(?=[/?#]|$)/i)?.[1];
 
-  if (bandId) {
-    return routes.band(bandId, suffix);
-  }
+  if (bandId) return routes.band(bandId, suffix);
 
   if (routes.knownPrefixes.some((prefix) => path.startsWith(prefix))) {
     return path;
@@ -235,4 +226,80 @@ export const getNotificationTargetPath = (
   }
 
   return routes.fallback(notification);
+};
+
+const getDeepLinkMode = (deepLink?: string | null): NotificationMode | null => {
+  const normalizedPath = deepLink ? normalizeDeepLink(deepLink.trim()) : "";
+
+  if (normalizedPath.startsWith("/band/")) return "BAND";
+  if (normalizedPath.startsWith("/fan/")) return "FAN";
+
+  return null;
+};
+
+export const getNotificationMode = (
+  notification: NotificationItem,
+): NotificationMode | null => {
+  if (notification.mode === "FAN" || notification.mode === "BAND") {
+    return notification.mode;
+  }
+
+  const deepLinkMode = getDeepLinkMode(notification.deepLink);
+
+  if (deepLinkMode) return deepLinkMode;
+
+  const type = notification.type.toUpperCase();
+
+  if (type === "BAND_INVITE" || type.startsWith("BAND_")) return "BAND";
+  if (type.startsWith("FAN_")) return "FAN";
+
+  if (
+    type.includes("MESSAGE") ||
+    type.includes("CHAT") ||
+    type.includes("DM") ||
+    type.includes("SESSION_APPLICATION") ||
+    type.includes("APPLICATION_STATUS") ||
+    type.includes("RECRUITMENT") ||
+    type.includes("NEW_SESSION") ||
+    type.includes("LIVE_START_STATUS")
+  ) {
+    return "BAND";
+  }
+
+  if (
+    type.includes("FOLLOWED") ||
+    type.includes("FOLLOW") ||
+    type.includes("PERFORMANCE") ||
+    type.includes("CONCERT") ||
+    type.includes("PERFORMANCE_REMINDER") ||
+    type.includes("PERFORMANCE_UPDATE") ||
+    type.includes("LIVE_START") ||
+    type.includes("LIVE_REMINDER") ||
+    type.includes("LIVE_REPLAY")
+  ) {
+    return "FAN";
+  }
+
+  return null;
+};
+
+export const isPostRegistrationNotification = (
+  notification: NotificationItem,
+) => {
+  const type = notification.type.toUpperCase();
+
+  return (
+    type.includes("POST") ||
+    type.includes("CONTENT") ||
+    type.includes("NEWS")
+  );
+};
+
+export const isNotificationForMode = (
+  notification: NotificationItem,
+  mode: NotificationMode,
+) => {
+  const notificationMode = getNotificationMode(notification);
+
+  return notificationMode === null || notificationMode === mode;
 };

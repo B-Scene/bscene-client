@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import type { KeyboardEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import ArrowLeftIcon from "@/assets/icons/arrow-left.svg";
 import BandDefaultProfileImage from "@/assets/icons/band/band-default-profile.svg";
@@ -11,12 +12,17 @@ import {
   FAN_NOTIFICATION_ROUTES,
   formatNotificationTime,
   getNotificationTargetPath,
+  isNotificationForMode,
 } from "@/utils/notificationDeepLink";
 import type { NotificationItem } from "@/types/notification";
 
 const NOTIFICATION_PAGE_SIZE = 20;
 
-const NotificationCard = ({ notification }: { notification: NotificationItem }) => {
+const NotificationCard = ({
+  notification,
+}: {
+  notification: NotificationItem;
+}) => {
   const navigate = useNavigate();
   const markNotificationAsRead = useMarkNotificationAsReadMutation();
   const time = formatNotificationTime(notification.createdAt);
@@ -41,7 +47,7 @@ const NotificationCard = ({ notification }: { notification: NotificationItem }) 
     navigate(targetPath);
   };
 
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
+  const handleKeyDown = (event: KeyboardEvent<HTMLElement>) => {
     if (event.key !== "Enter" && event.key !== " ") return;
 
     event.preventDefault();
@@ -107,7 +113,11 @@ const NotificationPage = () => {
     refetch,
   } = useNotificationsInfiniteQuery(NOTIFICATION_PAGE_SIZE);
   const notifications = useMemo(
-    () => data?.pages.flatMap((page) => page.items) ?? [],
+    () =>
+      data?.pages
+        .flatMap((page) => page.items)
+        .filter((notification) => isNotificationForMode(notification, "FAN")) ??
+      [],
     [data],
   );
   const hasNotifications = notifications.length > 0;

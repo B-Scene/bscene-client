@@ -19,6 +19,7 @@ export interface NotificationBandInvite {
 export interface NotificationItem {
   notificationId: number;
   type: NotificationType;
+  mode?: NotificationSettingsMode | null;
   deepLink: string | null;
   referenceId: number | null;
   title: string;

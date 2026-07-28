@@ -20,6 +20,8 @@ import {
   BAND_NOTIFICATION_ROUTES,
   formatNotificationTime,
   getNotificationTargetPath,
+  isNotificationForMode,
+  isPostRegistrationNotification,
 } from "@/utils/notificationDeepLink";
 import type { BandMemberPart } from "@/types/band/bandMember";
 import type {
@@ -92,7 +94,15 @@ const NotificationPage = () => {
   const acceptBandInvite = useAcceptBandInviteMutation();
   const rejectBandInvite = useRejectBandInviteMutation();
   const notifications = useMemo(
-    () => data?.pages.flatMap((page) => page.items) ?? [],
+    () =>
+      data?.pages
+        .flatMap((page) => page.items)
+        .filter(
+          (notification) =>
+            isNotificationForMode(notification, "BAND") &&
+            !isPostRegistrationNotification(notification),
+        ) ??
+      [],
     [data],
   );
   const hasNotifications = notifications.length > 0;

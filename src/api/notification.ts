@@ -6,6 +6,7 @@ import type {
   DeletePushTokenRequest,
   NotificationBandInvite,
   NotificationItem,
+  NotificationSettingsMode,
   NotificationSettingType,
   NotificationSettingsResponse,
   NotificationsPageResponse,
@@ -37,6 +38,16 @@ const toBoolean = (value: unknown, fallback = false): boolean =>
 
 const toBooleanOrNull = (value: unknown): boolean | null =>
   typeof value === "boolean" ? value : null;
+
+const toNotificationMode = (value: unknown): NotificationSettingsMode | null => {
+  if (typeof value !== "string") return null;
+
+  const mode = value.toUpperCase();
+
+  return mode === "FAN" || mode === "BAND"
+    ? (mode as NotificationSettingsMode)
+    : null;
+};
 
 const normalizeServerDateTime = (value: unknown): string => {
   const dateTime = toStringOrNull(value)?.trim();
@@ -73,6 +84,12 @@ const normalizeNotification = (
   return {
     notificationId,
     type: toStringOrNull(item.type) ?? "UNKNOWN",
+    mode:
+      toNotificationMode(item.mode) ??
+      toNotificationMode(item.notificationMode) ??
+      toNotificationMode(item.receiverMode) ??
+      toNotificationMode(item.targetMode) ??
+      toNotificationMode(item.userMode),
     deepLink: toStringOrNull(item.deepLink),
     referenceId: toNumberOrNull(item.referenceId),
     title: toStringOrNull(item.title) ?? "",
@@ -217,10 +234,8 @@ const normalizeNotificationSettings = (
     });
   }
 
-  const mode = isRecord(result) ? toStringOrNull(result.mode) : null;
-
   return {
-    mode: mode === "FAN" || mode === "BAND" ? mode : null,
+    mode: isRecord(result) ? toNotificationMode(result.mode) : null,
     values,
   };
 };
