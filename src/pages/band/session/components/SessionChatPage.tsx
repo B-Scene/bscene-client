@@ -22,7 +22,6 @@ import {
 } from "@/hooks/api/session/useSessionChat";
 import { getApiErrorMessage } from "@/utils/getApiErrorMessage";
 import type {
-  ChatRoomsParams,
   ChatRoomsResponse,
   DirectMessageData,
   DirectMessageErrorFrame,
@@ -283,9 +282,15 @@ export default function SessionChatPage() {
         return;
       }
 
-      const queryParams = queryKey[2] as ChatRoomsParams | undefined;
+      const queryParams = queryKey[2];
+      const filter =
+        typeof queryParams === "object" &&
+        queryParams !== null &&
+        "filter" in queryParams
+          ? queryParams.filter
+          : undefined;
       const content =
-        queryParams?.filter === "UNREAD"
+        filter === "UNREAD"
           ? cachedRooms.content.filter(
               (room) => room.chatRoomId !== chatRoomId,
             )

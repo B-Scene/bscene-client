@@ -9,6 +9,10 @@ export const getRenderableProfileImageUrl = (
     return null;
   }
 
+  if (url.startsWith("//")) {
+    return null;
+  }
+
   if (url.startsWith("/") || url.startsWith("blob:") || url.startsWith("data:")) {
     return url;
   }
