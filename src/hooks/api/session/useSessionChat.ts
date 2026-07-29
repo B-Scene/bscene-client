@@ -16,6 +16,7 @@ import {
   getChatRooms,
   getChatWebSocketUrl,
   issueChatWebSocketTicket,
+  leaveChatRoom,
 } from "@/api/session/sessionChat";
 import type {
   ChatRoomDetailParams,
@@ -111,6 +112,22 @@ export const useChatRoomDetailQuery = (
 };
 
 export const useSessionChatRoomDetailQuery = useChatRoomDetailQuery;
+
+export const useLeaveChatRoomMutation = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (chatRoomId: number) => leaveChatRoom(chatRoomId),
+    onSuccess: (_, chatRoomId) => {
+      queryClient.removeQueries({
+        queryKey: [...sessionChatKeys.all, "detail", chatRoomId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: sessionChatKeys.rooms(),
+      });
+    },
+  });
+};
 
 export const useIssueChatWebSocketTicketMutation = () => {
   return useMutation({

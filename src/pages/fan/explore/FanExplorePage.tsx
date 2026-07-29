@@ -119,14 +119,14 @@ const ExploreTopBar = () => {
   const navigate = useNavigate();
 
   return (
-    <header className="relative flex h-[48px] w-full max-w-[393px] items-center justify-center bg-neutral-0 px-[24px]">
-      <h1 className="m-0 font-body text-label2 text-neutral-900">탐색</h1>
+    <header className="relative flex h-12 w-full max-w-[393px] items-center justify-center bg-neutral-0 px-6">
+      <h1 className="m-0 font-body text-label2 text-[#1D1A1A]">탐색</h1>
 
       <button
         type="button"
         aria-label="검색"
         onClick={() => navigate("/fan/explore/search")}
-        className="absolute right-[24px] top-1/2 flex size-6 -translate-y-1/2 items-center justify-center"
+        className="absolute right-6 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center"
       >
         <img
           src={SearchIcon}

@@ -222,6 +222,12 @@ export const useSessionRecruitmentDetail = ({
     sessionApplicationId: number,
     applicationTitle = "기본",
   ) => {
+    if (canDelete) {
+      setIsApplicationModalOpen(false);
+      window.alert("내가 올린 모집 공고에는 지원할 수 없어요.");
+      return;
+    }
+
     try {
       await onApplyApplication?.(
         sessionRecruitmentId,
@@ -332,8 +338,14 @@ export const useSessionRecruitmentDetail = ({
     closeDeleteModal,
     confirmDelete,
 
-    openApplicationModal: () =>
-      setIsApplicationModalOpen(true),
+    openApplicationModal: () => {
+      if (canDelete) {
+        window.alert("내가 올린 모집 공고에는 지원할 수 없어요.");
+        return;
+      }
+
+      setIsApplicationModalOpen(true);
+    },
 
     closeApplicationModal: () =>
       setIsApplicationModalOpen(false),

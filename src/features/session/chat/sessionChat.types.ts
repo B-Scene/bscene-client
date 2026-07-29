@@ -5,6 +5,7 @@ export interface ChatMessage {
   direction: MessageDirection;
   content: string;
   time: string;
+  isRead?: boolean;
 }
 
 export interface ChatLocationState {

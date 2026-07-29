@@ -17,7 +17,6 @@ import {
   MyApplicationSummary,
 } from "@/features/session/applicationDetail/MyApplicationDetailView";
 import {
-  APPLICATION_DETAIL_TABS,
   type DetailSectionId,
 } from "@/features/session/applicationDetail/applicationDetail.types";
 import type { MyApplicationDetailData } from "@/features/session/applicationList/sessionApplicationList.types";
@@ -105,42 +104,6 @@ export const MyApplicationDetail = ({
     .filter(Boolean)
     .join(" · ");
 
-  const handleScroll = () => {
-    const scrollContainer =
-      scrollContainerRef.current;
-
-    if (!scrollContainer) {
-      return;
-    }
-
-    const containerTop =
-      scrollContainer.getBoundingClientRect().top;
-
-    const activationPoint =
-      containerTop + 60;
-
-    let currentSection: DetailSectionId =
-      "introduction";
-
-    APPLICATION_DETAIL_TABS.forEach((tab) => {
-      const section =
-        sectionRefs.current[tab.id];
-
-      if (!section) {
-        return;
-      }
-
-      const sectionTop =
-        section.getBoundingClientRect().top;
-
-      if (sectionTop <= activationPoint) {
-        currentSection = tab.id;
-      }
-    });
-
-    setActiveSection(currentSection);
-  };
-
   const handleClose = () => {
     setActiveSection("introduction");
     onClose();
@@ -187,7 +150,6 @@ export const MyApplicationDetail = ({
 
       <section
         ref={scrollContainerRef}
-        onScroll={handleScroll}
         className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain"
       >
         <MyApplicationSummary

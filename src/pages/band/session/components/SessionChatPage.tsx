@@ -6,18 +6,26 @@ import {
   useRef,
   useState,
 } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 import BandProfileImage from "@/assets/Img_Band.png";
+import ChatSendIcon from "@/assets/icons/Btn_send.svg";
+import AirplaneIcon from "@/assets/icons/airplane.svg";
 import Modal from "@/components/Modal/Modal";
 import { ModalOverlay } from "@/components/common/Modal/ModalOverlay";
 import {
+  sessionChatKeys,
   useChatRoomDetailQuery,
+  useLeaveChatRoomMutation,
   useSessionDirectMessageSocket,
 } from "@/hooks/api/session/useSessionChat";
+import { getApiErrorMessage } from "@/utils/getApiErrorMessage";
 import type {
+  ChatRoomsResponse,
   DirectMessageData,
   DirectMessageErrorFrame,
+  DirectMessageReadData,
 } from "@/types/session/sessionChat";
 import type { ChatMessage } from "@/features/session/chat/sessionChat.types";
 import { getCurrentChatTime } from "@/features/session/chat/sessionChat.utils";
@@ -97,6 +105,7 @@ const getMessageKey = (message: LocalChatMessage) => {
 
 export default function SessionChatPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const params = useParams();
   const location = useLocation();
 
@@ -106,6 +115,7 @@ export default function SessionChatPage() {
   const chatRoomDetailQuery = useChatRoomDetailQuery(chatRoomId, {
     size: 20,
   });
+  const leaveChatRoomMutation = useLeaveChatRoomMutation();
 
   const detail = chatRoomDetailQuery.data;
 
@@ -126,6 +136,7 @@ export default function SessionChatPage() {
   const messageListRef = useRef<HTMLDivElement>(null);
   const messageInputRef = useRef<HTMLInputElement>(null);
   const lastReadMessageIdRef = useRef(0);
+  const currentUserIdRef = useRef<number | null>(null);
 
   const dateDividerText = useMemo(() => {
     return formatChatDate(detail?.messages?.[0]?.createdAt);
@@ -138,15 +149,15 @@ export default function SessionChatPage() {
         clientMsgId: string | null;
       },
     ) => {
+      if (frame.clientMsgId) {
+        currentUserIdRef.current = message.senderId;
+      }
+
       setMessages((previousMessages) => {
-        const alreadyExists = previousMessages.some(
+        const existingServerMessageIndex = previousMessages.findIndex(
           (previousMessage) =>
             previousMessage.serverMessageId === message.chatMessageId,
         );
-
-        if (alreadyExists) {
-          return previousMessages;
-        }
 
         const optimisticMessageIndex = frame.clientMsgId
           ? previousMessages.findIndex(
@@ -155,25 +166,54 @@ export default function SessionChatPage() {
             )
           : -1;
 
-        const isMine = optimisticMessageIndex >= 0;
+        const isMine =
+          optimisticMessageIndex >= 0 ||
+          message.senderId === currentUserIdRef.current;
+        const existingMessage =
+          previousMessages[
+            optimisticMessageIndex >= 0
+              ? optimisticMessageIndex
+              : existingServerMessageIndex
+          ];
 
         const nextMessage: LocalChatMessage = {
-          id:
-            optimisticMessageIndex >= 0
-              ? previousMessages[optimisticMessageIndex].id
-              : message.chatMessageId,
+          id: existingMessage?.id ?? message.chatMessageId,
           serverMessageId: message.chatMessageId,
-          clientMsgId: frame.clientMsgId ?? undefined,
+          clientMsgId:
+            frame.clientMsgId ?? existingMessage?.clientMsgId ?? undefined,
           direction: isMine ? "sent" : "received",
           content: message.content,
           time: formatChatTime(message.createdAt),
+          isRead:
+            Boolean(existingMessage?.isRead) ||
+            (isMine ? Boolean(message.readAt) : true),
           pending: false,
         };
 
         if (optimisticMessageIndex >= 0) {
-          const copiedMessages = [...previousMessages];
-          copiedMessages[optimisticMessageIndex] = nextMessage;
-          return copiedMessages;
+          return previousMessages.flatMap((previousMessage, index) => {
+            if (
+              index === existingServerMessageIndex &&
+              existingServerMessageIndex !== optimisticMessageIndex
+            ) {
+              return [];
+            }
+
+            return index === optimisticMessageIndex
+              ? [nextMessage]
+              : [previousMessage];
+          });
+        }
+
+        if (existingServerMessageIndex >= 0) {
+          return previousMessages.map((previousMessage, index) =>
+            index === existingServerMessageIndex
+              ? {
+                  ...nextMessage,
+                  direction: previousMessage.direction,
+                }
+              : previousMessage,
+          );
         }
 
         return [...previousMessages, nextMessage];
@@ -181,6 +221,29 @@ export default function SessionChatPage() {
     },
     [],
   );
+
+  const handleSocketRead = useCallback((readData: DirectMessageReadData) => {
+    if (readData.readerId === currentUserIdRef.current) {
+      return;
+    }
+
+    setMessages((previousMessages) =>
+      previousMessages.map((message) => {
+        if (
+          message.direction !== "sent" ||
+          !message.serverMessageId ||
+          message.serverMessageId > readData.lastReadMessageId
+        ) {
+          return message;
+        }
+
+        return {
+          ...message,
+          isRead: true,
+        };
+      }),
+    );
+  }, []);
 
   const handleSocketError = useCallback((frame: DirectMessageErrorFrame) => {
     const message =
@@ -208,6 +271,7 @@ export default function SessionChatPage() {
     chatRoomId,
     enabled: chatRoomId > 0,
     onMessage: handleSocketMessage,
+    onRead: handleSocketRead,
     onError: handleSocketError,
   });
 
@@ -216,17 +280,104 @@ export default function SessionChatPage() {
       return;
     }
 
-    setMessages(
-      detail.messages.map((message) => ({
+    const currentUserId =
+      detail.messages.find((message) => message.isMine)?.senderUserId;
+
+    if (currentUserId !== undefined) {
+      currentUserIdRef.current = currentUserId;
+    }
+
+    const serverMessages: LocalChatMessage[] = detail.messages.map(
+      (message) => ({
         id: message.chatMessageId,
         serverMessageId: message.chatMessageId,
         direction: message.isMine ? "sent" : "received",
         content: message.content,
         time: formatChatTime(message.createdAt),
+        isRead: message.isRead,
         pending: false,
-      })),
+      }),
     );
+
+    const animationFrame = window.requestAnimationFrame(() => {
+      setMessages((previousMessages) => {
+        const previousMessagesByServerId = new Map(
+          previousMessages
+            .filter((message) => message.serverMessageId !== undefined)
+            .map((message) => [message.serverMessageId, message]),
+        );
+        const serverMessageIds = new Set(
+          serverMessages.map((message) => message.serverMessageId),
+        );
+
+        const mergedServerMessages = serverMessages.map((serverMessage) => {
+          const previousMessage = serverMessage.serverMessageId
+            ? previousMessagesByServerId.get(serverMessage.serverMessageId)
+            : undefined;
+
+          if (!previousMessage) {
+            return serverMessage;
+          }
+
+          return {
+            ...serverMessage,
+            clientMsgId: previousMessage.clientMsgId,
+            direction: previousMessage.direction,
+            isRead: Boolean(serverMessage.isRead || previousMessage.isRead),
+          };
+        });
+        const localMessages = previousMessages.filter(
+          (message) =>
+            message.serverMessageId === undefined ||
+            !serverMessageIds.has(message.serverMessageId),
+        );
+
+        return [...mergedServerMessages, ...localMessages];
+      });
+    });
+
+    return () => {
+      window.cancelAnimationFrame(animationFrame);
+    };
   }, [detail]);
+
+  const markCurrentRoomAsReadInCache = useCallback(() => {
+    const cachedRoomLists = queryClient.getQueriesData<ChatRoomsResponse>({
+      queryKey: sessionChatKeys.rooms(),
+    });
+
+    cachedRoomLists.forEach(([queryKey, cachedRooms]) => {
+      if (!cachedRooms) {
+        return;
+      }
+
+      const queryParams = queryKey[2];
+      const filter =
+        typeof queryParams === "object" &&
+        queryParams !== null &&
+        "filter" in queryParams
+          ? queryParams.filter
+          : undefined;
+      const content =
+        filter === "UNREAD"
+          ? cachedRooms.content.filter(
+              (room) => room.chatRoomId !== chatRoomId,
+            )
+          : cachedRooms.content.map((room) =>
+              room.chatRoomId === chatRoomId
+                ? {
+                    ...room,
+                    unreadCount: 0,
+                  }
+                : room,
+            );
+
+      queryClient.setQueryData<ChatRoomsResponse>(queryKey, {
+        ...cachedRooms,
+        content,
+      });
+    });
+  }, [chatRoomId, queryClient]);
 
   useEffect(() => {
     const messageList = messageListRef.current;
@@ -264,8 +415,9 @@ export default function SessionChatPage() {
 
     if (sent) {
       lastReadMessageIdRef.current = lastServerMessageId;
+      markCurrentRoomAsReadInCache();
     }
-  }, [messages, sendRead]);
+  }, [markCurrentRoomAsReadInCache, messages, sendRead]);
 
   const handleBack = () => {
     navigate(-1);
@@ -276,15 +428,33 @@ export default function SessionChatPage() {
   };
 
   const handleLeaveModalClose = () => {
+    if (leaveChatRoomMutation.isPending) {
+      return;
+    }
+
     setIsLeaveModalOpen(false);
   };
 
-  const handleLeaveChat = () => {
-    setIsLeaveModalOpen(false);
+  const handleLeaveChat = async () => {
+    if (chatRoomId <= 0 || leaveChatRoomMutation.isPending) {
+      return;
+    }
 
-    navigate("/band/session/messages", {
-      replace: true,
-    });
+    try {
+      await leaveChatRoomMutation.mutateAsync(chatRoomId);
+      setIsLeaveModalOpen(false);
+
+      navigate("/band/session/messages", {
+        replace: true,
+      });
+    } catch (error) {
+      window.alert(
+        getApiErrorMessage(
+          error,
+          "채팅방을 나가지 못했어요. 잠시 후 다시 시도해주세요.",
+        ),
+      );
+    }
   };
 
   const handleSendMessage = (event: FormEvent<HTMLFormElement>) => {
@@ -332,6 +502,7 @@ export default function SessionChatPage() {
       time: getCurrentChatTime(),
       clientMsgId,
       pending: true,
+      isRead: false,
     };
 
     setMessages((previousMessages) => [...previousMessages, newMessage]);
@@ -400,14 +571,23 @@ export default function SessionChatPage() {
               aria-label={`${senderName}님과의 쪽지`}
               className="mt-5 flex flex-col gap-[22px]"
             >
-              {messages.map((message) => (
-                <SessionChatMessage
-                  key={getMessageKey(message)}
-                  message={message}
-                  senderName={senderName}
-                  profileImageUrl={profileImageUrl || BandProfileImage}
-                />
-              ))}
+              {messages.map((message, index) => {
+                const nextMessage = messages[index + 1];
+                const showTime =
+                  !nextMessage ||
+                  nextMessage.direction !== message.direction ||
+                  nextMessage.time !== message.time;
+
+                return (
+                  <SessionChatMessage
+                    key={getMessageKey(message)}
+                    message={message}
+                    senderName={senderName}
+                    profileImageUrl={profileImageUrl || BandProfileImage}
+                    showTime={showTime}
+                  />
+                );
+              })}
             </section>
           </>
         ) : (
@@ -421,7 +601,7 @@ export default function SessionChatPage() {
 
       <form
         onSubmit={handleSendMessage}
-        className="flex h-[78px] shrink-0 items-center gap-[10px] border-t border-neutral-200 bg-neutral-0 px-[15px]"
+        className="flex h-[78px] shrink-0 items-center gap-4 bg-neutral-0 px-6"
       >
         <input
           ref={messageInputRef}
@@ -434,20 +614,34 @@ export default function SessionChatPage() {
               : "현재 메시지를 보낼 수 없어요"
           }
           disabled={!canSend}
-          className="h-[45px] min-w-0 flex-1 rounded-full border border-neutral-300 bg-neutral-0 px-4 text-[14px] font-medium text-neutral-900 outline-none placeholder:text-neutral-400 disabled:bg-neutral-100 disabled:text-neutral-400"
+          className="h-9 min-w-0 flex-1 rounded-full border border-neutral-300 bg-neutral-0 px-6 text-[12px] leading-[18px] font-medium text-neutral-900 outline-none placeholder:text-neutral-400 focus:border-secondary-500 disabled:bg-neutral-100 disabled:text-neutral-400"
         />
 
         <button
           type="submit"
           disabled={!canSend || !messageInput.trim()}
-          className="flex size-[45px] shrink-0 items-center justify-center rounded-full bg-secondary-500 text-[22px] font-bold text-neutral-0 disabled:bg-neutral-300"
+          className="relative flex size-9 shrink-0 items-center justify-center rounded-full disabled:opacity-40"
           aria-label="쪽지 보내기"
         >
-          ➤
+          <img
+            src={ChatSendIcon}
+            alt=""
+            className="pointer-events-none absolute inset-0 size-9"
+          />
+          <img
+            src={AirplaneIcon}
+            alt=""
+            className="pointer-events-none relative z-10 size-8"
+          />
         </button>
       </form>
 
-      <ModalOverlay open={isLeaveModalOpen} onClose={handleLeaveModalClose}>
+      <ModalOverlay
+        open={isLeaveModalOpen}
+        onClose={
+          leaveChatRoomMutation.isPending ? undefined : handleLeaveModalClose
+        }
+      >
         <Modal
           tone="orange"
           title="쪽지창을 나갈까요?"
@@ -459,7 +653,11 @@ export default function SessionChatPage() {
             </>
           }
           cancelLabel="취소"
-          confirmLabel="나가기"
+          confirmLabel={
+            leaveChatRoomMutation.isPending ? "나가는 중..." : "나가기"
+          }
+          cancelDisabled={leaveChatRoomMutation.isPending}
+          confirmDisabled={leaveChatRoomMutation.isPending}
           onCancel={handleLeaveModalClose}
           onConfirm={handleLeaveChat}
         />

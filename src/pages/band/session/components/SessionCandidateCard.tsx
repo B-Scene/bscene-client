@@ -1,4 +1,5 @@
 import UserDefaultProfileIcon from "@/assets/icons/band/user-default-profile.svg";
+import { getRenderableProfileImageUrl } from "@/utils/profileImageUrl";
 
 export interface SessionCandidateCardData {
   id: number;
@@ -21,6 +22,10 @@ export const SessionCandidateCard = ({
   candidate,
   onSelect,
 }: SessionCandidateCardProps) => {
+  const profileImageUrl = getRenderableProfileImageUrl(
+    candidate.profileImageUrl,
+  );
+
   return (
     <article
       role={onSelect ? "button" : undefined}
@@ -40,8 +45,12 @@ export const SessionCandidateCard = ({
       ].join(" ")}
     >
       <img
-        src={candidate.profileImageUrl || UserDefaultProfileIcon}
+        src={profileImageUrl || UserDefaultProfileIcon}
         alt=""
+        onError={(event) => {
+          event.currentTarget.onerror = null;
+          event.currentTarget.src = UserDefaultProfileIcon;
+        }}
         className="size-[50px] shrink-0 rounded-full object-cover"
       />
 

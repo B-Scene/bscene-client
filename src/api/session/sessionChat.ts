@@ -191,6 +191,15 @@ export const getChatRoomDetail = async (
   return data.result;
 };
 
+export const leaveChatRoom = async (chatRoomId: number): Promise<void> => {
+  await axiosInstance.delete<SessionChatApiResponse<null>>(
+    `/chat/rooms/${chatRoomId}`,
+    {
+      headers: getAuthHeaders(),
+    },
+  );
+};
+
 export const issueChatWebSocketTicket =
   async (): Promise<ChatWebSocketTicketResponse> => {
     const { data } = await axiosInstance.post<

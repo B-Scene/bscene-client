@@ -1,5 +1,7 @@
 import {
+  useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { useNavigate } from "react-router-dom";
@@ -12,6 +14,7 @@ import {
 } from "@/hooks/api/session/useSessionRecruitment";
 import {
   useApplySessionRecruitmentMutation,
+  useMySessionApplicationSummaryQuery,
 } from "@/hooks/api/session/useSessionApplication";
 import { useCreateSessionChatRoomMutation } from "@/hooks/api/session/useSessionChat";
 import type {
@@ -121,10 +124,17 @@ export const RecruitmentNoticeScreen = () => {
     setIsFilterOpen,
   ] = useState(false);
 
-  const [filterValues, setFilterValues] =
+  const [recruitmentFilterValues, setRecruitmentFilterValues] =
     useState<SessionFilterValues>(
       INITIAL_SESSION_FILTERS,
     );
+
+  const [findFilterValues, setFindFilterValues] =
+    useState<SessionFilterValues>(
+      INITIAL_SESSION_FILTERS,
+    );
+
+  const hasInitializedFindFilters = useRef(false);
 
   const [sort, setSort] =
     useState<SessionRecruitmentSort>("LATEST");
@@ -184,6 +194,9 @@ export const RecruitmentNoticeScreen = () => {
   const applyRecruitmentMutation =
     useApplySessionRecruitmentMutation();
 
+  const myApplicationSummaryQuery =
+    useMySessionApplicationSummaryQuery();
+
   const createChatRoomMutation =
     useCreateSessionChatRoomMutation();
 
@@ -192,6 +205,23 @@ export const RecruitmentNoticeScreen = () => {
       size: 20,
       sort,
     });
+
+  useEffect(() => {
+    const summary = myApplicationSummaryQuery.data;
+
+    if (!summary || hasInitializedFindFilters.current) {
+      return;
+    }
+
+    hasInitializedFindFilters.current = true;
+
+    setFindFilterValues({
+      part: summary.part || INITIAL_SESSION_FILTERS.part,
+      skill: summary.skillLevel || INITIAL_SESSION_FILTERS.skill,
+      genre: summary.genre || INITIAL_SESSION_FILTERS.genre,
+      region: summary.region || INITIAL_SESSION_FILTERS.region,
+    });
+  }, [myApplicationSummaryQuery.data]);
 
   const posts = useMemo(() => {
     const apiPosts =
@@ -219,21 +249,21 @@ export const RecruitmentNoticeScreen = () => {
   const filteredPosts = useMemo(() => {
     return posts.filter((post) => {
       const matchesPart =
-        filterValues.part === "전체" ||
-        post.tags.includes(filterValues.part);
+        recruitmentFilterValues.part === "전체" ||
+        post.tags.includes(recruitmentFilterValues.part);
 
       const matchesSkill =
-        filterValues.skill === "전체" ||
-        post.tags.includes(filterValues.skill);
+        recruitmentFilterValues.skill === "전체" ||
+        post.tags.includes(recruitmentFilterValues.skill);
 
       const matchesGenre =
-        filterValues.genre === "전체" ||
-        post.genre.includes(filterValues.genre);
+        recruitmentFilterValues.genre === "전체" ||
+        post.genre.includes(recruitmentFilterValues.genre);
 
       const matchesRegion =
-        filterValues.region === "전체" ||
+        recruitmentFilterValues.region === "전체" ||
         post.location.includes(
-          filterValues.region,
+          recruitmentFilterValues.region,
         );
 
       return (
@@ -243,7 +273,7 @@ export const RecruitmentNoticeScreen = () => {
         matchesRegion
       );
     });
-  }, [filterValues, posts]);
+  }, [recruitmentFilterValues, posts]);
 
   const selectedPost = useMemo(() => {
     if (!selectedPostId) return null;
@@ -449,9 +479,9 @@ export const RecruitmentNoticeScreen = () => {
   if (isSearchOpen) {
     return (
       <SessionSearchScreen
-        values={filterValues}
+        values={recruitmentFilterValues}
         onBack={() => setIsSearchOpen(false)}
-        onApplyFilters={setFilterValues}
+        onApplyFilters={setRecruitmentFilterValues}
       />
     );
   }
@@ -506,7 +536,11 @@ export const RecruitmentNoticeScreen = () => {
 
       {activeTab !== "applications" ? (
         <SessionFilterBar
-          values={filterValues}
+          values={
+            activeTab === "find"
+              ? findFilterValues
+              : recruitmentFilterValues
+          }
           sort={sort}
           onSortChange={setSort}
           showBottomBorder={activeTab !== "find"}
@@ -563,7 +597,7 @@ export const RecruitmentNoticeScreen = () => {
         </section>
       ) : activeTab === "find" ? (
         <SessionFindScreen
-          values={filterValues}
+          values={findFilterValues}
         />
       ) : activeTab === "applications" ? (
         <SessionApplicationsScreen
@@ -604,8 +638,16 @@ export const RecruitmentNoticeScreen = () => {
 
       {isFilterOpen ? (
         <SessionFilterBottomSheet
-          values={filterValues}
-          onApply={setFilterValues}
+          values={
+            activeTab === "find"
+              ? findFilterValues
+              : recruitmentFilterValues
+          }
+          onApply={
+            activeTab === "find"
+              ? setFindFilterValues
+              : setRecruitmentFilterValues
+          }
           onClose={() =>
             setIsFilterOpen(false)
           }

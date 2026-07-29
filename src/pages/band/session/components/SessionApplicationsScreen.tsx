@@ -20,6 +20,8 @@ import {
   useUpdateSessionApplication,
   useUpdateSessionApplicationVisibility,
 } from "@/hooks/api/session/useSessionApplication";
+import { useSessionProfileQuery } from "@/hooks/api/session/useSessionProfile";
+import { getRenderableProfileImageUrl } from "@/utils/profileImageUrl";
 import type {
   CreateSessionApplicationRequest,
   MySessionApplicationDetailResponse,
@@ -124,6 +126,7 @@ export const SessionApplicationsScreen = ({
     useState(false);
 
   const summaryQuery = useMySessionApplicationSummaryQuery();
+  const sessionProfileQuery = useSessionProfileQuery();
 
   const visibilityMutation = useUpdateSessionApplicationVisibility();
 
@@ -358,8 +361,18 @@ export const SessionApplicationsScreen = ({
           <div className="flex w-full items-center justify-between gap-4">
             <div className="flex min-w-0 items-center gap-4">
               <img
-                src={summary?.profileImageUrl || UserDefaultProfileIcon}
+                src={
+                  getRenderableProfileImageUrl(
+                    sessionProfileQuery.data?.profileImageUrl,
+                  ) ||
+                  getRenderableProfileImageUrl(summary?.profileImageUrl) ||
+                  UserDefaultProfileIcon
+                }
                 alt=""
+                onError={(event) => {
+                  event.currentTarget.onerror = null;
+                  event.currentTarget.src = UserDefaultProfileIcon;
+                }}
                 className="size-[42px] shrink-0 rounded-full object-cover"
               />
 

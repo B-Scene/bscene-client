@@ -55,16 +55,26 @@ export const SessionFilterBar = ({
 
       <img src={LineIcon} alt="" className="h-[26px] w-0.5 shrink-0" />
 
-      {filterLabels.map((filter, index) => (
-        <button
-          key={`${SESSION_FILTERS[index]}-${index}`}
-          type="button"
-          onClick={onOpenFilter}
-          className="flex h-[22px] min-w-[49px] shrink-0 items-center justify-center whitespace-nowrap rounded-full border border-neutral-400 bg-neutral-0 px-2 py-0.5 text-caption2 text-neutral-600"
-        >
-          {filter}
-        </button>
-      ))}
+      {filterLabels.map((filter, index) => {
+        const isSelected = selectedFilters[index] !== "전체";
+
+        return (
+          <button
+            key={`${SESSION_FILTERS[index]}-${index}`}
+            type="button"
+            aria-pressed={isSelected}
+            onClick={onOpenFilter}
+            className={[
+              "flex h-[22px] min-w-[49px] shrink-0 items-center justify-center whitespace-nowrap rounded-full border bg-neutral-0 px-2 py-0.5 text-caption2",
+              isSelected
+                ? "border-secondary-500 text-secondary-500"
+                : "border-neutral-400 text-neutral-600",
+            ].join(" ")}
+          >
+            {filter}
+          </button>
+        );
+      })}
 
       <button
         type="button"

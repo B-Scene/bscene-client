@@ -101,7 +101,7 @@ interface FilterGroupProps {
 const FilterGroup = ({ title, options, selectedValue, onSelect }: FilterGroupProps) => {
   return (
     <section>
-      <h3 className="text-label1 text-neutral-900">{title}</h3>
+      <h3 className="text-body1 text-neutral-900">{title}</h3>
       <div className="mt-2 flex flex-wrap gap-x-1.5 gap-y-1.5">
         {options.map((option) => {
           const isSelected = selectedValue === option;
