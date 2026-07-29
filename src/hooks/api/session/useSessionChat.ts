@@ -149,6 +149,11 @@ export const useSessionDirectMessageSocket = ({
   const pongTimeoutRef = useRef<number | null>(null);
   const shouldReconnectRef = useRef(false);
   const reconnectAttemptRef = useRef(0);
+  const connectionGenerationRef = useRef(0);
+  const ticketRequestRef = useRef<ReturnType<
+    typeof issueChatWebSocketTicket
+  > | null>(null);
+  const connectSocketRef = useRef<() => Promise<void>>(async () => undefined);
 
   const onMessageRef = useRef(onMessage);
   const onReadRef = useRef(onRead);
@@ -248,6 +253,7 @@ export const useSessionDirectMessageSocket = ({
 
   const closeSocket = useCallback(() => {
     shouldReconnectRef.current = false;
+    connectionGenerationRef.current += 1;
 
     clearReconnectTimer();
     clearHeartbeat();
@@ -292,11 +298,25 @@ export const useSessionDirectMessageSocket = ({
 
     shouldReconnectRef.current = true;
     setLastErrorMessage("");
+    const connectionGeneration = connectionGenerationRef.current + 1;
+    connectionGenerationRef.current = connectionGeneration;
 
     try {
-      const ticketResult = await issueChatWebSocketTicket();
+      const ticketRequest =
+        ticketRequestRef.current ?? issueChatWebSocketTicket();
 
-      if (!shouldReconnectRef.current) {
+      ticketRequestRef.current = ticketRequest;
+
+      const ticketResult = await ticketRequest;
+
+      if (ticketRequestRef.current === ticketRequest) {
+        ticketRequestRef.current = null;
+      }
+
+      if (
+        !shouldReconnectRef.current ||
+        connectionGeneration !== connectionGenerationRef.current
+      ) {
         return;
       }
 
@@ -390,10 +410,19 @@ export const useSessionDirectMessageSocket = ({
         clearReconnectTimer();
 
         reconnectTimerRef.current = window.setTimeout(() => {
-          void connectSocket();
+          void connectSocketRef.current();
         }, delay);
       };
     } catch {
+      ticketRequestRef.current = null;
+
+      if (
+        !shouldReconnectRef.current ||
+        connectionGeneration !== connectionGenerationRef.current
+      ) {
+        return;
+      }
+
       setIsConnected(false);
       setLastErrorMessage("쪽지 WebSocket 연결 티켓 발급에 실패했어요.");
 
@@ -404,7 +433,7 @@ export const useSessionDirectMessageSocket = ({
         clearReconnectTimer();
 
         reconnectTimerRef.current = window.setTimeout(() => {
-          void connectSocket();
+          void connectSocketRef.current();
         }, delay);
       }
     }
@@ -417,15 +446,18 @@ export const useSessionDirectMessageSocket = ({
   ]);
 
   useEffect(() => {
+    connectSocketRef.current = connectSocket;
+  }, [connectSocket]);
+
+  useEffect(() => {
     if (!enabled || chatRoomId <= 0) {
-      closeSocket();
       return;
     }
 
     shouldReconnectRef.current = true;
     reconnectAttemptRef.current = 0;
 
-    void connectSocket();
+    void connectSocketRef.current();
 
     return () => {
       closeSocket();
@@ -433,7 +465,6 @@ export const useSessionDirectMessageSocket = ({
   }, [
     chatRoomId,
     closeSocket,
-    connectSocket,
     enabled,
   ]);
 
