@@ -89,7 +89,7 @@ export function FanLiveHomePage() {
   return (
     <main className="relative h-full overflow-hidden bg-neutral-0 text-neutral-900">
       <header className="flex h-12 items-center justify-center bg-neutral-0">
-        <h1 className="m-0 font-body text-label2 text-neutral-900">라이브</h1>
+        <h1 className="m-0 font-body text-label2 text-[#1D1A1A]">라이브</h1>
       </header>
 
       <div className="fan-live-home-scroll h-[calc(100%_-_48px)] overflow-y-auto px-5 pb-[calc(var(--bottom-nav-height)+24px)]">

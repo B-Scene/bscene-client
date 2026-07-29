@@ -11,6 +11,7 @@ interface HeaderProps {
   className?: string;
   titleClassName?: string;
   onBack?: () => void;
+  variant?: "default" | "main";
 }
 
 export const Header = ({
@@ -21,9 +22,11 @@ export const Header = ({
   className = "",
   titleClassName = "",
   onBack,
+  variant = "default",
 }: HeaderProps) => {
   const navigate = useNavigate();
   const isBetween = align === "between";
+  const isMain = variant === "main";
 
   const handleBack = () => {
     if (onBack) {
@@ -36,8 +39,12 @@ export const Header = ({
 
   return (
     <header
-      className={`relative flex h-12 items-center bg-neutral-0 ${
-        isBetween ? "justify-between px-6" : "justify-center px-3.75"
+      className={`relative flex bg-neutral-0 ${
+        isMain
+          ? "h-12 items-center justify-center px-3.75"
+          : `h-12 items-center ${
+              isBetween ? "justify-between px-6" : "justify-center px-3.75"
+            }`
       } ${className}`}
     >
       {showBack ? (
@@ -55,8 +62,12 @@ export const Header = ({
 
       <h1
         className={`${
-          isBetween ? "text-[20px] leading-6 font-bold" : "text-label2"
-        } text-neutral-900 ${titleClassName}`}
+          isMain
+            ? "text-label2 text-[#1D1A1A]"
+            : `${
+                isBetween ? "text-[20px] leading-6 font-bold" : "text-label2"
+              } text-neutral-900`
+        } ${titleClassName}`}
       >
         {title}
       </h1>

@@ -42,6 +42,7 @@ const mapRecruitmentToPost = (
 ): SessionRecruitmentPost => {
   return {
     id: recruitment.sessionRecruitmentId,
+    isMine: recruitment.isMine ?? false,
     deadline: toDeadlineLabel(recruitment.dDay),
     title: recruitment.recruitmentTitle,
     bandName: recruitment.bandName,

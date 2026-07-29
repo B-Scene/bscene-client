@@ -212,7 +212,7 @@ export function BandLiveHome({
 
   return (
     <main className="relative min-h-dvh bg-neutral-0 pb-[calc(var(--bottom-nav-height)+24px)] text-neutral-900">
-      <TopBar title="라이브" />
+      <TopBar title="라이브" variant="main" />
 
       <div className="px-5">
         <section className="mt-5 flex h-[164px] w-full items-center justify-between rounded-xl bg-secondary-0 px-[18px] shadow-[0_4px_15px_rgba(20,20,20,0.08)]">

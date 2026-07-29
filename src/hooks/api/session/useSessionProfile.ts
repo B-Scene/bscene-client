@@ -27,6 +27,10 @@ export const useUpdateSessionProfile = () => {
       queryClient.invalidateQueries({
         queryKey: sessionProfileKeys.detail(),
       });
+
+      queryClient.invalidateQueries({
+        queryKey: ["sessionApplications"],
+      });
     },
   });
 };

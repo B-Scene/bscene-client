@@ -14,10 +14,10 @@ export const SESSION_TABS: SessionTabItem[] = [
 export const SESSION_FILTERS = ["파트", "실력대", "장르", "지역"] as const;
 
 export const INITIAL_SESSION_FILTERS: SessionFilterValues = {
-  part: "드럼",
-  skill: "중급",
+  part: "전체",
+  skill: "전체",
   genre: "전체",
-  region: "서울",
+  region: "전체",
 };
 
 export const SESSION_FILTER_GROUPS: SessionFilterGroup[] = [
