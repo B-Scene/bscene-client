@@ -5,6 +5,7 @@ import {
   cancelSessionApplicationSubmission,
   createSessionApplication,
   deleteSessionApplication,
+  getApplicationSubmissionDetail,
   getApplicationSubmissions,
   getMySessionApplicationDetail,
   getMySessionApplicationSummary,
@@ -57,6 +58,13 @@ export const sessionApplicationKeys = {
 
   submissionsList: (params: ApplicationSubmissionsParams) =>
     [...sessionApplicationKeys.submissions(), params] as const,
+
+  submissionDetail: (applicationSubmissionId: number) =>
+    [
+      ...sessionApplicationKeys.submissions(),
+      "detail",
+      applicationSubmissionId,
+    ] as const,
 };
 
 export const useSessionApplicationsSearchQuery = (
@@ -111,6 +119,17 @@ export const useApplicationSubmissionsQuery = (
   return useQuery({
     queryKey: sessionApplicationKeys.submissionsList(params),
     queryFn: () => getApplicationSubmissions(params),
+    staleTime: 1000 * 30,
+  });
+};
+
+export const useApplicationSubmissionDetailQuery = (
+  applicationSubmissionId: number,
+) => {
+  return useQuery({
+    queryKey: sessionApplicationKeys.submissionDetail(applicationSubmissionId),
+    queryFn: () => getApplicationSubmissionDetail(applicationSubmissionId),
+    enabled: applicationSubmissionId > 0,
     staleTime: 1000 * 30,
   });
 };

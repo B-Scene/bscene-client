@@ -71,6 +71,34 @@ export interface SessionApplicationDetailResponse {
   portfolioLinks: SessionApplicationPortfolioLink[];
 }
 
+export interface ApplicationSubmissionDetailResponse {
+  applicationSubmissionId: number;
+  sessionRecruitmentId: number;
+  recruitmentTitle: string;
+  bandId: number;
+  bandName: string;
+  deadlineAt: string;
+  sessionApplicationId: number;
+  title: string;
+  userId: number;
+  profileImageUrl: string | null;
+  nickname: string;
+  defaultPart: string;
+  defaultSkillLevel: string;
+  defaultRegion: string;
+  isPublic: boolean;
+  purpose: string;
+  oneLineIntro: string;
+  intro: string;
+  part: string;
+  skillLevel: string;
+  genre: string;
+  region: string;
+  availableActivities: string[];
+  careers: SessionApplicationCareer[];
+  portfolioLinks: SessionApplicationPortfolioLink[];
+}
+
 export interface MySessionApplicationDetailResponse {
   modifiedAt: string;
   profileImageUrl: string | null;
