@@ -154,14 +154,10 @@ export default function SessionChatPage() {
       }
 
       setMessages((previousMessages) => {
-        const alreadyExists = previousMessages.some(
+        const existingServerMessageIndex = previousMessages.findIndex(
           (previousMessage) =>
             previousMessage.serverMessageId === message.chatMessageId,
         );
-
-        if (alreadyExists) {
-          return previousMessages;
-        }
 
         const optimisticMessageIndex = frame.clientMsgId
           ? previousMessages.findIndex(
@@ -170,26 +166,54 @@ export default function SessionChatPage() {
             )
           : -1;
 
-        const isMine = optimisticMessageIndex >= 0;
+        const isMine =
+          optimisticMessageIndex >= 0 ||
+          message.senderId === currentUserIdRef.current;
+        const existingMessage =
+          previousMessages[
+            optimisticMessageIndex >= 0
+              ? optimisticMessageIndex
+              : existingServerMessageIndex
+          ];
 
         const nextMessage: LocalChatMessage = {
-          id:
-            optimisticMessageIndex >= 0
-              ? previousMessages[optimisticMessageIndex].id
-              : message.chatMessageId,
+          id: existingMessage?.id ?? message.chatMessageId,
           serverMessageId: message.chatMessageId,
-          clientMsgId: frame.clientMsgId ?? undefined,
+          clientMsgId:
+            frame.clientMsgId ?? existingMessage?.clientMsgId ?? undefined,
           direction: isMine ? "sent" : "received",
           content: message.content,
           time: formatChatTime(message.createdAt),
-          isRead: isMine ? Boolean(message.readAt) : true,
+          isRead:
+            Boolean(existingMessage?.isRead) ||
+            (isMine ? Boolean(message.readAt) : true),
           pending: false,
         };
 
         if (optimisticMessageIndex >= 0) {
-          const copiedMessages = [...previousMessages];
-          copiedMessages[optimisticMessageIndex] = nextMessage;
-          return copiedMessages;
+          return previousMessages.flatMap((previousMessage, index) => {
+            if (
+              index === existingServerMessageIndex &&
+              existingServerMessageIndex !== optimisticMessageIndex
+            ) {
+              return [];
+            }
+
+            return index === optimisticMessageIndex
+              ? [nextMessage]
+              : [previousMessage];
+          });
+        }
+
+        if (existingServerMessageIndex >= 0) {
+          return previousMessages.map((previousMessage, index) =>
+            index === existingServerMessageIndex
+              ? {
+                  ...nextMessage,
+                  direction: previousMessage.direction,
+                }
+              : previousMessage,
+          );
         }
 
         return [...previousMessages, nextMessage];
@@ -256,11 +280,15 @@ export default function SessionChatPage() {
       return;
     }
 
-    currentUserIdRef.current =
-      detail.messages.find((message) => message.isMine)?.senderUserId ?? null;
+    const currentUserId =
+      detail.messages.find((message) => message.isMine)?.senderUserId;
 
-    setMessages(
-      detail.messages.map((message) => ({
+    if (currentUserId !== undefined) {
+      currentUserIdRef.current = currentUserId;
+    }
+
+    const serverMessages: LocalChatMessage[] = detail.messages.map(
+      (message) => ({
         id: message.chatMessageId,
         serverMessageId: message.chatMessageId,
         direction: message.isMine ? "sent" : "received",
@@ -268,8 +296,49 @@ export default function SessionChatPage() {
         time: formatChatTime(message.createdAt),
         isRead: message.isRead,
         pending: false,
-      })),
+      }),
     );
+
+    const animationFrame = window.requestAnimationFrame(() => {
+      setMessages((previousMessages) => {
+        const previousMessagesByServerId = new Map(
+          previousMessages
+            .filter((message) => message.serverMessageId !== undefined)
+            .map((message) => [message.serverMessageId, message]),
+        );
+        const serverMessageIds = new Set(
+          serverMessages.map((message) => message.serverMessageId),
+        );
+
+        const mergedServerMessages = serverMessages.map((serverMessage) => {
+          const previousMessage = serverMessage.serverMessageId
+            ? previousMessagesByServerId.get(serverMessage.serverMessageId)
+            : undefined;
+
+          if (!previousMessage) {
+            return serverMessage;
+          }
+
+          return {
+            ...serverMessage,
+            clientMsgId: previousMessage.clientMsgId,
+            direction: previousMessage.direction,
+            isRead: Boolean(serverMessage.isRead || previousMessage.isRead),
+          };
+        });
+        const localMessages = previousMessages.filter(
+          (message) =>
+            message.serverMessageId === undefined ||
+            !serverMessageIds.has(message.serverMessageId),
+        );
+
+        return [...mergedServerMessages, ...localMessages];
+      });
+    });
+
+    return () => {
+      window.cancelAnimationFrame(animationFrame);
+    };
   }, [detail]);
 
   const markCurrentRoomAsReadInCache = useCallback(() => {
