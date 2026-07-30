@@ -1,9 +1,11 @@
 import DefaultAvatar from "@/assets/images/IMG_my.svg";
+import { getRenderableProfileImageUrl } from "@/utils/profileImageUrl";
 
 interface ProfileSummaryProps {
   name: string;
   subtitle: string;
   bandLabel: string;
+  profileImageUrl?: string | null;
   onSwitchBand: () => void;
 }
 
@@ -11,13 +13,14 @@ export const ProfileSummary = ({
   name,
   subtitle,
   bandLabel,
+  profileImageUrl,
   onSwitchBand,
 }: ProfileSummaryProps) => {
   return (
     <div className="flex items-center justify-between gap-3">
       <div className="flex min-w-0 flex-1 items-center gap-3">
         <img
-          src={DefaultAvatar}
+          src={getRenderableProfileImageUrl(profileImageUrl) ?? DefaultAvatar}
           alt=""
           className="size-14 shrink-0 rounded-full object-cover"
         />

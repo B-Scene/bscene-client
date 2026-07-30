@@ -7,6 +7,7 @@ import Modal from "@/components/Modal/Modal";
 import { ProfileSummary } from "@/components/fan/my/ProfileSummary";
 import { MenuSection } from "@/components/band/my/MenuSection";
 import { useFanMyPageQuery } from "@/hooks/api/user/useFanMyPage";
+import { useFanInformationQuery } from "@/hooks/api/user/useFanInformation";
 import { useGenres, useRegions } from "@/hooks/api/onboarding/useOnboarding";
 import { useLogoutAndRedirect } from "@/hooks/useLogoutAndRedirect";
 import type { CodeName } from "@/types/onboarding/onboarding";
@@ -39,6 +40,7 @@ const MyPage = () => {
   const navigate = useNavigate();
   const [isLogoutOpen, setIsLogoutOpen] = useState(false);
   const { data } = useFanMyPageQuery();
+  const { data: fanInformation } = useFanInformationQuery();
   const logout = useLogoutAndRedirect();
   const { data: genres = [] } = useGenres();
   const { data: regions = [] } = useRegions();
@@ -51,6 +53,7 @@ const MyPage = () => {
         <ProfileSummary
           name={data?.nickname ?? ""}
           subtitle={data ? buildSubtitle(data, genres, regions) : ""}
+          profileImageUrl={fanInformation?.profileImageUrl}
         />
 
         <div className="mt-4">

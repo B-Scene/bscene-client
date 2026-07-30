@@ -8,16 +8,22 @@ import Modal from "@/components/Modal/Modal";
 import { ProfileSummary } from "@/components/band/my/ProfileSummary";
 import { MenuSection } from "@/components/band/my/MenuSection";
 import { useBandMyPageQuery } from "@/hooks/api/user/useBandMyPage";
+import { useMyProfilesQuery } from "@/hooks/api/user/useMyProfiles";
 import { useLogoutAndRedirect } from "@/hooks/useLogoutAndRedirect";
 import { getPartLabel } from "@/utils/bandLabels";
 
 const MyPage = () => {
   const navigate = useNavigate();
   const { data } = useBandMyPageQuery();
+  const { data: bandProfiles } = useMyProfilesQuery({ type: "band" });
   const logout = useLogoutAndRedirect();
 
   const [isModeSwitchOpen, setIsModeSwitchOpen] = useState(false);
   const [isLogoutOpen, setIsLogoutOpen] = useState(false);
+
+  const activeBandProfile = bandProfiles?.bandProfiles.find(
+    (band) => band.isActive,
+  );
 
   const bandName = data?.bandName ?? "";
   const partsLabel = data?.parts.map(getPartLabel).join(" · ") ?? "";
@@ -31,6 +37,7 @@ const MyPage = () => {
           name={data?.nickname ?? ""}
           subtitle={[bandName, partsLabel].filter(Boolean).join(" · ")}
           bandLabel={bandName}
+          profileImageUrl={activeBandProfile?.profileImageUrl}
           onSwitchBand={() => setIsModeSwitchOpen(true)}
         />
 

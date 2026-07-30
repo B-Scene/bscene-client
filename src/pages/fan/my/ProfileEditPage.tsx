@@ -10,6 +10,8 @@ import {
 } from "@/hooks/api/user/useFanInformation";
 import { useGenres, useRegions } from "@/hooks/api/onboarding/useOnboarding";
 import { getApiErrorMessage } from "@/utils/getApiErrorMessage";
+import { getRenderableProfileImageUrl } from "@/utils/profileImageUrl";
+import { uploadMediaFile } from "@/utils/uploadMediaFile";
 import type { FanInformationResponse } from "@/types/user/fanInformation";
 import type { CodeName } from "@/types/onboarding/onboarding";
 
@@ -64,8 +66,14 @@ const ProfileEditForm = ({
   const { data: regions = [] } = useRegions();
   const updateFanInformation = useUpdateFanInformation();
 
-  const [avatarUrl, setAvatarUrl] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState(
+    getRenderableProfileImageUrl(initialData.profileImageUrl) ?? "",
+  );
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [isAvatarRemoved, setIsAvatarRemoved] = useState(false);
   const [isImageMenuOpen, setIsImageMenuOpen] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [nickname, setNickname] = useState(initialData.nickname);
   const [selectedGenres, setSelectedGenres] = useState<string[]>(
     initialData.genres,
@@ -100,6 +108,8 @@ const ProfileEditForm = ({
     if (!file) return;
 
     setIsImageMenuOpen(false);
+    setAvatarFile(file);
+    setIsAvatarRemoved(false);
     setAvatarUrl((prev) => {
       if (prev) URL.revokeObjectURL(prev);
       return URL.createObjectURL(file);
@@ -108,6 +118,8 @@ const ProfileEditForm = ({
 
   const handleDeleteImage = () => {
     setIsImageMenuOpen(false);
+    setAvatarFile(null);
+    setIsAvatarRemoved(true);
     setAvatarUrl((prev) => {
       if (prev) URL.revokeObjectURL(prev);
       return "";
@@ -117,11 +129,27 @@ const ProfileEditForm = ({
   const handleSubmit = async () => {
     if (!isValid) return;
 
+    setUploadError(null);
+    let uploadedAvatarUrl = avatarUrl;
+
+    if (avatarFile) {
+      try {
+        setIsUploading(true);
+        uploadedAvatarUrl = await uploadMediaFile(avatarFile, "USER_PROFILE");
+      } catch {
+        setIsUploading(false);
+        setUploadError("이미지 업로드에 실패했어요. 다시 시도해주세요");
+        return;
+      }
+      setIsUploading(false);
+    }
+
     try {
       await updateFanInformation.mutateAsync({
         nickname: nickname.trim(),
         genres: selectedGenres,
         regions: selectedRegions,
+        profileImageUrl: isAvatarRemoved ? null : uploadedAvatarUrl || undefined,
       });
       navigate(-1);
     } catch {
@@ -219,7 +247,11 @@ const ProfileEditForm = ({
       </section>
 
       <div className="fixed inset-x-0 bottom-9 flex flex-col gap-2 px-5">
-        {updateFanInformation.error ? (
+        {uploadError ? (
+          <span className="text-center text-body5 text-error">
+            {uploadError}
+          </span>
+        ) : updateFanInformation.error ? (
           <span className="text-center text-body5 text-error">
             {getApiErrorMessage(
               updateFanInformation.error,
@@ -231,14 +263,18 @@ const ProfileEditForm = ({
         <button
           type="button"
           onClick={handleSubmit}
-          disabled={!isValid || updateFanInformation.isPending}
+          disabled={!isValid || isUploading || updateFanInformation.isPending}
           className={`flex h-13 w-full items-center justify-center gap-2.5 rounded-xl text-label1 ${
-            isValid && !updateFanInformation.isPending
+            isValid && !isUploading && !updateFanInformation.isPending
               ? "bg-primary-400 text-neutral-0"
               : "bg-neutral-300 text-neutral-600"
           }`}
         >
-          {updateFanInformation.isPending ? "저장 중..." : "프로필 저장"}
+          {isUploading
+            ? "업로드 중..."
+            : updateFanInformation.isPending
+              ? "저장 중..."
+              : "프로필 저장"}
         </button>
       </div>
     </main>
