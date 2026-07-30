@@ -2,6 +2,7 @@ import type { NotificationItem } from "@/types/notification";
 
 type RouteBuilder = (id: string | number, suffix: string) => string;
 export type NotificationMode = "FAN" | "BAND";
+const NOTIFICATION_RETENTION_MS = 72 * 60 * 60 * 1000;
 
 export interface NotificationRouteMapping {
   post: RouteBuilder;
@@ -35,6 +36,16 @@ export const formatNotificationTime = (createdAt: string) => {
   if (diffDays < 7) return `${diffDays}일 전`;
 
   return `${createdDate.getFullYear()}.${createdDate.getMonth() + 1}.${createdDate.getDate()}.`;
+};
+
+export const isNotificationWithinRetention = (
+  notification: NotificationItem,
+) => {
+  const createdTime = new Date(notification.createdAt).getTime();
+
+  if (Number.isNaN(createdTime)) return true;
+
+  return Date.now() - createdTime < NOTIFICATION_RETENTION_MS;
 };
 
 export const normalizeDeepLink = (deepLink: string) => {
