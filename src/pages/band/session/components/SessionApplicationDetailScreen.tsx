@@ -5,11 +5,16 @@ import ArrowLeftIcon from "@/assets/icons/arrow-left.svg";
 import UserDefaultProfileIcon from "@/assets/icons/band/user-default-profile.svg";
 import PlayButtonIcon from "@/assets/icons/band/play-button.svg";
 import Button from "@/components/common/Button/Button";
-import { useSessionApplicationDetailQuery } from "@/hooks/api/session/useSessionApplication";
+import {
+  useMySessionApplicationDetailQuery,
+  useSessionApplicationDetailQuery,
+} from "@/hooks/api/session/useSessionApplication";
+import { getRenderableProfileImageUrl } from "@/utils/profileImageUrl";
 
 interface SessionApplicationDetailScreenProps {
   sessionApplicationId: number;
   onBack: () => void;
+  isOwnApplication?: boolean;
 }
 
 type DetailSectionId =
@@ -57,19 +62,47 @@ const DetailChip = ({
 export const SessionApplicationDetailScreen = ({
   sessionApplicationId,
   onBack,
+  isOwnApplication = false,
 }: SessionApplicationDetailScreenProps) => {
   const navigate = useNavigate();
-  const detailQuery =
+
+  const publicDetailQuery =
     useSessionApplicationDetailQuery(
-      sessionApplicationId,
+      isOwnApplication
+        ? 0
+        : sessionApplicationId,
     );
 
-  const detail = detailQuery.data;
+  const myDetailQuery =
+    useMySessionApplicationDetailQuery(
+      isOwnApplication
+        ? sessionApplicationId
+        : 0,
+    );
+
+  const detailQuery = isOwnApplication
+    ? myDetailQuery
+    : publicDetailQuery;
+
+  const detail = isOwnApplication
+    ? myDetailQuery.data
+      ? {
+          ...myDetailQuery.data,
+          userId: null,
+          nickname:
+            myDetailQuery.data.name ||
+            "닉네임 없음",
+        }
+      : undefined
+    : publicDetailQuery.data;
 
   const [activeSection, setActiveSection] =
     useState<DetailSectionId>(
       "introduction",
     );
+
+  const scrollContainerRef =
+    useRef<HTMLElement>(null);
 
   const sectionRefs = useRef<
     Record<
@@ -86,18 +119,37 @@ export const SessionApplicationDetailScreen = ({
   const moveToSection = (
     sectionId: DetailSectionId,
   ) => {
+    const scrollContainer =
+      scrollContainerRef.current;
+    const section =
+      sectionRefs.current[sectionId];
+
     setActiveSection(sectionId);
 
-    sectionRefs.current[
-      sectionId
-    ]?.scrollIntoView({
+    if (!scrollContainer || !section) {
+      return;
+    }
+
+    const containerTop =
+      scrollContainer.getBoundingClientRect().top;
+    const sectionTop =
+      section.getBoundingClientRect().top;
+
+    scrollContainer.scrollTo({
+      top:
+        scrollContainer.scrollTop +
+        sectionTop -
+        containerTop -
+        47,
       behavior: "smooth",
-      block: "start",
     });
   };
 
   return (
-    <main className="fixed inset-0 z-50 mx-auto w-full max-w-[393px] overflow-y-auto bg-neutral-0 pb-[92px]">
+    <main
+      ref={scrollContainerRef}
+      className="fixed inset-0 z-50 mx-auto w-full max-w-[393px] overflow-y-auto bg-neutral-0 pb-[92px]"
+    >
       <header className="flex h-12 w-full items-center bg-neutral-0 px-[15px] py-[5px]">
         <button
           type="button"
@@ -144,10 +196,14 @@ export const SessionApplicationDetailScreen = ({
             <div className="mt-[30px] flex items-center gap-[32px]">
               <img
                 src={
-                  detail.profileImageUrl ||
+                  getRenderableProfileImageUrl(detail.profileImageUrl) ||
                   UserDefaultProfileIcon
                 }
                 alt=""
+                onError={(event) => {
+                  event.currentTarget.onerror = null;
+                  event.currentTarget.src = UserDefaultProfileIcon;
+                }}
                 className="size-24 shrink-0 rounded-full object-cover"
               />
 
@@ -167,7 +223,7 @@ export const SessionApplicationDetailScreen = ({
 
           <nav
             aria-label="세션 지원서 상세 메뉴"
-            className="grid h-12 grid-cols-4 border-b border-neutral-400 bg-neutral-0"
+            className="sticky top-0 z-20 grid h-12 grid-cols-4 border-b border-neutral-400 bg-neutral-0"
           >
             {DETAIL_TABS.map((tab) => {
               const isActive =
@@ -182,7 +238,7 @@ export const SessionApplicationDetailScreen = ({
                   }
                   className={`relative flex items-center justify-center text-body1 ${
                     isActive
-                      ? "text-neutral-900"
+                      ? "text-secondary-500"
                       : "text-neutral-400"
                   }`}
                 >
@@ -202,7 +258,7 @@ export const SessionApplicationDetailScreen = ({
                 sectionRefs.current.introduction =
                   element;
               }}
-              className="scroll-mt-4 border-b border-neutral-300 py-[28px]"
+              className="scroll-mt-12 border-b border-neutral-300 py-[28px]"
             >
               <h2 className="text-label1 text-neutral-900">
                 세션 소개
@@ -226,7 +282,7 @@ export const SessionApplicationDetailScreen = ({
                 sectionRefs.current.information =
                   element;
               }}
-              className="scroll-mt-4 border-b border-neutral-300 py-[28px]"
+              className="scroll-mt-12 border-b border-neutral-300 py-[28px]"
             >
               <h2 className="text-label1 text-neutral-900">
                 세션 정보
@@ -274,7 +330,7 @@ export const SessionApplicationDetailScreen = ({
                 sectionRefs.current.career =
                   element;
               }}
-              className="scroll-mt-4 border-b border-neutral-300 py-[28px]"
+              className="scroll-mt-12 border-b border-neutral-300 py-[28px]"
             >
               <h2 className="text-label1 text-neutral-900">
                 경력
@@ -324,7 +380,7 @@ export const SessionApplicationDetailScreen = ({
                 sectionRefs.current.portfolio =
                   element;
               }}
-              className="scroll-mt-4 py-[28px]"
+              className="scroll-mt-12 py-[28px]"
             >
               <h2 className="text-label1 text-neutral-900">
                 포트폴리오
@@ -386,7 +442,7 @@ export const SessionApplicationDetailScreen = ({
         </>
       ) : null}
 
-      {detail ? (
+      {detail && !isOwnApplication ? (
         <div className="fixed inset-x-0 bottom-0 z-10 mx-auto w-full max-w-[393px] bg-neutral-0 px-5 py-4 shadow-[0_-5px_20px_rgba(0,0,0,0.03)]">
           <Button
             tone="orange"

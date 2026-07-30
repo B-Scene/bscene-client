@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { KeyboardEvent, ReactNode } from "react";
 import BandProfileImage from "@/assets/icons/band/band-default-profile.svg";
 
 type FollowedNewsCardVariant = "gallery" | "video" | "image" | "text";
@@ -13,6 +13,8 @@ type FollowedNewsCardProps = {
   mediaUrls?: string[];
   videoThumbnailUrl?: string;
   tags?: string[];
+  onClick?: () => void;
+  ariaLabel?: string;
 };
 
 const ImagePlaceholderIcon = () => (
@@ -85,11 +87,29 @@ export const FollowedNewsCard = ({
   mediaUrls = [],
   videoThumbnailUrl,
   tags = ["해시태그", "해시태그", "지역", "장르"],
+  onClick,
+  ariaLabel,
 }: FollowedNewsCardProps) => {
   const imageUrls = mediaUrls.slice(0, 2);
+  const isInteractive = Boolean(onClick);
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+    if (!onClick) return;
+    if (event.key !== "Enter" && event.key !== " ") return;
+
+    event.preventDefault();
+    onClick();
+  };
 
   return (
-    <article className="box-border flex w-full flex-col rounded-[12px] bg-neutral-0 px-4 py-3 text-left shadow-[0_0_8px_0_rgba(0,0,0,0.10)]">
+    <article
+      role={isInteractive ? "button" : undefined}
+      tabIndex={isInteractive ? 0 : undefined}
+      aria-label={ariaLabel}
+      onClick={onClick}
+      onKeyDown={isInteractive ? handleKeyDown : undefined}
+      className="box-border flex w-full flex-col rounded-[12px] bg-neutral-0 px-4 py-3 text-left shadow-[0_0_8px_0_rgba(0,0,0,0.10)]"
+    >
       <header className="flex items-center gap-[11px]">
         <img
           src={profileImageSrc}

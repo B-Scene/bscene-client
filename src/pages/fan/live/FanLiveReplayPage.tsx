@@ -1,8 +1,15 @@
-import { useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
-import PlayIcon from "@/assets/icons/band/play-button.svg";
+import { useCallback, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import BandImage from "@/assets/Img_Band.png";
+import PlayIcon from "@/assets/icons/play.svg";
 import VideoCard from "@/components/common/Card/VideoCard";
 import { BottomNavBar } from "@/components/layout/BottomNavBar";
+import { useReplayListQuery } from "@/hooks/api/live/useLive";
+import { useInfiniteScrollObserver } from "@/hooks/useInfiniteScrollObserver";
+import type {
+  ReplayListFilter,
+  ReplaySort,
+} from "@/types/live/live";
 import "./FanLivePage.css";
 import {
   FanLiveFilterTabs,
@@ -10,139 +17,187 @@ import {
   type FanLiveFilter,
 } from "./components/FanLiveHomeParts";
 
-type ReplaySort = "latest" | "popular";
+const toApiFilter = (filter: FanLiveFilter): ReplayListFilter => {
+  return filter === "followed" ? "following" : "all";
+};
 
-const FOLLOWED_REPLAYS = ["replay-followed-1", "replay-followed-2"];
-const ALL_REPLAYS = [
-  "replay-all-1",
-  "replay-all-2",
-  "replay-all-3",
-  "replay-all-4",
-  "replay-all-5",
-];
+const formatDuration = (totalSeconds: number) => {
+  const safeSeconds = Math.max(0, Math.floor(totalSeconds));
+  const hours = Math.floor(safeSeconds / 3600);
+  const minutes = Math.floor((safeSeconds % 3600) / 60);
+  const seconds = safeSeconds % 60;
 
-const REPLAY_METRICS: Record<
-  string,
-  { publishedOrder: number; viewCount: number }
-> = {
-  "replay-followed-1": { publishedOrder: 2, viewCount: 6785 },
-  "replay-followed-2": { publishedOrder: 1, viewCount: 8450 },
-  "replay-all-1": { publishedOrder: 5, viewCount: 6785 },
-  "replay-all-2": { publishedOrder: 4, viewCount: 9120 },
-  "replay-all-3": { publishedOrder: 3, viewCount: 4556 },
-  "replay-all-4": { publishedOrder: 2, viewCount: 10340 },
-  "replay-all-5": { publishedOrder: 1, viewCount: 7230 },
+  return [hours, minutes, seconds]
+    .map((value) => String(value).padStart(2, "0"))
+    .join(":");
 };
 
 export function FanLiveReplayPage() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   const [filter, setFilter] = useState<FanLiveFilter>("followed");
-  const [sort, setSort] = useState<ReplaySort>("latest");
+  const [sort, setSort] = useState<ReplaySort>("LATEST");
   const [searchQuery, setSearchQuery] = useState("");
-  const isEmpty = searchParams.get("empty") === "true";
-  const items = filter === "followed" ? FOLLOWED_REPLAYS : ALL_REPLAYS;
-  const normalizedQuery = searchQuery.trim().toLocaleLowerCase();
-  const visibleItems = items
-    .filter(() =>
-      "라이브 제목명 밴드명".toLocaleLowerCase().includes(normalizedQuery),
-    )
-    .sort((firstId, secondId) => {
-      const firstMetrics = REPLAY_METRICS[firstId];
-      const secondMetrics = REPLAY_METRICS[secondId];
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isError,
+    isFetchingNextPage,
+    isLoading,
+    refetch,
+  } = useReplayListQuery(toApiFilter(filter), sort);
 
-      return sort === "latest"
-        ? secondMetrics.publishedOrder - firstMetrics.publishedOrder
-        : secondMetrics.viewCount - firstMetrics.viewCount;
-    });
-  const hasNoResults = !isEmpty && visibleItems.length === 0;
+  const replayItems = useMemo(
+    () => data?.pages.flatMap((page) => page.items) ?? [],
+    [data],
+  );
+  const normalizedQuery = searchQuery.trim().toLocaleLowerCase();
+  const visibleItems = useMemo(() => {
+    if (!normalizedQuery) return replayItems;
+
+    return replayItems.filter((replay) =>
+      `${replay.title} ${replay.bandName}`
+        .toLocaleLowerCase()
+        .includes(normalizedQuery),
+    );
+  }, [normalizedQuery, replayItems]);
+  const hasNoResults = !isLoading && visibleItems.length === 0;
+
+  const loadMore = useCallback(() => {
+    if (!hasNextPage || isFetchingNextPage) return;
+    void fetchNextPage();
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
+
+  const loadMoreRef = useInfiniteScrollObserver({
+    enabled: Boolean(hasNextPage) && !isFetchingNextPage,
+    onIntersect: loadMore,
+  });
 
   return (
     <main className="relative h-full overflow-hidden bg-neutral-0 text-neutral-900">
       <FanLiveListHeader
         title="다시보기"
-        onBack={() => navigate(-1)}
+        onBack={() => navigate("/fan/live", { replace: true })}
         searchValue={searchQuery}
         onSearchChange={setSearchQuery}
       />
       <FanLiveFilterTabs value={filter} onChange={setFilter} />
 
       <div className="flex h-[calc(100%_-_176px)] flex-col">
-        {isEmpty || hasNoResults ? (
-          <div className="flex flex-1 items-center justify-center">
-            <div className="flex w-[219px] flex-col items-center gap-3 text-center">
-              <h2 className="m-0 font-body text-label1 text-neutral-900">
-                {hasNoResults ? "검색 결과가 없어요" : "저장된 다시보기가 없어요"}
-              </h2>
-              <p className="m-0 font-body text-caption1 text-neutral-600">
-                {hasNoResults ? (
-                  "다른 검색어를 입력해 보세요"
-                ) : (
-                  <>
-                    라이브가 종료되면 밴드가
-                    <br />
-                    녹음본 저장 여부를 선택해요
-                  </>
-                )}
-              </p>
-            </div>
+        <div className="flex h-14 shrink-0 items-center justify-between px-5">
+          <p className="m-0 font-body text-caption2 text-neutral-700">
+            라이브는 최대 72시간까지 보관됩니다
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setSort("LATEST")}
+              className={`rounded-full px-[15px] py-1 font-body text-caption3 ${
+                sort === "LATEST"
+                  ? "bg-primary-50 text-primary-400"
+                  : "bg-neutral-300 text-neutral-600"
+              }`}
+            >
+              최신순
+            </button>
+            <button
+              type="button"
+              onClick={() => setSort("POPULAR")}
+              className={`rounded-full px-[15px] py-1 font-body text-caption2 ${
+                sort === "POPULAR"
+                  ? "bg-primary-50 text-primary-400"
+                  : "bg-neutral-300 text-neutral-600"
+              }`}
+            >
+              인기순
+            </button>
           </div>
-        ) : (
-          <>
-            <div className="flex h-14 shrink-0 items-center justify-between px-5">
-              <p className="m-0 font-body text-caption2 text-neutral-700">
-                라이브는 최대 72시간까지 보관됩니다
+        </div>
+
+        <section className="fan-live-home-scroll relative flex flex-1 flex-col overflow-y-auto px-5 pb-6">
+          {isLoading ? (
+            <p className="py-10 text-center font-body text-caption2 text-neutral-500">
+              다시보기를 불러오는 중이에요.
+            </p>
+          ) : null}
+
+          {isError ? (
+            <div className="py-10 text-center">
+              <p className="font-body text-caption2 text-neutral-600">
+                다시보기를 불러오지 못했어요.
               </p>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setSort("latest")}
-                  className={`rounded-full px-[15px] py-1 font-body text-caption3 ${
-                    sort === "latest"
-                      ? "bg-primary-50 text-primary-400"
-                      : "bg-neutral-300 text-neutral-600"
-                  }`}
-                >
-                  최신순
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSort("popular")}
-                  className={`rounded-full px-[15px] py-1 font-body text-caption2 ${
-                    sort === "popular"
-                      ? "bg-primary-50 text-primary-400"
-                      : "bg-neutral-300 text-neutral-600"
-                  }`}
-                >
-                  인기순
-                </button>
+              <button
+                type="button"
+                onClick={() => refetch()}
+                className="mt-3 rounded-lg bg-primary-400 px-4 py-2 font-body text-caption3 text-neutral-0"
+              >
+                다시 불러오기
+              </button>
+            </div>
+          ) : null}
+
+          {!isLoading && !isError && hasNoResults ? (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="flex w-[219px] flex-col items-center gap-3 text-center">
+                <h2 className="m-0 font-body text-label1 text-neutral-900">
+                  {normalizedQuery
+                    ? "검색 결과가 없어요"
+                    : "저장된 다시보기가 없어요"}
+                </h2>
+                <p className="m-0 font-body text-caption1 text-neutral-600">
+                  {normalizedQuery ? (
+                    "다른 검색어를 입력해 보세요"
+                  ) : (
+                    <>
+                      라이브가 종료되면 밴드가
+                      <br />
+                      녹음본 저장 여부를 선택해요
+                    </>
+                  )}
+                </p>
               </div>
             </div>
+          ) : null}
 
-            <section className="fan-live-home-scroll flex flex-1 flex-col items-center gap-3 overflow-y-auto px-5 pb-6">
-              {visibleItems.map((id) => {
-                const { viewCount } = REPLAY_METRICS[id];
+          {!isLoading && !isError && !hasNoResults ? (
+            <div className="flex flex-col items-center gap-3">
+              {visibleItems.map((replay) => (
+                <VideoCard
+                  key={replay.liveId}
+                  imageSrc={replay.thumbnailImageUrl || BandImage}
+                  imageAlt={`${replay.bandName} 다시보기 이미지`}
+                  title={replay.title}
+                  bandName={replay.bandName}
+                  duration={formatDuration(
+                    replay.durationSeconds ?? replay.durationSec ?? 0,
+                  )}
+                  onClick={() =>
+                    navigate(`/fan/live/replays/${replay.liveId}`)
+                  }
+                  ariaLabel={`${replay.title} 다시보기 열기`}
+                  timeAgo={
+                    <span className="flex items-center gap-1">
+                      <img
+                        src={PlayIcon}
+                        alt=""
+                        className="size-[9px] brightness-0 opacity-30"
+                      />
+                      {replay.viewCount.toLocaleString()}
+                    </span>
+                  }
+                />
+              ))}
 
-                return (
-                  <VideoCard
-                    key={id}
-                    title="라이브 제목명"
-                    bandName="밴드명"
-                    duration="00:00:00"
-                    onClick={() => navigate(`/fan/live/replays/${id}`)}
-                    ariaLabel="라이브 다시보기 열기"
-                    timeAgo={
-                      <span className="flex items-center gap-1">
-                        <img src={PlayIcon} alt="" className="size-3 opacity-40" />
-                        {viewCount.toLocaleString()}
-                      </span>
-                    }
-                  />
-                );
-              })}
-            </section>
-          </>
-        )}
+              <div ref={loadMoreRef} className="h-1" />
+
+              {isFetchingNextPage ? (
+                <p className="py-3 font-body text-caption2 text-neutral-500">
+                  다시보기를 더 불러오는 중이에요.
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+        </section>
       </div>
 
       <BottomNavBar modeOverride="fan" activeColorModeOverride="fan" />

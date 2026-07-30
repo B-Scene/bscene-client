@@ -1,5 +1,9 @@
-import { useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useEffect, useState } from "react";
+import {
+  useLocation,
+  useNavigate,
+  useParams,
+} from "react-router-dom";
 import ArrowLeftIcon from "@/assets/icons/arrow-left.svg";
 import OfficialIcon from "@/assets/icons/band/official-icon.svg";
 import PlusIcon from "@/assets/icons/Plus.svg";
@@ -8,57 +12,28 @@ import SpotifyIcon from "@/assets/icons/Spotify.svg";
 import YouTubeIcon from "@/assets/icons/youtube.svg";
 import BandImage from "@/assets/Img_Band.png";
 import ConcertCard from "@/components/common/Card/ConcertCard";
+import { ModalOverlay } from "@/components/common/Modal/ModalOverlay";
+import { Toast } from "@/components/common/Toast/Toast";
 import { FollowedNewsCard } from "@/components/fan/home/FollowedNewsCard";
+import Modal from "@/components/Modal/Modal";
+import {
+  useFanExploreBandDetailQuery,
+  useFollowExploreBand,
+  useUnfollowExploreBand,
+} from "@/hooks/api/fan/useFanExplore";
+import { useMusicLinksQuery } from "@/hooks/api/band/useMusicLink";
+import { usePerformancesQuery } from "@/hooks/api/band/usePerformance";
+import { usePostsQuery } from "@/hooks/api/band/usePost";
+import { useEnterLiveMutation } from "@/hooks/api/live/useLive";
+import type { FanExploreBandDetail } from "@/types/fan/explore";
+import type { MusicLinksResponse } from "@/types/band/musicLink";
+import type { PerformanceListItem } from "@/types/band/performance";
+import type { PostListItem, PostType } from "@/types/band/post";
+import { getGenreLabel, getRegionLabel } from "@/utils/bandLabels";
+import { getApiErrorMessage } from "@/utils/getApiErrorMessage";
 
 const TABS = ["콘텐츠", "일정", "음원"] as const;
 type ProfileTab = (typeof TABS)[number];
-
-const SCHEDULES = [
-  { id: "schedule-1", showThumbnail: true, status: "D-7" },
-  {
-    id: "schedule-2",
-    month: "MAY",
-    day: "17",
-    dateBadgeClassName: "bg-primary-300",
-    status: "D-day",
-  },
-  {
-    id: "schedule-3",
-    showThumbnail: true,
-    isPending: true,
-    thumbnailClassName: "bg-neutral-600 text-neutral-700",
-    titleClassName: "text-neutral-500",
-    status: "공연 완료",
-  },
-];
-
-const MUSIC_LINKS = [
-  {
-    id: "spotify",
-    title: "Spotify",
-    url: "open.spotify.com/artist/밴드명",
-    icon: "spotify",
-  },
-  {
-    id: "youtube",
-    title: "YouTube",
-    url: "youtube.com/@밴드채널명",
-    icon: "youtube",
-  },
-  {
-    id: "soundcloud",
-    title: "SoundCloud",
-    url: "soundcloud.com/밴드명",
-    icon: "soundcloud",
-  },
-  {
-    id: "other",
-    title: "기타 링크",
-    url: "멜론, 지니, 벅스, 애플뮤직 등",
-    icon: "other",
-    disabled: true,
-  },
-];
 
 const LocationIconNeutral500 = () => (
   <svg
@@ -120,23 +95,29 @@ const MusicLinkArrowIcon = () => (
   </svg>
 );
 
+const getExternalUrl = (url: string) => {
+  if (/^https?:\/\//i.test(url)) {
+    return url;
+  }
+
+  return `https://${url}`;
+};
+
 const MusicLinkCard = ({
   title,
   url,
   icon,
-  disabled = false,
 }: {
   title: string;
   url: string;
   icon: string;
-  disabled?: boolean;
 }) => {
   return (
-    <article
-      className={[
-        "box-border flex h-[60px] w-full max-w-[330px] items-center gap-[25px] rounded-[12px] px-[12px] py-[15px] text-left shadow-[0_0_8px_0_rgba(0,0,0,0.10)]",
-        disabled ? "bg-neutral-300" : "bg-neutral-0",
-      ].join(" ")}
+    <a
+      href={getExternalUrl(url)}
+      target="_blank"
+      rel="noreferrer"
+      className="box-border flex h-[60px] w-full max-w-[330px] items-center gap-[25px] rounded-[12px] bg-neutral-0 px-[12px] py-[15px] text-left shadow-[0_0_8px_0_rgba(0,0,0,0.10)]"
     >
       <MusicPlatformIcon type={icon} />
       <div className="min-w-0 flex-1">
@@ -147,30 +128,225 @@ const MusicLinkCard = ({
           {url}
         </p>
       </div>
-      {disabled ? null : <MusicLinkArrowIcon />}
-    </article>
+      <MusicLinkArrowIcon />
+    </a>
+  );
+};
+
+const toDate = (date?: string | null, time?: string | null) => {
+  if (!date) return null;
+
+  const dateValue = time && !date.includes("T") ? `${date}T${time}` : date;
+  const parsedDate = new Date(dateValue);
+
+  return Number.isNaN(parsedDate.getTime()) ? null : parsedDate;
+};
+
+const formatDateTime = (date: Date | null) => {
+  if (!date) return "일정 미정";
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hour = String(date.getHours()).padStart(2, "0");
+  const minute = String(date.getMinutes()).padStart(2, "0");
+
+  return `${year}.${month}.${day}. ${hour}:${minute}`;
+};
+
+const formatDday = (date: Date | null) => {
+  if (!date) return "준비중";
+
+  const today = new Date();
+  const todayStart = new Date(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate(),
+  );
+  const dateStart = new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate(),
+  );
+  const diffDays = Math.ceil(
+    (dateStart.getTime() - todayStart.getTime()) / 86_400_000,
+  );
+
+  if (diffDays < 0) return "공연 완료";
+  if (diffDays === 0) return "D-DAY";
+  return `D-${diffDays}`;
+};
+
+const formatPostMeta = (
+  createdAt: string | null | undefined,
+  genre: string,
+  region: string,
+) => {
+  const createdDate = createdAt ? new Date(createdAt) : null;
+
+  if (!createdDate || Number.isNaN(createdDate.getTime())) {
+    return `${genre} · ${region}`;
+  }
+
+  const diffMinutes = Math.max(
+    0,
+    Math.floor((Date.now() - createdDate.getTime()) / 60_000),
+  );
+  const timeLabel =
+    diffMinutes < 60
+      ? `${diffMinutes}분 전`
+      : diffMinutes < 1440
+        ? `${Math.floor(diffMinutes / 60)}시간 전`
+        : `${Math.floor(diffMinutes / 1440)}일 전`;
+
+  return `${genre} · ${region} · ${timeLabel}`;
+};
+
+const getPostVariant = (type: PostType) => {
+  if (type === "VIDEO") return "video";
+  if (type === "PHOTO") return "image";
+  return "text";
+};
+
+const getMusicLinks = (links?: MusicLinksResponse | null) => {
+  if (!links) return [];
+
+  return [
+    { id: "spotify", title: "Spotify", url: links.spotifyUrl, icon: "spotify" },
+    { id: "youtube", title: "YouTube", url: links.youtubeUrl, icon: "youtube" },
+    {
+      id: "soundcloud",
+      title: "SoundCloud",
+      url: links.soundcloudUrl,
+      icon: "soundcloud",
+    },
+    {
+      id: "etc",
+      title: links.etcPlatform ?? "기타",
+      url: links.etcUrl ?? links.otherUrl,
+      icon: "other",
+    },
+  ].filter((link): link is { id: string; title: string; url: string; icon: string } =>
+    Boolean(link.url),
   );
 };
 
 const FanBandProfilePage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { bandId = "wavy" } = useParams<{ bandId: string }>();
-  const [searchParams] = useSearchParams();
+  const bandPreview = (
+    location.state as { bandPreview?: FanExploreBandDetail } | null
+  )?.bandPreview;
   const currentBandId = bandId;
-  const [isFollowing, setIsFollowing] = useState(false);
-  const [followerCount, setFollowerCount] = useState(560);
   const [activeTab, setActiveTab] = useState<ProfileTab>("콘텐츠");
-  const hasContent = searchParams.get("content") !== "empty";
-  const hasSchedules = searchParams.get("schedule") !== "empty";
-  const hasMusic = searchParams.get("music") !== "empty";
+  const [isUnfollowModalOpen, setIsUnfollowModalOpen] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const numericBandId = Number(currentBandId);
+  const canToggleFollow = Number.isFinite(numericBandId) && numericBandId > 0;
+  const bandDetailQuery = useFanExploreBandDetailQuery(
+    canToggleFollow ? numericBandId : undefined,
+  );
+  const postsQuery = usePostsQuery(canToggleFollow ? numericBandId : Number.NaN, {
+    size: 20,
+  });
+  const performancesQuery = usePerformancesQuery(
+    canToggleFollow ? numericBandId : Number.NaN,
+  );
+  const musicLinksQuery = useMusicLinksQuery(
+    canToggleFollow ? numericBandId : Number.NaN,
+  );
+  const followBandMutation = useFollowExploreBand();
+  const unfollowBandMutation = useUnfollowExploreBand();
+  const enterLiveMutation = useEnterLiveMutation();
+  const bandDetail = bandDetailQuery.data ?? bandPreview;
+  const bandName = bandDetail?.bandName ?? bandDetail?.name ?? "밴드";
+  const bandGenre = bandDetail?.genre ? getGenreLabel(bandDetail.genre) : "장르";
+  const bandRegion = bandDetail?.region
+    ? getRegionLabel(bandDetail.region)
+    : "지역";
+  const bandDescription =
+    bandDetail?.description ??
+    bandDetail?.bandDescription ??
+    bandDetail?.introduction ??
+    bandDetail?.introduce ??
+    "등록된 소개가 없어요";
+  const bandProfileImage =
+    bandDetail?.profileImageUrl ??
+    bandDetail?.bandProfileImageUrl ??
+    bandDetail?.imageUrl ??
+    BandImage;
+  const followerCount = bandDetail?.followerCount ?? bandDetail?.followers ?? 0;
+  const isFollowing =
+    bandDetail?.isFollowing ??
+    bandDetail?.following ??
+    false;
+  const isOfficial = bandDetail?.isOfficial ?? bandDetail?.official ?? false;
+  const rawLiveId = bandDetail?.liveId ?? null;
+  const liveId =
+    typeof rawLiveId === "number"
+      ? rawLiveId
+      : typeof rawLiveId === "string"
+        ? Number(rawLiveId)
+        : null;
+  const canEnterLive =
+    bandDetail?.isLive === true && typeof liveId === "number" && liveId > 0;
+  const isFollowPending =
+    followBandMutation.isPending || unfollowBandMutation.isPending;
+  const posts = postsQuery.data?.posts ?? [];
+  const performances = performancesQuery.data?.performances ?? [];
+  const musicLinks = getMusicLinks(musicLinksQuery.data);
+  const hasContent = posts.length > 0;
+  const hasSchedules = performances.length > 0;
+  const hasMusic = musicLinks.length > 0;
 
-  const handleToggleFollow = () => {
-    const nextIsFollowing = !isFollowing;
+  useEffect(() => {
+    if (!toastMessage) return;
 
-    setIsFollowing(nextIsFollowing);
-    setFollowerCount((count) =>
-      nextIsFollowing ? count + 1 : Math.max(0, count - 1),
-    );
+    const timerId = window.setTimeout(() => setToastMessage(null), 2000);
+
+    return () => window.clearTimeout(timerId);
+  }, [toastMessage]);
+
+  const handleOpenLive = async () => {
+    if (!canEnterLive || liveId == null || enterLiveMutation.isPending) return;
+
+    try {
+      const enteredLive = await enterLiveMutation.mutateAsync(liveId);
+
+      navigate("/fan/live/room", { state: { live: enteredLive } });
+    } catch (error) {
+      alert(getApiErrorMessage(error, "라이브 입장에 실패했어요."));
+    }
+  };
+
+  const handleToggleFollow = async () => {
+    if (!canToggleFollow || isFollowPending) return;
+
+    if (isFollowing) {
+      setIsUnfollowModalOpen(true);
+      return;
+    }
+
+    try {
+      await followBandMutation.mutateAsync(numericBandId);
+      setToastMessage(`${bandName}를 팔로우했어요`);
+    } catch {
+      setToastMessage("밴드 팔로우에 실패했어요");
+    }
+  };
+
+  const confirmUnfollow = async () => {
+    if (!canToggleFollow || isFollowPending) return;
+
+    try {
+      await unfollowBandMutation.mutateAsync(numericBandId);
+
+      setIsUnfollowModalOpen(false);
+      setToastMessage(`${bandName} 팔로우를 취소했어요`);
+    } catch {
+      setToastMessage("팔로우 취소에 실패했어요");
+    }
   };
 
   return (
@@ -188,30 +364,32 @@ const FanBandProfilePage = () => {
           <img src={ArrowLeftIcon} alt="" className="size-6" />
         </button>
         <h1 className="m-0 font-body text-label2 text-neutral-900">
-          WAVY의 프로필
+          {bandName}의 프로필
         </h1>
       </header>
 
       <section className="px-[32px] pt-[16px]">
         <div className="flex items-center gap-[21px]">
           <img
-            src={BandImage}
-            alt="WAVY 프로필"
+            src={bandProfileImage}
+            alt={`${bandName} 프로필`}
             className="size-[72px] rounded-full object-cover"
           />
 
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-[8px]">
               <h2 className="m-0 font-body text-label1 text-neutral-900">
-                WAVY
+                {bandName}
               </h2>
-              <img src={OfficialIcon} alt="" className="size-[19px] shrink-0" />
+              {isOfficial ? (
+                <img src={OfficialIcon} alt="" className="size-[19px] shrink-0" />
+              ) : null}
             </div>
             <p className="m-0 mt-[5px] font-body text-caption2 text-neutral-700">
-              인디 · 서울 · 팔로워 {followerCount}명
+              {bandGenre} · {bandRegion} · 팔로워 {followerCount}명
             </p>
             <p className="m-0 mt-[5px] line-clamp-1 font-body text-body5 text-neutral-600">
-              몽환적인 사운드와 감각적인 스타일로 주목받는 3인조 밴드
+              {bandDescription}
             </p>
           </div>
         </div>
@@ -219,7 +397,8 @@ const FanBandProfilePage = () => {
         <div className="mt-[32px] grid grid-cols-2 gap-[16px]">
           <button
             type="button"
-            onClick={handleToggleFollow}
+            disabled={!canToggleFollow || isFollowPending}
+            onClick={() => void handleToggleFollow()}
             className={[
               "flex h-[38px] items-center justify-center rounded-[8px] border font-body text-body1",
               isFollowing
@@ -232,6 +411,8 @@ const FanBandProfilePage = () => {
 
           <button
             type="button"
+            disabled={!canEnterLive || enterLiveMutation.isPending}
+            onClick={() => void handleOpenLive()}
             className="flex h-[38px] items-center justify-center rounded-[8px] border border-primary-400 bg-primary-400 font-body text-body1 text-neutral-0"
           >
             라이브 입장
@@ -265,8 +446,26 @@ const FanBandProfilePage = () => {
       {activeTab === "콘텐츠" && hasContent ? (
         <section className="px-[23px] pt-[24px]">
           <div className="flex flex-col gap-[12px]">
-            <FollowedNewsCard variant="image" tags={[]} />
-            <FollowedNewsCard variant="video" tags={[]} />
+            {posts.map((post: PostListItem) => {
+              const mediaUrls = post.thumbnailUrl ? [post.thumbnailUrl] : [];
+
+              return (
+                <FollowedNewsCard
+                  key={post.postId}
+                  variant={getPostVariant(post.type)}
+                  profileImageSrc={bandProfileImage}
+                  profileImageAlt={`${bandName} 프로필`}
+                  bandName={bandName}
+                  meta={formatPostMeta(post.createdAt, bandGenre, bandRegion)}
+                  content={post.description ?? post.title}
+                  mediaUrls={mediaUrls}
+                  videoThumbnailUrl={post.thumbnailUrl ?? undefined}
+                  tags={[]}
+                  onClick={() => navigate(`/fan/explore/contents/${post.postId}`)}
+                  ariaLabel={`${post.title} 상세보기`}
+                />
+              );
+            })}
           </div>
         </section>
       ) : null}
@@ -287,43 +486,63 @@ const FanBandProfilePage = () => {
       {activeTab === "일정" && hasSchedules ? (
         <section className="px-[23px] pt-[24px]">
           <div className="flex flex-col gap-[12px]">
-            {SCHEDULES.map((schedule) => (
-              <ConcertCard
-                key={schedule.id}
-                showThumbnail={schedule.showThumbnail}
-                month={schedule.month}
-                day={schedule.day}
-                title={
-                  <span className={schedule.titleClassName}>
-                    WAVY 단독 공연
-                  </span>
-                }
-                location={
-                  schedule.isPending ? (
-                    <span className="flex items-center gap-1 text-neutral-500">
-                      <LocationIconNeutral500 />
-                      홍대 롤링홀
+            {performances.map((performance: PerformanceListItem) => {
+              const performanceDate = toDate(performance.performanceDate);
+              const month = performanceDate
+                ? performanceDate.toLocaleString("en-US", { month: "short" }).toUpperCase()
+                : "TBD";
+              const day = performanceDate
+                ? String(performanceDate.getDate()).padStart(2, "0")
+                : "--";
+              const isCompleted = formatDday(performanceDate) === "공연 완료";
+
+              return (
+                <ConcertCard
+                  key={performance.performanceId}
+                  showThumbnail={Boolean(performance.posterImageUrl)}
+                  thumbnailSrc={performance.posterImageUrl ?? undefined}
+                  month={month}
+                  day={day}
+                  title={
+                    <span className={isCompleted ? "text-neutral-500" : undefined}>
+                      {performance.title}
                     </span>
-                  ) : (
-                    "홍대 롤링홀"
-                  )
-                }
-                locationIconSrc={schedule.isPending ? "" : undefined}
-                dateTime="2026.05.17. 18:00"
-                status={
-                  <span
-                    className={
-                      schedule.isPending ? "text-neutral-500" : "text-primary-500"
-                    }
-                  >
-                    {schedule.status}
-                  </span>
-                }
-                dateBadgeClassName={schedule.dateBadgeClassName}
-                isPending={schedule.isPending}
-                thumbnailClassName={schedule.thumbnailClassName}
-              />
-            ))}
+                  }
+                  location={
+                    isCompleted ? (
+                      <span className="flex items-center gap-1 text-neutral-500">
+                        <LocationIconNeutral500 />
+                        {performance.venue}
+                      </span>
+                    ) : (
+                      performance.venue
+                    )
+                  }
+                  locationIconSrc={isCompleted ? "" : undefined}
+                  dateTime={formatDateTime(performanceDate)}
+                  status={
+                    <span
+                      className={
+                        isCompleted ? "text-neutral-500" : "text-primary-500"
+                      }
+                    >
+                      {formatDday(performanceDate)}
+                    </span>
+                  }
+                  dateBadgeClassName="bg-primary-300"
+                  isPending={isCompleted}
+                  thumbnailClassName={
+                    isCompleted
+                      ? "bg-neutral-600 text-neutral-700"
+                      : "bg-neutral-300 text-neutral-700"
+                  }
+                  onClick={() =>
+                    navigate(`/fan/home/concerts/${performance.performanceId}`)
+                  }
+                  ariaLabel={`${performance.title} 상세보기`}
+                />
+              );
+            })}
           </div>
         </section>
       ) : null}
@@ -347,13 +566,12 @@ const FanBandProfilePage = () => {
             외부 음원 플랫폼에서 이 밴드의 음악을 들어보세요
           </p>
           <div className="mt-[16px] flex flex-col gap-[12px]">
-            {MUSIC_LINKS.map((link) => (
+            {musicLinks.map((link) => (
               <MusicLinkCard
                 key={link.id}
                 title={link.title}
                 url={link.url}
                 icon={link.icon}
-                disabled={link.disabled}
               />
             ))}
           </div>
@@ -372,6 +590,33 @@ const FanBandProfilePage = () => {
           </p>
         </section>
       ) : null}
+
+      <ModalOverlay
+        open={isUnfollowModalOpen}
+        onClose={() => setIsUnfollowModalOpen(false)}
+      >
+        <Modal
+          title="팔로우를 취소할까요?"
+          description={
+            <>
+              이 밴드의 소식이
+              <br />
+              홈피드에서 사라져요
+            </>
+          }
+          cancelLabel="취소"
+          confirmLabel="확인"
+          onCancel={() => setIsUnfollowModalOpen(false)}
+          onConfirm={() => void confirmUnfollow()}
+        />
+      </ModalOverlay>
+
+      <Toast
+        open={toastMessage !== null}
+        message={toastMessage}
+        onClose={() => setToastMessage(null)}
+        tone={toastMessage?.includes("실패") ? "error" : "success"}
+      />
     </main>
   );
 };

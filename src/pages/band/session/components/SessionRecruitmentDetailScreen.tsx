@@ -49,6 +49,7 @@ export const SessionRecruitmentDetailScreen = ({
         applicationTitle={screen.completedApplication.applicationTitle}
         onSendMessage={screen.sendMessage}
         onViewApplication={screen.viewCompletedApplication}
+        onGoToSessionHome={onBack}
       />
     );
   }
@@ -135,13 +136,15 @@ export const SessionRecruitmentDetailScreen = ({
         </ModalOverlay>
       ) : null}
 
-      <SessionApplicationSelectModal
-        open={screen.isApplicationModalOpen}
-        onClose={screen.closeApplicationModal}
-        onPreviewApplication={screen.previewApplication}
-        onEditApplication={screen.editApplication}
-        onApplyApplication={screen.applyApplication}
-      />
+      {!screen.canDelete ? (
+        <SessionApplicationSelectModal
+          open={screen.isApplicationModalOpen}
+          onClose={screen.closeApplicationModal}
+          onPreviewApplication={screen.previewApplication}
+          onEditApplication={screen.editApplication}
+          onApplyApplication={screen.applyApplication}
+        />
+      ) : null}
     </main>
   );
 };

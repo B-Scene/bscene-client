@@ -1,10 +1,17 @@
 import type { FormEvent } from "react";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ArrowLeftIcon from "@/assets/icons/arrow-left.svg";
 import CloseIcon from "@/assets/icons/close.svg";
 import TimesCircleIcon from "@/assets/icons/ic_Times Circle.svg";
 import SearchIcon from "@/assets/icons/band/search.svg";
+import { Toast } from "@/components/common/Toast/Toast";
+import {
+  useDeleteAllFanExploreRecentSearches,
+  useDeleteFanExploreRecentSearch,
+  useFanExploreRecentSearchesQuery,
+} from "@/hooks/api/fan/useFanExplore";
+import type { NormalizedFanExploreRecentSearch } from "@/types/fan/explore";
 import {
   addRecentSearch,
   getRecentSearches,
@@ -14,7 +21,44 @@ import {
 const FanExploreSearchPage = () => {
   const navigate = useNavigate();
   const [keyword, setKeyword] = useState("");
-  const [recentKeywords, setRecentKeywords] = useState(() => getRecentSearches());
+  const [localRecentKeywords, setLocalRecentKeywords] = useState(() =>
+    getRecentSearches(),
+  );
+  const [hiddenRecentKeywords, setHiddenRecentKeywords] = useState<string[]>([]);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const recentSearchesQuery = useFanExploreRecentSearchesQuery();
+  const deleteRecentSearchMutation = useDeleteFanExploreRecentSearch();
+  const deleteAllRecentSearchesMutation =
+    useDeleteAllFanExploreRecentSearches();
+  const localRecentItems = useMemo(
+    () =>
+      localRecentKeywords.map((recentKeyword) => ({
+        recentSearchId: null,
+        keyword: recentKeyword,
+      })),
+    [localRecentKeywords],
+  );
+  const apiRecentItems = recentSearchesQuery.data?.items ?? [];
+  const baseRecentItems = recentSearchesQuery.isError
+    ? localRecentItems
+    : recentSearchesQuery.data
+      ? apiRecentItems
+      : localRecentItems;
+  const recentSearchItems = useMemo(
+    () =>
+      baseRecentItems.filter(
+        ({ keyword: recentKeyword }) =>
+          !hiddenRecentKeywords.includes(recentKeyword),
+      ),
+    [baseRecentItems, hiddenRecentKeywords],
+  );
+  const recentKeywords = useMemo(
+    () => recentSearchItems.map(({ keyword }) => keyword),
+    [recentSearchItems],
+  );
+  const isDeletingRecentSearch =
+    deleteRecentSearchMutation.isPending ||
+    deleteAllRecentSearchesMutation.isPending;
   const isSearchActive = keyword.length > 0;
   const submitSearch = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -22,7 +66,10 @@ const FanExploreSearchPage = () => {
     const trimmedKeyword = keyword.trim();
     if (!trimmedKeyword) return;
 
-    setRecentKeywords(addRecentSearch(trimmedKeyword));
+    setLocalRecentKeywords(addRecentSearch(trimmedKeyword));
+    setHiddenRecentKeywords((keywords) =>
+      keywords.filter((item) => item !== trimmedKeyword),
+    );
     navigate(`/fan/explore/search/results?q=${encodeURIComponent(trimmedKeyword)}`);
   };
 
@@ -33,13 +80,58 @@ const FanExploreSearchPage = () => {
     const nextKeywords = addRecentSearch(trimmedKeyword);
 
     setKeyword(trimmedKeyword);
-    setRecentKeywords(nextKeywords);
+    setLocalRecentKeywords(nextKeywords);
+    setHiddenRecentKeywords((keywords) =>
+      keywords.filter((item) => item !== trimmedKeyword),
+    );
     navigate(`/fan/explore/search/results?q=${encodeURIComponent(trimmedKeyword)}`);
   };
 
+  useEffect(() => {
+    if (!toastMessage) return;
+
+    const timerId = window.setTimeout(() => setToastMessage(null), 2000);
+
+    return () => window.clearTimeout(timerId);
+  }, [toastMessage]);
+
   const updateRecentKeywords = (keywords: string[]) => {
-    setRecentKeywords(keywords);
+    const hiddenKeywords = baseRecentItems
+      .map(({ keyword: recentKeyword }) => recentKeyword)
+      .filter((recentKeyword) => !keywords.includes(recentKeyword));
+
+    setLocalRecentKeywords(keywords);
     setRecentSearches(keywords);
+    setHiddenRecentKeywords((currentKeywords) =>
+      Array.from(new Set([...currentKeywords, ...hiddenKeywords])),
+    );
+  };
+
+  const removeAllRecentSearches = async () => {
+    await deleteAllRecentSearchesMutation.mutateAsync();
+    updateRecentKeywords([]);
+  };
+
+  const removeRecentSearch = async ({
+    recentSearchId,
+    keyword: recentKeyword,
+  }: NormalizedFanExploreRecentSearch) => {
+    const nextKeywords = recentKeywords.filter((item) => item !== recentKeyword);
+
+    if (recentSearchId != null) {
+      try {
+        await deleteRecentSearchMutation.mutateAsync(recentSearchId);
+      } catch {
+        setToastMessage("최근 검색어 삭제에 실패했어요");
+        return;
+      }
+    }
+
+    setHiddenRecentKeywords((currentKeywords) =>
+      Array.from(new Set([...currentKeywords, recentKeyword])),
+    );
+    setLocalRecentKeywords(nextKeywords);
+    setRecentSearches(nextKeywords);
   };
 
   return (
@@ -104,7 +196,8 @@ const FanExploreSearchPage = () => {
             {recentKeywords.length > 0 ? (
               <button
                 type="button"
-                onClick={() => updateRecentKeywords([])}
+                disabled={isDeletingRecentSearch}
+                onClick={() => void removeAllRecentSearches()}
                 className="font-body text-body5 text-neutral-600"
               >
                 전체 삭제
@@ -112,28 +205,25 @@ const FanExploreSearchPage = () => {
             ) : null}
           </div>
 
-          {recentKeywords.length > 0 ? (
+          {recentSearchItems.length > 0 ? (
             <div className="mt-[8px] flex flex-wrap gap-[8px]">
-              {recentKeywords.map((recentKeyword) => (
+              {recentSearchItems.map((recentSearch) => (
                 <div
-                  key={recentKeyword}
+                  key={`${recentSearch.recentSearchId ?? "local"}-${recentSearch.keyword}`}
                   className="flex h-[26px] items-center gap-[8px] rounded-full border border-neutral-400 bg-neutral-0 px-[6px] py-[7px] font-body text-caption3 text-neutral-600"
                 >
                   <button
                     type="button"
-                    onClick={() => searchRecentKeyword(recentKeyword)}
+                    onClick={() => searchRecentKeyword(recentSearch.keyword)}
                     className="min-w-0 max-w-[120px] truncate"
                   >
-                    {recentKeyword}
+                    {recentSearch.keyword}
                   </button>
                   <button
                     type="button"
-                    aria-label={`${recentKeyword} 삭제`}
-                    onClick={() =>
-                      updateRecentKeywords(
-                        recentKeywords.filter((item) => item !== recentKeyword),
-                      )
-                    }
+                    aria-label={`${recentSearch.keyword} 삭제`}
+                    disabled={isDeletingRecentSearch}
+                    onClick={() => void removeRecentSearch(recentSearch)}
                     className="flex size-[12px] shrink-0 items-center justify-center"
                   >
                     <img src={CloseIcon} alt="" className="size-[12px]" />
@@ -148,6 +238,12 @@ const FanExploreSearchPage = () => {
           )}
         </section>
       </div>
+      <Toast
+        open={toastMessage !== null}
+        message={toastMessage}
+        onClose={() => setToastMessage(null)}
+        tone="error"
+      />
     </main>
   );
 };

@@ -1,6 +1,7 @@
 import ArrowLeftIcon from "@/assets/icons/arrow-left.svg";
 import UserDefaultProfileIcon from "@/assets/icons/band/user-default-profile.svg";
 import type { SessionApplicationDraft } from "@/features/session/applicationForm/applicationForm.types";
+import { getRenderableProfileImageUrl } from "@/utils/profileImageUrl";
 
 import {
   formatApplicationDetailDate,
@@ -56,8 +57,15 @@ export const MyApplicationSummary = ({
 
     <div className="mt-7 flex items-center gap-6">
       <img
-        src={profileImageUrl || UserDefaultProfileIcon}
+        src={
+          getRenderableProfileImageUrl(profileImageUrl) ||
+          UserDefaultProfileIcon
+        }
         alt=""
+        onError={(event) => {
+          event.currentTarget.onerror = null;
+          event.currentTarget.src = UserDefaultProfileIcon;
+        }}
         className="size-[72px] shrink-0 rounded-full object-cover"
       />
 
@@ -95,7 +103,7 @@ export const MyApplicationDetailTabs = ({
           type="button"
           onClick={() => onSelect(tab.id)}
           className={`relative flex items-center justify-center text-body1 ${
-            isActive ? "text-neutral-900" : "text-neutral-400"
+            isActive ? "text-secondary-500" : "text-neutral-400"
           }`}
         >
           {tab.label}

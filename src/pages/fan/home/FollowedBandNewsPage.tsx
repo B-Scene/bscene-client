@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import ArrowLeftIcon from "@/assets/icons/arrow-left.svg";
-import { FollowedNewsCard } from "@/components/fan/home/FollowedNewsCard";
+import {
+  FollowedNewsList,
+  type FollowedNewsListItem,
+} from "@/components/fan/home/FollowedNewsList";
 import { useFollowingPostsInfiniteQuery } from "@/hooks/api/fan/useFanHome";
 import type {
   FollowingPostItem,
@@ -103,6 +106,45 @@ const FollowedBandNewsPage = () => {
   const posts = useMemo(() => {
     return data?.pages.flatMap((page) => page.items) ?? [];
   }, [data]);
+  const newsItems = useMemo<FollowedNewsListItem[]>(() => {
+    return posts.map((item, index) => {
+      const mediaUrls = getMediaUrls(item);
+      const postedAgo = formatPostedAgo(item);
+      const meta =
+        [item.genre, item.region, postedAgo].filter(Boolean).join(" · ") ||
+        "장르 · 지역";
+      const postId = item.postId ?? item.id;
+      const id = String(postId ?? `post-${index}`);
+
+      return {
+        id,
+        variant: getVariant(item),
+        profileImageSrc: getProfileImageUrl(item),
+        bandName: item.bandName ?? "밴드명",
+        meta,
+        content: item.content ?? item.title ?? "새로운 소식이 도착했어요",
+        mediaUrls,
+        videoThumbnailUrl:
+          item.videoThumbnailUrl ??
+          item.thumbnailUrl ??
+          item.thumbnailImageUrl ??
+          undefined,
+        tags: item.tags ?? [],
+        onClick: () => {
+          if (postId == null) return;
+
+          navigate(
+            `/fan/explore/contents/${postId}${
+              item.createdAt
+                ? `?createdAt=${encodeURIComponent(item.createdAt)}`
+                : ""
+            }`,
+          );
+        },
+        ariaLabel: `${item.title ?? item.content ?? "게시물"} 상세보기`,
+      };
+    });
+  }, [navigate, posts]);
 
   useEffect(() => {
     const target = loadMoreRef.current;
@@ -148,64 +190,14 @@ const FollowedBandNewsPage = () => {
         <span aria-hidden="true" className="size-6" />
       </header>
 
-      <section className="mt-6 flex flex-col gap-3">
-        {isLoading ? (
-          <p className="m-0 font-body text-body3 text-neutral-600">
-            소식을 불러오는 중이에요
-          </p>
-        ) : null}
-
-        {isError ? (
-          <div className="rounded-[12px] bg-neutral-50 px-4 py-6">
-            <p className="m-0 font-body text-body3 text-neutral-700">
-              소식을 불러오지 못했어요
-            </p>
-            <button
-              type="button"
-              onClick={() => void refetch()}
-              className="mt-3 rounded-[8px] bg-primary-400 px-4 py-2 font-body text-caption3 text-neutral-0"
-            >
-              다시 시도
-            </button>
-          </div>
-        ) : null}
-
-        {posts.map((item, index) => {
-          const mediaUrls = getMediaUrls(item);
-          const postedAgo = formatPostedAgo(item);
-          const meta =
-            [item.genre, item.region, postedAgo].filter(Boolean).join(" · ") ||
-            "장르 · 지역";
-          const id = String(item.postId ?? item.id ?? `post-${index}`);
-
-          return (
-            <FollowedNewsCard
-              key={id}
-              variant={getVariant(item)}
-              profileImageSrc={getProfileImageUrl(item)}
-              bandName={item.bandName ?? "밴드명"}
-              meta={meta}
-              content={item.content ?? item.title ?? "새로운 소식이 도착했어요"}
-              mediaUrls={mediaUrls}
-              videoThumbnailUrl={
-                item.videoThumbnailUrl ??
-                item.thumbnailUrl ??
-                item.thumbnailImageUrl ??
-                undefined
-              }
-              tags={item.tags ?? []}
-            />
-          );
-        })}
-
-        <div ref={loadMoreRef} className="h-4" />
-
-        {isFetchingNextPage ? (
-          <p className="m-0 text-center font-body text-caption2 text-neutral-600">
-            더 불러오는 중이에요
-          </p>
-        ) : null}
-      </section>
+      <FollowedNewsList
+        items={newsItems}
+        isLoading={isLoading}
+        isError={isError}
+        isFetchingNextPage={isFetchingNextPage}
+        onRetry={() => void refetch()}
+        loadMoreRef={loadMoreRef}
+      />
     </main>
   );
 };

@@ -11,12 +11,12 @@ export const SessionPageHeader = ({
   onMessages,
 }: SessionPageHeaderProps) => {
   return (
-    <header className="relative flex h-[88px] w-full shrink-0 items-end justify-center bg-neutral-0 pb-[23px]">
-      <h1 className="text-[18px] leading-5 font-bold text-neutral-900">
+    <header className="relative flex h-12 w-full shrink-0 items-center justify-center bg-neutral-0">
+      <h1 className="text-label2 text-[#1D1A1A]">
         세션
       </h1>
 
-      <div className="absolute right-6 bottom-[18px] flex items-center gap-4">
+      <div className="absolute right-6 top-1/2 flex h-8 -translate-y-1/2 items-center gap-4">
         <button
           type="button"
           aria-label="세션 검색"
@@ -26,7 +26,7 @@ export const SessionPageHeader = ({
           <img
             src={SearchIcon}
             alt=""
-            className="h-5 w-[21px]"
+            className="size-[23px] object-contain"
           />
         </button>
 
@@ -39,7 +39,7 @@ export const SessionPageHeader = ({
           <img
             src={AirplaneIcon}
             alt=""
-            className="size-8"
+            className="size-[23px] object-contain"
           />
         </button>
       </div>

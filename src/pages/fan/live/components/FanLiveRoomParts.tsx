@@ -10,18 +10,45 @@ import UsersIcon from "@/assets/icons/users.svg";
 import VolumeIcon from "@/assets/icons/Volume.svg";
 import UserProfileIcon from "@/assets/icons/band/user-default-profile.svg";
 import { useSlideUpSheet } from "@/hooks/useSlideUpSheet";
+import type { EnterLiveResponse, LiveMemberItem } from "@/types/live/live";
 
-export function FanLiveHeader({ onExit }: { onExit: () => void }) {
+type FanLiveHeroData = Pick<
+  EnterLiveResponse,
+  "bandProfileImageUrl" | "bandName" | "title"
+> & {
+  description?: string | null;
+};
+
+const formatDuration = (totalSeconds: number) => {
+  const safeSeconds = Math.max(0, Math.floor(totalSeconds));
+  const hours = Math.floor(safeSeconds / 3600);
+  const minutes = Math.floor((safeSeconds % 3600) / 60);
+  const seconds = safeSeconds % 60;
+
+  return [hours, minutes, seconds]
+    .map((value) => String(value).padStart(2, "0"))
+    .join(":");
+};
+
+export function FanLiveHeader({
+  onExit,
+  durationSeconds,
+  viewerCount,
+}: {
+  onExit: () => void;
+  durationSeconds: number;
+  viewerCount: number;
+}) {
   return (
     <header className="absolute inset-x-0 top-2.5 z-10 flex h-12 items-center justify-between pr-6 pl-[31px]">
       <div className="flex items-center gap-2.5 text-neutral-900">
         <span className="flex h-[22px] items-center rounded-lg bg-primary-400 px-[9px] py-0.5 text-caption3 text-neutral-0">
           · LIVE
         </span>
-        <span className="text-caption2">00:24:15</span>
+        <span className="text-caption2">{formatDuration(durationSeconds)}</span>
         <span className="flex items-center gap-1 text-caption2">
           <img src={HeadsetIcon} alt="" className="size-4 object-contain brightness-0" />
-          30명 청취 중
+          {viewerCount.toLocaleString()}명 청취 중
         </span>
       </div>
       <button
@@ -37,44 +64,68 @@ export function FanLiveHeader({ onExit }: { onExit: () => void }) {
 
 const waveHeights = [5, 5, 15, 35, 65, 100, 65, 35, 15, 5, 5];
 
-function Waveform() {
+function Waveform({
+  isActive,
+  side,
+}: {
+  isActive: boolean;
+  side: "left" | "right";
+}) {
   return (
     <div className="flex h-[100px] w-[103px] shrink-0 items-center gap-[7px]" aria-hidden="true">
       {waveHeights.map((height, index) => (
         <span
-          key={`${height}-${index}`}
-          className="w-[3px] shrink-0 rounded-full bg-gradient-to-b from-primary-100 via-primary-300 to-primary-400"
-          style={{ height }}
+          key={`${side}-${height}-${index}`}
+          className={`live-audio-wave-bar w-[3px] shrink-0 rounded-full bg-gradient-to-b from-primary-100 via-primary-300 to-primary-400 ${
+            isActive ? "is-active" : ""
+          }`}
+          style={{
+            height,
+            animationDelay: `-${(index * 113 + (side === "right" ? 170 : 0)) % 760}ms`,
+            animationDuration: `${620 + ((index * 137 + (side === "right" ? 90 : 0)) % 480)}ms`,
+          }}
         />
       ))}
     </div>
   );
 }
 
-export function FanLiveHero({ top = 90 }: { top?: number }) {
+export function FanLiveHero({
+  isAudioActive = false,
+  live,
+  top = 90,
+}: {
+  isAudioActive?: boolean;
+  live?: FanLiveHeroData;
+  top?: number;
+}) {
   return (
     <section
       className="absolute inset-x-0 h-[272px] text-center"
       style={{ top }}
     >
       <div className="flex h-[160px] items-center justify-center gap-2.5">
-        <Waveform />
+        <Waveform isActive={isAudioActive} side="left" />
         <img
-          src={BandImage}
-          alt="WAVY 밴드"
+          src={live?.bandProfileImageUrl || BandImage}
+          alt={`${live?.bandName ?? "밴드"} 프로필`}
           className="fan-live-profile-image size-[160px] shrink-0 rounded-full border-2 border-neutral-0 object-cover"
         />
-        <Waveform />
+        <Waveform isActive={isAudioActive} side="right" />
       </div>
 
       <div className="mt-8 flex h-20 flex-col items-center gap-[5px]">
         <div className="flex h-6 items-center justify-center gap-2.5">
-          <h1 className="text-label1 text-neutral-900">WAVY</h1>
+          <h1 className="text-label1 text-neutral-900">
+            {live?.bandName ?? "WAVY"}
+          </h1>
           <img src={BadgeIcon} alt="인증된 밴드" className="size-6 object-contain" />
         </div>
-        <h2 className="text-h4 text-neutral-900">신곡 데모 첫 공개!</h2>
+        <h2 className="text-h4 text-neutral-900">
+          {live?.title ?? "라이브"}
+        </h2>
         <p className="text-caption2 text-neutral-600">
-          미공개 데모를 라이브로 들려드려요
+          {live?.description ?? ""}
         </p>
       </div>
     </section>
@@ -123,15 +174,17 @@ function ActionItem({
 
 export function FanLiveActionBar({
   chatOpen,
+  isMuted,
   onOpenMembers,
+  onToggleMute,
   onToggleChat,
 }: {
   chatOpen: boolean;
+  isMuted: boolean;
   onOpenMembers: () => void;
+  onToggleMute: () => void;
   onToggleChat: () => void;
 }) {
-  const [isMuted, setIsMuted] = useState(false);
-
   return (
     <nav
       aria-label="라이브 메뉴"
@@ -142,7 +195,7 @@ export function FanLiveActionBar({
 
         <button
           type="button"
-          onClick={() => setIsMuted((current) => !current)}
+          onClick={onToggleMute}
           aria-pressed={isMuted}
           aria-label="소리 켜기/끄기"
           className="fan-live-mic-button absolute left-1/2 -top-[18px] flex size-[66px] -translate-x-1/2 items-center justify-center rounded-full bg-primary-0"
@@ -165,41 +218,24 @@ export function FanLiveActionBar({
   );
 }
 
-interface FanChatMessage {
-  id: number;
+export interface FanChatMessage {
+  id: string;
+  senderId?: number;
   sender: string;
   message: string;
   time: string;
+  profileImageUrl?: string | null;
   band?: boolean;
+  pending?: boolean;
 }
-
-const initialFanChatMessages: FanChatMessage[] = [
-  {
-    id: 1,
-    sender: "최준우",
-    message: "라이브 자주 해주세요!!",
-    time: "20:34",
-  },
-  {
-    id: 2,
-    sender: "이름",
-    message: "여러분 감사합니다!\n신곡은 다음 달 공개 예정이에요!",
-    time: "20:33",
-    band: true,
-  },
-  {
-    id: 3,
-    sender: "한아영",
-    message: "노래 너무 좋아요!!",
-    time: "20:32",
-  },
-];
 
 function FanChatAvatar({
   band = false,
+  profileImageUrl,
   onClick,
 }: {
   band?: boolean;
+  profileImageUrl?: string | null;
   onClick?: () => void;
 }) {
   if (!band) {
@@ -210,7 +246,11 @@ function FanChatAvatar({
         onClick={onClick}
         className="size-10 rounded-full"
       >
-        <img src={UserProfileIcon} alt="" className="size-10 object-contain" />
+        <img
+          src={profileImageUrl || UserProfileIcon}
+          alt=""
+          className="size-10 rounded-full object-cover"
+        />
       </button>
     );
   }
@@ -218,8 +258,8 @@ function FanChatAvatar({
   return (
     <div className="relative size-10 shrink-0">
       <img
-        src={BandImage}
-        alt="WAVY"
+        src={profileImageUrl || BandImage}
+        alt=""
         className="size-10 rounded-full border border-primary-300 object-cover"
       />
       <span className="absolute -right-0.5 -bottom-0.5 flex size-3.5 items-center justify-center rounded-full bg-neutral-0">
@@ -237,15 +277,17 @@ function FanChatRow({
   onProfileClick,
 }: {
   chat: FanChatMessage;
-  onProfileClick: () => void;
+  onProfileClick: (chat: FanChatMessage) => void;
 }) {
   if (chat.band) {
     return (
       <article className="grid grid-cols-[40px_283px] items-start gap-[15px]">
-        <FanChatAvatar band />
+        <FanChatAvatar band profileImageUrl={chat.profileImageUrl} />
         <div className="relative min-h-[73px] w-[283px] max-w-full rounded-2xl border border-primary-300 bg-primary-50 px-[11px] py-[7px] pr-11">
           <strong className="block text-caption3 text-neutral-900">{chat.sender}</strong>
-          <p className="mt-1 whitespace-pre-line text-body3 text-neutral-900">{chat.message}</p>
+          <p className="mt-1 break-words whitespace-pre-wrap text-body3 text-neutral-900">
+            {chat.message}
+          </p>
           <time className="absolute right-[11px] top-1/2 -translate-y-1/2 text-caption4 text-neutral-600">
             {chat.time}
           </time>
@@ -257,11 +299,18 @@ function FanChatRow({
   return (
     <article className="grid grid-cols-[40px_minmax(0,1fr)_28px] items-start gap-x-[15px]">
       <div className="row-span-2">
-        <FanChatAvatar onClick={onProfileClick} />
+        <FanChatAvatar
+          profileImageUrl={chat.profileImageUrl}
+          onClick={() => onProfileClick(chat)}
+        />
       </div>
       <strong className="text-caption3 text-neutral-900">{chat.sender}</strong>
       <span />
-      <p className="mt-1 flex h-7 max-w-[191px] items-center rounded-xl bg-neutral-0 px-[11px] text-body3 text-neutral-900">
+      <p
+        className={`mt-1 min-h-7 max-w-[191px] break-words whitespace-pre-wrap rounded-xl bg-neutral-0 px-[11px] py-1 text-body3 text-neutral-900 ${
+          chat.pending ? "opacity-60" : ""
+        }`}
+      >
         {chat.message}
       </p>
       <time className="mt-[13px] mr-[11px] justify-self-end text-caption4 text-neutral-600">
@@ -273,12 +322,19 @@ function FanChatRow({
 
 export function FanLiveChatArea({
   composerOpen,
+  connectionMessage,
+  isConnected,
+  messages,
   onProfileClick,
+  onSendMessage,
 }: {
   composerOpen: boolean;
-  onProfileClick: () => void;
+  connectionMessage?: string;
+  isConnected: boolean;
+  messages: FanChatMessage[];
+  onProfileClick: (chat: FanChatMessage) => void;
+  onSendMessage: (content: string) => boolean;
 }) {
-  const [messages, setMessages] = useState(initialFanChatMessages);
   const [message, setMessage] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -297,21 +353,9 @@ export function FanLiveChatArea({
     const trimmedMessage = message.trim();
     if (!trimmedMessage) return;
 
-    const now = new Date();
-    const time = `${String(now.getHours()).padStart(2, "0")}:${String(
-      now.getMinutes(),
-    ).padStart(2, "0")}`;
-
-    setMessages((current) => [
-      ...current,
-      {
-        id: Date.now(),
-        sender: "나",
-        message: trimmedMessage,
-        time,
-      },
-    ]);
-    setMessage("");
+    if (onSendMessage(trimmedMessage)) {
+      setMessage("");
+    }
   };
 
   return (
@@ -322,75 +366,109 @@ export function FanLiveChatArea({
           composerOpen ? "pb-[190px]" : "pb-[110px]"
         }`}
       >
-        <div className="grid gap-3">
-          {messages.map((chat) => (
-            <FanChatRow key={chat.id} chat={chat} onProfileClick={onProfileClick} />
-          ))}
-        </div>
+        {messages.length > 0 ? (
+          <div className="grid gap-3">
+            {messages.map((chat) => (
+              <FanChatRow
+                key={chat.id}
+                chat={chat}
+                onProfileClick={onProfileClick}
+              />
+            ))}
+          </div>
+        ) : (
+          <p className="pt-12 text-center text-caption2 text-neutral-600">
+            {isConnected ? "첫 번째 채팅을 보내보세요!" : "채팅 연결 중이에요."}
+          </p>
+        )}
       </div>
 
       {composerOpen ? (
-        <form
-          onSubmit={handleSubmit}
-          className="absolute inset-x-5 bottom-[132px] z-10 flex items-center gap-[17px]"
-        >
-          <input
-            aria-label="메시지 입력"
-            value={message}
-            onChange={(event) => setMessage(event.target.value)}
-            placeholder="메시지 입력하기"
-            className="h-9 min-w-0 flex-1 rounded-full border border-neutral-400 bg-neutral-0 px-5 text-caption2 text-neutral-900 outline-none placeholder:text-neutral-500 focus:border-primary-300"
-          />
-          <button
-            type="submit"
-            aria-label="메시지 보내기"
-            disabled={!message.trim()}
-            className="flex size-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-primary-100 to-primary-400 disabled:opacity-60"
+        <div className="absolute inset-x-5 bottom-[112px] z-10">
+          {connectionMessage ? (
+            <p className="mb-2 text-center text-caption4 text-error">
+              {connectionMessage}
+            </p>
+          ) : null}
+          <form
+            onSubmit={handleSubmit}
+            className="flex items-center gap-[17px]"
           >
-            <img src={AirplaneIcon} alt="" className="size-8 translate-x-0.5" />
-          </button>
-        </form>
+            <input
+              aria-label="메시지 입력"
+              value={message}
+              maxLength={500}
+              onChange={(event) => setMessage(event.target.value)}
+              placeholder={isConnected ? "메시지 입력하기" : "채팅 연결 중"}
+              disabled={!isConnected}
+              className="h-9 min-w-0 flex-1 rounded-full border border-neutral-400 bg-neutral-0 px-5 text-caption2 text-neutral-900 outline-none placeholder:text-neutral-500 focus:border-primary-300 disabled:bg-neutral-100"
+            />
+            <button
+              type="submit"
+              aria-label="메시지 보내기"
+              disabled={!isConnected || !message.trim()}
+              className="flex size-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-primary-100 to-primary-400 disabled:opacity-60"
+            >
+              <img
+                src={AirplaneIcon}
+                alt=""
+                className="size-8 translate-x-0.5"
+              />
+            </button>
+          </form>
+        </div>
       ) : null}
     </section>
   );
 }
 
-const fanLiveMembers = [
-  { id: 1, name: "이름", role: "파트", host: true },
-  { id: 2, name: "이름", role: "파트", host: false },
-  { id: 3, name: "이름", role: "파트", host: false },
-  { id: 4, name: "이름", role: "파트", host: false },
-];
+const MEMBER_PART_LABELS: Record<string, string> = {
+  VOCAL: "보컬",
+  GUITAR: "기타",
+  BASS: "베이스",
+  DRUM: "드럼",
+  KEYBOARD: "키보드",
+};
 
-function FanLiveMemberRow({
-  name,
-  role,
-  host,
-}: {
-  name: string;
-  role: string;
-  host: boolean;
-}) {
+const formatMemberParts = (parts: string[]) => {
+  if (parts.length === 0) return "파트 미정";
+
+  return parts.map((part) => MEMBER_PART_LABELS[part] ?? part).join(", ");
+};
+
+function FanLiveMemberRow({ member }: { member: LiveMemberItem }) {
   return (
     <article className="fan-live-member-row flex h-[60px] items-center gap-2.5 rounded-lg bg-neutral-0 p-3">
       <img
-        src={UserProfileIcon}
-        alt=""
-        className="size-[38px] shrink-0 object-contain"
+        src={member.bandProfileImageUrl || UserProfileIcon}
+        alt={`${member.nickname} 프로필`}
+        className="size-[38px] shrink-0 rounded-full object-cover"
       />
       <div className="min-w-0 flex-1 text-left">
-        <strong className="block truncate text-caption3 text-neutral-900">{name}</strong>
-        <span className="block truncate text-caption2 text-neutral-600">{role}</span>
+        <strong className="block truncate text-caption3 text-neutral-900">
+          {member.nickname}
+        </strong>
+        <span className="block truncate text-caption2 text-neutral-600">
+          {formatMemberParts(member.part)}
+        </span>
       </div>
-      {host ? <span className="shrink-0 text-caption3 text-neutral-900">진행자</span> : null}
+      {member.isLeader ? (
+        <span className="shrink-0 text-caption3 text-neutral-900">리더</span>
+      ) : null}
     </article>
   );
 }
 
 export function FanLiveMemberSheet({
+  hasError,
+  isLoading,
+  members,
   open,
   onClose,
 }: {
+  hasError: boolean;
+  isLoading: boolean;
+  members: LiveMemberItem[];
   open: boolean;
   onClose: () => void;
 }) {
@@ -437,10 +515,33 @@ export function FanLiveMemberSheet({
           멤버
         </h2>
 
-        <div className="mx-5 mt-[13px] grid gap-2.5">
-          {fanLiveMembers.map((member) => (
-            <FanLiveMemberRow key={member.id} {...member} />
-          ))}
+        <div className="mx-5 mt-[13px] grid max-h-[250px] gap-2.5 overflow-y-auto">
+          {isLoading ? (
+            <p className="py-6 text-center text-caption2 text-neutral-500">
+              멤버를 불러오는 중이에요.
+            </p>
+          ) : null}
+
+          {!isLoading && hasError ? (
+            <p className="py-6 text-center text-caption2 text-neutral-500">
+              멤버를 불러오지 못했어요.
+            </p>
+          ) : null}
+
+          {!isLoading && !hasError && members.length === 0 ? (
+            <p className="py-6 text-center text-caption2 text-neutral-500">
+              표시할 멤버가 없어요.
+            </p>
+          ) : null}
+
+          {!isLoading && !hasError
+            ? members.map((member, index) => (
+                <FanLiveMemberRow
+                  key={`${member.nickname}-${member.bandName}-${index}`}
+                  member={member}
+                />
+              ))
+            : null}
         </div>
 
         <div className="mx-auto mt-[13px] h-1 w-[132px] rounded-full bg-neutral-300" />
@@ -450,11 +551,17 @@ export function FanLiveMemberSheet({
 }
 
 export function FanLiveProfileActionSheet({
+  isBlocked,
+  isBlockPending,
   open,
+  onBlockToggle,
   onClose,
   onReport,
 }: {
+  isBlocked: boolean;
+  isBlockPending: boolean;
   open: boolean;
+  onBlockToggle: () => void;
   onClose: () => void;
   onReport: () => void;
 }) {
@@ -505,10 +612,15 @@ export function FanLiveProfileActionSheet({
           </button>
           <button
             type="button"
-            onClick={onClose}
+            onClick={onBlockToggle}
+            disabled={isBlockPending}
             className="flex h-14 w-full items-center justify-center px-4 py-[18px] text-label2 text-[#FF3B30]"
           >
-            사용자 차단하기
+            {isBlockPending
+              ? "처리 중"
+              : isBlocked
+                ? "차단 해제하기"
+                : "사용자 차단하기"}
           </button>
         </div>
 
