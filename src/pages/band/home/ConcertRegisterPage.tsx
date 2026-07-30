@@ -32,7 +32,6 @@ import {
   PERFORMANCE_GENRE_BY_LABEL,
   PERFORMANCE_GENRE_LABELS,
   PERFORMANCE_GENRE_LABEL_OPTIONS,
-  PERFORMANCE_REGION_BY_BAND_REGION,
 } from "@/utils/bandLabels";
 import CalendarIcon from "@/assets/icons/band/data-range.svg";
 import ClockIcon from "@/assets/icons/band/clock-band.svg";
@@ -223,7 +222,9 @@ const ConcertRegisterForm = ({
   const isStep1Valid = Boolean(
     title.trim() && genre && region && ageRating && description.trim(),
   );
-  const isStep2Valid = Boolean(startDate && location.trim() && price.trim());
+  const isStep2Valid = Boolean(
+    startDate && time && location.trim() && price.trim(),
+  );
 
   const titleError = showStep1Errors && !title.trim();
   const genreError = showStep1Errors && !genre;
@@ -232,6 +233,7 @@ const ConcertRegisterForm = ({
   const descriptionError = showStep1Errors && !description.trim();
 
   const dateError = showStep2Errors && !startDate;
+  const timeError = showStep2Errors && !time;
   const locationError = showStep2Errors && !location.trim();
   const priceError = showStep2Errors && !price.trim();
 
@@ -291,11 +293,9 @@ const ConcertRegisterForm = ({
       return;
     }
 
-    const performanceRegionValue = PERFORMANCE_REGION_BY_BAND_REGION[regionValue];
     const ticketPriceValue = String(
       Number(price.replace(/[^0-9]/g, "")) || 0,
     );
-
     setUploadError(null);
     let uploadedPosterUrl = posterUrl;
 
@@ -339,7 +339,7 @@ const ConcertRegisterForm = ({
           genre: genreValue,
           performanceDate: startDate,
           startTime: time,
-          region: performanceRegionValue,
+          region: regionValue,
           venue: location,
           description,
           ticketPrice: ticketPriceValue,
@@ -359,7 +359,7 @@ const ConcertRegisterForm = ({
         genre: genreValue,
         performanceDate: startDate,
         startTime: time,
-        region: performanceRegionValue,
+        region: regionValue,
         venue: location,
         description,
         ticketPrice: ticketPriceValue,
@@ -564,11 +564,13 @@ const ConcertRegisterForm = ({
                   </button>
                 </Field>
 
-                <Field label="공연 시작 시간">
+                <Field label="공연 시작 시간" required error={timeError}>
                   <button
                     type="button"
                     onClick={() => setIsTimePickerOpen(true)}
-                    className="flex w-full items-center rounded-[5px] border border-neutral-400 px-4 py-1.25"
+                    className={`flex w-full items-center rounded-[5px] border px-4 py-1.25 ${
+                      timeError ? "border-error" : "border-neutral-400"
+                    }`}
                   >
                     <span
                       className={`flex-1 text-left text-caption2 ${time ? "text-neutral-900" : "text-neutral-500"}`}

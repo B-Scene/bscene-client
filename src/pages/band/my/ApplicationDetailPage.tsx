@@ -1,8 +1,10 @@
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { Header } from "@/components/band/home/Header";
 import { SessionApplicationProfile } from "@/components/band/my/SessionApplicationProfile";
 import type { SessionApplicationProfileData } from "@/components/band/my/SessionApplicationProfile";
 import { useApplicationSubmissionDetailQuery } from "@/hooks/api/session/useSessionApplication";
+import { useAcceptApplicationSubmissionMutation } from "@/hooks/api/user/useReceivedApplications";
+import { getApiErrorMessage } from "@/utils/getApiErrorMessage";
 
 const MOCK_IS_BAND_OWNER = true;
 
@@ -19,11 +21,36 @@ const formatDeadline = (deadlineAt: string) => {
 };
 
 const ApplicationDetailPage = () => {
+  const navigate = useNavigate();
   const { applySubmissionId } = useParams<{ applySubmissionId: string }>();
   const applicationSubmissionId = Number(applySubmissionId);
 
   const { data: detail, isLoading, isError, refetch } =
     useApplicationSubmissionDetailQuery(applicationSubmissionId);
+
+  const acceptMutation = useAcceptApplicationSubmissionMutation();
+
+  const handleDecision = async (isApproved: boolean) => {
+    if (acceptMutation.isPending) return;
+
+    try {
+      await acceptMutation.mutateAsync({
+        applySubmissionId: applicationSubmissionId,
+        isApproved,
+      });
+
+      navigate(-1);
+    } catch (error) {
+      window.alert(
+        getApiErrorMessage(
+          error,
+          isApproved
+            ? "지원 수락에 실패했어요. 잠시 후 다시 시도해주세요."
+            : "지원 거절에 실패했어요. 잠시 후 다시 시도해주세요.",
+        ),
+      );
+    }
+  };
 
   const applicantProfile: SessionApplicationProfileData | null = detail
     ? {
@@ -100,13 +127,17 @@ const ApplicationDetailPage = () => {
           <div className="flex items-center justify-center gap-4 px-8 pt-3 pb-9">
             <button
               type="button"
-              className="flex h-9.5 w-39.25 items-center justify-center rounded-lg border border-secondary-500 text-body1 text-secondary-500"
+              onClick={() => handleDecision(false)}
+              disabled={acceptMutation.isPending}
+              className="flex h-9.5 w-39.25 items-center justify-center rounded-lg border border-secondary-500 text-body1 text-secondary-500 disabled:opacity-60"
             >
               거절
             </button>
             <button
               type="button"
-              className="flex h-9.5 w-39.25 items-center justify-center rounded-lg bg-secondary-500 text-body1 text-neutral-0"
+              onClick={() => handleDecision(true)}
+              disabled={acceptMutation.isPending}
+              className="flex h-9.5 w-39.25 items-center justify-center rounded-lg bg-secondary-500 text-body1 text-neutral-0 disabled:opacity-60"
             >
               수락
             </button>
