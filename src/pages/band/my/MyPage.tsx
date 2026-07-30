@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Header } from "@/components/band/home/Header";
+import { Header } from "@/components/common/Header/Header";
 import { StatRow } from "@/components/band/home/StatRow";
 import { ModeSwitchSheet } from "@/components/band/home/ModeSwitchSheet";
 import { ModalOverlay } from "@/components/common/Modal/ModalOverlay";

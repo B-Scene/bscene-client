@@ -1,4 +1,4 @@
-import { Header } from "@/components/band/home/Header";
+import { Header } from "@/components/common/Header/Header";
 import { useActiveBandId } from "@/hooks/api/user/useMyProfiles";
 import { useBandQuery } from "@/hooks/api/band/useBand";
 import { useNotificationSettingToggle } from "@/hooks/useNotificationSettingToggle";

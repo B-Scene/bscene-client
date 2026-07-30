@@ -1,11 +1,10 @@
-// 임시 헤더
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import ArrowLeftIcon from "@/assets/icons/arrow-left.svg";
 
 interface HeaderProps {
   title: string;
-  align?: "center" | "between";
+  align?: "center" | "between" | "betweenCompact" | "mainWithAction";
   showBack?: boolean;
   rightContent?: ReactNode;
   className?: string;
@@ -25,8 +24,10 @@ export const Header = ({
   variant = "default",
 }: HeaderProps) => {
   const navigate = useNavigate();
-  const isBetween = align === "between";
-  const isMain = variant === "main";
+  const isBetween = align === "between" || align === "betweenCompact";
+  const isCompact = align === "betweenCompact";
+  const isMainWithAction = align === "mainWithAction";
+  const isMain = variant === "main" || isMainWithAction;
 
   const handleBack = () => {
     if (onBack) {
@@ -37,13 +38,23 @@ export const Header = ({
     navigate(-1);
   };
 
+  const titleClass = isMain
+    ? "text-label2 text-[#1D1A1A]"
+    : isBetween && !isCompact
+      ? "text-[20px] leading-6 font-bold text-neutral-900"
+      : "text-label2 text-neutral-900";
+
   return (
     <header
       className={`relative flex bg-neutral-0 ${
         isMain
-          ? "h-12 items-center justify-center px-3.75"
+          ? `h-12 items-center justify-center ${
+              isMainWithAction ? "px-6" : "px-3.75"
+            }`
           : `h-12 items-center ${
-              isBetween ? "justify-between px-6" : "justify-center px-3.75"
+              isBetween
+                ? `justify-between ${isCompact ? "px-3.75" : "px-6"}`
+                : "justify-center px-3.75"
             }`
       } ${className}`}
     >
@@ -52,7 +63,11 @@ export const Header = ({
           type="button"
           onClick={handleBack}
           className={`${
-            isBetween ? "" : "absolute left-3.75"
+            isBetween
+              ? ""
+              : isMainWithAction
+                ? "absolute left-6"
+                : "absolute left-3.75"
           } flex size-6 items-center justify-center`}
           aria-label="뒤로가기"
         >
@@ -60,20 +75,16 @@ export const Header = ({
         </button>
       ) : null}
 
-      <h1
-        className={`${
-          isMain
-            ? "text-label2 text-[#1D1A1A]"
-            : `${
-                isBetween ? "text-[20px] leading-6 font-bold" : "text-label2"
-              } text-neutral-900`
-        } ${titleClassName}`}
-      >
-        {title}
-      </h1>
+      <h1 className={`${titleClass} ${titleClassName}`}>{title}</h1>
 
       {rightContent ? (
-        <div className="flex size-6 items-center justify-center">{rightContent}</div>
+        <div
+          className={`flex items-center justify-center ${
+            isMain ? (isMainWithAction ? "absolute right-6" : "absolute right-3.75") : ""
+          }`}
+        >
+          {rightContent}
+        </div>
       ) : isBetween ? (
         <span className="size-6" aria-hidden="true" />
       ) : null}

@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import ApplyMemberIcon from "@/assets/icons/band/apply-member.svg";
 import ArrowRightIcon from "@/assets/icons/band/arrow-right-my.svg";
 import DefaultAvatar from "@/assets/icons/band/user-default-profile.svg";
-import { Header } from "@/components/band/home/Header";
+import { Header } from "@/components/common/Header/Header";
 import { NotificationBandBanner } from "@/components/band/my/NotificationBandBanner";
 import { EmptyState } from "@/components/common/EmptyState/EmptyState";
 import { useBandMyPageQuery } from "@/hooks/api/user/useBandMyPage";

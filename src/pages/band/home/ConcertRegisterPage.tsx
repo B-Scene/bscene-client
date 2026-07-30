@@ -6,7 +6,7 @@ import {
   type ReactNode,
 } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Header } from "@/components/band/home/Header";
+import { Header } from "@/components/common/Header/Header";
 import { DatePickerSheet } from "@/components/band/home/DatePickerSheet";
 import { TimePickerSheet } from "@/components/band/home/TimePickerSheet";
 import { Input } from "@/components/common/Input/Input";

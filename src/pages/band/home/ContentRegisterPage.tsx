@@ -6,7 +6,7 @@ import {
   type ReactNode,
 } from "react";
 import { useNavigate } from "react-router-dom";
-import { Header } from "@/components/band/home/Header";
+import { Header } from "@/components/common/Header/Header";
 import { Input } from "@/components/common/Input/Input";
 import { useActiveBandId } from "@/hooks/api/user/useMyProfiles";
 import { useCreatePost } from "@/hooks/api/band/usePost";

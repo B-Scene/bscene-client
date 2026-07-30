@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { Header } from "@/components/band/home/Header";
+import { Header } from "@/components/common/Header/Header";
 import { useEnterBandInviteLink } from "@/hooks/api/band/useBandMember";
 import { notificationKeys } from "@/hooks/api/useNotifications";
 import { getApiErrorMessage } from "@/utils/getApiErrorMessage";

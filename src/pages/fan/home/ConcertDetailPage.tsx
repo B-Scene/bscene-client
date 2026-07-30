@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
 import Modal from "@/components/Modal/Modal";
+import { Header } from "@/components/common/Header/Header";
 import { ModalOverlay } from "@/components/common/Modal/ModalOverlay";
 import NotificationOffIcon from "@/assets/icons/Notification Off.svg";
 import CloseIcon from "@/assets/icons/close.svg";
@@ -77,21 +78,6 @@ const ImagePlaceholderIcon = () => (
       strokeLinejoin="round"
     />
     <circle cx="16.5" cy="8.5" r="1.5" fill="currentColor" />
-  </svg>
-);
-
-const ChevronLeftIcon = () => (
-  <svg
-    width="24"
-    height="24"
-    viewBox="0 0 24 24"
-    fill="none"
-    aria-hidden="true"
-  >
-    <path
-      d="M16.75 20.34C17.114 20.7544 17.0737 21.3853 16.66 21.75C16.2456 22.114 15.6147 22.0737 15.25 21.66L7.24999 12.66C6.91834 12.2825 6.91834 11.7175 7.24999 11.34L15.25 2.34003C15.4806 2.05369 15.8498 1.91701 16.2113 1.9841C16.5728 2.0512 16.8683 2.31126 16.9808 2.66129C17.0933 3.01132 17.0047 3.39487 16.75 3.66003L9.33999 12L16.75 20.34Z"
-      fill="white"
-    />
   </svg>
 );
 
@@ -608,54 +594,53 @@ const ConcertDetailPage = () => {
 
   return (
     <main className="min-h-dvh bg-neutral-0">
-      <section className="relative flex h-[492px] w-full items-center justify-center bg-neutral-400 text-neutral-700">
-        <div className="absolute left-0 top-11 flex w-full items-center justify-between pl-[15px] pr-6 text-neutral-0">
-          <button
-            type="button"
-            aria-label="뒤로가기"
-            onClick={() => navigate(-1)}
-            className="flex size-6 items-center justify-center"
-          >
-            <ChevronLeftIcon />
-          </button>
-
-          <div className="flex items-center gap-4">
-            <button
-              type="button"
-              aria-label={
-                isNotificationEnabled ? "공연 알림 설정됨" : "공연 알림 설정"
-              }
-              aria-pressed={isNotificationEnabled}
-              disabled={
-                setPerformanceAlarmMutation.isPending ||
-                deletePerformanceAlarmMutation.isPending
-              }
-              onClick={() => void handleNotificationClick()}
-              className="flex size-6 items-center justify-center"
-            >
-              {isNotificationEnabled ? (
-                <span className="flex size-6 items-center justify-center text-neutral-0">
-                  <NotificationOnIcon />
-                </span>
-              ) : (
-                <img src={NotificationOffIcon} alt="" className="size-6" />
-              )}
-            </button>
-            <button
-              type="button"
-              aria-label="공유하기"
-              onClick={() => setIsShareSheetOpen(true)}
-              className="flex size-6 items-center justify-center"
-            >
-              <img src={ShareIcon} alt="" className="size-6" />
-            </button>
-          </div>
-        </div>
+      <div className="relative">
+        <Header
+          title=""
+          align="betweenCompact"
+          rightContent={
+            <div className="flex items-center gap-4">
+              <button
+                type="button"
+                aria-label={
+                  isNotificationEnabled ? "공연 알림 설정됨" : "공연 알림 설정"
+                }
+                aria-pressed={isNotificationEnabled}
+                disabled={
+                  setPerformanceAlarmMutation.isPending ||
+                  deletePerformanceAlarmMutation.isPending
+                }
+                onClick={() => void handleNotificationClick()}
+                className="flex size-6 items-center justify-center"
+              >
+                {isNotificationEnabled ? (
+                  <span className="flex size-6 items-center justify-center text-neutral-900">
+                    <NotificationOnIcon />
+                  </span>
+                ) : (
+                  <img
+                    src={NotificationOffIcon}
+                    alt=""
+                    className="size-6 brightness-0"
+                  />
+                )}
+              </button>
+              <button
+                type="button"
+                aria-label="공유하기"
+                onClick={() => setIsShareSheetOpen(true)}
+                className="flex size-6 items-center justify-center"
+              >
+                <img src={ShareIcon} alt="" className="size-6 brightness-0" />
+              </button>
+            </div>
+          }
+        />
 
         {showNotificationHint ? (
           <aside
             aria-label="공연 참여 예정 안내"
-            className="absolute right-[43px] top-[92px] z-20 flex w-[266px] flex-col items-start gap-3 rounded-[16px] bg-neutral-0 px-6 py-3"
+            className="absolute right-3.75 top-14 z-20 flex w-[266px] flex-col items-start gap-3 rounded-[16px] bg-neutral-0 px-6 py-3 shadow-[0_0_8px_0_rgba(0,0,0,0.10)]"
           >
             <span
               aria-hidden="true"
@@ -680,7 +665,9 @@ const ConcertDetailPage = () => {
             </p>
           </aside>
         ) : null}
+      </div>
 
+      <section className="relative flex h-[492px] w-full items-center justify-center bg-neutral-400 text-neutral-700">
         {posterImageUrl ? (
           <img
             src={posterImageUrl}
