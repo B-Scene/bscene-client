@@ -27,32 +27,23 @@ export const BAND_REGION_LABELS: Record<BandRegion, string> = {
 };
 
 export const BAND_GENRE_LABELS: Record<BandGenre, string> = {
-  METAL: "메탈",
-  BLUES: "블루스",
-  PSYCHEDELIC_ROCK: "사이키델릭 록",
-  ALTERNATIVE_ROCK: "얼터너티브 록",
   INDIE: "인디",
-  ELECTRONIC_ROCK: "일렉트로닉 록",
-  JAZZ: "재즈",
   POP: "팝",
-  POP_ROCK: "팝 록",
-  PUNK_ROCK: "펑크 록",
-  FOLK_ROCK: "포크 록",
-  HARD_ROCK: "하드 록",
-  ETC: "기타",
+  POP_ROCK: "팝록",
+  JAZZ: "재즈",
+  BLUES: "블루스",
+  ALTERNATIVE_ROCK: "얼터너티브록",
+  PSYCHEDELIC_ROCK: "사이키델릭록",
+  ELECTRONIC_ROCK: "일렉트로닉록",
+  FOLK_ROCK: "포크록",
+  PUNK_ROCK: "펑크록",
+  HARD_ROCK: "하드록",
+  METAL: "메탈",
+  ETC: "etc.",
 };
 
-export const PERFORMANCE_GENRE_LABELS: Record<PerformanceGenre, string> = {
-  ROCK: "록",
-  INDIE_POP: "인디팝",
-  JAZZ: "재즈",
-  METAL: "메탈",
-  FOLK: "포크",
-  RNB: "R&B",
-  BLUES: "블루스",
-  PUNK: "펑크",
-  ACOUSTIC: "어쿠스틱",
-};
+export const PERFORMANCE_GENRE_LABELS: Record<PerformanceGenre, string> =
+  BAND_GENRE_LABELS;
 
 export const PERFORMANCE_AGE_RATING_LABELS: Record<
   PerformanceAgeRating,
