@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
 import { useNavigate, useParams } from "react-router-dom";
 import {
-  getLiveBearerAuthorization,
+  getLivePlaybackAuthorization,
   resolveLiveApiUrl,
 } from "@/api/live/live";
 import HeadsetIcon from "@/assets/Headset.svg";
@@ -219,14 +219,12 @@ export function FanLivePlaybackPage() {
     const hls = new Hls({
       lowLatencyMode: false,
       backBufferLength: 60,
-      xhrSetup: (xhr, url) => {
-        if (url.includes("/api/")) {
-          xhr.withCredentials = true;
-          xhr.setRequestHeader(
-            "Authorization",
-            getLiveBearerAuthorization(),
-          );
-        }
+      xhrSetup: (xhr) => {
+        xhr.withCredentials = true;
+        xhr.setRequestHeader(
+          "Authorization",
+          getLivePlaybackAuthorization(),
+        );
       },
     });
 

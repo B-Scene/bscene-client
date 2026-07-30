@@ -4,7 +4,7 @@ import Hls from "hls.js";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   getLiveMembers,
-  getLiveBearerAuthorization,
+  getLivePlaybackAuthorization,
   resolveLiveApiUrl,
   subscribeViewerCount,
 } from "@/api/live/live";
@@ -333,7 +333,7 @@ export function FanLivePage() {
   let authorization: string;
 
   try {
-    authorization = getLiveBearerAuthorization();
+    authorization = getLivePlaybackAuthorization();
   } catch (error) {
     window.setTimeout(() => {
       setAudioMessage(
@@ -350,12 +350,9 @@ export function FanLivePage() {
   const hls = new Hls({
     lowLatencyMode: true,
     backBufferLength: 30,
-    xhrSetup: (xhr, url) => {
+    xhrSetup: (xhr) => {
       xhr.withCredentials = true;
-
-      if (url.includes("/api/") || url.includes("api.bscene.app")) {
-        xhr.setRequestHeader("Authorization", authorization);
-      }
+      xhr.setRequestHeader("Authorization", authorization);
     },
   });
 
@@ -369,6 +366,10 @@ export function FanLivePage() {
   hls.on(Hls.Events.MANIFEST_PARSED, () => {
     setAudioMessage("");
     void startPlayback();
+  });
+
+  hls.on(Hls.Events.FRAG_LOADED, () => {
+    setAudioMessage("");
   });
 
   hls.on(Hls.Events.ERROR, (_, data) => {
