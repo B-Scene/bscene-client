@@ -6,11 +6,11 @@ import {
 } from "react";
 import { isAxiosError } from "axios";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import ArrowLeftIcon from "@/assets/icons/arrow-left.svg";
 import CommentIcon from "@/assets/icons/Comment.svg";
 import HeartIcon from "@/assets/icons/Heart.svg";
 import LikedHeartIcon from "@/assets/icons/Union.svg";
 import BandImage from "@/assets/Img_Band.png";
+import { Header } from "@/components/common/Header/Header";
 import {
   useCreateFanExplorePostComment,
   useDeleteFanExplorePostComment,
@@ -145,18 +145,7 @@ const getCommentMutationErrorMessage = (
 };
 
 const ContentDetailHeader = ({ onBack }: { onBack: () => void }) => {
-  return (
-    <header className="flex h-[48px] items-center bg-neutral-0 px-[15px]">
-      <button
-        type="button"
-        aria-label="뒤로가기"
-        onClick={onBack}
-        className="flex size-6 items-center justify-center"
-      >
-        <img src={ArrowLeftIcon} alt="" className="size-6" />
-      </button>
-    </header>
-  );
+  return <Header title="" onBack={onBack} />;
 };
 
 const ContentDetailLoading = ({ onBack }: { onBack: () => void }) => {

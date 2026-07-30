@@ -5,7 +5,7 @@ import SearchActiveIcon from "@/assets/icons/band/search-active.svg";
 import InviteCloseIcon from "@/assets/icons/band/delete-circle.svg";
 import LinkIcon from "@/assets/icons/band/link-icon.svg";
 import DefaultAvatar from "@/assets/icons/band/user-default-profile.svg";
-import { Header } from "@/components/band/home/Header";
+import { Header } from "@/components/common/Header/Header";
 import { ModalOverlay } from "@/components/common/Modal/ModalOverlay";
 import { Toast } from "@/components/common/Toast/Toast";
 import Modal from "@/components/Modal/Modal";

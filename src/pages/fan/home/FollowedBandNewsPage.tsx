@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import ArrowLeftIcon from "@/assets/icons/arrow-left.svg";
 import {
   FollowedNewsList,
   type FollowedNewsListItem,
 } from "@/components/fan/home/FollowedNewsList";
+import { Header } from "@/components/common/Header/Header";
 import { useFollowingPostsInfiniteQuery } from "@/hooks/api/fan/useFanHome";
 import type {
   FollowingPostItem,
@@ -173,22 +173,7 @@ const FollowedBandNewsPage = () => {
 
   return (
     <main className="min-h-dvh bg-neutral-0 px-5 pb-[calc(var(--bottom-nav-height)+24px)]">
-      <header className="-mx-5 flex h-[60px] items-center justify-between px-[15px]">
-        <button
-          type="button"
-          aria-label="뒤로가기"
-          onClick={() => navigate(-1)}
-          className="flex size-6 items-center justify-center"
-        >
-          <img src={ArrowLeftIcon} alt="" className="size-6" />
-        </button>
-
-        <h1 className="m-0 font-body text-label2 text-neutral-900">
-          팔로우한 밴드 소식
-        </h1>
-
-        <span aria-hidden="true" className="size-6" />
-      </header>
+      <Header title="팔로우한 밴드 소식" align="betweenCompact" className="-mx-5" />
 
       <FollowedNewsList
         items={newsItems}
