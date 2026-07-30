@@ -4,9 +4,12 @@ import type {
   CreateSessionRecruitmentResponse,
   DeleteSessionRecruitmentResponse,
   DeleteSessionSearchHistoryResponse,
+  InterestedSessionRecruitmentsResponse,
+  RecentlyViewedSessionRecruitmentsResponse,
   SessionApiResponse,
   SessionRecruitmentDetailResponse,
   SessionRecruitmentEditInfoResponse,
+  SessionRecruitmentHistoryParams,
   SessionRecruitmentInterestResponse,
   SessionRecruitmentListParams,
   SessionRecruitmentListResponse,
@@ -15,7 +18,11 @@ import type {
   UpdateSessionRecruitmentResponse,
 } from "@/types/session/sessionRecruitment";
 
-const removeEmptyParams = (params: SessionRecruitmentListParams) => {
+const removeEmptyParams = <
+  T extends Record<string, string | number | boolean | null | undefined>,
+>(
+  params: T,
+) => {
   return Object.fromEntries(
     Object.entries(params).filter(
       ([, value]) => value !== undefined && value !== null && value !== "",
@@ -29,7 +36,7 @@ export const getSessionRecruitments = async (
   const { data } = await axiosInstance.get<
     SessionApiResponse<SessionRecruitmentListResponse>
   >("/sessions/recruitments", {
-    params: removeEmptyParams(params),
+    params: removeEmptyParams(params as Record<string, string | number | boolean | null | undefined>),
   });
 
   return data.result;
@@ -118,6 +125,30 @@ export const deleteSessionSearchHistory = async (keywordId: number) => {
   const { data } = await axiosInstance.delete<
     SessionApiResponse<DeleteSessionSearchHistoryResponse>
   >(`/sessions/recruitments/search-history/${keywordId}`);
+
+  return data.result;
+};
+
+export const getInterestedSessionRecruitments = async (
+  params: SessionRecruitmentHistoryParams = {},
+) => {
+  const { data } = await axiosInstance.get<
+    SessionApiResponse<InterestedSessionRecruitmentsResponse>
+  >("/sessions/recruitments/interests", {
+    params: removeEmptyParams(params as Record<string, string | number | boolean | null | undefined>),
+  });
+
+  return data.result;
+};
+
+export const getRecentlyViewedSessionRecruitments = async (
+  params: SessionRecruitmentHistoryParams = {},
+) => {
+  const { data } = await axiosInstance.get<
+    SessionApiResponse<RecentlyViewedSessionRecruitmentsResponse>
+  >("/sessions/recruitments/recently-viewed", {
+    params: removeEmptyParams(params as Record<string, string | number | boolean | null | undefined>),
+  });
 
   return data.result;
 };

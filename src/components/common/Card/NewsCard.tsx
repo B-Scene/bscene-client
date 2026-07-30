@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { KeyboardEvent, ReactNode } from 'react'
 
 type NewsCardProps = {
   profileImageSrc: string
@@ -9,6 +9,8 @@ type NewsCardProps = {
   meta?: ReactNode
   title?: ReactNode
   tags?: ReactNode[]
+  onClick?: () => void
+  ariaLabel?: string
 }
 
 const NewsCard = ({
@@ -26,11 +28,33 @@ const NewsCard = ({
     </>
   ),
   tags = ['홍대', '정기공연', '인디팝'],
+  onClick,
+  ariaLabel,
 }: NewsCardProps) => {
   const hasContentImage = Boolean(contentImageSrc)
+  const isInteractive = Boolean(onClick)
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+    if (!onClick) return
+    if (event.key !== 'Enter' && event.key !== ' ') return
+
+    event.preventDefault()
+    onClick()
+  }
 
   return (
-    <article className="box-border flex h-[187px] w-[146px] shrink-0 flex-col items-start gap-[8px] rounded-[12px] bg-neutral-0 px-[10px] py-[12px] text-left shadow-[0_0_4px_0_rgba(0,0,0,0.10)]">
+    <article
+      role={isInteractive ? 'button' : undefined}
+      tabIndex={isInteractive ? 0 : undefined}
+      aria-label={ariaLabel}
+      onClick={onClick}
+      onKeyDown={isInteractive ? handleKeyDown : undefined}
+      className={`box-border flex h-[187px] w-[146px] shrink-0 flex-col items-start gap-[8px] rounded-[12px] bg-neutral-0 px-[10px] py-[12px] text-left shadow-[0_0_4px_0_rgba(0,0,0,0.10)] ${
+        isInteractive
+          ? 'cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-400'
+          : ''
+      }`}
+    >
       <header className="flex items-center gap-[8px]">
         <img
           alt={profileImageAlt}

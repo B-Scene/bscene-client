@@ -55,20 +55,37 @@ interface SessionChatMessageProps {
   message: ChatMessage;
   senderName: string;
   profileImageUrl: string;
+  showTime?: boolean;
 }
 
 export const SessionChatMessage = ({
   message,
   senderName,
   profileImageUrl,
+  showTime = true,
 }: SessionChatMessageProps) => {
   if (message.direction === "sent") {
     return (
       <article className="flex justify-end">
         <div className="flex items-end gap-[5px]">
-          <time className="mb-[1px] shrink-0 text-[8px] leading-[10px] font-medium text-neutral-500">
-            {message.time}
-          </time>
+          {message.isRead === false || showTime ? (
+            <div className="mb-[1px] flex shrink-0 flex-col items-end">
+              {message.isRead === false ? (
+                <span
+                  aria-label="상대방이 읽지 않음"
+                  className="text-[9px] leading-[10px] font-medium text-secondary-500"
+                >
+                  1
+                </span>
+              ) : null}
+
+              {showTime ? (
+                <time className="text-[8px] leading-[10px] font-medium text-neutral-500">
+                  {message.time}
+                </time>
+              ) : null}
+            </div>
+          ) : null}
 
           <p className="max-w-[208px] break-words whitespace-pre-line rounded-[12px] border border-secondary-500 bg-secondary-100 py-3 pr-4 pl-3 text-[12px] leading-[18px] font-normal text-neutral-900">
             {message.content}
@@ -96,9 +113,11 @@ export const SessionChatMessage = ({
             {message.content}
           </p>
 
-          <time className="mb-[1px] shrink-0 text-[8px] leading-[10px] text-caption4 text-neutral-500">
-            {message.time}
-          </time>
+          {showTime ? (
+            <time className="mb-[1px] shrink-0 text-[8px] leading-[10px] text-caption4 text-neutral-500">
+              {message.time}
+            </time>
+          ) : null}
         </div>
       </div>
     </article>
@@ -108,6 +127,8 @@ export const SessionChatMessage = ({
 interface SessionChatInputProps {
   inputRef: RefObject<HTMLInputElement | null>;
   value: string;
+  disabled?: boolean;
+  placeholder?: string;
   onChange: (value: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }
@@ -115,6 +136,8 @@ interface SessionChatInputProps {
 export const SessionChatInput = ({
   inputRef,
   value,
+  disabled = false,
+  placeholder = "메시지 입력하기",
   onChange,
   onSubmit,
 }: SessionChatInputProps) => (
@@ -131,16 +154,18 @@ export const SessionChatInput = ({
       id="chat-message"
       type="text"
       value={value}
+      disabled={disabled}
       onChange={(event) => onChange(event.target.value)}
-      placeholder="메시지 입력하기"
+      placeholder={placeholder}
       autoComplete="off"
-      className="h-9 min-w-0 flex-1 rounded-full border border-neutral-400 bg-neutral-0 px-[18px] text-[12px] leading-[18px] text-neutral-900 outline-none placeholder:text-neutral-500 focus:border-secondary-500"
+      className="h-9 min-w-0 flex-1 rounded-full border border-neutral-400 bg-neutral-0 px-[18px] text-[12px] leading-[18px] text-neutral-900 outline-none placeholder:text-neutral-500 focus:border-secondary-500 disabled:bg-neutral-200 disabled:text-neutral-500"
     />
 
     <button
       type="submit"
       aria-label="메시지 보내기"
-      className="relative flex size-9 shrink-0 items-center justify-center"
+      disabled={disabled}
+      className="relative flex size-9 shrink-0 items-center justify-center disabled:opacity-40"
     >
       <img
         src={ChatSendIcon}

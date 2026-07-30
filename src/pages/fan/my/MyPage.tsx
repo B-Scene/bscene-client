@@ -45,7 +45,7 @@ const MyPage = () => {
 
   return (
     <main className="relative flex min-h-dvh flex-col bg-neutral-0">
-      <Header title="마이" showBack={false} />
+      <Header title="마이" showBack={false} variant="main" />
 
       <section className="bg-primary-0 px-5 py-6">
         <ProfileSummary

@@ -1,4 +1,5 @@
 import { Fragment, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import ApplyMemberIcon from "@/assets/icons/band/apply-member.svg";
 import ArrowRightIcon from "@/assets/icons/band/arrow-right-my.svg";
 import DefaultAvatar from "@/assets/icons/band/user-default-profile.svg";
@@ -18,6 +19,7 @@ const TABS: { code: RecruitmentStatusFilter; label: string }[] = [
 ];
 
 const ApplicationManagementPage = () => {
+  const navigate = useNavigate();
   const { data: bandMyPage } = useBandMyPageQuery();
   const bandName = bandMyPage?.bandName ?? "";
   const today = useTodayTick();
@@ -152,6 +154,11 @@ const ApplicationManagementPage = () => {
                               <span className="mx-1.5 text-neutral-300">|</span>
                               <button
                                 type="button"
+                                onClick={() =>
+                                  navigate(
+                                    `/band/my/applications/${applicant.applySubmissionId}`,
+                                  )
+                                }
                                 className="text-caption3 text-secondary-500"
                               >
                                 지원서 확인

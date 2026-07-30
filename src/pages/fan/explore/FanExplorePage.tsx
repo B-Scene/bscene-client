@@ -2,18 +2,20 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import SearchIcon from "@/assets/icons/band/search.svg";
 import ArrowDownIcon from "@/assets/icons/band/arrow-down-gray.svg";
-import CheckActiveIcon from "@/assets/icons/check-active.svg";
 import BandImage from "@/assets/Img_Band.png";
 import Modal from "@/components/Modal/Modal";
 import BandCard from "@/components/common/Card/BandCard";
 import { ModalOverlay } from "@/components/common/Modal/ModalOverlay";
 import { Toast } from "@/components/common/Toast/Toast";
+import {
+  useFollowExploreBand,
+  useRecommendedExploreBandsInfiniteQuery,
+  useUnfollowExploreBand,
+} from "@/hooks/api/fan/useFanExplore";
+import { useInfiniteScrollObserver } from "@/hooks/useInfiniteScrollObserver";
 import { useSlideUpSheet } from "@/hooks/useSlideUpSheet";
-
-type ExploreFilter = {
-  id: string;
-  label: string;
-};
+import type { FanExploreBand } from "@/types/fan/explore";
+import { getGenreLabel, getRegionLabel } from "@/utils/bandLabels";
 
 type AppliedExploreFilters = {
   genre: string;
@@ -21,8 +23,9 @@ type AppliedExploreFilters = {
   content: string;
 };
 
-type RecommendedBand = {
+type RecommendedBandItem = {
   id: string;
+  bandId: number | null;
   name: string;
   genre: string;
   region: string;
@@ -30,11 +33,11 @@ type RecommendedBand = {
   followers: number;
   score: number;
   description: string;
+  imageSrc: string;
+  isFollowing: boolean;
 };
 
-const SORT_FILTER: ExploreFilter = { id: "recommend", label: "추천순" };
-const SORT_OPTIONS = ["정확도순", "인기순"] as const;
-type SortOption = (typeof SORT_OPTIONS)[number];
+const DEFAULT_SORT_LABEL = "추천순";
 
 const DEFAULT_APPLIED_FILTERS: AppliedExploreFilters = {
   genre: "전체",
@@ -67,101 +70,63 @@ const FILTER_OPTIONS = {
   content: ["전체", "밴드", "공연", "영상"],
 };
 
-const RECOMMENDED_BANDS: RecommendedBand[] = [
-  {
-    id: "wavy",
-    name: "WAVY",
-    genre: "인디팝",
-    region: "서울",
-    contentTypes: ["밴드", "공연", "영상"],
-    followers: 560,
-    score: 98,
-    description: "몽환적인 사운드와 감각적인 스타일로 주목받는 3인조 밴드",
-  },
-  {
-    id: "loud-kids",
-    name: "LOUD KIDS",
-    genre: "록",
-    region: "서울",
-    contentTypes: ["밴드", "공연"],
-    followers: 820,
-    score: 91,
-    description: "강한 기타 리프와 에너지 있는 라이브를 중심으로 활동해요",
-  },
-  {
-    id: "blue-hour",
-    name: "BLUE HOUR",
-    genre: "재즈",
-    region: "부산",
-    contentTypes: ["밴드", "영상"],
-    followers: 340,
-    score: 84,
-    description: "도시적인 재즈 사운드와 즉흥 연주 콘텐츠를 선보여요",
-  },
-  {
-    id: "silver-line",
-    name: "SILVER LINE",
-    genre: "메탈",
-    region: "대구",
-    contentTypes: ["밴드", "공연"],
-    followers: 730,
-    score: 79,
-    description: "묵직한 사운드와 공연 중심 활동으로 팬층을 넓히고 있어요",
-  },
-  {
-    id: "paper-moon",
-    name: "PAPER MOON",
-    genre: "어쿠스틱",
-    region: "경기",
-    contentTypes: ["밴드", "영상"],
-    followers: 290,
-    score: 76,
-    description: "잔잔한 어쿠스틱 편곡과 커버 영상으로 소통하는 듀오예요",
-  },
-  {
-    id: "river-folk",
-    name: "RIVER FOLK",
-    genre: "포크",
-    region: "강원",
-    contentTypes: ["밴드", "공연"],
-    followers: 410,
-    score: 72,
-    description: "지역 페스티벌과 작은 공연장에서 따뜻한 포크 음악을 전해요",
-  },
-  {
-    id: "neon-wave",
-    name: "NEON WAVE",
-    genre: "R&B",
-    region: "광주",
-    contentTypes: ["밴드", "영상"],
-    followers: 650,
-    score: 88,
-    description: "그루브한 리듬과 감각적인 보컬 라인으로 주목받고 있어요",
-  },
-  {
-    id: "punk-road",
-    name: "PUNK ROAD",
-    genre: "펑크",
-    region: "인천",
-    contentTypes: ["밴드", "공연", "영상"],
-    followers: 480,
-    score: 82,
-    description: "빠른 템포와 직설적인 메시지의 라이브 무대를 만들어요",
-  },
-];
+const mapBandToItem = (band: FanExploreBand): RecommendedBandItem => {
+  const bandInfo = band.band ?? band;
+  const bandId =
+    typeof bandInfo.bandId === "number"
+      ? bandInfo.bandId
+      : typeof bandInfo.id === "number"
+        ? bandInfo.id
+        : null;
+  const id = String(
+    bandInfo.bandId ?? bandInfo.id ?? bandInfo.name ?? bandInfo.bandName,
+  );
+
+  return {
+    id,
+    bandId,
+    name: bandInfo.name ?? bandInfo.bandName ?? "밴드명",
+    genre: bandInfo.genre ? getGenreLabel(bandInfo.genre) : "장르",
+    region: bandInfo.region ? getRegionLabel(bandInfo.region) : "지역",
+    contentTypes: bandInfo.contentTypes ?? band.contentTypes ?? ["밴드"],
+    followers:
+      bandInfo.followerCount ??
+      bandInfo.followers ??
+      band.followerCount ??
+      band.followers ??
+      0,
+    score: band.recommendationScore ?? band.score ?? 0,
+    description:
+      bandInfo.description ??
+      bandInfo.introduction ??
+      band.description ??
+      band.introduction ??
+      "",
+    imageSrc:
+      bandInfo.profileImageUrl ??
+      bandInfo.bandProfileImageUrl ??
+      bandInfo.imageUrl ??
+      band.profileImageUrl ??
+      band.bandProfileImageUrl ??
+      band.imageUrl ??
+      BandImage,
+    isFollowing:
+      bandInfo.isFollowing ?? bandInfo.following ?? band.isFollowing ?? band.following ?? false,
+  };
+};
 
 const ExploreTopBar = () => {
   const navigate = useNavigate();
 
   return (
-    <header className="relative flex h-[48px] w-full max-w-[393px] items-center justify-center bg-neutral-0 px-[24px]">
-      <h1 className="m-0 font-body text-label2 text-neutral-900">탐색</h1>
+    <header className="relative flex h-12 w-full max-w-[393px] items-center justify-center bg-neutral-0 px-6">
+      <h1 className="m-0 font-body text-label2 text-[#1D1A1A]">탐색</h1>
 
       <button
         type="button"
         aria-label="검색"
         onClick={() => navigate("/fan/explore/search")}
-        className="absolute right-[24px] top-1/2 flex size-6 -translate-y-1/2 items-center justify-center"
+        className="absolute right-6 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center"
       >
         <img
           src={SearchIcon}
@@ -195,11 +160,13 @@ export const FilterControlIcon = () => {
 export const ExploreFilterBar = ({
   appliedFilters,
   appliedSort,
+  highlightSort = true,
   onSortClick,
   onFilterClick,
 }: {
   appliedFilters: AppliedExploreFilters;
   appliedSort?: string | null;
+  highlightSort?: boolean;
   onSortClick?: () => void;
   onFilterClick?: () => void;
 }) => {
@@ -213,6 +180,7 @@ export const ExploreFilterBar = ({
     ? filterChips.filter((filter) => filter.value !== "전체")
     : filterChips;
   const isSortApplied = Boolean(appliedSort);
+  const shouldHighlightSort = isSortApplied && highlightSort;
   const sortChipWidthClass = appliedSort === "정확도순" ? "w-[73px]" : "w-[62px]";
 
   return (
@@ -224,18 +192,18 @@ export const ExploreFilterBar = ({
           className={[
             "box-border flex h-[22px] shrink-0 items-center justify-center gap-[4px] whitespace-nowrap rounded-full border px-[15px] py-[7px] text-center font-body text-caption3",
             sortChipWidthClass,
-            isSortApplied
+            shouldHighlightSort
               ? "border-primary-400 bg-primary-0 text-primary-400"
               : "border-neutral-400 bg-neutral-0 text-neutral-600",
           ].join(" ")}
         >
-          {appliedSort ?? SORT_FILTER.label}
+          {appliedSort ?? DEFAULT_SORT_LABEL}
           <img
             src={ArrowDownIcon}
             alt=""
             className={[
               "h-[7px] w-[12px]",
-              isSortApplied
+              shouldHighlightSort
                 ? "[filter:brightness(0)_saturate(100%)_invert(39%)_sepia(80%)_saturate(2432%)_hue-rotate(319deg)_brightness(96%)_contrast(96%)]"
                 : "[filter:brightness(0)_saturate(100%)_invert(44%)_sepia(0%)_saturate(0%)_hue-rotate(173deg)_brightness(95%)_contrast(92%)]",
             ].join(" ")}
@@ -272,73 +240,6 @@ export const ExploreFilterBar = ({
       >
         <FilterControlIcon />
       </button>
-    </div>
-  );
-};
-
-const ExploreSortSheet = ({
-  open,
-  onClose,
-  selectedSort,
-  onSelect,
-}: {
-  open: boolean;
-  onClose: () => void;
-  selectedSort: SortOption | null;
-  onSelect: (sort: SortOption) => void;
-}) => {
-  const { rendered, isVisible, handleTransitionEnd } = useSlideUpSheet(open);
-  const sortDialogLabel = selectedSort ?? SORT_FILTER.label;
-
-  if (!rendered) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center">
-      <button
-        type="button"
-        aria-label="정렬 닫기"
-        onClick={onClose}
-        className={`absolute inset-0 bg-neutral-900/75 transition-opacity duration-300 ${
-          isVisible ? "opacity-100" : "opacity-0"
-        }`}
-      />
-
-      <section
-        role="dialog"
-        aria-modal="true"
-        aria-label={sortDialogLabel}
-        onTransitionEnd={handleTransitionEnd}
-        className={[
-          "relative z-10 flex w-[393px] max-w-full flex-col items-start gap-[10px] rounded-t-[20px] bg-neutral-0 px-[15px] pt-[32px] pb-[48px] transition-transform duration-300 ease-out",
-          isVisible ? "translate-y-0" : "translate-y-full",
-        ].join(" ")}
-      >
-        {SORT_OPTIONS.map((option) => {
-          const isSelected = selectedSort === option;
-
-          return (
-            <button
-              key={option}
-              type="button"
-              onClick={() => {
-                onSelect(option);
-                onClose();
-              }}
-              className={[
-                "box-border flex h-6 w-full items-center justify-between px-3 font-body text-label2",
-                isSelected ? "text-primary-400" : "text-neutral-900",
-              ].join(" ")}
-            >
-              {option}
-              <span className="flex h-5 w-5 items-center justify-center">
-                {isSelected ? (
-                  <img src={CheckActiveIcon} alt="" className="h-5 w-5" />
-                ) : null}
-              </span>
-            </button>
-          );
-        })}
-      </section>
     </div>
   );
 };
@@ -494,19 +395,24 @@ const ExploreFilterSheet = ({
 const RecommendationSection = ({
   bands,
   showIntro,
+  isLoading,
+  isError,
+  onRetry,
 }: {
-  bands: RecommendedBand[];
+  bands: RecommendedBandItem[];
   showIntro: boolean;
+  isLoading: boolean;
+  isError: boolean;
+  onRetry: () => void;
 }) => {
   const navigate = useNavigate();
-  const [followingIds, setFollowingIds] = useState<Set<string>>(new Set());
-  const [followerCounts, setFollowerCounts] = useState(() =>
-    Object.fromEntries(
-      RECOMMENDED_BANDS.map((band) => [band.id, band.followers]),
-    ),
-  );
   const [unfollowTargetId, setUnfollowTargetId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const followBandMutation = useFollowExploreBand();
+  const unfollowBandMutation = useUnfollowExploreBand();
+  const unfollowTarget = bands.find((band) => band.id === unfollowTargetId);
+  const isFollowPending =
+    followBandMutation.isPending || unfollowBandMutation.isPending;
 
   useEffect(() => {
     if (!toastMessage) return;
@@ -518,35 +424,27 @@ const RecommendationSection = ({
     return () => window.clearTimeout(timerId);
   }, [toastMessage]);
 
-  const followBand = (bandId: string, bandName: string) => {
-    if (followingIds.has(bandId)) return;
+  const followBand = async (band: RecommendedBandItem) => {
+    if (band.bandId == null || band.isFollowing || isFollowPending) return;
 
-    setFollowingIds((current) => {
-      const next = new Set(current);
-      next.add(bandId);
-      return next;
-    });
-    setFollowerCounts((current) => ({
-      ...current,
-      [bandId]: current[bandId] + 1,
-    }));
-    setToastMessage(`${bandName}를 팔로우했어요`);
+    try {
+      await followBandMutation.mutateAsync(band.bandId);
+      setToastMessage(`${band.name}를 팔로우했어요`);
+    } catch {
+      setToastMessage("밴드 팔로우에 실패했어요");
+    }
   };
 
-  const confirmUnfollow = () => {
-    if (!unfollowTargetId) return;
+  const confirmUnfollow = async () => {
+    if (!unfollowTarget?.bandId || isFollowPending) return;
 
-    setFollowingIds((current) => {
-      const next = new Set(current);
-      next.delete(unfollowTargetId);
-      return next;
-    });
-    setFollowerCounts((current) => ({
-      ...current,
-      [unfollowTargetId]: Math.max(0, current[unfollowTargetId] - 1),
-    }));
-
-    setUnfollowTargetId(null);
+    try {
+      await unfollowBandMutation.mutateAsync(unfollowTarget.bandId);
+      setUnfollowTargetId(null);
+      setToastMessage(`${unfollowTarget.name} 팔로우를 취소했어요`);
+    } catch {
+      setToastMessage("팔로우 취소에 실패했어요");
+    }
   };
 
   return (
@@ -565,29 +463,56 @@ const RecommendationSection = ({
         </>
       ) : null}
 
-      {bands.length > 0 ? (
+      {isLoading ? (
+        <p className="m-0 mt-[16px] font-body text-caption2 text-neutral-600">
+          추천 밴드를 불러오는 중이에요
+        </p>
+      ) : isError ? (
+        <button
+          type="button"
+          onClick={onRetry}
+          className="mt-[16px] font-body text-caption2 text-primary-400"
+        >
+          추천 밴드 다시 불러오기
+        </button>
+      ) : bands.length > 0 ? (
         <div
           className={`flex flex-col gap-[12px] ${showIntro ? "mt-[16px]" : ""}`}
         >
           {bands.map((band) => (
           <BandCard
             key={band.id}
-            imageSrc={BandImage}
+            imageSrc={band.imageSrc}
             imageAlt={`${band.name} 프로필`}
             title={band.name}
-            subtitle={`${band.genre} · ${band.region} · 팔로워 ${
-              followerCounts[band.id]
-            }명`}
+            subtitle={`${band.genre} · ${band.region} · 팔로워 ${band.followers.toLocaleString()}명`}
             description={band.description}
-            following={followingIds.has(band.id)}
-            onClick={() => navigate(`/fan/bands/${band.id}`)}
+            following={band.isFollowing}
+            onClick={() =>
+              navigate(`/fan/bands/${band.bandId ?? band.id}`, {
+                state: {
+                  bandPreview: {
+                    bandId: band.bandId,
+                    name: band.name,
+                    genre: band.genre,
+                    region: band.region,
+                    profileImageUrl: band.imageSrc,
+                    description: band.description,
+                    followerCount: band.followers,
+                    isFollowing: band.isFollowing,
+                  },
+                },
+              })
+            }
             onToggleFollow={() => {
-              if (followingIds.has(band.id)) {
+              if (band.bandId == null || isFollowPending) return;
+
+              if (band.isFollowing) {
                 setUnfollowTargetId(band.id);
                 return;
               }
 
-              followBand(band.id, band.name);
+              void followBand(band);
             }}
             className="!h-[86px] !w-[348px] !gap-[16px]"
             contentClassName="!h-auto flex-1 shrink !w-auto"
@@ -596,7 +521,11 @@ const RecommendationSection = ({
           />
           ))}
         </div>
-      ) : null}
+      ) : (
+        <p className="m-0 mt-[16px] font-body text-caption2 text-neutral-600">
+          조건에 맞는 밴드가 없어요
+        </p>
+      )}
 
       <ModalOverlay
         open={unfollowTargetId !== null}
@@ -614,7 +543,7 @@ const RecommendationSection = ({
           cancelLabel="취소"
           confirmLabel="확인"
           onCancel={() => setUnfollowTargetId(null)}
-          onConfirm={confirmUnfollow}
+          onConfirm={() => void confirmUnfollow()}
         />
       </ModalOverlay>
 
@@ -622,6 +551,7 @@ const RecommendationSection = ({
         open={toastMessage !== null}
         message={toastMessage}
         onClose={() => setToastMessage(null)}
+        tone={toastMessage?.includes("실패") ? "error" : "success"}
       />
     </section>
   );
@@ -629,34 +559,49 @@ const RecommendationSection = ({
 
 const FanExplorePage = () => {
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
-  const [isSortSheetOpen, setIsSortSheetOpen] = useState(false);
-  const [appliedSort, setAppliedSort] = useState<SortOption | null>(null);
   const [appliedFilters, setAppliedFilters] = useState(
     DEFAULT_APPLIED_FILTERS,
   );
   const hasAppliedFilter = Object.values(appliedFilters).some(
     (value) => value !== "전체",
   );
-  const filteredBands = useMemo(() => {
-    const nextBands = RECOMMENDED_BANDS.filter((band) => {
-      const matchesGenre =
-        appliedFilters.genre === "전체" || band.genre === appliedFilters.genre;
-      const matchesRegion =
-        appliedFilters.region === "전체" ||
-        band.region === appliedFilters.region;
-      const matchesContent =
-        appliedFilters.content === "전체" ||
-        band.contentTypes.includes(appliedFilters.content);
+  const appliedSort = hasAppliedFilter ? "정확도순" : null;
+  const recommendedBandsQuery = useRecommendedExploreBandsInfiniteQuery({
+    size: 10,
+  });
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = recommendedBandsQuery;
+  const fetchedBands = useMemo(
+    () => data?.pages.flatMap((page) => page.items).map(mapBandToItem) ?? [],
+    [data],
+  );
+  const recommendedBands = useMemo(
+    () => {
+      const nextBands = fetchedBands.filter((band) => {
+        const matchesGenre =
+          appliedFilters.genre === "전체" || band.genre === appliedFilters.genre;
+        const matchesRegion =
+          appliedFilters.region === "전체" ||
+          band.region === appliedFilters.region;
+        const matchesContent =
+          appliedFilters.content === "전체" ||
+          band.contentTypes.includes(appliedFilters.content);
 
-      return matchesGenre && matchesRegion && matchesContent;
-    });
+        return matchesGenre && matchesRegion && matchesContent;
+      });
 
-    if (appliedSort === "인기순") {
-      return [...nextBands].sort((a, b) => b.followers - a.followers);
-    }
-
-    return [...nextBands].sort((a, b) => b.score - a.score);
-  }, [appliedFilters, appliedSort]);
+      return [...nextBands].sort((a, b) => b.score - a.score);
+    },
+    [appliedFilters, fetchedBands],
+  );
+  const sentinelRef = useInfiniteScrollObserver({
+    enabled: Boolean(hasNextPage) && !isFetchingNextPage,
+    onIntersect: fetchNextPage,
+  });
 
   return (
     <main className="min-h-dvh bg-neutral-0 pb-[calc(var(--bottom-nav-height)+24px)]">
@@ -664,19 +609,17 @@ const FanExplorePage = () => {
       <ExploreFilterBar
         appliedFilters={appliedFilters}
         appliedSort={appliedSort}
-        onSortClick={() => setIsSortSheetOpen(true)}
+        highlightSort={false}
         onFilterClick={() => setIsFilterSheetOpen(true)}
       />
       <RecommendationSection
-        bands={filteredBands}
+        bands={recommendedBands}
         showIntro={!hasAppliedFilter}
+        isLoading={recommendedBandsQuery.isLoading}
+        isError={recommendedBandsQuery.isError}
+        onRetry={() => void recommendedBandsQuery.refetch()}
       />
-      <ExploreSortSheet
-        open={isSortSheetOpen}
-        onClose={() => setIsSortSheetOpen(false)}
-        selectedSort={appliedSort}
-        onSelect={setAppliedSort}
-      />
+      <div ref={sentinelRef} aria-hidden="true" className="h-px w-full" />
       <ExploreFilterSheet
         open={isFilterSheetOpen}
         onClose={() => setIsFilterSheetOpen(false)}

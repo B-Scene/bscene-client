@@ -1,4 +1,5 @@
 import {
+  useEffect,
   useRef,
   useState,
   type ChangeEvent,
@@ -11,6 +12,7 @@ import {
   useSessionProfileQuery,
   useUpdateSessionProfile,
 } from "@/hooks/api/session/useSessionProfile";
+import { uploadMediaFile } from "@/utils/uploadMediaFile";
 import type {
   SessionApiResponse,
   SessionProfileGender,
@@ -93,6 +95,8 @@ const SessionBasicProfileEditForm = ({
   const updateProfileMutation = useUpdateSessionProfile();
 
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   const [saveErrorMessage, setSaveErrorMessage] = useState("");
   const [values, setValues] = useState<BasicProfileValues>({
     name: profile.name,
@@ -103,15 +107,22 @@ const SessionBasicProfileEditForm = ({
     profileImageUrl: profile.profileImageUrl,
   });
 
+  useEffect(() => {
+    return () => {
+      if (previewImage) {
+        URL.revokeObjectURL(previewImage);
+      }
+    };
+  }, [previewImage]);
+
   const handleProfileImageChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
 
     if (!file) return;
 
+    setProfileImageFile(file);
     setPreviewImage(URL.createObjectURL(file));
-    setSaveErrorMessage(
-      "이미지 저장은 Presigned URL 업로드 API 연결 후 반영돼요. 현재는 미리보기만 가능합니다.",
-    );
+    setSaveErrorMessage("");
   };
 
   const handleEmailChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -132,12 +143,17 @@ const SessionBasicProfileEditForm = ({
 
   const handleSave = async () => {
     setSaveErrorMessage("");
+    setIsSaving(true);
 
     try {
+      const profileImageUrl = profileImageFile
+        ? await uploadMediaFile(profileImageFile, "SESSION_PROFILE")
+        : values.profileImageUrl;
+
       await updateProfileMutation.mutateAsync({
         email: values.email.trim() || undefined,
         gender: values.gender,
-        profileImageUrl: values.profileImageUrl ?? undefined,
+        profileImageUrl: profileImageUrl ?? undefined,
       });
 
       onBack();
@@ -148,6 +164,8 @@ const SessionBasicProfileEditForm = ({
       setSaveErrorMessage(
         apiMessage ?? "기본 정보 수정에 실패했어요. 잠시 후 다시 시도해주세요.",
       );
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -230,11 +248,11 @@ const SessionBasicProfileEditForm = ({
       <div className="fixed inset-x-0 bottom-[var(--bottom-nav-height)] z-20 bg-neutral-0 px-5 pt-4 pb-5">
         <button
           type="button"
-          disabled={updateProfileMutation.isPending}
+          disabled={isSaving}
           onClick={handleSave}
           className="flex h-[52px] w-full items-center justify-center rounded-[12px] bg-secondary-500 text-label2 text-neutral-0 disabled:bg-neutral-300 disabled:text-neutral-700"
         >
-          {updateProfileMutation.isPending ? "저장 중" : "프로필 저장"}
+          {isSaving ? "저장 중" : "프로필 저장"}
         </button>
       </div>
     </main>
