@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import "@/styles/tokens/color.css";
+import { Header } from "@/components/band/home/Header";
 import MicIcon from "@/assets/icons/ic_Mic.svg";
 import MicEllipseIcon from "@/assets/icons/Mic_Ellipse.svg";
 import LiveStartIcon from "@/assets/icons/band/live-start.svg";
 import LiveStopIcon from "@/assets/icons/band/live-stop.svg";
 import { cx } from "../utils";
-import { TopBar } from "./TopBar";
 
 interface MicTestScreenProps {
   onBack: () => void;
@@ -231,12 +231,7 @@ export function MicTestScreen({
         );
       }
     },
-    [
-      clearTimers,
-      finishMicTest,
-      stopAudioResources,
-      updateElapsedSeconds,
-    ],
+    [clearTimers, finishMicTest, stopAudioResources, updateElapsedSeconds],
   );
 
   useEffect(() => {
@@ -271,10 +266,25 @@ export function MicTestScreen({
 
   return (
     <main className="relative min-h-dvh bg-neutral-0 text-neutral-900">
-      <TopBar title="마이크 테스트" onBack={handleBack} onClose={handleClose} />
+      <Header
+        title="마이크 테스트"
+        showBack
+        variant="main"
+        onBack={handleBack}
+      />
 
-      <section className="flex flex-col items-center px-5 pt-[54px]">
-        <div className="flex w-[215px] flex-col items-center gap-2 text-center">
+      <button
+        type="button"
+        onClick={handleClose}
+        aria-label="닫기"
+        className="absolute right-5 top-0 z-20 flex h-[52px] w-10 items-center justify-center"
+      >
+        <span className="absolute h-[28px] w-[2.5px] rotate-45 rounded-full bg-neutral-500" />
+        <span className="absolute h-[28px] w-[2.5px] -rotate-45 rounded-full bg-neutral-500" />
+      </button>
+
+      <section className="flex flex-col items-center px-5 pt-[46px]">
+        <div className="flex w-full max-w-[300px] flex-col items-center gap-2 text-center">
           <h1 className="text-h4 font-bold text-neutral-900">
             마이크 볼륨을 테스트해 보세요
           </h1>
@@ -284,7 +294,7 @@ export function MicTestScreen({
           </p>
         </div>
 
-        <div className="mt-[45px] flex flex-col items-center">
+        <div className="mt-[42px] flex flex-col items-center">
           <button
             type="button"
             onClick={handleTogglePlayback}
@@ -298,7 +308,7 @@ export function MicTestScreen({
               src={MicEllipseIcon}
               alt=""
               className={cx(
-                "absolute inset-0 h-full w-full object-contain transition-opacity",
+                "absolute inset-0 h-[135px] w-[135px] object-contain transition-opacity",
                 isTesting ? "opacity-100" : "opacity-80",
               )}
             />
@@ -306,18 +316,18 @@ export function MicTestScreen({
             <img
               src={MicIcon}
               alt=""
-              className="relative z-10 h-[72px] w-[72px] object-contain"
+              className="relative z-10 h-[77px] w-[77px] object-contain"
             />
           </button>
 
-          <span className="mt-4 h-4 text-caption4 font-bold text-secondary-500">
+          <span className="mt-3 h-4 text-caption4 font-bold text-secondary-500">
             {isTesting || isCompleted || elapsedSeconds > 0
               ? formatSeconds(elapsedSeconds)
               : ""}
           </span>
         </div>
 
-        <section className="mt-[34px] w-full max-w-[335px] rounded-[12px] bg-neutral-0 px-6 py-5 shadow-[0_4px_15px_rgba(20,20,20,0.08)]">
+        <section className="mt-[22px] w-full max-w-[335px] rounded-[12px] bg-neutral-0 px-6 py-5 shadow-[0_4px_15px_rgba(20,20,20,0.08)]">
           <div className="flex h-9 items-end justify-between">
             {Array.from({ length: VOLUME_BAR_COUNT }).map((_, index) => {
               const isActive = index < volumeLevel;
@@ -361,7 +371,7 @@ export function MicTestScreen({
           </p>
         ) : null}
 
-        <section className="mt-[34px] flex h-[56px] w-full max-w-[353px] items-center rounded-[10px] bg-secondary-0 px-5 shadow-[0_4px_15px_rgba(20,20,20,0.04)]">
+        <section className="mt-[24px] flex h-[56px] w-full max-w-[353px] items-center rounded-[10px] bg-secondary-0 px-5 shadow-[0_4px_15px_rgba(20,20,20,0.04)]">
           <button
             type="button"
             onClick={handleTogglePlayback}

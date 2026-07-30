@@ -164,9 +164,9 @@ export interface CreateLiveResponse {
   playback?: LivePlayback;
 }
 
-export type PlaybackRole = "BROADCASTER" | "LISTENER";
+export type PlaybackRole = "BROADCASTER" | "LISTENER" | "CO_HOST";
 
-export type PlaybackProtocol = "WHIP" | "HLS";
+export type PlaybackProtocol = "WHIP" | "HLS" | "WHEP";
 
 export interface LivePlayback {
   role: PlaybackRole;
@@ -273,3 +273,9 @@ export interface UpdateLiveReservationRequest {
 export interface UpdateLiveReservationResponse {
   liveId?: number;
 }
+
+export interface RespondCoHostInvitationRequest {
+  isAccepted: boolean;
+}
+
+export type RespondCoHostInvitationResponse = null;

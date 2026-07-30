@@ -18,6 +18,8 @@ import type {
   ReportLiveUserResponse,
   ReplayListResponse,
   ReplayPlaybackResponse,
+  RespondCoHostInvitationRequest,
+  RespondCoHostInvitationResponse,
   ScheduledLiveListResponse,
   ToggleLiveAlarmResponse,
   UpdateLiveReservationRequest,
@@ -38,14 +40,8 @@ type MaybePaginatedResponse<T> =
       data?: T[];
       list?: T[];
       liveNow?: T[];
-      liveNowList?: T[];
-      now?: T[];
-      lives?: T[];
       scheduled?: T[];
-      scheduledLives?: T[];
-      reservations?: T[];
       replays?: T[];
-      replayList?: T[];
       pageInfo?: {
         nextCursor?: number | null;
         hasNext?: boolean;
@@ -250,14 +246,8 @@ const getPaginatedItems = <T>(result: MaybePaginatedResponse<T>) => {
     result.data ??
     result.list ??
     result.liveNow ??
-    result.liveNowList ??
-    result.now ??
-    result.lives ??
     result.scheduled ??
-    result.scheduledLives ??
-    result.reservations ??
     result.replays ??
-    result.replayList ??
     []
   );
 };
@@ -417,39 +407,17 @@ const parseErrorMessage = (responseText: string, fallbackMessage: string) => {
 };
 
 export const getLiveHome = async (): Promise<LiveHomeResponse> => {
-  const response = await axiosInstance.get<
-    LiveApiResponse<
-      Partial<LiveHomeResponse> & {
-        liveNowList?: MaybePaginatedResponse<
-          LiveHomeResponse["liveNow"][number]
-        >;
-        now?: MaybePaginatedResponse<LiveHomeResponse["liveNow"][number]>;
-        scheduledLives?: MaybePaginatedResponse<
-          LiveHomeResponse["scheduled"][number]
-        >;
-        reservations?: MaybePaginatedResponse<
-          LiveHomeResponse["scheduled"][number]
-        >;
-        replayList?: MaybePaginatedResponse<
-          LiveHomeResponse["replays"][number]
-        >;
-      }
-    >
-  >("/lives/home");
+  const response =
+    await axiosInstance.get<LiveApiResponse<Partial<LiveHomeResponse>>>(
+      "/lives/home",
+    );
 
   const result = unwrapResult(response.data);
-  const liveNow = getPaginatedItems(
-    result.liveNow ?? result.liveNowList ?? result.now,
-  );
-  const replays = getPaginatedItems(result.replays ?? result.replayList);
-  const scheduled = getPaginatedItems(
-    result.scheduled ?? result.scheduledLives ?? result.reservations,
-  );
 
   return {
-    liveNow,
-    replays: replays.map(normalizeReplayLiveId),
-    scheduled,
+    liveNow: result.liveNow ?? [],
+    replays: (result.replays ?? []).map(normalizeReplayLiveId),
+    scheduled: result.scheduled ?? [],
   };
 };
 
@@ -652,7 +620,10 @@ export const updateLiveReservation = async ({
 }): Promise<UpdateLiveReservationResponse | null> => {
   const response = await axiosInstance.patch<
     LiveApiResponse<UpdateLiveReservationResponse | null>
-  >(`/lives/${liveId}/reservation`, normalizeUpdateLiveReservationRequest(request));
+  >(
+    `/lives/${liveId}/reservation`,
+    normalizeUpdateLiveReservationRequest(request),
+  );
 
   return unwrapResult(response.data);
 };
@@ -661,6 +632,20 @@ export const cancelLiveReservation = async (
   liveId: number,
 ): Promise<void> => {
   await axiosInstance.delete(`/lives/${liveId}/reservation`);
+};
+
+export const respondCoHostInvitation = async ({
+  liveId,
+  request,
+}: {
+  liveId: number;
+  request: RespondCoHostInvitationRequest;
+}): Promise<RespondCoHostInvitationResponse> => {
+  const response = await axiosInstance.patch<
+    LiveApiResponse<RespondCoHostInvitationResponse>
+  >(`/lives/${liveId}/co-host-invitation`, request);
+
+  return unwrapResult(response.data);
 };
 
 export const createWhipSession = async ({

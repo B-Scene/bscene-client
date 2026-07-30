@@ -1,105 +1,198 @@
-import { useCallback, useMemo } from "react";
 import type { AxiosError } from "axios";
+import LiveHeadIcon from "@/assets/icons/live-head.svg";
+import { Header } from "@/components/band/home/Header";
+import { BottomNavBar } from "@/components/layout/BottomNavBar";
 import {
   useEnterLiveMutation,
   useLiveHomeQuery,
-  useLiveNowQuery,
   useScheduledLiveQuery,
 } from "@/hooks/api/live/useLive";
-import { useInfiniteScrollObserver } from "@/hooks/useInfiniteScrollObserver";
-import type { LiveApiResponse } from "@/types/live/live";
+import type {
+  LiveApiResponse,
+  ScheduledLiveItem,
+  ScheduledLiveListItem,
+} from "@/types/live/live";
 import type {
   ActiveLive,
   GoLiveScreen,
   LiveCard,
   ScheduledLiveCardData,
 } from "./types";
-import { HomeLiveCard, ScheduledLiveCard } from "./BandLiveHome";
-import { TopBar } from "./components/TopBar";
+import { LiveIllustration } from "./components/LiveIllustration";
+import { ProfileImage } from "./components/ProfileImage";
+import { SectionHeader } from "./components/SectionHeader";
 
-interface BandLiveListPageProps {
+export function HomeLiveCard({
+  live,
+  onEnter,
+  disabled,
+}: {
+  live: LiveCard;
+  onEnter: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <article className="relative flex h-[88px] items-center rounded-[10px] bg-neutral-0 px-4 shadow-[0_4px_15px_rgba(20,20,20,0.08)]">
+      <div className="relative shrink-0">
+        <ProfileImage glow src={live.imageUrl ?? undefined} />
+        <span className="absolute -bottom-1 left-1/2 flex h-3 w-[27px] -translate-x-1/2 items-center justify-center rounded-full bg-secondary-500 text-label4 text-neutral-0">
+          LIVE
+        </span>
+      </div>
+
+      <div className="ml-4 min-w-0 flex-1 pr-[62px]">
+        <strong className="block truncate text-body1 text-neutral-900">
+          {live.title}
+        </strong>
+        <span className="mt-0.5 block truncate text-body3 text-neutral-700">
+          {live.subtitle}
+        </span>
+        <span className="mt-1 block text-caption2 text-secondary-500">
+          <span className="inline-flex items-center gap-1.5">
+            <img
+              src={LiveHeadIcon}
+              alt=""
+              className="h-[13px] w-3 object-contain"
+            />
+            {live.listeners}
+          </span>
+        </span>
+      </div>
+
+      <button
+        type="button"
+        onClick={onEnter}
+        disabled={disabled}
+        className="absolute right-4 bottom-3 flex h-[22px] w-[51px] items-center justify-center rounded-full border border-secondary-500 bg-neutral-0 text-caption3 text-secondary-500 disabled:opacity-50"
+      >
+        입장
+      </button>
+    </article>
+  );
+}
+
+export function ScheduledLiveCard({
+  live,
+  onEdit,
+}: {
+  live: ScheduledLiveCardData;
+  onEdit: () => void;
+}) {
+  return (
+    <article className="flex h-[88px] items-center rounded-[10px] bg-neutral-0 px-4 shadow-[0_4px_15px_rgba(20,20,20,0.08)]">
+      <ProfileImage src={live.imageUrl ?? undefined} />
+
+      <div className="ml-4 min-w-0 flex-1">
+        <strong className="block truncate text-body1 text-neutral-900">
+          {live.isMine ? "내 예정 라이브" : live.bandName}
+        </strong>
+        <span className="mt-0.5 block truncate text-body3 text-neutral-700">
+          {live.title}
+        </span>
+        <span className="mt-1 block truncate text-caption2 text-secondary-500">
+          {live.scheduledAt}
+        </span>
+      </div>
+
+      {live.isMine ? (
+        <button
+          type="button"
+          onClick={onEdit}
+          className="flex h-8 w-[69px] items-center justify-center rounded-lg bg-secondary-0 text-caption3 text-secondary-500"
+        >
+          수정
+        </button>
+      ) : null}
+    </article>
+  );
+}
+
+interface BandLiveHomeProps {
   go: GoLiveScreen;
-}
-
-interface BandLiveNowListPageProps extends BandLiveListPageProps {
   onEnterLive: (live: ActiveLive) => void;
-}
-
-interface BandLiveScheduledListPageProps extends BandLiveListPageProps {
   onEditReservation: (liveId: number) => void;
 }
 
-function ListMessage({
-  children,
-  onRetry,
-}: {
-  children: string;
-  onRetry?: () => void;
-}) {
-  return (
-    <div className="py-12 text-center">
-      <p className="text-caption2 text-neutral-500">{children}</p>
-      {onRetry ? (
-        <button
-          type="button"
-          onClick={onRetry}
-          className="mt-3 rounded-lg bg-secondary-500 px-4 py-2 text-caption3 text-neutral-0"
-        >
-          다시 불러오기
-        </button>
-      ) : null}
-    </div>
-  );
-}
+const getScheduledImageUrl = (
+  live: ScheduledLiveItem | ScheduledLiveListItem,
+) => {
+  return live.bandProfileImageUrl ?? live.thumbnailImageUrl ?? null;
+};
 
-export function BandLiveNowListPage({
+const mapScheduledToCard = (
+  live: ScheduledLiveItem | ScheduledLiveListItem,
+): ScheduledLiveCardData => {
+  return {
+    id: live.liveId,
+    bandName: live.bandName,
+    title: live.title,
+    scheduledAt: live.scheduledAt,
+    isMine: Boolean(live.isMine),
+    imageUrl: getScheduledImageUrl(live),
+  };
+};
+
+export function BandLiveHome({
   go,
   onEnterLive,
-}: BandLiveNowListPageProps) {
+  onEditReservation,
+}: BandLiveHomeProps) {
   const {
     data,
-    fetchNextPage,
-    hasNextPage,
-    isError,
-    isFetchingNextPage,
-    isLoading,
-    refetch,
-  } = useLiveNowQuery("all");
+    isLoading: isHomeLoading,
+    isError: isHomeError,
+    refetch: refetchHome,
+  } = useLiveHomeQuery();
+
+  const {
+    data: scheduledListData,
+    isLoading: isScheduledLoading,
+    isError: isScheduledError,
+    refetch: refetchScheduled,
+  } = useScheduledLiveQuery(false);
+
   const enterLiveMutation = useEnterLiveMutation();
 
-  const liveCards = useMemo<LiveCard[]>(
-    () =>
-      data?.pages.flatMap((page) =>
-        page.items.map((live) => ({
-          id: live.liveId,
-          title: live.isMine ? "내 라이브 진행 중" : live.bandName,
-          subtitle: live.title,
-          listeners: `${(
-            live.viewerCount ??
-            live.viewCount ??
-            0
-          ).toLocaleString()}명 청취 중`,
-          imageUrl:
-            live.bandProfileImageUrl ?? live.thumbnailImageUrl ?? null,
-          isMine: live.isMine,
-        })),
-      ) ?? [],
-    [data],
-  );
+  const liveNowCards: LiveCard[] =
+    data?.liveNow.map((live) => ({
+      id: live.liveId,
+      title: live.isMine ? "내 라이브 진행 중" : live.bandName,
+      subtitle: live.title,
+      listeners: `${live.viewerCount}명 청취 중`,
+      imageUrl: live.bandProfileImageUrl,
+      isMine: live.isMine,
+    })) ?? [];
 
-  const loadMore = useCallback(() => {
-    if (!hasNextPage || isFetchingNextPage) return;
-    void fetchNextPage();
-  }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
+  const scheduledFromHome = data?.scheduled ?? [];
+  const scheduledFromList =
+    scheduledListData?.pages.flatMap((page) => page.items ?? []) ?? [];
 
-  const loadMoreRef = useInfiniteScrollObserver({
-    enabled: Boolean(hasNextPage) && !isFetchingNextPage,
-    onIntersect: loadMore,
+  const mergedScheduledMap = new Map<
+    number,
+    ScheduledLiveItem | ScheduledLiveListItem
+  >();
+
+  scheduledFromList.forEach((live) => {
+    mergedScheduledMap.set(live.liveId, live);
   });
 
-  const handleEnterLive = async (liveId: number) => {
-    if (enterLiveMutation.isPending) return;
+  scheduledFromHome.forEach((live) => {
+    mergedScheduledMap.set(live.liveId, live);
+  });
 
+  const scheduledCards = Array.from(mergedScheduledMap.values()).map(
+    mapScheduledToCard,
+  );
+
+  const isLoading = isHomeLoading || isScheduledLoading;
+  const isError = isHomeError && isScheduledError;
+
+  const handleRetry = () => {
+    void refetchHome();
+    void refetchScheduled();
+  };
+
+  const handleEnterLive = async (liveId: number) => {
     try {
       const enteredLive = await enterLiveMutation.mutateAsync(liveId);
 
@@ -109,144 +202,109 @@ export function BandLiveNowListPage({
       const apiMessage = (error as AxiosError<LiveApiResponse<null>>).response
         ?.data?.message;
 
-      alert(apiMessage ?? "라이브방에 입장하지 못했어요.");
+      alert(apiMessage ?? "라이브 입장에 실패했어요.");
     }
   };
 
   return (
-    <main className="relative h-dvh overflow-hidden bg-neutral-0 text-neutral-900">
-      <TopBar title="진행 중인 라이브" onBack={() => go("home")} />
+    <main className="relative min-h-dvh bg-neutral-0 pb-[calc(var(--bottom-nav-height)+24px)] text-neutral-900">
+      <Header title="라이브" showBack={false} variant="main" />
 
-      <section className="h-[calc(100%_-_64px)] overflow-y-auto px-5 pb-8">
-        {isLoading ? <ListMessage>라이브 목록을 불러오는 중이에요.</ListMessage> : null}
-
-        {isError ? (
-          <ListMessage onRetry={() => void refetch()}>
-            라이브 목록을 불러오지 못했어요.
-          </ListMessage>
-        ) : null}
-
-        {!isLoading && !isError && liveCards.length === 0 ? (
-          <ListMessage>현재 진행 중인 라이브가 없어요.</ListMessage>
-        ) : null}
-
-        {!isLoading && !isError && liveCards.length > 0 ? (
-          <div className="grid gap-3 pt-5">
-            {liveCards.map((live) => (
-              <HomeLiveCard
-                key={live.id}
-                disabled={enterLiveMutation.isPending}
-                live={live}
-                onEnter={() => void handleEnterLive(live.id)}
-              />
-            ))}
-
-            <div ref={loadMoreRef} className="h-1" />
-
-            {isFetchingNextPage ? (
-              <p className="py-3 text-center text-caption2 text-neutral-500">
-                라이브를 더 불러오는 중이에요.
-              </p>
-            ) : null}
+      <div className="px-5">
+        <section className="mt-5 flex h-[164px] w-full items-center justify-between rounded-xl bg-secondary-0 px-[18px] shadow-[0_4px_15px_rgba(20,20,20,0.08)]">
+          <div className="min-w-0">
+            <h2 className="text-[17px] leading-5 font-bold text-neutral-900">
+              지금, 오디오 라이브를
+              <br />
+              시작 해보세요!
+            </h2>
+            <p className="mt-2 text-caption2 text-neutral-700">
+              목소리만으로 팬들과 실시간 소통,
+              <br />
+              팔로워가 없어도 바로
+              <br />
+              시작할 수 있어요.
+            </p>
+            <button
+              type="button"
+              onClick={() => go("instantForm")}
+              className="mt-3 flex h-[30px] w-[91px] items-center justify-center rounded-md bg-secondary-500 text-caption3 text-neutral-0"
+            >
+              라이브 시작하기
+            </button>
           </div>
-        ) : null}
-      </section>
-    </main>
-  );
-}
 
-export function BandLiveScheduledListPage({
-  go,
-  onEditReservation,
-}: BandLiveScheduledListPageProps) {
-  const {
-    data,
-    fetchNextPage,
-    hasNextPage,
-    isError,
-    isFetchingNextPage,
-    isLoading,
-    refetch,
-  } = useScheduledLiveQuery(false);
-  const { data: liveHome } = useLiveHomeQuery();
+          <LiveIllustration />
+        </section>
 
-  const previewScheduleByLiveId = useMemo(
-    () =>
-      new Map(
-        (liveHome?.scheduled ?? []).map((live) => [
-          live.liveId,
-          live.scheduledAt,
-        ]),
-      ),
-    [liveHome?.scheduled],
-  );
-
-  const scheduledCards = useMemo<ScheduledLiveCardData[]>(
-    () =>
-      data?.pages.flatMap((page) =>
-        page.items.map((live) => ({
-          id: live.liveId,
-          bandName: live.bandName,
-          title: live.title,
-          scheduledAt:
-            previewScheduleByLiveId.get(live.liveId) ?? live.scheduledAt,
-          isMine: Boolean(live.isMine),
-          imageUrl:
-            live.bandProfileImageUrl ?? live.thumbnailImageUrl ?? null,
-        })),
-      ) ?? [],
-    [data, previewScheduleByLiveId],
-  );
-
-  const loadMore = useCallback(() => {
-    if (!hasNextPage || isFetchingNextPage) return;
-    void fetchNextPage();
-  }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
-
-  const loadMoreRef = useInfiniteScrollObserver({
-    enabled: Boolean(hasNextPage) && !isFetchingNextPage,
-    onIntersect: loadMore,
-  });
-
-  return (
-    <main className="relative h-dvh overflow-hidden bg-neutral-0 text-neutral-900">
-      <TopBar title="예정된 라이브" onBack={() => go("home")} />
-
-      <section className="h-[calc(100%_-_64px)] overflow-y-auto px-5 pb-8">
         {isLoading ? (
-          <ListMessage>예정된 라이브를 불러오는 중이에요.</ListMessage>
+          <p className="mt-8 text-center text-caption2 text-neutral-500">
+            라이브를 불러오는 중이에요.
+          </p>
         ) : null}
 
         {isError ? (
-          <ListMessage onRetry={() => void refetch()}>
-            예정된 라이브를 불러오지 못했어요.
-          </ListMessage>
-        ) : null}
-
-        {!isLoading && !isError && scheduledCards.length === 0 ? (
-          <ListMessage>예정된 라이브가 없어요.</ListMessage>
-        ) : null}
-
-        {!isLoading && !isError && scheduledCards.length > 0 ? (
-          <div className="grid gap-3 pt-5">
-            {scheduledCards.map((live) => (
-              <ScheduledLiveCard
-                key={live.id}
-                live={live}
-                onEdit={() => onEditReservation(live.id)}
-              />
-            ))}
-
-            <div ref={loadMoreRef} className="h-1" />
-
-            {isFetchingNextPage ? (
-              <p className="py-3 text-center text-caption2 text-neutral-500">
-                라이브를 더 불러오는 중이에요.
-              </p>
-            ) : null}
+          <div className="mt-8 rounded-xl bg-secondary-0 p-5 text-center">
+            <p className="text-caption2 text-neutral-700">
+              라이브 정보를 불러오지 못했어요.
+            </p>
+            <button
+              type="button"
+              onClick={handleRetry}
+              className="mt-3 rounded-lg bg-secondary-500 px-4 py-2 text-caption3 text-neutral-0"
+            >
+              다시 불러오기
+            </button>
           </div>
         ) : null}
-      </section>
+
+        <section className="mt-8">
+          <SectionHeader
+            title="진행 중인 라이브"
+            onClick={() => go("liveNowList")}
+          />
+          <div className="mt-3 grid gap-3">
+            {liveNowCards.length > 0 ? (
+              liveNowCards.map((live) => (
+                <HomeLiveCard
+                  key={live.id}
+                  live={live}
+                  disabled={enterLiveMutation.isPending}
+                  onEnter={() => handleEnterLive(live.id)}
+                />
+              ))
+            ) : (
+              <p className="rounded-xl bg-secondary-0 py-6 text-center text-caption2 text-neutral-500">
+                진행 중인 라이브가 없어요.
+              </p>
+            )}
+          </div>
+        </section>
+
+        <section className="mt-8">
+          <SectionHeader
+            title="예정된 라이브"
+            onClick={() => go("scheduledList")}
+          />
+          <div className="mt-3 grid gap-3">
+            {scheduledCards.length > 0 ? (
+              scheduledCards.map((live) => (
+                <ScheduledLiveCard
+                  key={live.id}
+                  live={live}
+                  onEdit={() => onEditReservation(live.id)}
+                />
+              ))
+            ) : (
+              <p className="rounded-xl bg-secondary-0 py-6 text-center text-caption2 text-neutral-500">
+                예정된 라이브가 없어요.
+              </p>
+            )}
+          </div>
+        </section>
+      </div>
+
+      <BottomNavBar modeOverride="band" />
     </main>
   );
 }

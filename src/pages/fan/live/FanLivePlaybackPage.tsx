@@ -160,7 +160,7 @@ export function FanLivePlaybackPage() {
     isError,
     isLoading,
     refetch,
-  } = useReplayPlaybackQuery(hasValidLiveId ? liveId : null);
+  } = useReplayPlaybackQuery(hasValidLiveId ? liveId : undefined);
   const audioRef = useRef<HTMLAudioElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const [playing, setPlaying] = useState(false);

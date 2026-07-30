@@ -1,5 +1,6 @@
 import type { AxiosError } from "axios";
 import LiveHeadIcon from "@/assets/icons/live-head.svg";
+import { Header } from "@/components/band/home/Header";
 import { BottomNavBar } from "@/components/layout/BottomNavBar";
 import {
   useEnterLiveMutation,
@@ -20,7 +21,6 @@ import type {
 import { LiveIllustration } from "./components/LiveIllustration";
 import { ProfileImage } from "./components/ProfileImage";
 import { SectionHeader } from "./components/SectionHeader";
-import { TopBar } from "./components/TopBar";
 
 export function HomeLiveCard({
   live,
@@ -116,11 +116,7 @@ interface BandLiveHomeProps {
 const getScheduledImageUrl = (
   live: ScheduledLiveItem | ScheduledLiveListItem,
 ) => {
-  return (
-    live.bandProfileImageUrl ??
-    live.thumbnailImageUrl ??
-    null
-  );
+  return live.bandProfileImageUrl ?? live.thumbnailImageUrl ?? null;
 };
 
 const mapScheduledToCard = (
@@ -212,7 +208,7 @@ export function BandLiveHome({
 
   return (
     <main className="relative min-h-dvh bg-neutral-0 pb-[calc(var(--bottom-nav-height)+24px)] text-neutral-900">
-      <TopBar title="라이브" variant="main" />
+      <Header title="라이브" showBack={false} variant="main" />
 
       <div className="px-5">
         <section className="mt-5 flex h-[164px] w-full items-center justify-between rounded-xl bg-secondary-0 px-[18px] shadow-[0_4px_15px_rgba(20,20,20,0.08)]">

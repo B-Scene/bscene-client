@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { AxiosError } from "axios";
+import { Header } from "@/components/band/home/Header";
 import { BottomNavBar } from "@/components/layout/BottomNavBar";
 import {
   useCreateLiveMutation,
@@ -19,7 +20,6 @@ import type { ActiveLive, GoLiveScreen, LiveFormMode } from "./types";
 import { ConfirmDialog } from "./components/ConfirmDialog";
 import { CoHostSelectionScreen } from "./components/CoHostSelectionScreen";
 import { MicTestScreen } from "./components/MicTestScreen";
-import { TopBar } from "./components/TopBar";
 import {
   ChoiceCard,
   CoHostCard,
@@ -89,9 +89,7 @@ const getInitialSelectedCoHostIds = (
 ) => {
   return candidates
     .filter((candidate) => {
-      return (
-        candidate.status === "APPROVED" || candidate.status === "INVITED"
-      );
+      return candidate.status === "APPROVED" || candidate.status === "INVITED";
     })
     .map((candidate) => candidate.bandMemberId);
 };
@@ -108,6 +106,33 @@ const isSameNumberArray = (leftValues: number[], rightValues: number[]) => {
 
   return left.every((value, index) => value === right[index]);
 };
+
+function HeaderBackButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="뒤로가기"
+      className="absolute top-0 left-5 z-20 flex h-[52px] w-10 items-center justify-center"
+    >
+      <span className="block h-[18px] w-[18px] rotate-45 border-b-[2.5px] border-l-[2.5px] border-[#1D1A1A]" />
+    </button>
+  );
+}
+
+function HeaderCloseButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="닫기"
+      className="absolute top-0 right-5 z-20 flex h-[52px] w-10 items-center justify-center"
+    >
+      <span className="absolute h-[28px] w-[2.5px] rotate-45 rounded-full bg-neutral-500" />
+      <span className="absolute h-[28px] w-[2.5px] -rotate-45 rounded-full bg-neutral-500" />
+    </button>
+  );
+}
 
 export function LiveForm({
   mode,
@@ -442,11 +467,13 @@ export function LiveForm({
 
   return (
     <main className="relative min-h-dvh bg-secondary-0 pb-[calc(var(--bottom-nav-height)+32px)] text-neutral-900">
-      <TopBar
+      <Header
         title={isReservationMode ? "라이브 예약 수정" : "라이브 시작"}
-        onBack={handleBack}
-        onClose={handleClose}
+        showBack={false}
+        variant="main"
       />
+      <HeaderBackButton onClick={handleBack} />
+      <HeaderCloseButton onClick={handleClose} />
 
       <div className="grid gap-3 px-5 pt-3 pb-6">
         {!isEdit ? (

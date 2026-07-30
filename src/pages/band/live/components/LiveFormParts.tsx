@@ -1,8 +1,4 @@
-import {
-  useRef,
-  type ChangeEvent,
-  type ReactNode,
-} from "react";
+import { useRef, type ChangeEvent, type ReactNode } from "react";
 import AddImageIcon from "@/assets/icons/band/add-image.svg";
 import ArrowDownGrayIcon from "@/assets/icons/band/arrow-down-gray.svg";
 import CalendarIcon from "@/assets/icons/band/data-range.svg";
@@ -242,6 +238,9 @@ export function DateTimeSelector({
   const dateInputRef = useRef<HTMLInputElement>(null);
   const timeInputRef = useRef<HTMLInputElement>(null);
 
+  const hasSelectedDate = Boolean(date);
+  const hasSelectedTime = Boolean(time);
+
   const openNativePicker = (input: HTMLInputElement | null) => {
     if (!input) return;
 
@@ -266,7 +265,14 @@ export function DateTimeSelector({
           onClick={() => openNativePicker(dateInputRef.current)}
           className="flex h-9 w-full items-center gap-4 text-left"
         >
-          <img src={CalendarIcon} alt="" className="size-6 shrink-0" />
+          <img
+            src={CalendarIcon}
+            alt=""
+            className={cx(
+              "size-6 shrink-0",
+              hasSelectedDate ? "brightness-0" : "",
+            )}
+          />
 
           <span className="flex-1">
             <span className="block text-caption2 text-neutral-500">
@@ -299,7 +305,14 @@ export function DateTimeSelector({
           onClick={() => openNativePicker(timeInputRef.current)}
           className="flex h-9 w-full items-center gap-4 text-left"
         >
-          <img src={ClockIcon} alt="" className="size-6 shrink-0" />
+          <img
+            src={ClockIcon}
+            alt=""
+            className={cx(
+              "size-6 shrink-0",
+              hasSelectedTime ? "brightness-0" : "",
+            )}
+          />
 
           <span className="flex-1">
             <span className="block text-caption2 text-neutral-500">
