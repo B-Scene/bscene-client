@@ -44,6 +44,9 @@ export const Header = ({
       ? "text-[20px] leading-6 font-bold text-neutral-900"
       : "text-label2 text-neutral-900";
 
+  const betweenPaddingLeft = isCompact ? "pl-3.75" : "pl-6";
+  const betweenPaddingRight = rightContent ? "pr-6" : isCompact ? "pr-3.75" : "pr-6";
+
   return (
     <header
       className={`relative flex bg-neutral-0 ${
@@ -53,7 +56,7 @@ export const Header = ({
             }`
           : `h-12 items-center ${
               isBetween
-                ? `justify-between ${isCompact ? "px-3.75" : "px-6"}`
+                ? `justify-between ${betweenPaddingLeft} ${betweenPaddingRight}`
                 : "justify-center px-3.75"
             }`
       } ${className}`}

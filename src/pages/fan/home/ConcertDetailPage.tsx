@@ -296,11 +296,7 @@ const getPerformanceDate = (detail?: FanPerformanceDetailResponse) => {
   const dateValue =
     detail.startAt ?? detail.startDateTime ?? detail.performanceDate;
 
-  if (
-    dateValue &&
-    detail.performanceTime &&
-    !dateValue.includes("T")
-  ) {
+  if (dateValue && detail.performanceTime && !dateValue.includes("T")) {
     return toDate(`${dateValue}T${detail.performanceTime}`);
   }
 
@@ -371,7 +367,9 @@ const getDetailLocation = (detail?: FanPerformanceDetailResponse) => {
 };
 
 const getDetailMeta = (detail?: FanPerformanceDetailResponse) => {
-  return [detail?.genre, detail?.region].filter(Boolean).join(" · ") || "장르 · 지역";
+  return (
+    [detail?.genre, detail?.region].filter(Boolean).join(" · ") || "장르 · 지역"
+  );
 };
 
 const getDetailDescription = (detail?: FanPerformanceDetailResponse) => {
@@ -395,16 +393,14 @@ const ConcertDetailPage = () => {
   const concertIntroRef = useRef<HTMLElement | null>(null);
   const castingRef = useRef<HTMLElement | null>(null);
   const queryClient = useQueryClient();
-  const [selectedTab, setSelectedTab] =
-    useState<ConcertDetailTab>("공연정보");
+  const [selectedTab, setSelectedTab] = useState<ConcertDetailTab>("공연정보");
   const [notificationOverride, setNotificationOverride] = useState<
     boolean | null
   >(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isShareSheetOpen, setIsShareSheetOpen] = useState(false);
   const [isInterestSyncing, setIsInterestSyncing] = useState(false);
-  const [isNotificationModalOpen, setIsNotificationModalOpen] =
-    useState(false);
+  const [isNotificationModalOpen, setIsNotificationModalOpen] = useState(false);
   const [isNotificationHintDismissed, setIsNotificationHintDismissed] =
     useState(false);
   const detailQuery = useFanPerformanceDetailQuery(
@@ -413,7 +409,7 @@ const ConcertDetailPage = () => {
   const detail = detailQuery.data;
   const isLiked = detail?.isInterested ?? false;
   const isNotificationEnabled =
-    notificationOverride ?? (detail?.participationStatus != null);
+    notificationOverride ?? detail?.participationStatus != null;
   const showNotificationHint =
     Boolean(detail) && !isNotificationEnabled && !isNotificationHintDismissed;
   const title = getDetailTitle(detail);
@@ -477,7 +473,10 @@ const ConcertDetailPage = () => {
       if (isAlreadyInterestedPerformanceError(error)) {
         setIsInterestSyncing(true);
         try {
-          await invalidatePerformanceInterestQueries(queryClient, performanceId);
+          await invalidatePerformanceInterestQueries(
+            queryClient,
+            performanceId,
+          );
         } finally {
           setIsInterestSyncing(false);
         }
@@ -638,32 +637,34 @@ const ConcertDetailPage = () => {
         />
 
         {showNotificationHint ? (
-          <aside
-            aria-label="공연 참여 예정 안내"
-            className="absolute right-3.75 top-14 z-20 flex w-[266px] flex-col items-start gap-3 rounded-[16px] bg-neutral-0 px-6 py-3 shadow-[0_0_8px_0_rgba(0,0,0,0.10)]"
-          >
+          <div className="absolute right-6 top-14 z-20 drop-shadow-[0_0_8px_rgba(0,0,0,0.10)]">
             <span
               aria-hidden="true"
-              className="absolute right-[24px] top-[-7px] size-[18px] rotate-45 rounded-[3px] bg-neutral-0"
+              className="absolute right-[43px] top-[-7px] size-[18px] rotate-45 rounded-[3px] bg-neutral-0"
             />
-            <div className="flex w-full items-start justify-between gap-6">
-              <h2 className="m-0 font-body text-label1 text-neutral-900">
-                공연 참여 예정이신가요?
-              </h2>
-              <button
-                type="button"
-                aria-label="공연 참여 예정 안내 닫기"
-                onClick={() => setIsNotificationHintDismissed(true)}
-                className="flex size-5 shrink-0 items-center justify-center"
-              >
-                <img src={CloseIcon} alt="" className="size-[20px]" />
-              </button>
-            </div>
-            <p className="m-0 whitespace-pre-line font-body text-caption1 text-neutral-600">
-              알림 설정을 하면 공연이 끝나고{"\n"}
-              참여 여부를 선택할 수 있어요
-            </p>
-          </aside>
+            <aside
+              aria-label="공연 참여 예정 안내"
+              className="relative flex w-[266px] flex-col items-start gap-3 rounded-[16px] bg-neutral-0 px-6 py-3"
+            >
+              <div className="flex w-full items-start justify-between gap-6">
+                <h2 className="m-0 font-body text-label1 text-neutral-900">
+                  공연 참여 예정이신가요?
+                </h2>
+                <button
+                  type="button"
+                  aria-label="공연 참여 예정 안내 닫기"
+                  onClick={() => setIsNotificationHintDismissed(true)}
+                  className="flex size-5 shrink-0 items-center justify-center"
+                >
+                  <img src={CloseIcon} alt="" className="size-[20px]" />
+                </button>
+              </div>
+              <p className="m-0 whitespace-pre-line font-body text-caption1 text-neutral-600">
+                알림 설정을 하면 공연이 끝나고{"\n"}
+                참여 여부를 선택할 수 있어요
+              </p>
+            </aside>
+          </div>
         ) : null}
       </div>
 
@@ -768,7 +769,10 @@ const ConcertDetailPage = () => {
         <span className="pointer-events-none absolute bottom-0 left-1/2 h-[2px] w-[393px] max-w-full -translate-x-1/2 bg-neutral-400" />
       </nav>
 
-      <section ref={concertInfoRef} className="scroll-mt-[43px] px-[29px] pb-4 py-4">
+      <section
+        ref={concertInfoRef}
+        className="scroll-mt-[43px] px-[29px] pb-4 py-4"
+      >
         <h2 className="m-0 text-body1 font-bold leading-[38px] text-neutral-900">
           공연정보
         </h2>
@@ -782,7 +786,10 @@ const ConcertDetailPage = () => {
 
       <div className="h-4 bg-primary-0" />
 
-      <section ref={concertIntroRef} className="scroll-mt-[43px] px-6 pb-6 pt-4">
+      <section
+        ref={concertIntroRef}
+        className="scroll-mt-[43px] px-6 pb-6 pt-4"
+      >
         <h2 className="m-0 font-body text-body1 text-neutral-900">공연소개</h2>
         <p className="m-0 mt-[20px] whitespace-pre-line font-body text-caption2 text-neutral-900">
           {description}
@@ -797,7 +804,10 @@ const ConcertDetailPage = () => {
 
       <div className="h-4 bg-primary-0" />
 
-      <section ref={castingRef} className="scroll-mt-[82px] px-[29px] pb-12 pt-[16px]">
+      <section
+        ref={castingRef}
+        className="scroll-mt-[82px] px-[29px] pb-12 pt-[16px]"
+      >
         <h2 className="m-0 font-body text-body1 text-neutral-900">캐스팅</h2>
 
         <div className="mt-4 flex flex-col gap-3">
@@ -815,8 +825,7 @@ const ConcertDetailPage = () => {
               const region =
                 bandInfo.region ?? bandInfo.bandRegion ?? band.region;
               const bandMeta =
-                [genre, region].filter(Boolean).join(" · ") ||
-                "장르 · 지역";
+                [genre, region].filter(Boolean).join(" · ") || "장르 · 지역";
               const profileImageUrl = getCastingBandImageUrl(band) ?? null;
               const isFollowing =
                 bandInfo.isFollowing ??
@@ -898,7 +907,7 @@ const ConcertDetailPage = () => {
               캐스팅 정보가 준비 중이에요
             </p>
           )}
-          </div>
+        </div>
       </section>
 
       {toastMessage ? (
