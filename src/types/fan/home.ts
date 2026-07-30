@@ -9,6 +9,7 @@ export interface FanApiResponse<T> {
 
 export interface FanHomeNewsItem {
   newsId?: number;
+  postId?: number;
   contentId?: number;
   id?: number | string;
   bandId?: number;
