@@ -1,6 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   acceptBandInvite,
+  createBandInviteLink,
+  enterBandInviteLink,
+  getBandInviteLinkInfo,
   getBandMembers,
   inviteBandMember,
   rejectBandInvite,
@@ -9,6 +12,7 @@ import {
 } from "@/api/band/bandMember";
 import type {
   AcceptBandInviteRequest,
+  CreateBandInviteLinkRequest,
   InviteBandMemberRequest,
 } from "@/types/band/bandMember";
 import { bandMemberProfileKeys } from "@/hooks/api/band/useBandMemberProfile";
@@ -116,6 +120,32 @@ export const useRejectBandInviteMutation = () => {
     onSuccess: (_result, { bandId }) => {
       queryClient.invalidateQueries({ queryKey: bandMemberKeys.lists(bandId) });
     },
+  });
+};
+
+export const useCreateBandInviteLink = (bandId: number) => {
+  return useMutation({
+    mutationFn: (body: CreateBandInviteLinkRequest) =>
+      createBandInviteLink(bandId, body),
+  });
+};
+
+export const bandInviteLinkKeys = {
+  all: ["bandInviteLink"] as const,
+  detail: (token: string) => [...bandInviteLinkKeys.all, token] as const,
+};
+
+export const useBandInviteLinkInfoQuery = (token: string) => {
+  return useQuery({
+    queryKey: bandInviteLinkKeys.detail(token),
+    queryFn: () => getBandInviteLinkInfo(token),
+    enabled: token.length > 0,
+  });
+};
+
+export const useEnterBandInviteLink = () => {
+  return useMutation({
+    mutationFn: (token: string) => enterBandInviteLink(token),
   });
 };
 

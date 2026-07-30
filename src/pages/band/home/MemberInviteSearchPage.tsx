@@ -13,9 +13,11 @@ import { useActiveBandId } from "@/hooks/api/user/useMyProfiles";
 import { useBandQuery } from "@/hooks/api/band/useBand";
 import {
   useBandMemberCandidatesQuery,
+  useCreateBandInviteLink,
   useInviteBandMember,
 } from "@/hooks/api/band/useBandMember";
 import { cacheNicknames } from "@/utils/bandMemberNicknameCache";
+import { getApiErrorMessage } from "@/utils/getApiErrorMessage";
 import type { BandMemberSearchItem } from "@/types/band/bandMember";
 
 type InviteBadge = "invite" | "member" | "pending" | "unavailable";
@@ -47,6 +49,9 @@ const MemberInviteSearchPage = () => {
   const [isFocused, setIsFocused] = useState(false);
   const [inviteTargetId, setInviteTargetId] = useState<number | null>(null);
   const [showCopyToast, setShowCopyToast] = useState(false);
+  const [copyErrorMessage, setCopyErrorMessage] = useState<string | null>(
+    null,
+  );
 
   const isSearchActive = isFocused || search.length > 0;
   const showResults = search.trim().length > 0;
@@ -54,6 +59,7 @@ const MemberInviteSearchPage = () => {
   const candidatesQuery = useBandMemberCandidatesQuery(bandId, search);
   const candidates = candidatesQuery.data ?? [];
   const inviteMutation = useInviteBandMember(bandId);
+  const createInviteLink = useCreateBandInviteLink(bandId);
 
   useEffect(() => {
     if (!candidatesQuery.data) return;
@@ -71,11 +77,23 @@ const MemberInviteSearchPage = () => {
   );
 
   const handleCopyInviteLink = async () => {
+    setCopyErrorMessage(null);
+
     try {
-      await navigator.clipboard.writeText(window.location.href);
+      const { token } = await createInviteLink.mutateAsync({
+        memberType: "MEMBER",
+      });
+      const inviteUrl = `${window.location.origin}/band/invite-links/${token}`;
+
+      await navigator.clipboard.writeText(inviteUrl);
       setShowCopyToast(true);
-    } catch {
-      // clipboard access denied or unavailable
+    } catch (error) {
+      setCopyErrorMessage(
+        getApiErrorMessage(
+          error,
+          "초대 링크를 만들지 못했어요. 잠시 후 다시 시도해주세요.",
+        ),
+      );
     }
   };
 
@@ -139,12 +157,16 @@ const MemberInviteSearchPage = () => {
             </div>
             <button
               type="button"
-              onClick={handleCopyInviteLink}
-              className="flex w-67.5 h-9.5 items-center justify-center gap-4 rounded-lg bg-secondary-400 text-body1 text-neutral-0"
+              onClick={() => void handleCopyInviteLink()}
+              disabled={createInviteLink.isPending}
+              className="flex w-67.5 h-9.5 items-center justify-center gap-4 rounded-lg bg-secondary-400 text-body1 text-neutral-0 disabled:opacity-60"
             >
               <img src={LinkIcon} alt="" />
-              초대링크 복사하기
+              {createInviteLink.isPending ? "링크 생성 중..." : "초대링크 복사하기"}
             </button>
+            {copyErrorMessage ? (
+              <p className="text-caption2 text-error">{copyErrorMessage}</p>
+            ) : null}
           </div>
         ) : showResults ? (
           <div className="mt-6 flex flex-col gap-4 px-4">

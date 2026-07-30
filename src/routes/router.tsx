@@ -57,6 +57,7 @@ import LiveAlertSettingsPage from "@/pages/band/my/LiveAlertSettingsPage";
 import SessionMailboxPage from "@/pages/band/session/components/SessionMailboxPage";
 import SessionChatPage from "@/pages/band/session/components/SessionChatPage";
 import ApplicationDetailPage from "@/pages/band/my/ApplicationDetailPage";
+import BandInviteLinkPage from "@/pages/band/home/BandInviteLinkPage";
 
 export const router = createBrowserRouter([
   {
@@ -190,6 +191,10 @@ export const router = createBrowserRouter([
       {
         path: "/band/profile/invite/search",
         element: <MemberInviteSearchPage />,
+      },
+      {
+        path: "/band/invite-links/:token",
+        element: <BandInviteLinkPage />,
       },
       {
         path: "/band/profile/applications",
