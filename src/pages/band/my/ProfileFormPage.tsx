@@ -280,10 +280,12 @@ const ProfileForm = ({
           name,
           genre: genreValue,
           region: regionValue,
-          profileImageUrl: isAvatarRemoved
-            ? null
-            : uploadedAvatarUrl || undefined,
           description: bio || undefined,
+          ...(isAvatarRemoved
+            ? { deleteProfileImage: true }
+            : uploadedAvatarUrl
+              ? { profileImageUrl: uploadedAvatarUrl }
+              : {}),
         });
 
         if (memberProfileId && myActivityName.trim() && myPart) {
