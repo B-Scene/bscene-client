@@ -149,7 +149,11 @@ const ProfileEditForm = ({
         nickname: nickname.trim(),
         genres: selectedGenres,
         regions: selectedRegions,
-        profileImageUrl: isAvatarRemoved ? null : uploadedAvatarUrl || undefined,
+        ...(isAvatarRemoved
+          ? { deleteProfileImage: true }
+          : uploadedAvatarUrl
+            ? { profileImageUrl: uploadedAvatarUrl }
+            : {}),
       });
       navigate(-1);
     } catch {
