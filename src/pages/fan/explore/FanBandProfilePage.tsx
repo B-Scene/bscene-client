@@ -436,8 +436,8 @@ const FanBandProfilePage = () => {
         ...currentOverrides,
         [numericBandId]: Math.max(followerCount + 1, 1),
       }));
-      await followBandMutation.mutateAsync(numericBandId);
       setToastMessage(`${bandName}를 팔로우했어요`);
+      await followBandMutation.mutateAsync(numericBandId);
     } catch {
       setFollowOverrides((currentOverrides) => ({
         ...currentOverrides,
@@ -454,6 +454,8 @@ const FanBandProfilePage = () => {
   const confirmUnfollow = async () => {
     if (!canToggleFollow || isFollowPending) return;
 
+    setIsUnfollowModalOpen(false);
+
     try {
       setFollowOverrides((currentOverrides) => ({
         ...currentOverrides,
@@ -465,7 +467,6 @@ const FanBandProfilePage = () => {
       }));
       await unfollowBandMutation.mutateAsync(numericBandId);
 
-      setIsUnfollowModalOpen(false);
       setToastMessage(`${bandName} 팔로우를 취소했어요`);
     } catch {
       setFollowOverrides((currentOverrides) => ({
