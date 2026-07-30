@@ -8,22 +8,28 @@ import Modal from "@/components/Modal/Modal";
 import { ProfileSummary } from "@/components/band/my/ProfileSummary";
 import { MenuSection } from "@/components/band/my/MenuSection";
 import { useBandMyPageQuery } from "@/hooks/api/user/useBandMyPage";
+import { useMyProfilesQuery } from "@/hooks/api/user/useMyProfiles";
 import { useLogoutAndRedirect } from "@/hooks/useLogoutAndRedirect";
 import { getPartLabel } from "@/utils/bandLabels";
 
 const MyPage = () => {
   const navigate = useNavigate();
   const { data } = useBandMyPageQuery();
+  const { data: bandProfiles } = useMyProfilesQuery({ type: "band" });
   const logout = useLogoutAndRedirect();
 
   const [isModeSwitchOpen, setIsModeSwitchOpen] = useState(false);
   const [isLogoutOpen, setIsLogoutOpen] = useState(false);
 
+  const activeBandProfile = bandProfiles?.bandProfiles.find(
+    (band) => band.isActive,
+  );
+
   const bandName = data?.bandName ?? "";
   const partsLabel = data?.parts.map(getPartLabel).join(" · ") ?? "";
 
   return (
-    <main className="relative flex min-h-dvh flex-col bg-neutral-0">
+    <main className="relative flex min-h-dvh flex-col bg-neutral-0 pb-[calc(var(--bottom-nav-height)+24px)]">
       <Header title="마이" showBack={false} variant="main" />
 
       <section className="bg-secondary-0 px-5 py-6">
@@ -31,6 +37,7 @@ const MyPage = () => {
           name={data?.nickname ?? ""}
           subtitle={[bandName, partsLabel].filter(Boolean).join(" · ")}
           bandLabel={bandName}
+          profileImageUrl={activeBandProfile?.profileImageUrl}
           onSwitchBand={() => setIsModeSwitchOpen(true)}
         />
 
