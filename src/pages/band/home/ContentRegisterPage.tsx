@@ -8,6 +8,11 @@ import {
 import { useNavigate } from "react-router-dom";
 import { Header } from "@/components/band/home/Header";
 import { Input } from "@/components/common/Input/Input";
+import { useActiveBandId } from "@/hooks/api/user/useMyProfiles";
+import { useCreatePost } from "@/hooks/api/band/usePost";
+import { uploadMediaFile } from "@/utils/uploadMediaFile";
+import { getApiErrorMessage } from "@/utils/getApiErrorMessage";
+import type { PostType } from "@/types/band/post";
 import UploadIcon from "@/assets/icons/band/upload.svg";
 import CloseCircleIcon from "@/assets/icons/band/close-circle.svg";
 import CloseIcon from "@/assets/icons/close.svg";
@@ -15,6 +20,12 @@ import PlayButtonIcon from "@/assets/icons/band/play-button.svg";
 
 const CONTENT_TYPES = ["사진", "글", "영상"] as const;
 type ContentType = (typeof CONTENT_TYPES)[number];
+
+const CONTENT_TYPE_TO_POST_TYPE: Record<ContentType, PostType> = {
+  사진: "PHOTO",
+  글: "TEXT",
+  영상: "VIDEO",
+};
 
 const MAX_IMAGES = 10;
 const MAX_TAGS = 8;
@@ -52,13 +63,15 @@ const Field = ({ label, required, error, children }: FieldProps) => (
 
 interface ImageFile {
   id: string;
-  url: string;
+  file: File;
+  previewUrl: string;
 }
 
 interface VideoFile {
+  file: File;
   name: string;
   size: string;
-  url: string;
+  previewUrl: string;
 }
 
 const formatFileSize = (bytes: number) =>
@@ -67,6 +80,8 @@ const formatFileSize = (bytes: number) =>
 const ContentRegisterPage = () => {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const activeBandId = useActiveBandId();
+  const createPost = useCreatePost(activeBandId ?? NaN);
 
   const [contentType, setContentType] = useState<ContentType | null>(null);
   const [images, setImages] = useState<ImageFile[]>([]);
@@ -79,6 +94,8 @@ const ContentRegisterPage = () => {
   const [tagInput, setTagInput] = useState("");
 
   const [showErrors, setShowErrors] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   const isValid = Boolean(contentType && title.trim());
 
@@ -94,11 +111,12 @@ const ContentRegisterPage = () => {
     if (isVideo) {
       const file = files[0];
       setVideo((prev) => {
-        if (prev) URL.revokeObjectURL(prev.url);
+        if (prev) URL.revokeObjectURL(prev.previewUrl);
         return {
+          file,
           name: file.name,
           size: formatFileSize(file.size),
-          url: URL.createObjectURL(file),
+          previewUrl: URL.createObjectURL(file),
         };
       });
       setContentType("영상");
@@ -107,7 +125,8 @@ const ContentRegisterPage = () => {
         .slice(0, MAX_IMAGES - images.length)
         .map((file) => ({
           id: crypto.randomUUID(),
-          url: URL.createObjectURL(file),
+          file,
+          previewUrl: URL.createObjectURL(file),
         }));
       setImages((prev) => [...prev, ...newImages]);
       setContentType((prev) => prev ?? "사진");
@@ -119,13 +138,13 @@ const ContentRegisterPage = () => {
   const handleRemoveImage = (id: string) => {
     setImages((prev) => {
       const target = prev.find((image) => image.id === id);
-      if (target) URL.revokeObjectURL(target.url);
+      if (target) URL.revokeObjectURL(target.previewUrl);
       return prev.filter((image) => image.id !== id);
     });
   };
 
   const handleRemoveVideo = () => {
-    if (video) URL.revokeObjectURL(video.url);
+    if (video) URL.revokeObjectURL(video.previewUrl);
     setVideo(null);
   };
 
@@ -144,23 +163,61 @@ const ContentRegisterPage = () => {
     setTags((prev) => prev.filter((item) => item !== tag));
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
+    if (activeBandId === null) return;
+
     if (!isValid) {
       setShowErrors(true);
       return;
     }
-    navigate("/band/register/complete", {
-      state: {
-        title: "콘텐츠가 업로드됐어요",
-        description: "콘텐츠 탭에서 확인할 수 있어요",
-        rows: [
-          { label: "콘텐츠", value: contentType ?? "" },
-          { label: "콘텐츠 제목", value: title },
-        ],
-        primaryLabel: "콘텐츠 보기",
-        primaryTo: "/band/home",
+
+    setUploadError(null);
+
+    let mediaUrls: string[] = [];
+
+    try {
+      setIsUploading(true);
+
+      if (contentType === "영상" && video) {
+        mediaUrls = [await uploadMediaFile(video.file, "POST")];
+      } else if (contentType === "사진" && images.length > 0) {
+        mediaUrls = await Promise.all(
+          images.map((image) => uploadMediaFile(image.file, "POST")),
+        );
+      }
+    } catch {
+      setIsUploading(false);
+      setUploadError("파일 업로드에 실패했어요. 다시 시도해주세요");
+      return;
+    }
+
+    setIsUploading(false);
+
+    createPost.mutate(
+      {
+        type: CONTENT_TYPE_TO_POST_TYPE[contentType!],
+        title,
+        description: description || undefined,
+        mediaUrls: mediaUrls.length > 0 ? mediaUrls : undefined,
+        tags: tags.length > 0 ? tags : undefined,
       },
-    });
+      {
+        onSuccess: () => {
+          navigate("/band/register/complete", {
+            state: {
+              title: "콘텐츠가 업로드됐어요",
+              description: "콘텐츠 탭에서 확인할 수 있어요",
+              rows: [
+                { label: "콘텐츠", value: contentType ?? "" },
+                { label: "콘텐츠 제목", value: title },
+              ],
+              primaryLabel: "콘텐츠 보기",
+              primaryTo: "/band/home",
+            },
+          });
+        },
+      },
+    );
   };
 
   return (
@@ -174,7 +231,7 @@ const ContentRegisterPage = () => {
               <div className="flex min-w-0 flex-1 items-center gap-3">
                 <div className="relative flex h-15 w-27 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-neutral-300">
                   <video
-                    src={video.url}
+                    src={video.previewUrl}
                     muted
                     playsInline
                     preload="metadata"
@@ -233,7 +290,7 @@ const ContentRegisterPage = () => {
                     {images.map((image) => (
                       <div key={image.id} className="relative size-13 shrink-0">
                         <img
-                          src={image.url}
+                          src={image.previewUrl}
                           alt=""
                           className="size-13 rounded-lg object-cover"
                         />
@@ -356,17 +413,31 @@ const ContentRegisterPage = () => {
         </div>
       </section>
 
-      <div className="fixed inset-x-0 bottom-[calc(var(--bottom-nav-height)+16px)] px-5">
+      <div className="fixed inset-x-0 bottom-[calc(var(--bottom-nav-height)+16px)] flex flex-col gap-2 px-5">
+        {uploadError ? (
+          <span className="text-center text-body5 text-error">
+            {uploadError}
+          </span>
+        ) : createPost.isError ? (
+          <span className="text-center text-body5 text-error">
+            {getApiErrorMessage(
+              createPost.error,
+              "업로드에 실패했어요. 다시 시도해주세요",
+            )}
+          </span>
+        ) : null}
+
         <button
           type="button"
           onClick={handleSubmit}
+          disabled={createPost.isPending || isUploading || activeBandId === null}
           className={`flex h-13 w-full items-center justify-center rounded-xl text-label1 ${
-            isValid
+            isValid && !createPost.isPending && !isUploading && activeBandId !== null
               ? "bg-secondary-500 text-neutral-0"
               : "bg-neutral-300 text-neutral-600"
           }`}
         >
-          콘텐츠 등록
+          {isUploading ? "업로드 중..." : "콘텐츠 등록"}
         </button>
       </div>
     </main>

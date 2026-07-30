@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
 import Modal from "@/components/Modal/Modal";
 import { ModalOverlay } from "@/components/common/Modal/ModalOverlay";
@@ -8,17 +9,24 @@ import HeartIcon from "@/assets/icons/Heart.svg";
 import ShareIcon from "@/assets/icons/ic_share.svg";
 import LikedHeartIcon from "@/assets/icons/Union.svg";
 import BandProfileImage from "@/assets/icons/band/band-default-profile.svg";
-import { useConcertLikeStore } from "@/stores/useConcertLikeStore";
+import {
+  invalidatePerformanceInterestQueries,
+  useAddPerformanceInterest,
+  useDeletePerformanceAlarm,
+  useDeletePerformanceInterest,
+  useFanPerformanceDetailQuery,
+  useSetPerformanceAlarm,
+} from "@/hooks/api/fan/useFanHome";
+import { isAlreadyInterestedPerformanceError } from "@/api/fan/home";
+import type { FanPerformanceDetailResponse } from "@/types/fan/home";
 
-const CONCERT_INFO = [
-  { label: "공연 일시", value: "2026.04.12. (토) 19:00" },
-  { label: "공연 장소", value: "홍대 롤링홀" },
-  { label: "티켓 가격", value: "66,000원 (전석 스탠딩)" },
-  { label: "관람 연령", value: "만 15세이상" },
-];
-
-const SUMMARY_INFO = CONCERT_INFO.slice(0, 3);
 const TABS = ["공연정보", "공연소개", "캐스팅"] as const;
+const AGE_RATING_LABELS: Record<string, string> = {
+  ALL: "전체 관람가",
+  AGE_12: "만 12세 이상",
+  AGE_15: "만 15세 이상",
+  AGE_19: "만 19세 이상",
+};
 
 type ConcertDetailTab = (typeof TABS)[number];
 type KakaoSharePayload = {
@@ -190,25 +198,214 @@ const InfoRows = ({
   </dl>
 );
 
+const toDate = (value?: string | null) => {
+  if (!value) return null;
+
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const firstImageUrl = (...values: Array<string | null | undefined>) => {
+  return values.find((value): value is string => Boolean(value));
+};
+
+const firstMediaUrl = (
+  ...values: Array<string[] | string | null | undefined>
+) => {
+  for (const value of values) {
+    if (Array.isArray(value) && value.length > 0) return value[0];
+    if (typeof value === "string" && value) return value;
+  }
+
+  return undefined;
+};
+
+const getDetailPosterImageUrl = (detail?: FanPerformanceDetailResponse) => {
+  if (!detail) return undefined;
+
+  return (
+    firstImageUrl(
+      detail.posterImageUrl,
+      detail.posterUrl,
+      detail.posterImage,
+      detail.performancePosterUrl,
+      detail.performanceImageUrl,
+      detail.imageUrl,
+      detail.mainImageUrl,
+      detail.thumbnailUrl,
+      detail.thumbnailImageUrl,
+    ) ?? firstMediaUrl(detail.imageUrls)
+  );
+};
+
+const getCastingBandImageUrl = (
+  band: FanPerformanceDetailResponse["casting"][number],
+) => {
+  return firstImageUrl(
+    band.profileImageUrl,
+    band.bandProfileImageUrl,
+    band.bandImageUrl,
+    band.imageUrl,
+    band.thumbnailUrl,
+    band.avatarUrl,
+    band.logoUrl,
+  );
+};
+
+const getPerformanceDate = (detail?: FanPerformanceDetailResponse) => {
+  if (!detail) return null;
+
+  const dateValue =
+    detail.startAt ?? detail.startDateTime ?? detail.performanceDate;
+
+  if (
+    dateValue &&
+    detail.performanceTime &&
+    !dateValue.includes("T")
+  ) {
+    return toDate(`${dateValue}T${detail.performanceTime}`);
+  }
+
+  return toDate(dateValue);
+};
+
+const formatPerformanceDateTime = (detail?: FanPerformanceDetailResponse) => {
+  const date = getPerformanceDate(detail);
+
+  if (!date) return "일정 미정";
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const weekday = ["일", "월", "화", "수", "목", "금", "토"][date.getDay()];
+  const hour = String(date.getHours()).padStart(2, "0");
+  const minute = String(date.getMinutes()).padStart(2, "0");
+
+  return `${year}.${month}.${day}. (${weekday}) ${hour}:${minute}`;
+};
+
+const getDdayLabel = (detail?: FanPerformanceDetailResponse) => {
+  const date = getPerformanceDate(detail);
+  if (!date) return "D--";
+
+  const today = new Date();
+  const todayStart = new Date(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate(),
+  );
+  const performanceStart = new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate(),
+  );
+  const diffDays = Math.ceil(
+    (performanceStart.getTime() - todayStart.getTime()) / 86_400_000,
+  );
+
+  if (diffDays < 0) return "종료";
+  if (diffDays === 0) return "D-DAY";
+  return `D-${diffDays}`;
+};
+
+const formatPrice = (value?: string | number | null) => {
+  if (value === null || value === undefined || value === "") return "가격 미정";
+  if (typeof value === "number") return `${value.toLocaleString()}원`;
+  return value;
+};
+
+const getDetailTitle = (detail?: FanPerformanceDetailResponse) => {
+  return (
+    detail?.performanceTitle ??
+    detail?.performanceName ??
+    detail?.concertTitle ??
+    detail?.concertName ??
+    detail?.showTitle ??
+    detail?.showName ??
+    detail?.name ??
+    detail?.title ??
+    "공연명"
+  );
+};
+
+const getDetailLocation = (detail?: FanPerformanceDetailResponse) => {
+  return detail?.location ?? detail?.venue ?? "공연 장소 미정";
+};
+
+const getDetailMeta = (detail?: FanPerformanceDetailResponse) => {
+  return [detail?.genre, detail?.region].filter(Boolean).join(" · ") || "장르 · 지역";
+};
+
+const getDetailDescription = (detail?: FanPerformanceDetailResponse) => {
+  return (
+    detail?.introduction ??
+    detail?.description ??
+    detail?.content ??
+    "공연 소개가 준비 중이에요."
+  );
+};
+
+const getDetailTags = (detail?: FanPerformanceDetailResponse) => {
+  return detail?.tags?.length ? detail.tags : [getDetailTitle(detail)];
+};
+
 const ConcertDetailPage = () => {
   const navigate = useNavigate();
   const { concertId = "default-concert" } = useParams();
+  const performanceId = Number(concertId);
   const concertInfoRef = useRef<HTMLElement | null>(null);
   const concertIntroRef = useRef<HTMLElement | null>(null);
   const castingRef = useRef<HTMLElement | null>(null);
+  const queryClient = useQueryClient();
   const [selectedTab, setSelectedTab] =
     useState<ConcertDetailTab>("공연정보");
-  const isLiked = useConcertLikeStore(
-    (state) => state.likedConcertIds[concertId] ?? false,
-  );
-  const toggleConcertLike = useConcertLikeStore(
-    (state) => state.toggleConcertLike,
-  );
+  const [notificationOverride, setNotificationOverride] = useState<
+    boolean | null
+  >(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isShareSheetOpen, setIsShareSheetOpen] = useState(false);
+  const [isInterestSyncing, setIsInterestSyncing] = useState(false);
   const [isNotificationModalOpen, setIsNotificationModalOpen] =
     useState(false);
-  const [isNotificationEnabled, setIsNotificationEnabled] = useState(false);
+  const [isNotificationHintDismissed, setIsNotificationHintDismissed] =
+    useState(false);
+  const detailQuery = useFanPerformanceDetailQuery(
+    Number.isFinite(performanceId) ? performanceId : 0,
+  );
+  const detail = detailQuery.data;
+  const isLiked = detail?.isInterested ?? false;
+  const isNotificationEnabled =
+    notificationOverride ?? (detail?.participationStatus != null);
+  const showNotificationHint =
+    Boolean(detail) && !isNotificationEnabled && !isNotificationHintDismissed;
+  const title = getDetailTitle(detail);
+  const meta = getDetailMeta(detail);
+  const location = getDetailLocation(detail);
+  const dateTime = formatPerformanceDateTime(detail);
+  const ticketPrice = formatPrice(detail?.ticketPrice ?? detail?.price);
+  const ageRating =
+    AGE_RATING_LABELS[String(detail?.ageRating ?? "")] ??
+    detail?.ageRating ??
+    "관람 연령 미정";
+  const infoRows = useMemo(
+    () => [
+      { label: "공연 일시", value: dateTime },
+      { label: "공연 장소", value: location },
+      { label: "티켓 가격", value: ticketPrice },
+      { label: "관람 연령", value: ageRating },
+    ],
+    [ageRating, dateTime, location, ticketPrice],
+  );
+  const summaryInfo = infoRows.slice(0, 3);
+  const description = getDetailDescription(detail);
+  const tags = getDetailTags(detail);
+  const ddayLabel = getDdayLabel(detail);
+  const posterImageUrl = getDetailPosterImageUrl(detail);
+  const casting = detail?.casting ?? [];
+  const addPerformanceInterestMutation = useAddPerformanceInterest();
+  const deletePerformanceInterestMutation = useDeletePerformanceInterest();
+  const setPerformanceAlarmMutation = useSetPerformanceAlarm();
+  const deletePerformanceAlarmMutation = useDeletePerformanceAlarm();
 
   useEffect(() => {
     if (!toastMessage) return;
@@ -220,11 +417,36 @@ const ConcertDetailPage = () => {
     return () => window.clearTimeout(timerId);
   }, [toastMessage]);
 
-  const handleLikeClick = () => {
-    const nextLiked = toggleConcertLike(concertId);
+  const handleLikeClick = async () => {
+    if (!Number.isFinite(performanceId) || performanceId <= 0) {
+      setToastMessage("공연 정보를 확인할 수 없어요");
+      return;
+    }
 
-    if (!nextLiked) {
-      setToastMessage("관심 공연을 해제했어요");
+    if (isLiked) {
+      try {
+        await deletePerformanceInterestMutation.mutateAsync(performanceId);
+        setToastMessage("관심 공연을 해제했어요");
+      } catch {
+        setToastMessage("관심 공연 해제에 실패했어요");
+      }
+      return;
+    }
+
+    try {
+      await addPerformanceInterestMutation.mutateAsync(performanceId);
+    } catch (error) {
+      if (isAlreadyInterestedPerformanceError(error)) {
+        setIsInterestSyncing(true);
+        try {
+          await invalidatePerformanceInterestQueries(queryClient, performanceId);
+        } finally {
+          setIsInterestSyncing(false);
+        }
+        return;
+      }
+
+      setToastMessage("관심 공연 등록에 실패했어요");
     }
   };
 
@@ -243,17 +465,40 @@ const ConcertDetailPage = () => {
     });
   };
 
-  const handleNotificationClick = () => {
-    if (isNotificationEnabled) {
-      setIsNotificationEnabled(false);
+  const handleNotificationClick = async () => {
+    if (!Number.isFinite(performanceId) || performanceId <= 0) {
+      setToastMessage("공연 정보를 확인할 수 없어요");
       return;
     }
 
-    setIsNotificationEnabled(true);
-    setIsNotificationModalOpen(true);
+    if (isNotificationEnabled) {
+      try {
+        await deletePerformanceAlarmMutation.mutateAsync(performanceId);
+        setNotificationOverride(false);
+        setToastMessage("공연 알림을 해제했어요");
+      } catch {
+        setToastMessage("공연 알림 해제에 실패했어요");
+      }
+      return;
+    }
+
+    try {
+      await setPerformanceAlarmMutation.mutateAsync(performanceId);
+      setNotificationOverride(true);
+      setIsNotificationHintDismissed(true);
+      setIsNotificationModalOpen(true);
+    } catch {
+      setToastMessage("공연 알림 설정에 실패했어요");
+    }
   };
 
   const getConcertLink = () => window.location.href;
+
+  const handleTicketClick = () => {
+    if (!detail?.ticketLink) return;
+
+    window.open(detail.ticketLink, "_blank", "noopener,noreferrer");
+  };
 
   const handleKakaoShareClick = () => {
     const concertLink = getConcertLink();
@@ -263,7 +508,7 @@ const ConcertDetailPage = () => {
       try {
         kakaoShareApi.sendDefault({
           objectType: "text",
-          text: "WAVY 단독 공연",
+          text: title,
           link: {
             mobileWebUrl: concertLink,
             webUrl: concertLink,
@@ -281,7 +526,7 @@ const ConcertDetailPage = () => {
 
     const shareUrl = `https://sharer.kakao.com/talk/friends/picker/link?url=${encodeURIComponent(
       concertLink,
-    )}&text=${encodeURIComponent("WAVY 단독 공연")}`;
+    )}&text=${encodeURIComponent(title)}`;
     const shareWindow = window.open(shareUrl, "_blank");
 
     if (!shareWindow) {
@@ -329,7 +574,11 @@ const ConcertDetailPage = () => {
                 isNotificationEnabled ? "공연 알림 설정됨" : "공연 알림 설정"
               }
               aria-pressed={isNotificationEnabled}
-              onClick={handleNotificationClick}
+              disabled={
+                setPerformanceAlarmMutation.isPending ||
+                deletePerformanceAlarmMutation.isPending
+              }
+              onClick={() => void handleNotificationClick()}
               className="flex size-6 items-center justify-center"
             >
               {isNotificationEnabled ? (
@@ -351,20 +600,76 @@ const ConcertDetailPage = () => {
           </div>
         </div>
 
-        <ImagePlaceholderIcon />
+        {showNotificationHint ? (
+          <aside
+            aria-label="공연 참여 예정 안내"
+            className="absolute right-[43px] top-[92px] z-20 flex w-[266px] flex-col items-start gap-3 rounded-[16px] bg-neutral-0 px-6 py-3"
+          >
+            <span
+              aria-hidden="true"
+              className="absolute right-[24px] top-[-7px] size-[18px] rotate-45 rounded-[3px] bg-neutral-0"
+            />
+            <div className="flex w-full items-start justify-between gap-6">
+              <h2 className="m-0 font-body text-label1 text-neutral-900">
+                공연 참여 예정이신가요?
+              </h2>
+              <button
+                type="button"
+                aria-label="공연 참여 예정 안내 닫기"
+                onClick={() => setIsNotificationHintDismissed(true)}
+                className="flex size-5 shrink-0 items-center justify-center"
+              >
+                <img src={CloseIcon} alt="" className="size-[20px]" />
+              </button>
+            </div>
+            <p className="m-0 whitespace-pre-line font-body text-caption1 text-neutral-600">
+              알림 설정을 하면 공연이 끝나고{"\n"}
+              참여 여부를 선택할 수 있어요
+            </p>
+          </aside>
+        ) : null}
+
+        {posterImageUrl ? (
+          <img
+            src={posterImageUrl}
+            alt={title}
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <ImagePlaceholderIcon />
+        )}
       </section>
 
       <section className="px-6 pb-6 pt-[24px]">
+        {detailQuery.isLoading ? (
+          <p className="m-0 mb-4 font-body text-body3 text-neutral-600">
+            공연 정보를 불러오는 중이에요
+          </p>
+        ) : null}
+        {detailQuery.isError ? (
+          <div className="mb-4 rounded-[12px] bg-neutral-50 px-4 py-4">
+            <p className="m-0 font-body text-body3 text-neutral-700">
+              공연 정보를 불러오지 못했어요
+            </p>
+            <button
+              type="button"
+              onClick={() => void detailQuery.refetch()}
+              className="mt-3 rounded-[8px] bg-primary-400 px-4 py-2 font-body text-caption3 text-neutral-0"
+            >
+              다시 시도
+            </button>
+          </div>
+        ) : null}
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <span className="inline-flex h-5 items-center rounded-[5px] bg-primary-50 px-[15px] font-body text-caption3 text-primary-400">
-              D-6
+              {ddayLabel}
             </span>
             <h1 className="m-0 mt-1 font-body text-[24px] font-bold leading-[38px] tracking-[0.72px] text-neutral-900">
-              WAVY 단독 공연
+              {title}
             </h1>
             <p className="m-0 font-body text-caption2 text-neutral-600">
-              인디록 · 서울
+              {meta}
             </p>
           </div>
 
@@ -372,7 +677,12 @@ const ConcertDetailPage = () => {
             type="button"
             aria-label={isLiked ? "좋아요 취소" : "좋아요"}
             aria-pressed={isLiked}
-            onClick={handleLikeClick}
+            disabled={
+              addPerformanceInterestMutation.isPending ||
+              deletePerformanceInterestMutation.isPending ||
+              isInterestSyncing
+            }
+            onClick={() => void handleLikeClick()}
             className="mt-[38px] flex size-6 shrink-0 items-center justify-center"
           >
             <img
@@ -384,11 +694,13 @@ const ConcertDetailPage = () => {
         </div>
 
         <section className="mt-4 rounded-[12px] bg-neutral-0 px-4 pb-3 pt-3 shadow-[0_0_8px_0_rgba(0,0,0,0.10)]">
-          <InfoRows rows={SUMMARY_INFO} />
+          <InfoRows rows={summaryInfo} />
 
           <button
             type="button"
-            className="mt-4 flex h-[44px] w-full items-center justify-center rounded-[12px] border-[1.2px] border-primary-400 font-body text-label2 text-primary-400"
+            disabled={!detail?.ticketLink}
+            onClick={handleTicketClick}
+            className="mt-4 flex h-[44px] w-full items-center justify-center rounded-[12px] border-[1.2px] border-primary-400 font-body text-label2 text-primary-400 disabled:border-neutral-400 disabled:text-neutral-500"
           >
             예매하기
           </button>
@@ -423,7 +735,7 @@ const ConcertDetailPage = () => {
         </h2>
         <div className="mt-[17px]">
           <InfoRows
-            rows={CONCERT_INFO}
+            rows={infoRows}
             valueClassName="text-body2 text-neutral-800"
           />
         </div>
@@ -433,16 +745,14 @@ const ConcertDetailPage = () => {
 
       <section ref={concertIntroRef} className="scroll-mt-[43px] px-6 pb-6 pt-4">
         <h2 className="m-0 font-body text-body1 text-neutral-900">공연소개</h2>
-        <p className="m-0 mt-[20px] font-body text-caption2 text-neutral-900">
-          WAVY의 새로운 시작을 함께해요.
-          <br />
-          따뜻한 사운드와 진심 어린 음악으로 여러분을 초대합니다.
+        <p className="m-0 mt-[20px] whitespace-pre-line font-body text-caption2 text-neutral-900">
+          {description}
         </p>
 
         <div className="mt-6 flex gap-1">
-          <Tag>WAVY</Tag>
-          <Tag>단독공연</Tag>
-          <Tag>라이브</Tag>
+          {tags.map((tag) => (
+            <Tag key={tag}>{tag}</Tag>
+          ))}
         </div>
       </section>
 
@@ -451,31 +761,56 @@ const ConcertDetailPage = () => {
       <section ref={castingRef} className="scroll-mt-[82px] px-[29px] pb-12 pt-[16px]">
         <h2 className="m-0 font-body text-body1 text-neutral-900">캐스팅</h2>
 
-        <article className="mt-4 flex h-[60px] items-center justify-between rounded-[8px] bg-neutral-0 px-4 shadow-[0_0_8px_0_rgba(0,0,0,0.10)]">
-          <div className="flex min-w-0 items-center gap-[18px]">
-            <img
-              src={BandProfileImage}
-              alt=""
-              className="size-[35px] shrink-0 rounded-full object-cover"
-            />
-            <div className="min-w-0">
-              <h3 className="m-0 truncate font-body text-caption3 text-neutral-900">
-                WAVY
-              </h3>
-              <p className="m-0 truncate font-body text-caption2 text-neutral-600">
-                인디록 · 서울
-              </p>
-            </div>
-          </div>
+        <div className="mt-4 flex flex-col gap-3">
+          {casting.length > 0 ? (
+            casting.map((band) => {
+              const bandName = band.bandName ?? band.name ?? "밴드명";
+              const bandMeta =
+                [band.genre, band.region].filter(Boolean).join(" · ") ||
+                "장르 · 지역";
 
-          <button
-            type="button"
-            aria-label="WAVY 밴드 상세보기"
-            className="flex size-6 shrink-0 items-center justify-center text-neutral-400"
-          >
-            <ArrowRightIcon />
-          </button>
-        </article>
+              return (
+                <article
+                  key={band.bandId}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => navigate(`/fan/bands/${band.bandId}`)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      navigate(`/fan/bands/${band.bandId}`);
+                    }
+                  }}
+                  className="flex h-[60px] items-center justify-between rounded-[8px] bg-neutral-0 px-4 shadow-[0_0_8px_0_rgba(0,0,0,0.10)]"
+                >
+                  <div className="flex min-w-0 items-center gap-[18px]">
+                    <img
+                      src={getCastingBandImageUrl(band) ?? BandProfileImage}
+                      alt=""
+                      className="size-[35px] shrink-0 rounded-full object-cover"
+                    />
+                    <div className="min-w-0">
+                      <h3 className="m-0 truncate font-body text-caption3 text-neutral-900">
+                        {bandName}
+                      </h3>
+                      <p className="m-0 truncate font-body text-caption2 text-neutral-600">
+                        {bandMeta}
+                      </p>
+                    </div>
+                  </div>
+
+                  <span className="flex size-6 shrink-0 items-center justify-center text-neutral-400">
+                    <ArrowRightIcon />
+                  </span>
+                </article>
+              );
+            })
+          ) : (
+            <p className="m-0 font-body text-caption2 text-neutral-600">
+              캐스팅 정보가 준비 중이에요
+            </p>
+          )}
+          </div>
       </section>
 
       {toastMessage ? (
@@ -570,7 +905,7 @@ const ConcertDetailPage = () => {
       >
         <Modal
           title="공연 알림이 설정됐어요"
-          description="공연 시작 전날에 알림을 보내드릴게요"
+          description="공연 시작 1시간 전에 알림을 보내드릴게요"
           confirmLabel="확인"
           showCancel={false}
           onConfirm={() => setIsNotificationModalOpen(false)}

@@ -39,6 +39,49 @@
   --color-neutral-900: var(--color-neutral-900);
 }
 
+@keyframes live-audio-wave-pulse {
+  0% {
+    transform: scaleY(0.32);
+    opacity: 0.62;
+  }
+
+  38% {
+    transform: scaleY(0.82);
+    opacity: 0.9;
+  }
+
+  68% {
+    transform: scaleY(0.48);
+    opacity: 0.72;
+  }
+
+  100% {
+    transform: scaleY(1.08);
+    opacity: 1;
+  }
+}
+
+.live-audio-wave-bar {
+  transform-origin: center;
+  transition:
+    transform 240ms ease,
+    opacity 240ms ease;
+}
+
+.live-audio-wave-bar.is-active {
+  animation-name: live-audio-wave-pulse;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+  will-change: transform, opacity;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live-audio-wave-bar.is-active {
+    animation: none;
+  }
+}
+
 /* Typography Utilities */
 
 @utility text-brand {
@@ -119,6 +162,14 @@
   font-weight: var(--text-body5-weight);
   line-height: var(--text-body5-line-height);
   letter-spacing: var(--text-body5-letter-spacing);
+}
+
+@utility text-body6 {
+  font-family: var(--font-body);
+  font-size: var(--text-body6-size);
+  font-weight: var(--text-body6-weight);
+  line-height: var(--text-body6-line-height);
+  letter-spacing: var(--text-body6-letter-spacing);
 }
 
 @utility text-label1 {

@@ -1,8 +1,12 @@
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useMyProfilesQuery } from "@/hooks/api/user/useMyProfiles";
+import { useChangeUserMode } from "@/hooks/api/user/useMode";
 import { useSlideUpSheet } from "@/hooks/useSlideUpSheet";
-import { useBandProfileStore } from "@/stores/useBandProfileStore";
+import { Toast } from "@/components/common/Toast/Toast";
 import { useModeStore } from "@/stores/useModeStore";
+import { getFanAccountDisplay } from "@/utils/authUser";
+import { BAND_GENRE_LABELS, BAND_REGION_LABELS } from "@/utils/bandLabels";
 import BandAvatar from "@/assets/images/IMG_my.svg";
 import FanAvatar from "@/assets/icons/band/user-default-profile.svg";
 import CheckCircleYellowIcon from "@/assets/icons/band/check-circle-yellow.svg";
@@ -14,15 +18,6 @@ interface ModeSwitchSheetProps {
 }
 
 const LAST_FAN_PATH_KEY = "bscene:last-fan-path";
-
-const MOCK_FAN_ACCOUNTS = [
-  { id: "fan-1", nickname: "닉네임", email: "bethescene12@gmail.com" },
-];
-
-const MOCK_BAND_ACCOUNTS = [
-  { id: "band-mock-1", name: "WAVY", subtitle: "인디록 · 서울" },
-  { id: "band-mock-2", name: "밴드명", subtitle: "인디록 · 서울" },
-];
 
 interface AccountRowProps {
   avatar: string;
@@ -102,38 +97,49 @@ const AccountRow = ({
 export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const bands = useBandProfileStore((state) => state.bands);
-  const activeBandId = useBandProfileStore((state) => state.activeBandId);
-  const setActiveBandId = useBandProfileStore((state) => state.setActiveBandId);
   const setMode = useModeStore((state) => state.setMode);
+  const changeUserMode = useChangeUserMode();
+  const { data: myProfiles } = useMyProfilesQuery({ type: "all" });
+  const { data: bandProfiles } = useMyProfilesQuery({ type: "band" });
 
-  const registeredBands = bands.filter((band) => band.name.trim());
-  const bandAccounts =
-    registeredBands.length > 0
-      ? registeredBands.map((band) => ({
-          id: band.id,
-          avatar: band.avatarUrl || BandAvatar,
-          name: band.name,
-          subtitle: `${band.genre} · ${band.regions.join(", ")}`,
-          storeBandId: band.id,
-        }))
-      : MOCK_BAND_ACCOUNTS.map((band) => ({
-          ...band,
-          avatar: BandAvatar,
-          storeBandId: null,
-        }));
+  const storedFanAccount = getFanAccountDisplay();
+  const fanProfile = myProfiles?.fanProfile ?? null;
+  const hasFanProfile = Boolean(fanProfile);
+  const fanAccount = {
+    id: fanProfile ? `fan-${fanProfile.fanProfileId}` : storedFanAccount.id,
+    profileId: fanProfile?.fanProfileId ?? null,
+    avatar: fanProfile?.profileImageUrl || FanAvatar,
+    nickname: fanProfile?.nickname || storedFanAccount.nickname,
+    email: fanProfile?.email || storedFanAccount.email,
+  };
+
+  const resolvedBandProfiles =
+    bandProfiles?.bandProfiles.length ? bandProfiles.bandProfiles : myProfiles?.bandProfiles;
+
+  const bandAccounts = (resolvedBandProfiles ?? []).map((band) => ({
+    id: `band-${band.bandId}`,
+    bandMemberProfileId: band.bandMemberProfileId,
+    avatar: band.profileImageUrl || BandAvatar,
+    name: band.bandName,
+    subtitle: `${BAND_GENRE_LABELS[band.genre as keyof typeof BAND_GENRE_LABELS] ?? band.genre} · ${BAND_REGION_LABELS[band.region as keyof typeof BAND_REGION_LABELS] ?? band.region}`,
+    isActive: band.isActive,
+  }));
+
   const isFanMode = location.pathname.startsWith("/fan");
-  const initialSelectedId = isFanMode
-    ? MOCK_FAN_ACCOUNTS[0].id
-    : bandAccounts.some((band) => band.id === activeBandId)
-      ? activeBandId
-      : bandAccounts[0]?.id ?? activeBandId;
+  const activeBand = bandAccounts.find((band) => band.isActive);
+  const initialSelectedId =
+    isFanMode && hasFanProfile
+      ? fanAccount.id
+      : (activeBand?.id ?? bandAccounts[0]?.id ?? fanAccount.id);
   const [selectedId, setSelectedId] = useState(initialSelectedId);
+  const [showErrorToast, setShowErrorToast] = useState(false);
   const { rendered, isVisible, handleTransitionEnd } = useSlideUpSheet(
     open,
     () => setSelectedId(initialSelectedId),
+    () => setShowErrorToast(false),
   );
   const selectedMode = selectedId.startsWith("fan") ? "fan" : "band";
+
   const bandModeSection = (
     <div className="flex w-82.5 flex-col gap-4">
       <span className="text-label2 text-secondary-500">밴드 모드</span>
@@ -152,22 +158,26 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
       </div>
     </div>
   );
+
   const fanModeSection = (
     <div className="flex w-82.5 flex-col gap-4">
       <span className="text-label2 text-primary-400">팬 모드</span>
 
       <div className="flex w-full flex-col gap-3">
-        {MOCK_FAN_ACCOUNTS.map((fan) => (
+        {hasFanProfile ? (
           <AccountRow
-            key={fan.id}
-            avatar={FanAvatar}
-            name={fan.nickname}
-            subtitle={fan.email}
-            selected={selectedId === fan.id}
+            avatar={fanAccount.avatar}
+            name={fanAccount.nickname}
+            subtitle={fanAccount.email}
+            selected={selectedId === fanAccount.id}
             selectedTone="fan"
-            onSelect={() => setSelectedId(fan.id)}
+            onSelect={() => setSelectedId(fanAccount.id)}
           />
-        ))}
+        ) : (
+          <div className="flex w-full items-center justify-center rounded-lg bg-neutral-100 py-3 pr-3.75 pl-3 text-caption2 text-neutral-500">
+            아직 팬 프로필이 없어요
+          </div>
+        )}
       </div>
     </div>
   );
@@ -225,10 +235,29 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
             <button
               type="button"
               onClick={() => {
-                if (selectedMode === "fan") {
-                  setMode("fan");
+                const proceed = () => {
+                  setShowErrorToast(false);
+                  setMode(selectedMode);
+                  if (selectedMode === "fan") {
+                    onClose();
+                    navigate(getLastFanPath());
+                    return;
+                  }
+
+                  if (isFanMode) {
+                    saveLastFanPath(
+                      `${location.pathname}${location.search}${location.hash}`,
+                    );
+                  }
                   onClose();
-                  navigate(getLastFanPath());
+                  navigate("/band/home");
+                };
+
+                if (selectedMode === "fan" && fanAccount.profileId) {
+                  changeUserMode.mutate(
+                    { profileId: fanAccount.profileId, type: "FAN" },
+                    { onSuccess: proceed, onError: () => setShowErrorToast(true) },
+                  );
                   return;
                 }
 
@@ -236,19 +265,20 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
                   (band) => band.id === selectedId,
                 );
 
-                if (selectedBand?.storeBandId) {
-                  setActiveBandId(selectedBand.storeBandId);
+                if (selectedBand) {
+                  changeUserMode.mutate(
+                    {
+                      profileId: selectedBand.bandMemberProfileId,
+                      type: "BAND",
+                    },
+                    { onSuccess: proceed, onError: () => setShowErrorToast(true) },
+                  );
+                  return;
                 }
 
-                setMode("band");
-                if (isFanMode) {
-                  saveLastFanPath(
-                    `${location.pathname}${location.search}${location.hash}`,
-                  );
-                }
-                onClose();
-                navigate("/band/home");
+                proceed();
               }}
+              disabled={changeUserMode.isPending}
               className={`flex h-[52px] w-[353px] items-center justify-center rounded-[12px] text-label1 text-neutral-0 ${
                 selectedMode === "fan" ? "bg-primary-400" : "bg-secondary-500"
               }`}
@@ -258,6 +288,13 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
           </div>
         </div>
       </div>
+
+      <Toast
+        open={showErrorToast}
+        message="모드 전환에 실패했어요. 다시 시도해주세요"
+        onClose={() => setShowErrorToast(false)}
+        tone="error"
+      />
     </div>
   );
 };

@@ -13,52 +13,35 @@ import { Input } from "@/components/common/Input/Input";
 import { Select } from "@/components/common/Select/Select";
 import { ModalOverlay } from "@/components/common/Modal/ModalOverlay";
 import Modal from "@/components/Modal/Modal";
-import { useConcertsStore } from "@/stores/useConcertsStore";
+import { useActiveBandId } from "@/hooks/api/user/useMyProfiles";
+import {
+  useCreatePerformance,
+  usePerformanceQuery,
+  useUpdatePerformance,
+} from "@/hooks/api/band/usePerformance";
+import { uploadMediaFile } from "@/utils/uploadMediaFile";
+import { getApiErrorMessage } from "@/utils/getApiErrorMessage";
+import type { PerformanceResponse } from "@/types/band/performance";
+import {
+  BAND_REGION_BY_LABEL,
+  BAND_REGION_LABELS,
+  BAND_REGION_LABEL_OPTIONS,
+  PERFORMANCE_AGE_RATING_BY_LABEL,
+  PERFORMANCE_AGE_RATING_LABELS,
+  PERFORMANCE_AGE_RATING_LABEL_OPTIONS,
+  PERFORMANCE_GENRE_BY_LABEL,
+  PERFORMANCE_GENRE_LABELS,
+  PERFORMANCE_GENRE_LABEL_OPTIONS,
+  PERFORMANCE_REGION_BY_BAND_REGION,
+} from "@/utils/bandLabels";
 import CalendarIcon from "@/assets/icons/band/data-range.svg";
 import ClockIcon from "@/assets/icons/band/clock-band.svg";
 import UploadIcon from "@/assets/icons/band/add-image.svg";
-import TrashIcon from "@/assets/icons/band/delete.svg";
 import CloseIcon from "@/assets/icons/close.svg";
 import Number1CircleIcon from "@/assets/icons/band/number1-circle.svg";
 import Number2CircleIcon from "@/assets/icons/band/number2-circle.svg";
 import Number2CircleActiveIcon from "@/assets/icons/band/number2-circle-active.svg";
 import CheckCircleYellowIcon from "@/assets/icons/band/check-circle-yellow.svg";
-
-const GENRE_OPTIONS = [
-  "록",
-  "인디팝",
-  "펑크",
-  "메탈",
-  "재즈",
-  "블루스",
-  "R&B",
-  "어쿠스틱",
-  "포크",
-];
-
-const REGION_OPTIONS = [
-  "서울",
-  "경기",
-  "인천",
-  "부산",
-  "대구",
-  "광주",
-  "대전",
-  "울산",
-  "세종",
-  "충청",
-  "전라",
-  "경상",
-  "강원",
-  "제주",
-];
-
-const AGE_RATING_OPTIONS = [
-  "전체 관람가",
-  "12세 이상",
-  "15세 이상",
-  "19세 이상",
-];
 
 const DESCRIPTION_MAX_LENGTH = 500;
 const MAX_TAGS = 8;
@@ -142,49 +125,96 @@ const Field = ({ label, required, error, children }: FieldProps) => (
 );
 
 const ConcertRegisterPage = () => {
-  const navigate = useNavigate();
   const { concertId } = useParams();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const addConcert = useConcertsStore((state) => state.addConcert);
-  const updateConcert = useConcertsStore((state) => state.updateConcert);
-  const existingConcert = useConcertsStore((state) =>
-    concertId
-      ? state.concerts.find((concert) => concert.id === concertId)
-      : undefined,
-  );
+  const activeBandId = useActiveBandId();
+  const bandId = activeBandId ?? NaN;
+  const performanceId = concertId ? Number(concertId) : NaN;
   const isEditMode = Boolean(concertId);
+
+  const { data: existingPerformance, isLoading } =
+    usePerformanceQuery(performanceId);
+
+  if (activeBandId === null || (isEditMode && isLoading)) {
+    return <main className="min-h-dvh bg-secondary-0" />;
+  }
+
+  return (
+    <ConcertRegisterForm
+      bandId={bandId}
+      performanceId={performanceId}
+      isEditMode={isEditMode}
+      existingPerformance={existingPerformance}
+    />
+  );
+};
+
+interface ConcertRegisterFormProps {
+  bandId: number;
+  performanceId: number;
+  isEditMode: boolean;
+  existingPerformance: PerformanceResponse | undefined;
+}
+
+const ConcertRegisterForm = ({
+  bandId,
+  performanceId,
+  isEditMode,
+  existingPerformance,
+}: ConcertRegisterFormProps) => {
+  const navigate = useNavigate();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const createPerformance = useCreatePerformance(bandId);
+  const updatePerformance = useUpdatePerformance(performanceId);
 
   const [step, setStep] = useState<Step>(1);
   const [isLeaveConfirmOpen, setIsLeaveConfirmOpen] = useState(false);
 
-  const [title, setTitle] = useState(() => existingConcert?.title ?? "");
-  const [genre, setGenre] = useState(() => existingConcert?.genre ?? "");
-  const [region, setRegion] = useState(() => existingConcert?.region ?? "");
-  const [ageRating, setAgeRating] = useState(
-    () => existingConcert?.ageRating ?? "",
+  const [title, setTitle] = useState(() => existingPerformance?.title ?? "");
+  const [genre, setGenre] = useState(() =>
+    existingPerformance ? PERFORMANCE_GENRE_LABELS[existingPerformance.genre] : "",
+  );
+  const [region, setRegion] = useState(() =>
+    existingPerformance ? BAND_REGION_LABELS[existingPerformance.region] : "",
+  );
+  const [ageRating, setAgeRating] = useState(() =>
+    existingPerformance
+      ? PERFORMANCE_AGE_RATING_LABELS[existingPerformance.ageRating]
+      : "",
   );
   const [description, setDescription] = useState(
-    () => existingConcert?.description ?? "",
+    () => existingPerformance?.description ?? "",
   );
   const [posterUrl, setPosterUrl] = useState(
-    () => existingConcert?.posterUrl ?? "",
+    () => existingPerformance?.posterImageUrl ?? "",
   );
-  const [tags, setTags] = useState<string[]>(() => existingConcert?.tags ?? []);
+  const [posterFile, setPosterFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [tags, setTags] = useState<string[]>(
+    () => existingPerformance?.tags ?? [],
+  );
   const [tagInput, setTagInput] = useState("");
 
   const [startDate, setStartDate] = useState(
-    () => existingConcert?.startDate ?? "",
+    () => existingPerformance?.performanceDate ?? "",
   );
-  const [endDate, setEndDate] = useState(() => existingConcert?.endDate ?? "");
+  const [endDate, setEndDate] = useState(
+    () => existingPerformance?.performanceDate ?? "",
+  );
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
-  const [time, setTime] = useState(() => existingConcert?.time ?? "");
+  const [time, setTime] = useState(
+    () => existingPerformance?.startTime.slice(0, 5) ?? "",
+  );
   const [isTimePickerOpen, setIsTimePickerOpen] = useState(false);
   const [location, setLocation] = useState(
-    () => existingConcert?.location ?? "",
+    () => existingPerformance?.venue ?? "",
   );
-  const [price, setPrice] = useState(() => existingConcert?.price ?? "");
-  const [ticketLinks, setTicketLinks] = useState<string[]>(
-    () => existingConcert?.ticketLinks ?? [""],
+  const [price, setPrice] = useState(
+    () => existingPerformance?.ticketPrice ?? "",
+  );
+  const [ticketLink, setTicketLink] = useState(
+    () => existingPerformance?.ticketLink ?? "",
   );
 
   const [showStep1Errors, setShowStep1Errors] = useState(false);
@@ -205,9 +235,17 @@ const ConcertRegisterPage = () => {
   const locationError = showStep2Errors && !location.trim();
   const priceError = showStep2Errors && !price.trim();
 
+  const submitError = isEditMode
+    ? updatePerformance.error
+    : createPerformance.error;
+  const isSubmitting =
+    (isEditMode ? updatePerformance.isPending : createPerformance.isPending) ||
+    isUploading;
+
   const handlePosterChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    setPosterFile(file);
     setPosterUrl(URL.createObjectURL(file));
   };
 
@@ -226,42 +264,7 @@ const ConcertRegisterPage = () => {
     setTags((prev) => prev.filter((item) => item !== tag));
   };
 
-  const handleTicketLinkChange = (index: number, value: string) => {
-    setTicketLinks((prev) =>
-      prev.map((link, linkIndex) => (linkIndex === index ? value : link)),
-    );
-  };
-
-  const handleRemoveTicketLink = (index: number) => {
-    setTicketLinks((prev) =>
-      prev.filter((_, linkIndex) => linkIndex !== index),
-    );
-  };
-
-  const handleAddTicketLink = () => {
-    setTicketLinks((prev) => [...prev, ""]);
-  };
-
   const handleConfirmLeave = () => {
-    if (!isEditMode) {
-      addConcert({
-        id: crypto.randomUUID(),
-        title: title.trim() || "제목 없는 공연",
-        genre,
-        region,
-        ageRating,
-        description,
-        posterUrl,
-        tags,
-        startDate,
-        endDate,
-        time,
-        location,
-        price,
-        ticketLinks: ticketLinks.filter((link) => link.trim()),
-        status: "draft",
-      });
-    }
     navigate("/band/home");
   };
 
@@ -273,51 +276,100 @@ const ConcertRegisterPage = () => {
     setStep(2);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!isStep2Valid) {
       setShowStep2Errors(true);
       return;
     }
 
-    const concert = {
-      id: existingConcert?.id ?? crypto.randomUUID(),
-      title,
-      genre,
-      region,
-      ageRating,
-      description,
-      posterUrl,
-      tags,
-      startDate,
-      endDate,
-      time,
-      location,
-      price,
-      ticketLinks: ticketLinks.filter((link) => link.trim()),
-      status: "scheduled" as const,
+    const regionValue = BAND_REGION_BY_LABEL[region];
+    const ageRatingValue = PERFORMANCE_AGE_RATING_BY_LABEL[ageRating];
+    const genreValue = PERFORMANCE_GENRE_BY_LABEL[genre];
+
+    if (!regionValue || !ageRatingValue || !genreValue) {
+      setUploadError("장르, 지역, 관람 연령을 다시 선택해주세요");
+      return;
+    }
+
+    const performanceRegionValue = PERFORMANCE_REGION_BY_BAND_REGION[regionValue];
+    const ticketPriceValue = String(
+      Number(price.replace(/[^0-9]/g, "")) || 0,
+    );
+
+    setUploadError(null);
+    let uploadedPosterUrl = posterUrl;
+
+    if (posterFile) {
+      try {
+        setIsUploading(true);
+        uploadedPosterUrl = await uploadMediaFile(
+          posterFile,
+          "PERFORMANCE_POSTER",
+        );
+      } catch {
+        setIsUploading(false);
+        setUploadError("포스터 업로드에 실패했어요. 다시 시도해주세요");
+        return;
+      }
+      setIsUploading(false);
+    }
+
+    const onSuccess = () => {
+      navigate("/band/register/complete", {
+        state: {
+          title: isEditMode ? "공연이 수정됐어요" : "공연이 등록됐어요",
+          description: isEditMode
+            ? "변경사항이 저장됐어요"
+            : "팔로워들에게 공연 소식이\n전달됐어요",
+          rows: [
+            { label: "공연명", value: title },
+            { label: "날짜", value: formatDateRange(startDate, endDate) },
+            { label: "장소", value: location },
+          ],
+          primaryLabel: "공연 상세 보기",
+          primaryTo: "/band/home",
+        },
+      });
     };
 
     if (isEditMode) {
-      updateConcert(concert.id, concert);
-    } else {
-      addConcert(concert);
+      updatePerformance.mutate(
+        {
+          title,
+          genre: genreValue,
+          performanceDate: startDate,
+          startTime: time,
+          region: performanceRegionValue,
+          venue: location,
+          description,
+          ticketPrice: ticketPriceValue,
+          ticketLink: ticketLink.trim() || undefined,
+          posterImageUrl: uploadedPosterUrl || undefined,
+          ageRating: ageRatingValue,
+          tags,
+        },
+        { onSuccess },
+      );
+      return;
     }
 
-    navigate("/band/register/complete", {
-      state: {
-        title: isEditMode ? "공연이 수정됐어요" : "공연이 등록됐어요",
-        description: isEditMode
-          ? "변경사항이 저장됐어요"
-          : "팔로워들에게 공연 소식이\n전달됐어요",
-        rows: [
-          { label: "공연명", value: title },
-          { label: "날짜", value: formatDateRange(startDate, endDate) },
-          { label: "장소", value: location },
-        ],
-        primaryLabel: "공연 상세 보기",
-        primaryTo: "/band/home",
+    createPerformance.mutate(
+      {
+        title,
+        genre: genreValue,
+        performanceDate: startDate,
+        startTime: time,
+        region: performanceRegionValue,
+        venue: location,
+        description,
+        ticketPrice: ticketPriceValue,
+        ticketLink: ticketLink.trim() || undefined,
+        posterImageUrl: uploadedPosterUrl || undefined,
+        ageRating: ageRatingValue,
+        tags,
       },
-    });
+      { onSuccess },
+    );
   };
 
   return (
@@ -358,7 +410,7 @@ const ConcertRegisterPage = () => {
                   <Select
                     value={genre}
                     onChange={setGenre}
-                    options={GENRE_OPTIONS}
+                    options={PERFORMANCE_GENRE_LABEL_OPTIONS}
                     placeholder="장르 선택"
                     error={genreError}
                     className="w-full"
@@ -369,7 +421,7 @@ const ConcertRegisterPage = () => {
                   <Select
                     value={region}
                     onChange={setRegion}
-                    options={REGION_OPTIONS}
+                    options={BAND_REGION_LABEL_OPTIONS}
                     placeholder="지역 선택"
                     error={regionError}
                     className="w-full"
@@ -378,7 +430,7 @@ const ConcertRegisterPage = () => {
 
                 <Field label="관람 연령" required error={ageRatingError}>
                   <div className="flex gap-2">
-                    {AGE_RATING_OPTIONS.map((option) => (
+                    {PERFORMANCE_AGE_RATING_LABEL_OPTIONS.map((option) => (
                       <button
                         key={option}
                         type="button"
@@ -548,36 +600,12 @@ const ConcertRegisterPage = () => {
                 </Field>
 
                 <Field label="티켓 예매 링크 (선택)">
-                  <div className="flex flex-col gap-2.5">
-                    {ticketLinks.map((link, index) => (
-                      <div key={index} className="flex items-center gap-2">
-                        <Input
-                          value={link}
-                          onChange={(event) =>
-                            handleTicketLinkChange(index, event.target.value)
-                          }
-                          placeholder="예매 링크 또는 관련 게시글 링크를 첨부해주세요"
-                          className="w-full rounded-[5px] px-4 py-1.25"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveTicketLink(index)}
-                          aria-label="링크 삭제"
-                          className="flex size-6 shrink-0 items-center justify-center"
-                        >
-                          <img src={TrashIcon} alt="" className="size-4" />
-                        </button>
-                      </div>
-                    ))}
-
-                    <button
-                      type="button"
-                      onClick={handleAddTicketLink}
-                      className="flex w-full items-center justify-center rounded-[5px] border border-secondary-500 py-1.25 text-caption2 text-secondary-500"
-                    >
-                      + 링크 추가
-                    </button>
-                  </div>
+                  <Input
+                    value={ticketLink}
+                    onChange={(event) => setTicketLink(event.target.value)}
+                    placeholder="예매 링크 또는 관련 게시글 링크를 첨부해주세요"
+                    className="w-full rounded-[5px] px-4 py-1.25"
+                  />
                 </Field>
               </>
             )}
@@ -585,7 +613,17 @@ const ConcertRegisterPage = () => {
         </section>
       </div>
 
-      <div className="fixed inset-x-0 bottom-[calc(var(--bottom-nav-height)+16px)] px-5">
+      <div className="fixed inset-x-0 bottom-[calc(var(--bottom-nav-height)+16px)] flex flex-col gap-2 px-5">
+        {uploadError ? (
+          <span className="text-center text-body5 text-error">
+            {uploadError}
+          </span>
+        ) : submitError ? (
+          <span className="text-center text-body5 text-error">
+            {getApiErrorMessage(submitError, "저장에 실패했어요. 다시 시도해주세요")}
+          </span>
+        ) : null}
+
         {step === 1 ? (
           <button
             type="button"
@@ -602,13 +640,18 @@ const ConcertRegisterPage = () => {
           <button
             type="button"
             onClick={handleSubmit}
+            disabled={isSubmitting}
             className={`flex h-13 w-full items-center justify-center rounded-xl text-label1 ${
-              isStep2Valid
+              isStep2Valid && !isSubmitting
                 ? "bg-secondary-500 text-neutral-0"
                 : "bg-neutral-300 text-neutral-600"
             }`}
           >
-            {isEditMode ? "수정 완료" : "공연 등록"}
+            {isUploading
+              ? "업로드 중..."
+              : isEditMode
+                ? "수정 완료"
+                : "공연 등록"}
           </button>
         )}
       </div>

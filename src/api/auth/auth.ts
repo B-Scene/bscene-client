@@ -7,10 +7,11 @@ import type {
   SendPhoneVerificationRequest,
   SendPhoneVerificationResponse,
   VerifyPhoneRequest,
-  LoginRequest, 
+  LoginRequest,
   LoginResponse,
-  ReissueRequest, 
+  ReissueRequest,
   ReissueResponse,
+  LogoutRequest,
   OAuthSignupRequest,
   OAuthExchangeResponse,
 } from "@/types/auth/auth";
@@ -66,6 +67,15 @@ export const login = async (body: LoginRequest) => {
 export const reissueToken = async (body: ReissueRequest) => {
   const { data } = await axiosInstance.post<ApiResponse<ReissueResponse>>(
     "/auth/reissue",
+    body,
+  );
+
+  return data.result;
+};
+
+export const logout = async (body: LogoutRequest) => {
+  const { data } = await axiosInstance.post<ApiResponse<null>>(
+    "/auth/logout",
     body,
   );
 

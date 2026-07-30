@@ -2,9 +2,20 @@ import { useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { Header } from "@/components/band/home/Header";
 import { Input } from "@/components/common/Input/Input";
-import TrashIcon from "@/assets/icons/band/delete.svg";
+import { useActiveBandId } from "@/hooks/api/user/useMyProfiles";
+import { useMusicLinksQuery, useSaveMusicLinks } from "@/hooks/api/band/useMusicLink";
+import { getApiErrorMessage } from "@/utils/getApiErrorMessage";
+import type {
+  MusicEtcPlatform,
+  MusicLinksResponse,
+} from "@/types/band/musicLink";
 
-const STORE_PLATFORMS = ["Melon", "genie", "Bugs", "Apple Music"];
+const ETC_PLATFORM_OPTIONS: { value: MusicEtcPlatform; label: string }[] = [
+  { value: "MELON", label: "Melon" },
+  { value: "GENIE", label: "genie" },
+  { value: "BUGS", label: "Bugs" },
+  { value: "APPLE_MUSIC", label: "Apple Music" },
+];
 
 interface FieldProps {
   label: string;
@@ -21,54 +32,97 @@ const Field = ({ label, error, children }: FieldProps) => (
 );
 
 const MusicRegisterPage = () => {
+  const activeBandId = useActiveBandId();
+  const bandId = activeBandId ?? NaN;
+  const { data: existingLinks, isLoading } = useMusicLinksQuery(bandId);
+
+  if (activeBandId === null || isLoading) {
+    return <main className="min-h-dvh bg-neutral-0" />;
+  }
+
+  return (
+    <MusicRegisterForm
+      key={bandId}
+      bandId={bandId}
+      existingLinks={existingLinks}
+    />
+  );
+};
+
+interface MusicRegisterFormProps {
+  bandId: number;
+  existingLinks: MusicLinksResponse | undefined;
+}
+
+const MusicRegisterForm = ({
+  bandId,
+  existingLinks,
+}: MusicRegisterFormProps) => {
   const navigate = useNavigate();
+  const saveMusicLinks = useSaveMusicLinks(bandId);
 
-  const [spotifyUrl, setSpotifyUrl] = useState("");
-  const [youtubeUrl, setYoutubeUrl] = useState("");
-  const [soundcloudUrl, setSoundcloudUrl] = useState("");
-  const [otherUrl, setOtherUrl] = useState("");
+  const [spotifyUrl, setSpotifyUrl] = useState(
+    () => existingLinks?.spotifyUrl ?? "",
+  );
+  const [youtubeUrl, setYoutubeUrl] = useState(
+    () => existingLinks?.youtubeUrl ?? "",
+  );
+  const [soundcloudUrl, setSoundcloudUrl] = useState(
+    () => existingLinks?.soundcloudUrl ?? "",
+  );
+  const [otherUrl, setOtherUrl] = useState(() => existingLinks?.otherUrl ?? "");
 
-  const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
-  const [platformLinks, setPlatformLinks] = useState<string[]>([""]);
+  const [etcPlatform, setEtcPlatform] = useState<MusicEtcPlatform | null>(
+    () => existingLinks?.etcPlatform ?? null,
+  );
+  const [etcUrl, setEtcUrl] = useState(() => existingLinks?.etcUrl ?? "");
 
   const [showErrors, setShowErrors] = useState(false);
 
   const isValid = Boolean(
     spotifyUrl.trim() ||
-    youtubeUrl.trim() ||
-    soundcloudUrl.trim() ||
-    otherUrl.trim() ||
-    (selectedPlatform && platformLinks.some((link) => link.trim())),
+      youtubeUrl.trim() ||
+      soundcloudUrl.trim() ||
+      otherUrl.trim() ||
+      (etcPlatform && etcUrl.trim()),
   );
 
+  const hasEtcPlatformMismatch =
+    Boolean(etcPlatform) !== Boolean(etcUrl.trim());
+
   const linksError = showErrors && !isValid;
+  const etcPlatformMismatchError = showErrors && hasEtcPlatformMismatch;
 
-  const handleSelectPlatform = (platform: string) => {
-    setSelectedPlatform((prev) => (prev === platform ? null : platform));
-  };
-
-  const handlePlatformLinkChange = (index: number, value: string) => {
-    setPlatformLinks((prev) =>
-      prev.map((link, linkIndex) => (linkIndex === index ? value : link)),
-    );
-  };
-
-  const handleRemovePlatformLink = (index: number) => {
-    setPlatformLinks((prev) =>
-      prev.filter((_, linkIndex) => linkIndex !== index),
-    );
-  };
-
-  const handleAddPlatformLink = () => {
-    setPlatformLinks((prev) => [...prev, ""]);
+  const handleSelectEtcPlatform = (platform: MusicEtcPlatform) => {
+    if (etcPlatform === platform) {
+      setEtcPlatform(null);
+      setEtcUrl("");
+      return;
+    }
+    setEtcPlatform(platform);
   };
 
   const handleSubmit = () => {
-    if (!isValid) {
+    if (!isValid || hasEtcPlatformMismatch) {
       setShowErrors(true);
       return;
     }
-    navigate("/band/home");
+
+    saveMusicLinks.mutate(
+      {
+        spotifyUrl: spotifyUrl.trim() || null,
+        youtubeUrl: youtubeUrl.trim() || null,
+        soundcloudUrl: soundcloudUrl.trim() || null,
+        etcPlatform,
+        etcUrl: etcUrl.trim() || null,
+        otherUrl: otherUrl.trim() || null,
+      },
+      {
+        onSuccess: () => {
+          navigate("/band/home");
+        },
+      },
+    );
   };
 
   return (
@@ -111,57 +165,40 @@ const MusicRegisterPage = () => {
             />
           </Field>
 
-          <Field label="Melon / genie / Bugs / Apple Music URL">
+          <Field
+            label="Melon / genie / Bugs / Apple Music URL"
+            error={
+              etcPlatformMismatchError
+                ? "플랫폼과 링크를 함께 입력해주세요"
+                : null
+            }
+          >
             <div className="flex flex-col gap-2.5">
               <div className="flex flex-wrap gap-2">
-                {STORE_PLATFORMS.map((platform) => (
+                {ETC_PLATFORM_OPTIONS.map((platform) => (
                   <button
-                    key={platform}
+                    key={platform.value}
                     type="button"
-                    onClick={() => handleSelectPlatform(platform)}
+                    onClick={() => handleSelectEtcPlatform(platform.value)}
                     className={`flex h-6.5 shrink-0 items-center justify-center gap-2.5 rounded-lg px-3.75 py-1.75 text-center text-caption3 ${
-                      selectedPlatform === platform
+                      etcPlatform === platform.value
                         ? "bg-secondary-500 text-neutral-0"
                         : "bg-neutral-300 text-neutral-600"
                     }`}
                   >
-                    {platform}
+                    {platform.label}
                   </button>
                 ))}
               </div>
 
-              {selectedPlatform ? (
-                <div className="flex flex-col gap-2.5">
-                  {platformLinks.map((link, index) => (
-                    <div key={index} className="flex items-center gap-2">
-                      <Input
-                        value={link}
-                        onChange={(event) =>
-                          handlePlatformLinkChange(index, event.target.value)
-                        }
-                        placeholder="예매 링크 또는 관련 게시글 링크를 첨부해주세요"
-                        error={linksError}
-                        className="w-full rounded-[5px] px-4 py-1.25"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => handleRemovePlatformLink(index)}
-                        aria-label="링크 삭제"
-                        className="flex size-6 shrink-0 items-center justify-center"
-                      >
-                        <img src={TrashIcon} alt="" className="size-4" />
-                      </button>
-                    </div>
-                  ))}
-
-                  <button
-                    type="button"
-                    onClick={handleAddPlatformLink}
-                    className="flex w-full items-center justify-center rounded-[5px] border border-secondary-500 py-1.25 text-caption2 text-secondary-500"
-                  >
-                    + 링크 추가
-                  </button>
-                </div>
+              {etcPlatform ? (
+                <Input
+                  value={etcUrl}
+                  onChange={(event) => setEtcUrl(event.target.value)}
+                  placeholder="예매 링크 또는 관련 게시글 링크를 첨부해주세요"
+                  error={etcPlatformMismatchError}
+                  className="w-full rounded-[5px] px-4 py-1.25"
+                />
               ) : null}
             </div>
           </Field>
@@ -181,12 +218,22 @@ const MusicRegisterPage = () => {
         </div>
       </section>
 
-      <div className="fixed inset-x-0 bottom-[calc(var(--bottom-nav-height)+16px)] px-5">
+      <div className="fixed inset-x-0 bottom-[calc(var(--bottom-nav-height)+16px)] flex flex-col gap-2 px-5">
+        {saveMusicLinks.isError ? (
+          <span className="text-center text-body5 text-error">
+            {getApiErrorMessage(
+              saveMusicLinks.error,
+              "저장에 실패했어요. 다시 시도해주세요",
+            )}
+          </span>
+        ) : null}
+
         <button
           type="button"
           onClick={handleSubmit}
+          disabled={saveMusicLinks.isPending}
           className={`flex h-13 w-full items-center justify-center rounded-xl text-label1 ${
-            isValid
+            isValid && !saveMusicLinks.isPending
               ? "bg-secondary-500 text-neutral-0"
               : "bg-neutral-300 text-neutral-600"
           }`}

@@ -4,6 +4,8 @@ import BSceneSymbol from "@/assets/bscene-symbol.svg";
 import Button from "@/components/common/Button/Button";
 import { useSaveOnboarding } from "@/hooks/api/onboarding/useOnboarding";
 import type { ModeCode } from "@/types/onboarding/onboarding";
+import { getHomePathForMode, saveFanNickname } from "@/utils/authUser";
+import { useModeStore } from "@/stores/useModeStore";
 
 const getJsonItem = <T,>(key: string, fallback: T): T => {
   const value = sessionStorage.getItem(key);
@@ -20,6 +22,7 @@ const getJsonItem = <T,>(key: string, fallback: T): T => {
 const OnboardingCompletePage = () => {
   const navigate = useNavigate();
   const { mutate: saveOnboardingMutate, isPending } = useSaveOnboarding();
+  const setMode = useModeStore((state) => state.setMode);
 
   const handleStart = () => {
     const selectedModes = getJsonItem<ModeCode[]>(
@@ -44,13 +47,18 @@ const OnboardingCompletePage = () => {
       },
       {
         onSuccess: () => {
+          if (fanNickname) {
+            saveFanNickname(fanNickname);
+          }
+
           sessionStorage.removeItem("onboardingSelectedModes");
           sessionStorage.removeItem("onboardingInitialMode");
           sessionStorage.removeItem("onboardingFanNickname");
           sessionStorage.removeItem("onboardingGenres");
           sessionStorage.removeItem("onboardingRegions");
 
-          navigate("/home", { replace: true });
+          setMode(initialMode === "BAND" ? "band" : "fan");
+          navigate(getHomePathForMode(initialMode), { replace: true });
         },
         onError: (error) => {
           console.error(error);

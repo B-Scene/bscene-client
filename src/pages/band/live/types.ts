@@ -1,5 +1,9 @@
+import type { EnterLiveResponse } from "@/types/live/live";
+
 export type BandLiveScreen =
   | "home"
+  | "liveNowList"
+  | "scheduledList"
   | "room"
   | "members"
   | "chat"
@@ -19,6 +23,17 @@ export type LiveCard = {
   title: string;
   subtitle: string;
   listeners?: string;
+  imageUrl?: string | null;
+  isMine?: boolean;
+};
+
+export type ScheduledLiveCardData = {
+  id: number;
+  title: string;
+  bandName: string;
+  scheduledAt: string;
+  isMine: boolean;
+  imageUrl?: string | null;
 };
 
 export type ChatMessage = {
@@ -27,6 +42,10 @@ export type ChatMessage = {
   message: string;
   time: string;
   highlighted?: boolean;
+  clientMsgId?: string | null;
+  serverMessageId?: string | null;
+  senderProfileImageUrl?: string | null;
+  pending?: boolean;
 };
 
 export type Member = {
@@ -34,3 +53,5 @@ export type Member = {
   name: string;
   role: string;
 };
+
+export type ActiveLive = EnterLiveResponse | null;

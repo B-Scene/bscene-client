@@ -1,0 +1,368 @@
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
+import {
+  createFanExplorePostComment,
+  deleteAllFanExploreRecentSearches,
+  deleteFanExploreRecentSearch,
+  deleteFanExplorePostComment,
+  followExploreBand,
+  getFanExploreBandDetail,
+  getFanExplorePostComments,
+  getFanExplorePostDetail,
+  getFanExploreRecentSearches,
+  getRecommendedExploreBands,
+  likeFanExplorePost,
+  searchFanExplore,
+  searchFanExploreContents,
+  searchFanExplorePerformances,
+  unlikeFanExplorePost,
+  unfollowExploreBand,
+  updateFanExplorePostComment,
+} from "@/api/fan/explore";
+import type {
+  FanExplorePostDetail,
+  FanExplorePostLikeResponse,
+  FanExplorePostCommentsParams,
+  FanExploreRecommendationParams,
+  FanExploreSearchParams,
+  UpsertFanExplorePostCommentRequest,
+} from "@/types/fan/explore";
+import { fanHomeKeys } from "@/hooks/api/fan/useFanHome";
+import { followedBandsKeys } from "@/hooks/api/user/useFollowedBands";
+
+export const fanExploreKeys = {
+  all: ["fanExplore"] as const,
+  recommendedBands: (params: FanExploreRecommendationParams) =>
+    [...fanExploreKeys.all, "recommendedBands", params] as const,
+  bandDetail: (bandId: number) =>
+    [...fanExploreKeys.all, "bandDetail", bandId] as const,
+  postDetail: (postId: number) =>
+    [...fanExploreKeys.all, "postDetail", postId] as const,
+  postComments: (postId: number, params: Omit<FanExplorePostCommentsParams, "cursor">) =>
+    [...fanExploreKeys.all, "postComments", postId, params] as const,
+  searches: () => [...fanExploreKeys.all, "search"] as const,
+  search: (params: FanExploreSearchParams) =>
+    [...fanExploreKeys.all, "search", params] as const,
+  searchPerformances: (params: FanExploreSearchParams) =>
+    [...fanExploreKeys.all, "searchPerformances", params] as const,
+  searchContentsLists: () => [...fanExploreKeys.all, "searchContents"] as const,
+  searchContents: (params: FanExploreSearchParams) =>
+    [...fanExploreKeys.all, "searchContents", params] as const,
+  recentSearches: () => [...fanExploreKeys.all, "recentSearches"] as const,
+};
+
+type FanExplorePostLikeMutationResult = Required<
+  Pick<FanExplorePostLikeResponse, "isLiked">
+> &
+  Pick<FanExplorePostLikeResponse, "likeCount">;
+
+const getOptimisticLikeCount = (
+  currentCount: number | undefined,
+  nextIsLiked: boolean,
+) => {
+  if (typeof currentCount !== "number") {
+    return currentCount;
+  }
+
+  return nextIsLiked ? currentCount + 1 : Math.max(0, currentCount - 1);
+};
+
+const updatePostDetailLike = (
+  currentData: FanExplorePostDetail | undefined,
+  isLiked: boolean,
+  likeCount?: number,
+) => {
+  if (!currentData) {
+    return currentData;
+  }
+
+  return {
+    ...currentData,
+    isLiked,
+    likeCount: likeCount ?? currentData.likeCount,
+  };
+};
+
+const invalidatePostLikeQueries = (
+  queryClient: ReturnType<typeof useQueryClient>,
+  postId: number,
+) => {
+  return Promise.all([
+    queryClient.invalidateQueries({ queryKey: fanExploreKeys.postDetail(postId) }),
+    queryClient.invalidateQueries({ queryKey: fanExploreKeys.searches() }),
+    queryClient.invalidateQueries({ queryKey: fanExploreKeys.searchContentsLists() }),
+  ]);
+};
+
+const useFanExplorePostLikeMutation = (
+  mutationFn: (postId: number) => Promise<FanExplorePostLikeMutationResult>,
+  optimisticIsLiked: boolean,
+) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn,
+    onMutate: async (postId) => {
+      await queryClient.cancelQueries({
+        queryKey: fanExploreKeys.postDetail(postId),
+      });
+
+      const previousPostDetail = queryClient.getQueryData<FanExplorePostDetail>(
+        fanExploreKeys.postDetail(postId),
+      );
+
+      queryClient.setQueryData(
+        fanExploreKeys.postDetail(postId),
+        (currentData: FanExplorePostDetail | undefined) =>
+          updatePostDetailLike(
+            currentData,
+            optimisticIsLiked,
+            getOptimisticLikeCount(currentData?.likeCount, optimisticIsLiked),
+          ),
+      );
+
+      return { previousPostDetail };
+    },
+    onSuccess: (result, postId) => {
+      queryClient.setQueryData(
+        fanExploreKeys.postDetail(postId),
+        (currentData: FanExplorePostDetail | undefined) =>
+          updatePostDetailLike(currentData, result.isLiked, result.likeCount),
+      );
+
+      return invalidatePostLikeQueries(queryClient, postId);
+    },
+    onError: (_error, postId, context) => {
+      if (!context?.previousPostDetail) {
+        return;
+      }
+
+      queryClient.setQueryData(
+        fanExploreKeys.postDetail(postId),
+        context.previousPostDetail,
+      );
+    },
+  });
+};
+
+export const useRecommendedExploreBandsInfiniteQuery = (
+  params: FanExploreRecommendationParams = {},
+) => {
+  return useInfiniteQuery({
+    queryKey: fanExploreKeys.recommendedBands(params),
+    queryFn: ({ pageParam }) =>
+      getRecommendedExploreBands({
+        ...params,
+        cursor: pageParam,
+      }),
+    initialPageParam: undefined as number | undefined,
+    getNextPageParam: (lastPage) =>
+      lastPage.hasNext ? (lastPage.nextCursor ?? undefined) : undefined,
+    staleTime: 1000 * 30,
+  });
+};
+
+export const useFanExploreBandDetailQuery = (bandId?: number) => {
+  return useQuery({
+    queryKey: fanExploreKeys.bandDetail(bandId ?? 0),
+    queryFn: () => getFanExploreBandDetail(bandId as number),
+    enabled: typeof bandId === "number" && Number.isFinite(bandId) && bandId > 0,
+    staleTime: 1000 * 30,
+  });
+};
+
+export const useFanExplorePostDetailQuery = (postId?: number) => {
+  return useQuery({
+    queryKey: fanExploreKeys.postDetail(postId ?? 0),
+    queryFn: () => getFanExplorePostDetail(postId as number),
+    enabled: typeof postId === "number" && Number.isFinite(postId) && postId > 0,
+    staleTime: 1000 * 30,
+  });
+};
+
+export const useLikeFanExplorePost = () => {
+  return useFanExplorePostLikeMutation(likeFanExplorePost, true);
+};
+
+export const useUnlikeFanExplorePost = () => {
+  return useFanExplorePostLikeMutation(unlikeFanExplorePost, false);
+};
+
+export const useFanExplorePostCommentsQuery = (
+  postId?: number,
+  params: Omit<FanExplorePostCommentsParams, "cursor"> = {},
+) => {
+  return useInfiniteQuery({
+    queryKey: fanExploreKeys.postComments(postId ?? 0, params),
+    queryFn: ({ pageParam }) =>
+      getFanExplorePostComments(postId as number, {
+        ...params,
+        cursor: pageParam,
+      }),
+    initialPageParam: undefined as number | undefined,
+    getNextPageParam: (lastPage) =>
+      lastPage.hasNext ? (lastPage.nextCursor ?? undefined) : undefined,
+    enabled: typeof postId === "number" && Number.isFinite(postId) && postId > 0,
+    staleTime: 1000 * 30,
+  });
+};
+
+const invalidatePostCommentQueries = (
+  queryClient: ReturnType<typeof useQueryClient>,
+  postId: number,
+) => {
+  return Promise.all([
+    queryClient.invalidateQueries({
+      queryKey: [...fanExploreKeys.all, "postComments", postId],
+    }),
+    queryClient.invalidateQueries({ queryKey: fanExploreKeys.postDetail(postId) }),
+    queryClient.invalidateQueries({ queryKey: fanExploreKeys.searches() }),
+    queryClient.invalidateQueries({ queryKey: fanExploreKeys.searchContentsLists() }),
+  ]);
+};
+
+export const useCreateFanExplorePostComment = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      postId,
+      body,
+    }: {
+      postId: number;
+      body: UpsertFanExplorePostCommentRequest;
+    }) => createFanExplorePostComment(postId, body),
+    onSuccess: (_result, { postId }) =>
+      invalidatePostCommentQueries(queryClient, postId),
+  });
+};
+
+export const useUpdateFanExplorePostComment = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: updateFanExplorePostComment,
+    onSuccess: (_result, { postId }) =>
+      invalidatePostCommentQueries(queryClient, postId),
+  });
+};
+
+export const useDeleteFanExplorePostComment = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: deleteFanExplorePostComment,
+    onSuccess: (_result, { postId }) =>
+      invalidatePostCommentQueries(queryClient, postId),
+  });
+};
+
+export const useFanExploreSearchQuery = (params: FanExploreSearchParams) => {
+  return useQuery({
+    queryKey: fanExploreKeys.search(params),
+    queryFn: () => searchFanExplore(params),
+    enabled: params.keyword.trim().length > 0,
+    staleTime: 1000 * 30,
+  });
+};
+
+export const useFanExploreRecentSearchesQuery = () => {
+  return useQuery({
+    queryKey: fanExploreKeys.recentSearches(),
+    queryFn: getFanExploreRecentSearches,
+    staleTime: 0,
+  });
+};
+
+export const useDeleteFanExploreRecentSearch = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (recentSearchId: number) =>
+      deleteFanExploreRecentSearch(recentSearchId),
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: fanExploreKeys.recentSearches(),
+      }),
+  });
+};
+
+export const useDeleteAllFanExploreRecentSearches = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: deleteAllFanExploreRecentSearches,
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: fanExploreKeys.recentSearches(),
+      }),
+  });
+};
+
+export const useFanExplorePerformanceSearchQuery = (
+  params: Omit<FanExploreSearchParams, "cursor" | "type">,
+) => {
+  return useInfiniteQuery({
+    queryKey: fanExploreKeys.searchPerformances(params),
+    queryFn: ({ pageParam }) =>
+      searchFanExplorePerformances({
+        ...params,
+        cursor: pageParam,
+      }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) =>
+      lastPage.hasNext ? String(lastPage.nextCursor ?? "") || undefined : undefined,
+    enabled: params.keyword.trim().length > 0,
+    staleTime: 1000 * 30,
+  });
+};
+
+export const useFanExploreContentSearchQuery = (
+  params: Omit<FanExploreSearchParams, "cursor" | "type">,
+) => {
+  return useInfiniteQuery({
+    queryKey: fanExploreKeys.searchContents(params),
+    queryFn: ({ pageParam }) =>
+      searchFanExploreContents({
+        ...params,
+        cursor: pageParam,
+      }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) =>
+      lastPage.hasNext ? String(lastPage.nextCursor ?? "") || undefined : undefined,
+    enabled: params.keyword.trim().length > 0,
+    staleTime: 1000 * 30,
+  });
+};
+
+export const useFollowExploreBand = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: followExploreBand,
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: fanExploreKeys.all }),
+        queryClient.invalidateQueries({ queryKey: fanHomeKeys.all }),
+        queryClient.invalidateQueries({ queryKey: followedBandsKeys.all }),
+      ]),
+  });
+};
+
+export const useUnfollowExploreBand = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: unfollowExploreBand,
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: fanExploreKeys.all }),
+        queryClient.invalidateQueries({ queryKey: fanHomeKeys.all }),
+        queryClient.invalidateQueries({ queryKey: followedBandsKeys.all }),
+      ]),
+  });
+};
