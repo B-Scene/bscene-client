@@ -24,6 +24,7 @@ import {
   isNotificationWithinRetention,
   isPostRegistrationNotification,
 } from "@/utils/notificationDeepLink";
+import { getGenreLabel, getRegionLabel } from "@/utils/bandLabels";
 import type { BandMemberPart } from "@/types/band/bandMember";
 import type {
   NotificationBandInvite,
@@ -65,9 +66,15 @@ const getNumberField = (
 const formatBandTag = (bandInvite: NotificationBandInvite | null) => {
   const genre = getStringField(bandInvite, "genre");
   const region = getStringField(bandInvite, "region");
-  const memberCount = getNumberField(bandInvite, "memberCount");
+  const memberCount =
+    getNumberField(bandInvite, "memberCount") ??
+    getNumberField(bandInvite, "acceptedMemberCount");
 
-  return [genre, region, memberCount != null ? `멤버 ${memberCount}명` : null]
+  return [
+    genre ? getGenreLabel(genre) : null,
+    region ? getRegionLabel(region) : null,
+    memberCount != null ? `멤버 ${memberCount}명` : null,
+  ]
     .filter(Boolean)
     .join(" · ");
 };

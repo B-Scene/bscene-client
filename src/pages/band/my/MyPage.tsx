@@ -7,6 +7,7 @@ import { ModalOverlay } from "@/components/common/Modal/ModalOverlay";
 import Modal from "@/components/Modal/Modal";
 import { ProfileSummary } from "@/components/band/my/ProfileSummary";
 import { MenuSection } from "@/components/band/my/MenuSection";
+import { EmptyState } from "@/components/common/EmptyState/EmptyState";
 import { useBandMyPageQuery } from "@/hooks/api/user/useBandMyPage";
 import { useMyProfilesQuery } from "@/hooks/api/user/useMyProfiles";
 import { useLogoutAndRedirect } from "@/hooks/useLogoutAndRedirect";
@@ -15,7 +16,11 @@ import { getPartLabel } from "@/utils/bandLabels";
 const MyPage = () => {
   const navigate = useNavigate();
   const { data } = useBandMyPageQuery();
-  const { data: bandProfiles } = useMyProfilesQuery({ type: "band" });
+  const {
+    data: bandProfiles,
+    isLoading: isBandProfilesLoading,
+    isError: isBandProfilesError,
+  } = useMyProfilesQuery({ type: "band" });
   const logout = useLogoutAndRedirect();
 
   const [isModeSwitchOpen, setIsModeSwitchOpen] = useState(false);
@@ -24,9 +29,12 @@ const MyPage = () => {
   const activeBandProfile = bandProfiles?.bandProfiles.find(
     (band) => band.isActive,
   );
+  const hasBand = Boolean(activeBandProfile);
+  const showNoBandState =
+    !hasBand && !isBandProfilesLoading && !isBandProfilesError;
 
-  const bandName = data?.bandName ?? "";
-  const partsLabel = data?.parts.map(getPartLabel).join(" · ") ?? "";
+  const bandName = hasBand ? (data?.bandName ?? "") : "";
+  const partsLabel = (data?.parts ?? []).map(getPartLabel).join(" · ");
 
   return (
     <main className="relative flex min-h-dvh flex-col bg-neutral-0 pb-[calc(var(--bottom-nav-height)+24px)]">
@@ -53,7 +61,7 @@ const MyPage = () => {
       </section>
 
       <div className="flex flex-col gap-4 pt-4.5 pb-5">
-        {data?.isBandMember ? (
+        {hasBand ? (
           <>
             <MenuSection
               title="현재 선택된 밴드 관리"
@@ -80,6 +88,25 @@ const MyPage = () => {
                 },
               ]}
             />
+
+            <div className="h-px bg-neutral-400" />
+          </>
+        ) : showNoBandState ? (
+          <>
+            <div className="px-6 py-8">
+              <EmptyState
+                title="등록된 밴드가 없어요"
+                description={
+                  <>
+                    밴드를 등록하면 콘텐츠, 공연, 라이브 등
+                    <br />
+                    다양한 활동을 관리할 수 있어요
+                  </>
+                }
+                actionLabel="밴드 등록하기"
+                onAction={() => navigate("/band/profile/new")}
+              />
+            </div>
 
             <div className="h-px bg-neutral-400" />
           </>
