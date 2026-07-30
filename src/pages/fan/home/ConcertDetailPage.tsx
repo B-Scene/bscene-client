@@ -220,6 +220,22 @@ const firstMediaUrl = (
   return undefined;
 };
 
+const toNumericId = (value?: number | string | null) => {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const parsedValue = Number(value);
+
+    if (Number.isFinite(parsedValue)) {
+      return parsedValue;
+    }
+  }
+
+  return null;
+};
+
 const getDetailPosterImageUrl = (detail?: FanPerformanceDetailResponse) => {
   if (!detail) return undefined;
 
@@ -238,10 +254,46 @@ const getDetailPosterImageUrl = (detail?: FanPerformanceDetailResponse) => {
   );
 };
 
+const getCastingBandInfo = (
+  band: FanPerformanceDetailResponse["casting"][number],
+) => band.band ?? band.profile ?? band.bandProfile ?? band.bandInfo ?? band;
+
+const getCastingBandId = (
+  band: FanPerformanceDetailResponse["casting"][number],
+) => {
+  const bandInfo = getCastingBandInfo(band);
+
+  return (
+    toNumericId(bandInfo.bandId) ??
+    toNumericId(band.bandId) ??
+    toNumericId(bandInfo.targetBandId) ??
+    toNumericId(band.targetBandId) ??
+    toNumericId(bandInfo.followingBandId) ??
+    toNumericId(band.followingBandId) ??
+    toNumericId(bandInfo.followedBandId) ??
+    toNumericId(band.followedBandId) ??
+    toNumericId(bandInfo.castingBandId) ??
+    toNumericId(band.castingBandId) ??
+    toNumericId(bandInfo.performanceBandId) ??
+    toNumericId(band.performanceBandId) ??
+    toNumericId(bandInfo.id) ??
+    toNumericId(band.id)
+  );
+};
+
 const getCastingBandImageUrl = (
   band: FanPerformanceDetailResponse["casting"][number],
 ) => {
+  const bandInfo = getCastingBandInfo(band);
+
   return firstImageUrl(
+    bandInfo.profileImageUrl,
+    bandInfo.bandProfileImageUrl,
+    bandInfo.bandImageUrl,
+    bandInfo.imageUrl,
+    bandInfo.thumbnailUrl,
+    bandInfo.avatarUrl,
+    bandInfo.logoUrl,
     band.profileImageUrl,
     band.bandProfileImageUrl,
     band.bandImageUrl,
@@ -763,29 +815,78 @@ const ConcertDetailPage = () => {
 
         <div className="mt-4 flex flex-col gap-3">
           {casting.length > 0 ? (
-            casting.map((band) => {
-              const bandName = band.bandName ?? band.name ?? "밴드명";
+            casting.map((band, index) => {
+              const bandInfo = getCastingBandInfo(band);
+              const bandId = getCastingBandId(band);
+              const bandName =
+                bandInfo.bandName ??
+                bandInfo.name ??
+                band.bandName ??
+                band.name ??
+                "밴드명";
+              const genre = bandInfo.genre ?? bandInfo.bandGenre ?? band.genre;
+              const region =
+                bandInfo.region ?? bandInfo.bandRegion ?? band.region;
               const bandMeta =
-                [band.genre, band.region].filter(Boolean).join(" · ") ||
+                [genre, region].filter(Boolean).join(" · ") ||
                 "장르 · 지역";
+              const profileImageUrl = getCastingBandImageUrl(band) ?? null;
+              const isFollowing =
+                bandInfo.isFollowing ??
+                bandInfo.isFollowed ??
+                bandInfo.following ??
+                bandInfo.followed;
+              const handleCastingBandClick = () => {
+                if (bandId == null) return;
+
+                navigate(`/fan/bands/${bandId}`, {
+                  state: {
+                    bandPreview: {
+                      bandId,
+                      name: bandName,
+                      bandName,
+                      genre,
+                      region,
+                      profileImageUrl,
+                      description:
+                        bandInfo.description ??
+                        bandInfo.bandDescription ??
+                        bandInfo.introduction ??
+                        bandInfo.introduce ??
+                        "",
+                      followerCount:
+                        bandInfo.followerCount ??
+                        bandInfo.followersCount ??
+                        bandInfo.followerCnt ??
+                        bandInfo.followCount ??
+                        bandInfo.followers ??
+                        0,
+                      ...(typeof isFollowing === "boolean"
+                        ? { isFollowing }
+                        : {}),
+                    },
+                  },
+                });
+              };
 
               return (
                 <article
-                  key={band.bandId}
+                  key={`${bandId ?? bandName}-${index}`}
                   role="button"
                   tabIndex={0}
-                  onClick={() => navigate(`/fan/bands/${band.bandId}`)}
+                  aria-disabled={bandId == null}
+                  onClick={handleCastingBandClick}
                   onKeyDown={(event) => {
                     if (event.key === "Enter" || event.key === " ") {
                       event.preventDefault();
-                      navigate(`/fan/bands/${band.bandId}`);
+                      handleCastingBandClick();
                     }
                   }}
                   className="flex h-[60px] items-center justify-between rounded-[8px] bg-neutral-0 px-4 shadow-[0_0_8px_0_rgba(0,0,0,0.10)]"
                 >
                   <div className="flex min-w-0 items-center gap-[18px]">
                     <img
-                      src={getCastingBandImageUrl(band) ?? BandProfileImage}
+                      src={profileImageUrl ?? BandProfileImage}
                       alt=""
                       className="size-[35px] shrink-0 rounded-full object-cover"
                     />

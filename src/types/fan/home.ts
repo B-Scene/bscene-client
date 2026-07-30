@@ -72,6 +72,7 @@ export interface FanHomeRecommendedBand {
   followCount?: number;
   followers?: number;
   isFollowing?: boolean;
+  isFollowed?: boolean;
   following?: boolean;
   followed?: boolean;
 }
@@ -142,7 +143,17 @@ export type PerformanceParticipationStatus = "SCHEDULED" | "COMPLETED";
 export type PerformanceAgeRating = "ALL" | "AGE_12" | "AGE_15" | "AGE_19";
 
 export interface FanPerformanceCastingBand {
-  bandId: number;
+  band?: FanPerformanceCastingBand;
+  profile?: FanPerformanceCastingBand;
+  bandProfile?: FanPerformanceCastingBand;
+  bandInfo?: FanPerformanceCastingBand;
+  bandId?: number | string;
+  targetBandId?: number | string;
+  followingBandId?: number | string;
+  followedBandId?: number | string;
+  castingBandId?: number | string;
+  performanceBandId?: number | string;
+  id?: number | string;
   bandName?: string;
   name?: string;
   profileImageUrl?: string | null;
@@ -153,7 +164,22 @@ export interface FanPerformanceCastingBand {
   avatarUrl?: string | null;
   logoUrl?: string | null;
   genre?: string | null;
+  bandGenre?: string | null;
   region?: string | null;
+  bandRegion?: string | null;
+  description?: string | null;
+  bandDescription?: string | null;
+  introduction?: string | null;
+  introduce?: string | null;
+  followerCount?: number;
+  followersCount?: number;
+  followerCnt?: number;
+  followCount?: number;
+  followers?: number;
+  isFollowing?: boolean;
+  isFollowed?: boolean;
+  following?: boolean;
+  followed?: boolean;
 }
 
 export interface FanPerformanceDetailResponse {

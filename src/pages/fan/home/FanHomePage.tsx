@@ -17,6 +17,7 @@ import {
   useDeletePerformanceParticipation,
   useFanHomeQuery,
   usePendingPerformanceParticipationQuery,
+  useUpcomingPerformancesInfiniteQuery,
 } from "@/hooks/api/fan/useFanHome";
 import {
   useFollowExploreBand,
@@ -76,6 +77,7 @@ type HomeBandItem = {
 
 type HomeConcertItem = {
   id: string;
+  date: Date | null;
   month: string;
   day: string;
   title: string;
@@ -379,6 +381,7 @@ const mapConcertItem = (
     id: String(
       item.performanceId ?? item.concertId ?? item.id ?? `concert-${index}`,
     ),
+    date,
     month: date ? MONTH_LABELS[date.getMonth()] : "TBD",
     day: date ? String(date.getDate()).padStart(2, "0") : "--",
     title:
@@ -414,6 +417,7 @@ const mapInterestedConcertItem = (
 
   return {
     id: String(item.performanceId),
+    date,
     month: date ? MONTH_LABELS[date.getMonth()] : "TBD",
     day: date ? String(date.getDate()).padStart(2, "0") : "--",
     title: item.title,
@@ -423,6 +427,16 @@ const mapInterestedConcertItem = (
     thumbnailSrc: item.posterImageUrl ?? undefined,
     showThumbnail: Boolean(item.posterImageUrl),
   };
+};
+
+const isUpcomingConcert = (concert: HomeConcertItem) => {
+  if (["종료", "COMPLETED", "ENDED", "FINISHED"].includes(concert.status)) {
+    return false;
+  }
+
+  if (!concert.date) return true;
+
+  return concert.date.getTime() >= Date.now();
 };
 
 const mapHomeResponse = (data?: FanHomeResponse) => {
@@ -443,7 +457,7 @@ const mapHomeResponse = (data?: FanHomeResponse) => {
     data?.recommendedConcerts,
     data?.recommendConcerts,
     data?.popularConcerts,
-  ).map(mapConcertItem);
+  ).map(mapConcertItem).filter(isUpcomingConcert);
 
   return {
     hasFollowingBands: data?.hasFollowingBands === true,
@@ -862,6 +876,10 @@ const FanHomePage = () => {
   const deleteParticipationMutation = useDeletePerformanceParticipation();
   const { data: fanHome, isError, isLoading, refetch } = useFanHomeQuery();
   const interestedPerformancesQuery = useInterestedPerformancesQuery("ALL");
+  const upcomingPerformancesQuery = useUpcomingPerformancesInfiniteQuery(
+    "IMMINENT",
+    4,
+  );
   const variant = getVariant(searchParams.get("variant"));
   const homeData = useMemo(() => mapHomeResponse(fanHome), [fanHome]);
   const interestedConcerts = useMemo(() => {
@@ -870,10 +888,27 @@ const FanHomePage = () => {
         .flatMap((page) => page.items)
         .filter((item) => item.participationStatus !== "COMPLETED")
         .map(mapInterestedConcertItem) ?? []
-    );
+    ).filter(isUpcomingConcert);
   }, [interestedPerformancesQuery.data]);
-  const upcomingConcerts =
-    interestedConcerts.length > 0 ? interestedConcerts : homeData.performances;
+  const upcomingApiConcerts = useMemo(() => {
+    return (
+      upcomingPerformancesQuery.data?.pages
+        .flatMap((page) => page.items ?? [])
+        .map(mapConcertItem)
+        .filter(isUpcomingConcert) ?? []
+    );
+  }, [upcomingPerformancesQuery.data]);
+  const shouldUseRecommendedPerformances =
+    variant === "recommended" ||
+    homeData.performanceType === "RECOMMENDED" ||
+    !homeData.hasFollowingBands;
+  const upcomingConcerts = shouldUseRecommendedPerformances
+    ? interestedConcerts.length > 0
+      ? interestedConcerts
+      : homeData.performances
+    : upcomingApiConcerts.length > 0
+      ? upcomingApiConcerts
+      : homeData.performances;
   const pendingPerformances = useMemo(() => {
     return (pendingParticipationQuery.data?.items ?? []).filter(
       (item) => !answeredPendingPerformanceIds.has(item.performanceId),
@@ -934,8 +969,6 @@ const FanHomePage = () => {
     }
 
     const isNewHome = variant === "new" || !homeData.hasFollowingBands;
-    const isRecommendedPerformances =
-      variant === "recommended" || homeData.performanceType === "RECOMMENDED";
     const hasInterestedConcerts = interestedConcerts.length > 0;
     const hasUpcomingConcerts = upcomingConcerts.length > 0;
 
@@ -973,7 +1006,7 @@ const FanHomePage = () => {
       );
     }
 
-    if (isRecommendedPerformances) {
+    if (shouldUseRecommendedPerformances) {
       return (
         <>
           <section>
@@ -1032,6 +1065,7 @@ const FanHomePage = () => {
     isLoading,
     navigate,
     refetch,
+    shouldUseRecommendedPerformances,
     upcomingConcerts,
     variant,
   ]);

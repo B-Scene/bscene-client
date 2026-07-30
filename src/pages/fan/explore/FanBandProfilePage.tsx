@@ -21,11 +21,13 @@ import {
   useFollowExploreBand,
   useUnfollowExploreBand,
 } from "@/hooks/api/fan/useFanExplore";
+import { useFollowedBandsQuery } from "@/hooks/api/user/useFollowedBands";
 import { useMusicLinksQuery } from "@/hooks/api/band/useMusicLink";
 import { usePerformancesQuery } from "@/hooks/api/band/usePerformance";
 import { usePostsQuery } from "@/hooks/api/band/usePost";
 import { useEnterLiveMutation } from "@/hooks/api/live/useLive";
 import type { FanExploreBandDetail } from "@/types/fan/explore";
+import type { FollowedBandItem } from "@/types/user/followedBands";
 import type { MusicLinksResponse } from "@/types/band/musicLink";
 import type { PerformanceListItem } from "@/types/band/performance";
 import type { PostListItem, PostType } from "@/types/band/post";
@@ -34,6 +36,50 @@ import { getApiErrorMessage } from "@/utils/getApiErrorMessage";
 
 const TABS = ["콘텐츠", "일정", "음원"] as const;
 type ProfileTab = (typeof TABS)[number];
+
+const toNumericId = (value?: number | string | null) => {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const parsedValue = Number(value);
+
+    return Number.isFinite(parsedValue) ? parsedValue : null;
+  }
+
+  return null;
+};
+
+const getFollowedBandId = (band: FollowedBandItem) => {
+  return (
+    toNumericId(band.bandId) ??
+    toNumericId(band.band?.bandId) ??
+    toNumericId(band.band?.id) ??
+    toNumericId(band.targetBandId) ??
+    toNumericId(band.followingBandId) ??
+    toNumericId(band.followedBandId) ??
+    toNumericId(band.id)
+  );
+};
+
+const getBandFollowerCount = (band?: FanExploreBandDetail | null) => {
+  return (
+    band?.followerCount ??
+    band?.followersCount ??
+    band?.followerCnt ??
+    band?.followCount ??
+    band?.followers
+  );
+};
+
+const getFollowedBandFollowerCount = (band?: FollowedBandItem | null) => {
+  const bandInfo = band?.band;
+
+  return (
+    band?.followerCount ??
+    band?.followers ??
+    bandInfo?.followerCount ??
+    bandInfo?.followers
+  );
+};
 
 const LocationIconNeutral500 = () => (
   <svg
@@ -242,6 +288,12 @@ const FanBandProfilePage = () => {
   const [activeTab, setActiveTab] = useState<ProfileTab>("콘텐츠");
   const [isUnfollowModalOpen, setIsUnfollowModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [followOverrides, setFollowOverrides] = useState<
+    Record<number, boolean>
+  >({});
+  const [followerCountOverrides, setFollowerCountOverrides] = useState<
+    Record<number, number>
+  >({});
   const numericBandId = Number(currentBandId);
   const canToggleFollow = Number.isFinite(numericBandId) && numericBandId > 0;
   const bandDetailQuery = useFanExploreBandDetailQuery(
@@ -256,6 +308,7 @@ const FanBandProfilePage = () => {
   const musicLinksQuery = useMusicLinksQuery(
     canToggleFollow ? numericBandId : Number.NaN,
   );
+  const followedBandsQuery = useFollowedBandsQuery(100);
   const followBandMutation = useFollowExploreBand();
   const unfollowBandMutation = useUnfollowExploreBand();
   const enterLiveMutation = useEnterLiveMutation();
@@ -276,11 +329,40 @@ const FanBandProfilePage = () => {
     bandDetail?.bandProfileImageUrl ??
     bandDetail?.imageUrl ??
     BandImage;
-  const followerCount = bandDetail?.followerCount ?? bandDetail?.followers ?? 0;
+  const followedBandMatch = canToggleFollow
+    ? followedBandsQuery.data?.pages
+        .flatMap((page) => page.items)
+        .find((followedBand) => getFollowedBandId(followedBand) === numericBandId)
+    : undefined;
+  const isFollowedFromList =
+    canToggleFollow && followedBandMatch != null;
+  const followOverride = canToggleFollow
+    ? followOverrides[numericBandId]
+    : undefined;
   const isFollowing =
-    bandDetail?.isFollowing ??
-    bandDetail?.following ??
+    followOverride ??
+    (isFollowedFromList ? true : undefined) ??
+    bandDetailQuery.data?.isFollowing ??
+    bandDetailQuery.data?.isFollowed ??
+    bandDetailQuery.data?.following ??
+    bandDetailQuery.data?.followed ??
+    bandPreview?.isFollowing ??
+    bandPreview?.isFollowed ??
+    bandPreview?.following ??
+    bandPreview?.followed ??
     false;
+  const rawFollowerCount =
+    getBandFollowerCount(bandDetailQuery.data) ??
+    getFollowedBandFollowerCount(followedBandMatch) ??
+    getBandFollowerCount(bandPreview) ??
+    0;
+  const followerCountOverride = canToggleFollow
+    ? followerCountOverrides[numericBandId]
+    : undefined;
+  const followerCount = Math.max(
+    followerCountOverride ?? rawFollowerCount,
+    isFollowing ? 1 : 0,
+  );
   const isOfficial = bandDetail?.isOfficial ?? bandDetail?.official ?? false;
   const rawLiveId = bandDetail?.liveId ?? null;
   const liveId =
@@ -308,6 +390,23 @@ const FanBandProfilePage = () => {
     return () => window.clearTimeout(timerId);
   }, [toastMessage]);
 
+  useEffect(() => {
+    if (
+      !canToggleFollow ||
+      isFollowedFromList ||
+      !followedBandsQuery.hasNextPage ||
+      followedBandsQuery.isFetchingNextPage
+    ) {
+      return;
+    }
+
+    void followedBandsQuery.fetchNextPage();
+  }, [
+    canToggleFollow,
+    followedBandsQuery,
+    isFollowedFromList,
+  ]);
+
   const handleOpenLive = async () => {
     if (!canEnterLive || liveId == null || enterLiveMutation.isPending) return;
 
@@ -329,9 +428,25 @@ const FanBandProfilePage = () => {
     }
 
     try {
+      setFollowOverrides((currentOverrides) => ({
+        ...currentOverrides,
+        [numericBandId]: true,
+      }));
+      setFollowerCountOverrides((currentOverrides) => ({
+        ...currentOverrides,
+        [numericBandId]: Math.max(followerCount + 1, 1),
+      }));
       await followBandMutation.mutateAsync(numericBandId);
       setToastMessage(`${bandName}를 팔로우했어요`);
     } catch {
+      setFollowOverrides((currentOverrides) => ({
+        ...currentOverrides,
+        [numericBandId]: false,
+      }));
+      setFollowerCountOverrides((currentOverrides) => ({
+        ...currentOverrides,
+        [numericBandId]: rawFollowerCount,
+      }));
       setToastMessage("밴드 팔로우에 실패했어요");
     }
   };
@@ -340,11 +455,27 @@ const FanBandProfilePage = () => {
     if (!canToggleFollow || isFollowPending) return;
 
     try {
+      setFollowOverrides((currentOverrides) => ({
+        ...currentOverrides,
+        [numericBandId]: false,
+      }));
+      setFollowerCountOverrides((currentOverrides) => ({
+        ...currentOverrides,
+        [numericBandId]: Math.max(followerCount - 1, 0),
+      }));
       await unfollowBandMutation.mutateAsync(numericBandId);
 
       setIsUnfollowModalOpen(false);
       setToastMessage(`${bandName} 팔로우를 취소했어요`);
     } catch {
+      setFollowOverrides((currentOverrides) => ({
+        ...currentOverrides,
+        [numericBandId]: true,
+      }));
+      setFollowerCountOverrides((currentOverrides) => ({
+        ...currentOverrides,
+        [numericBandId]: Math.max(rawFollowerCount, 1),
+      }));
       setToastMessage("팔로우 취소에 실패했어요");
     }
   };
