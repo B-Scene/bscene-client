@@ -44,7 +44,7 @@ const MyPage = () => {
   const { data: regions = [] } = useRegions();
 
   return (
-    <main className="relative flex min-h-dvh flex-col bg-neutral-0">
+    <main className="relative flex min-h-dvh flex-col bg-neutral-0 pb-[calc(var(--bottom-nav-height)+24px)]">
       <Header title="마이" showBack={false} variant="main" />
 
       <section className="bg-primary-0 px-5 py-6">

@@ -23,7 +23,7 @@ const MyPage = () => {
   const partsLabel = data?.parts.map(getPartLabel).join(" · ") ?? "";
 
   return (
-    <main className="relative flex min-h-dvh flex-col bg-neutral-0">
+    <main className="relative flex min-h-dvh flex-col bg-neutral-0 pb-[calc(var(--bottom-nav-height)+24px)]">
       <Header title="마이" showBack={false} variant="main" />
 
       <section className="bg-secondary-0 px-5 py-6">
