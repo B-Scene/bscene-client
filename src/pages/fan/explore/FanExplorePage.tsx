@@ -479,8 +479,8 @@ const RecommendationSection = ({
     if (band.bandId == null || band.isFollowing || isFollowPending) return;
 
     try {
-      await followBandMutation.mutateAsync(band.bandId);
       setToastMessage(`${band.name}를 팔로우했어요`);
+      await followBandMutation.mutateAsync(band.bandId);
     } catch {
       setToastMessage("밴드 팔로우에 실패했어요");
     }
@@ -489,9 +489,10 @@ const RecommendationSection = ({
   const confirmUnfollow = async () => {
     if (!unfollowTarget?.bandId || isFollowPending) return;
 
+    setUnfollowTargetId(null);
+
     try {
       await unfollowBandMutation.mutateAsync(unfollowTarget.bandId);
-      setUnfollowTargetId(null);
       setToastMessage(`${unfollowTarget.name} 팔로우를 취소했어요`);
     } catch {
       setToastMessage("팔로우 취소에 실패했어요");

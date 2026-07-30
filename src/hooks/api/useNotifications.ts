@@ -116,6 +116,11 @@ export const useMarkNotificationAsReadMutation = () => {
     onMutate: async (notificationId) => {
       await queryClient.cancelQueries({ queryKey: notificationKeys.all });
 
+      const previousNotifications =
+        queryClient.getQueriesData<InfiniteData<NotificationsPageResponse>>({
+          queryKey: notificationKeys.all,
+        });
+
       queryClient.setQueriesData<InfiniteData<NotificationsPageResponse>>(
         { queryKey: notificationKeys.all },
         (currentData) => {
@@ -140,8 +145,13 @@ export const useMarkNotificationAsReadMutation = () => {
           };
         },
       );
+
+      return { previousNotifications };
     },
-    onSettled: () =>
-      queryClient.invalidateQueries({ queryKey: notificationKeys.all }),
+    onError: (_error, _notificationId, context) => {
+      context?.previousNotifications.forEach(([queryKey, previousData]) => {
+        queryClient.setQueryData(queryKey, previousData);
+      });
+    },
   });
 };

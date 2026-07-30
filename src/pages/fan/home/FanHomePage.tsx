@@ -569,6 +569,7 @@ const BandRecommendationStrip = ({ bands }: { bands: HomeBandItem[] }) => {
     const previousIsFollowing =
       followOverrides[unfollowTarget.id] ?? unfollowTarget.isFollowing;
 
+    setUnfollowTargetId(null);
     setPendingBandId(unfollowTarget.bandId);
     setFollowOverrides((currentOverrides) => ({
       ...currentOverrides,
@@ -577,7 +578,6 @@ const BandRecommendationStrip = ({ bands }: { bands: HomeBandItem[] }) => {
 
     try {
       await unfollowBandMutation.mutateAsync(unfollowTarget.bandId);
-      setUnfollowTargetId(null);
       setToastMessage(`${unfollowTarget.name} 팔로우를 취소했어요`);
     } catch {
       setFollowOverrides((currentOverrides) => ({
@@ -657,9 +657,9 @@ const BandRecommendationStrip = ({ bands }: { bands: HomeBandItem[] }) => {
                     ...currentOverrides,
                     [band.id]: true,
                   }));
+                  setToastMessage(`${band.name}를 팔로우했어요`);
 
                   followBandMutation.mutate(band.bandId, {
-                    onSuccess: () => setToastMessage(`${band.name}를 팔로우했어요`),
                     onError: () => {
                       setFollowOverrides((currentOverrides) => ({
                         ...currentOverrides,

@@ -349,8 +349,8 @@ const FanExploreSearchResultPage = () => {
     const name = bandInfo.name ?? bandInfo.bandName ?? keyword;
 
     try {
-      await followBandMutation.mutateAsync(bandId);
       setToastMessage(`${name}를 팔로우했어요`);
+      await followBandMutation.mutateAsync(bandId);
     } catch {
       setToastMessage("밴드 팔로우에 실패했어요");
     }
@@ -359,9 +359,10 @@ const FanExploreSearchResultPage = () => {
   const confirmUnfollow = async () => {
     if (unfollowTargetBandId == null || isFollowPending) return;
 
+    setUnfollowTargetBandId(null);
+
     try {
       await unfollowBandMutation.mutateAsync(unfollowTargetBandId);
-      setUnfollowTargetBandId(null);
       const bandInfo = unfollowTarget ? getBandInfo(unfollowTarget) : null;
       const name = bandInfo?.name ?? bandInfo?.bandName;
       setToastMessage(name ? `${name} 팔로우를 취소했어요` : "팔로우를 취소했어요");
