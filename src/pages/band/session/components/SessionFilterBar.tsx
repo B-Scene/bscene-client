@@ -1,4 +1,5 @@
-import ArrowDownIcon from "@/assets/icons/band/arrow-down-gray.svg";
+import ArrowDownGrayIcon from "@/assets/icons/band/arrow-down-gray.svg";
+import ArrowDownYellowIcon from "@/assets/icons/band/arrow-down-yellow.svg";
 import FilterIcon from "@/assets/icons/band/filter.svg";
 import LineIcon from "@/assets/icons/band/Line.svg";
 import type { SessionRecruitmentSort } from "@/types/session/sessionRecruitment";
@@ -31,7 +32,8 @@ export const SessionFilterBar = ({
     values.region,
   ];
   const filterLabels = showSelectedValues ? selectedFilters : SESSION_FILTERS;
-  const sortLabel = sort === "LATEST" ? "최신순" : "마감순";
+  const sortLabel = sort === "LATEST" ? "최신순" : "마감일순";
+  const isSortSelected = sort === "IMMINENT";
 
   return (
     <section
@@ -47,10 +49,23 @@ export const SessionFilterBar = ({
         onClick={() =>
           onSortChange(sort === "LATEST" ? "IMMINENT" : "LATEST")
         }
-        className="flex h-[22px] w-[62px] shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-full border border-neutral-400 bg-neutral-0 px-2 py-0.5 text-caption2 text-neutral-600"
+        aria-pressed={isSortSelected}
+        className={[
+          "flex h-[22px] shrink-0 items-center justify-center whitespace-nowrap rounded-full border px-2 py-0.5 text-caption3",
+          isSortSelected
+            ? "w-[73px] gap-[10px] border-secondary-400 bg-secondary-0 text-secondary-500"
+            : "w-[62px] gap-1 border-neutral-400 bg-neutral-0 text-neutral-600",
+        ].join(" ")}
       >
         {sortLabel}
-        <img src={ArrowDownIcon} alt="" className="h-[7px] w-3 shrink-0" />
+        <img
+          src={isSortSelected ? ArrowDownYellowIcon : ArrowDownGrayIcon}
+          alt=""
+          className={[
+            "h-[6.247px] w-[10.542px] shrink-0",
+            isSortSelected ? "rotate-180" : "",
+          ].join(" ")}
+        />
       </button>
 
       <img src={LineIcon} alt="" className="h-[26px] w-0.5 shrink-0" />
@@ -65,10 +80,10 @@ export const SessionFilterBar = ({
             aria-pressed={isSelected}
             onClick={onOpenFilter}
             className={[
-              "flex h-[22px] min-w-[49px] shrink-0 items-center justify-center whitespace-nowrap rounded-full border bg-neutral-0 px-2 py-0.5 text-caption2",
+              "flex h-[22px] min-w-[49px] shrink-0 items-center justify-center whitespace-nowrap rounded-full border px-[15px] py-0.5 text-caption2",
               isSelected
-                ? "border-secondary-500 text-secondary-500"
-                : "border-neutral-400 text-neutral-600",
+                ? "border-secondary-400 bg-secondary-0 text-secondary-500"
+                : "border-neutral-400 bg-neutral-0 text-neutral-600",
             ].join(" ")}
           >
             {filter}

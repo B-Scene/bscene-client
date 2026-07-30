@@ -21,6 +21,7 @@ import {
   formatNotificationTime,
   getNotificationTargetPath,
   isNotificationForMode,
+  isNotificationWithinRetention,
   isPostRegistrationNotification,
 } from "@/utils/notificationDeepLink";
 import type { BandMemberPart } from "@/types/band/bandMember";
@@ -99,6 +100,7 @@ const NotificationPage = () => {
         .flatMap((page) => page.items)
         .filter(
           (notification) =>
+            isNotificationWithinRetention(notification) &&
             isNotificationForMode(notification, "BAND") &&
             !isPostRegistrationNotification(notification),
         ) ??

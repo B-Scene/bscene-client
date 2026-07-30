@@ -46,28 +46,71 @@ const DEFAULT_APPLIED_FILTERS: AppliedExploreFilters = {
 };
 
 const FILTER_OPTIONS = {
-  genre: ["전체", "록", "인디팝", "펑크", "메탈", "재즈", "블루스", "R&B", "어쿠스틱", "포크"],
-  region: [
-    "전체",
-    "서울",
-    "경기",
-    "인천",
-    "부산",
-    "대구",
-    "광주",
-    "대전",
-    "울산",
-    "세종",
-    "충남",
-    "충북",
-    "전남",
-    "전북",
-    "경남",
-    "경북",
-    "강원",
-    "제주",
+  genre: [
+    { options: ["전체", "인디", "팝", "팝록", "재즈", "블루스"] },
+    { options: ["얼터너티브록", "사이키델릭록", "일렉트로닉록"] },
+    { options: ["포크록", "펑크록", "하드록", "메탈", "etc."] },
   ],
-  content: ["전체", "밴드", "공연", "영상"],
+  region: [
+    { options: ["전체", "서울", "경기", "인천", "부산", "대구"] },
+    { options: ["광주", "대전", "울산", "세종", "충남", "충북"] },
+    { options: ["전남", "전북", "경남", "경북", "강원", "제주"] },
+  ],
+  content: [{ options: ["전체", "밴드", "공연", "영상"] }],
+};
+
+const EXPLORE_GENRE_LABELS: Record<string, string> = {
+  "팝 록": "팝록",
+  "얼터너티브 록": "얼터너티브록",
+  "사이키델릭 록": "사이키델릭록",
+  "일렉트로닉 록": "일렉트로닉록",
+  "포크 록": "포크록",
+  "펑크 록": "펑크록",
+  "하드 록": "하드록",
+  기타: "etc.",
+};
+
+const getExploreGenreLabel = (genre: string) => {
+  const genreLabel = getGenreLabel(genre);
+
+  return EXPLORE_GENRE_LABELS[genreLabel] ?? genreLabel;
+};
+
+const FILTER_OPTION_WIDTHS: Record<string, number> = {
+  팝: 41,
+  전체: 51,
+  인디: 51,
+  팝록: 51,
+  재즈: 51,
+  메탈: 51,
+  서울: 51,
+  경기: 51,
+  인천: 51,
+  부산: 51,
+  대구: 51,
+  광주: 51,
+  대전: 51,
+  울산: 51,
+  세종: 51,
+  충남: 51,
+  충북: 51,
+  전남: 51,
+  전북: 51,
+  경남: 51,
+  경북: 51,
+  강원: 51,
+  제주: 51,
+  밴드: 51,
+  공연: 51,
+  영상: 51,
+  블루스: 62,
+  포크록: 62,
+  펑크록: 62,
+  하드록: 62,
+  "etc.": 62,
+  얼터너티브록: 93,
+  사이키델릭록: 93,
+  일렉트로닉록: 93,
 };
 
 const mapBandToItem = (band: FanExploreBand): RecommendedBandItem => {
@@ -86,7 +129,7 @@ const mapBandToItem = (band: FanExploreBand): RecommendedBandItem => {
     id,
     bandId,
     name: bandInfo.name ?? bandInfo.bandName ?? "밴드명",
-    genre: bandInfo.genre ? getGenreLabel(bandInfo.genre) : "장르",
+    genre: bandInfo.genre ? getExploreGenreLabel(bandInfo.genre) : "장르",
     region: bandInfo.region ? getRegionLabel(bandInfo.region) : "지역",
     contentTypes: bandInfo.contentTypes ?? band.contentTypes ?? ["밴드"],
     followers:
@@ -258,8 +301,9 @@ const FilterOptionButton = ({
       type="button"
       aria-pressed={selected}
       onClick={onClick}
+      style={{ width: FILTER_OPTION_WIDTHS[label] }}
       className={[
-        "box-border flex h-[26px] min-w-[51px] items-center justify-center rounded-full px-[15px] py-[4px] font-body text-caption3",
+        "box-border flex h-[26px] shrink-0 items-center justify-center whitespace-nowrap rounded-full px-[8px] py-[4px] font-body text-caption3",
         selected
           ? "bg-primary-400 text-neutral-0"
           : "bg-neutral-300 text-neutral-600",
@@ -272,26 +316,33 @@ const FilterOptionButton = ({
 
 const FilterOptionGroup = ({
   title,
-  options,
+  optionRows,
   selected,
   onSelect,
 }: {
   title: string;
-  options: string[];
+  optionRows: Array<{ options: string[] }>;
   selected: string;
   onSelect: (value: string) => void;
 }) => {
   return (
     <section>
       <h3 className="m-0 font-body text-body1 text-neutral-900">{title}</h3>
-      <div className="mt-[8px] flex flex-wrap gap-x-[8px] gap-y-[8px]">
-        {options.map((option) => (
-          <FilterOptionButton
-            key={option}
-            label={option}
-            selected={selected === option}
-            onClick={() => onSelect(option)}
-          />
+      <div className="mt-[8px] flex flex-col gap-[8px]">
+        {optionRows.map(({ options }) => (
+          <div
+            key={options.join("-")}
+            className="flex items-center gap-[4px]"
+          >
+            {options.map((option) => (
+              <FilterOptionButton
+                key={option}
+                label={option}
+                selected={selected === option}
+                onClick={() => onSelect(option)}
+              />
+            ))}
+          </div>
         ))}
       </div>
     </section>
@@ -349,22 +400,22 @@ const ExploreFilterSheet = ({
           필터
         </h2>
 
-        <div className="mt-[16px] ml-[41px] mr-[11px] flex min-h-0 flex-1 flex-col gap-[16px] overflow-y-auto pb-[8px] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="mt-[16px] ml-[32px] mr-[31px] flex min-h-0 flex-1 flex-col gap-[16px] overflow-y-auto pb-[8px] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <FilterOptionGroup
             title="장르"
-            options={FILTER_OPTIONS.genre}
+            optionRows={FILTER_OPTIONS.genre}
             selected={selectedGenre}
             onSelect={setSelectedGenre}
           />
           <FilterOptionGroup
             title="지역"
-            options={FILTER_OPTIONS.region}
+            optionRows={FILTER_OPTIONS.region}
             selected={selectedRegion}
             onSelect={setSelectedRegion}
           />
           <FilterOptionGroup
             title="콘텐츠"
-            options={FILTER_OPTIONS.content}
+            optionRows={FILTER_OPTIONS.content}
             selected={selectedContent}
             onSelect={setSelectedContent}
           />

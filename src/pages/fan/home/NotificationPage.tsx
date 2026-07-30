@@ -12,6 +12,7 @@ import {
   FAN_NOTIFICATION_ROUTES,
   formatNotificationTime,
   getNotificationTargetPath,
+  isNotificationWithinRetention,
   isNotificationForMode,
 } from "@/utils/notificationDeepLink";
 import type { NotificationItem } from "@/types/notification";
@@ -116,7 +117,11 @@ const NotificationPage = () => {
     () =>
       data?.pages
         .flatMap((page) => page.items)
-        .filter((notification) => isNotificationForMode(notification, "FAN")) ??
+        .filter(
+          (notification) =>
+            isNotificationWithinRetention(notification) &&
+            isNotificationForMode(notification, "FAN"),
+        ) ??
       [],
     [data],
   );
