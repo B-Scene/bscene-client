@@ -16,7 +16,7 @@ export const HomeHeader = ({ rightAction }: HomeHeaderProps) => {
         className="h-[30px] w-[105px] justify-self-center"
       />
 
-      <div className="flex items-center justify-end gap-3 [&>button]:flex [&>button]:size-6 [&>button]:items-center [&>button]:justify-center [&_svg]:size-6">
+      <div className="flex items-center justify-end gap-4 [&>button]:flex [&>button]:size-6 [&>button]:items-center [&>button]:justify-center [&_svg]:size-6">
         {rightAction}
       </div>
     </header>
