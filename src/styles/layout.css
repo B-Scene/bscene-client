@@ -22,10 +22,10 @@
   transform: translateZ(0);
 
   @media (min-width: 768px), (hover: hover) and (pointer: fine) {
-    width: 393px;
+    width: min(393px, 100vw);
 
     @media (min-height: 852px) {
-      height: 852px;
+      height: min(852px, 100dvh);
     }
   }
 }

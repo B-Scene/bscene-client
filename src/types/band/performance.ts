@@ -1,4 +1,4 @@
-import type { BandRegion } from "@/types/band/band";
+import type { BandGenre, BandRegion } from "@/types/band/band";
 
 export interface BandApiResponse<T> {
   isSuccess: boolean;
@@ -9,16 +9,7 @@ export interface BandApiResponse<T> {
   timeStamp: string;
 }
 
-export type PerformanceGenre =
-  | "ROCK"
-  | "INDIE_POP"
-  | "JAZZ"
-  | "METAL"
-  | "FOLK"
-  | "RNB"
-  | "BLUES"
-  | "PUNK"
-  | "ACOUSTIC";
+export type PerformanceGenre = BandGenre;
 
 export type PerformanceAgeRating = "ALL" | "AGE_12" | "AGE_15" | "AGE_19";
 
