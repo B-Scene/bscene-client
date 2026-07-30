@@ -236,3 +236,11 @@ export interface ApplicationSubmissionsResponse {
   nextCursor: number | null;
   hasNext: boolean;
 }
+
+export interface FinalizeApplicationSubmissionRequest {
+  isAccepted: boolean;
+  nickname?: string;
+  part?: string;
+}
+
+export type FinalizeApplicationSubmissionResponse = null;
