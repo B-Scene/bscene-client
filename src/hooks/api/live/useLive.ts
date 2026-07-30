@@ -55,6 +55,7 @@ export const useLiveHomeQuery = () => {
     queryKey: liveKeys.home(),
     queryFn: getLiveHome,
     staleTime: 1000 * 20,
+    refetchInterval: 1000 * 5,
   });
 };
 
@@ -74,6 +75,7 @@ export const useLiveNowQuery = (filter: LiveNowListFilter) => {
       lastPage.pageInfo.hasNext
         ? (lastPage.pageInfo.nextCursor ?? undefined)
         : undefined,
+    refetchInterval: 1000 * 5,
   });
 };
 
@@ -173,6 +175,12 @@ export const useEnterLiveMutation = () => {
     mutationFn: (liveId: number) => enterLive(liveId),
     onSuccess: (data, liveId) => {
       queryClient.setQueryData(liveKeys.enter(liveId), data);
+      queryClient.invalidateQueries({
+        queryKey: liveKeys.home(),
+      });
+      queryClient.invalidateQueries({
+        queryKey: [...liveKeys.all, "liveNow"],
+      });
     },
   });
 };
