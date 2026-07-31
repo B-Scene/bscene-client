@@ -157,6 +157,7 @@ const ApplicationManagementPage = () => {
                                 onClick={() =>
                                   navigate(
                                     `/band/my/applications/${applicant.applySubmissionId}`,
+                                    { state: { status: applicant.status } },
                                   )
                                 }
                                 className="text-caption3 text-secondary-500"
