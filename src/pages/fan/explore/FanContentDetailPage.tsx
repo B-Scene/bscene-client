@@ -91,7 +91,10 @@ const formatRelativeTime = (createdAt: string) => {
   });
 };
 
-const getImageUrls = (imageUrlsValue: string | null, imageUrl: string | null) => {
+const getImageUrls = (
+  imageUrlsValue: string | null,
+  imageUrl: string | null,
+) => {
   if (imageUrlsValue) {
     try {
       const parsedValue = JSON.parse(imageUrlsValue) as unknown;
@@ -160,7 +163,7 @@ const ContentDetailLoading = ({ onBack }: { onBack: () => void }) => {
             <div className="mt-[8px] h-[12px] w-[72px] rounded bg-neutral-300" />
           </div>
         </div>
-        <div className="mt-[24px] h-[422px] w-[338px] max-w-full bg-neutral-300" />
+        <div className="mt-[24px] h-[422px] w-full bg-neutral-300" />
         <div className="mt-[24px] flex gap-[24px]">
           <div className="h-[20px] w-[48px] rounded bg-neutral-300" />
           <div className="h-[20px] w-[48px] rounded bg-neutral-300" />
@@ -287,9 +290,7 @@ const FanContentDetailPage = () => {
   const [searchParams] = useSearchParams();
   const postId = Number(contentId);
   const validPostId = Number.isFinite(postId) ? postId : undefined;
-  const postDetailQuery = useFanExplorePostDetailQuery(
-    validPostId,
-  );
+  const postDetailQuery = useFanExplorePostDetailQuery(validPostId);
   const commentsQuery = useFanExplorePostCommentsQuery(validPostId, {
     size: COMMENT_PAGE_SIZE,
   });
@@ -310,7 +311,8 @@ const FanContentDetailPage = () => {
   const [commentErrorMessage, setCommentErrorMessage] = useState("");
   const currentUser = getStoredAuthUser();
   const commentSentinelRef = useInfiniteScrollObserver({
-    enabled: Boolean(commentsQuery.hasNextPage) && !commentsQuery.isFetchingNextPage,
+    enabled:
+      Boolean(commentsQuery.hasNextPage) && !commentsQuery.isFetchingNextPage,
     onIntersect: commentsQuery.fetchNextPage,
   });
 
@@ -386,7 +388,8 @@ const FanContentDetailPage = () => {
   const isLiked = likeOverride?.isLiked ?? postDetail?.isLiked ?? false;
   const baseLikeCount = postDetail?.likeCount ?? BASE_LIKE_COUNT;
   const likeCount = likeOverride?.likeCount ?? baseLikeCount;
-  const isLikePending = likePostMutation.isPending || unlikePostMutation.isPending;
+  const isLikePending =
+    likePostMutation.isPending || unlikePostMutation.isPending;
   const comments =
     commentsQuery.data?.pages.flatMap((page) => page.items) ?? [];
   const commentIds = new Set(
@@ -560,7 +563,7 @@ const FanContentDetailPage = () => {
     <main className="min-h-dvh bg-primary-0">
       <ContentDetailHeader onBack={() => navigate(-1)} />
 
-      <article className="bg-neutral-0 px-[25px] pt-[24px]">
+      <article className="bg-neutral-0 px-[25px] p-[24px]">
         <header className="flex items-center gap-[16px]">
           <div className="flex size-[42px] shrink-0 items-center justify-center overflow-hidden rounded-full bg-neutral-300 text-neutral-600">
             {profileImageUrl ? (
@@ -583,7 +586,7 @@ const FanContentDetailPage = () => {
 
         {shouldRenderMedia ? (
           <div
-            className="mt-[24px] flex h-[422px] w-[338px] max-w-full snap-x snap-mandatory overflow-x-auto bg-neutral-300 text-neutral-700 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            className="mt-[24px] flex h-[422px] w-full snap-x snap-mandatory overflow-x-auto bg-neutral-300 text-neutral-700 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             onScroll={handleImageScroll}
           >
             {hasContentImages ? (
@@ -657,9 +660,7 @@ const FanContentDetailPage = () => {
         </div>
 
         <section className="mt-[16px]">
-          <h2 className="m-0 font-body text-body1 text-neutral-900">
-            {title}
-          </h2>
+          <h2 className="m-0 font-body text-body1 text-neutral-900">{title}</h2>
           {hasContent ? (
             <p className="m-0 mt-[8px] whitespace-pre-line font-caption2 text-caption2 text-neutral-900">
               {content}
@@ -679,7 +680,7 @@ const FanContentDetailPage = () => {
         </section>
       </article>
 
-      <section className="mt-[24px] inline-flex w-full flex-col items-start gap-[16px] bg-primary-0 pb-[24px] pl-[25px] pr-[26px] pt-[16px]">
+      <section className="inline-flex w-full flex-col items-start gap-[16px] bg-primary-0 pb-[24px] pl-[25px] pr-[26px] pt-[16px]">
         <h2 className="m-0 font-body text-caption3 text-neutral-900">
           댓글 {commentCount}
         </h2>
@@ -806,7 +807,9 @@ const FanContentDetailPage = () => {
                       }}
                       onEditValueChange={setEditingCommentDraft}
                       onSubmitEdit={() => void handleSubmitEditComment()}
-                      onDelete={() => void handleDeleteComment(comment.commentId)}
+                      onDelete={() =>
+                        void handleDeleteComment(comment.commentId)
+                      }
                     />
                   );
                 })}

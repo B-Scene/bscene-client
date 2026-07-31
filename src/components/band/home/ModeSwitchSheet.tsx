@@ -20,6 +20,7 @@ interface ModeSwitchSheetProps {
 
 const LAST_FAN_PATH_KEY = "bscene:last-fan-path";
 const FAN_START_ID = "fan-start";
+const BAND_START_ID = "band-start";
 
 interface AccountRowProps {
   avatar?: string;
@@ -141,11 +142,12 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
   }));
 
   const isFanMode = location.pathname.startsWith("/fan");
+  const hasBandAccount = bandAccounts.length > 0;
   const activeBand = bandAccounts.find((band) => band.isActive);
   const initialSelectedId =
     isFanMode && hasFanProfile
       ? fanAccount.id
-      : (activeBand?.id ?? bandAccounts[0]?.id ?? fanAccount.id);
+      : (activeBand?.id ?? bandAccounts[0]?.id ?? (isFanMode ? BAND_START_ID : fanAccount.id));
   const [selectedId, setSelectedId] = useState(initialSelectedId);
   const [showErrorToast, setShowErrorToast] = useState(false);
   const { rendered, isVisible, handleTransitionEnd } = useSlideUpSheet(
@@ -160,16 +162,29 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
       <span className="text-label2 text-secondary-500">밴드 모드</span>
 
       <div className="flex w-full flex-col gap-3">
-        {bandAccounts.map((band) => (
+        {hasBandAccount ? (
+          bandAccounts.map((band) => (
+            <AccountRow
+              key={band.id}
+              avatar={band.avatar}
+              name={band.name}
+              subtitle={band.subtitle}
+              selected={selectedId === band.id}
+              onSelect={() => setSelectedId(band.id)}
+            />
+          ))
+        ) : (
           <AccountRow
-            key={band.id}
-            avatar={band.avatar}
-            name={band.name}
-            subtitle={band.subtitle}
-            selected={selectedId === band.id}
-            onSelect={() => setSelectedId(band.id)}
+            avatarNode={
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-neutral-300">
+                <img src={PlusIcon} alt="" />
+              </div>
+            }
+            name="밴드 모드 시작하기"
+            selected={selectedId === BAND_START_ID}
+            onSelect={() => setSelectedId(BAND_START_ID)}
           />
-        ))}
+        )}
       </div>
     </div>
   );
@@ -259,6 +274,12 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
                 if (selectedMode === "fan" && !hasFanProfile) {
                   onClose();
                   navigate("/onboarding/fan-nickname");
+                  return;
+                }
+
+                if (selectedMode === "band" && !hasBandAccount) {
+                  onClose();
+                  navigate("/band/profile/new");
                   return;
                 }
 
