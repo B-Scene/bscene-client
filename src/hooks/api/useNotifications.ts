@@ -6,7 +6,6 @@ import {
   type InfiniteData,
 } from "@tanstack/react-query";
 import {
-  deletePushToken,
   getNotifications,
   getNotificationSettings,
   getNotificationSettingKey,
@@ -16,8 +15,8 @@ import {
   updateNotificationSetting,
 } from "@/api/notification";
 import type {
-  NotificationSettingsResponse,
   NotificationSettingsMode,
+  NotificationSettingsResponse,
   NotificationsPageResponse,
   UpdateNotificationSettingParams,
 } from "@/types/notification";
@@ -60,12 +59,6 @@ export const useRegisterPushTokenMutation = () => {
   });
 };
 
-export const useDeletePushTokenMutation = () => {
-  return useMutation({
-    mutationFn: deletePushToken,
-  });
-};
-
 export const useSendTestNotificationMutation = () => {
   return useMutation({
     mutationFn: sendTestNotification,
@@ -76,8 +69,9 @@ export const useUpdateNotificationSettingMutation = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ settingType, enabled }: UpdateNotificationSettingParams) =>
-      updateNotificationSetting({ settingType, enabled }),
+    mutationFn: (params: UpdateNotificationSettingParams) =>
+      updateNotificationSetting(params),
+
     onMutate: async ({ mode, settingType, enabled }) => {
       const queryKey = notificationKeys.settings(mode);
 
@@ -100,10 +94,17 @@ export const useUpdateNotificationSettingMutation = () => {
 
       return { previousSettings, queryKey };
     },
+
     onError: (_error, _variables, context) => {
       if (context?.previousSettings) {
         queryClient.setQueryData(context.queryKey, context.previousSettings);
       }
+    },
+
+    onSettled: (_data, _error, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: notificationKeys.settings(variables.mode),
+      });
     },
   });
 };
@@ -112,8 +113,9 @@ export const useMarkNotificationAsReadMutation = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: markNotificationAsRead,
-    onMutate: async (notificationId) => {
+    mutationFn: (notificationId: number) =>
+      markNotificationAsRead(notificationId),
+    onMutate: async (notificationId: number) => {
       await queryClient.cancelQueries({ queryKey: notificationKeys.all });
 
       queryClient.setQueriesData<InfiniteData<NotificationsPageResponse>>(
@@ -141,7 +143,8 @@ export const useMarkNotificationAsReadMutation = () => {
         },
       );
     },
-    onSettled: () =>
-      queryClient.invalidateQueries({ queryKey: notificationKeys.all }),
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: notificationKeys.all });
+    },
   });
 };

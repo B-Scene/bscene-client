@@ -5,9 +5,11 @@ import { BottomNavBar } from "@/components/layout/BottomNavBar";
 import {
   useEnterLiveMutation,
   useLiveHomeQuery,
+  useRespondCoHostInvitationMutation,
   useScheduledLiveQuery,
 } from "@/hooks/api/live/useLive";
 import type {
+  EnterLiveResponse,
   LiveApiResponse,
   ScheduledLiveItem,
   ScheduledLiveListItem,
@@ -132,6 +134,34 @@ const mapScheduledToCard = (
   };
 };
 
+const getApiErrorBody = (error: unknown) => {
+  return (error as AxiosError<LiveApiResponse<null>>).response?.data;
+};
+
+const getApiStatus = (error: unknown) => {
+  const axiosError = error as AxiosError<LiveApiResponse<null>>;
+
+  return axiosError.response?.status ?? axiosError.response?.data?.status;
+};
+
+const getApiMessage = (error: unknown, fallbackMessage: string) => {
+  return getApiErrorBody(error)?.message ?? fallbackMessage;
+};
+
+const isLiveEnterForbiddenError = (error: unknown) => {
+  const status = getApiStatus(error);
+  const code = getApiErrorBody(error)?.code ?? "";
+
+  return status === 403 || code.startsWith("LIVE403");
+};
+
+const isAlreadyProcessedInvitationError = (error: unknown) => {
+  const status = getApiStatus(error);
+  const code = getApiErrorBody(error)?.code ?? "";
+
+  return status === 409 || code.startsWith("LIVE409");
+};
+
 export function BandLiveHome({
   go,
   onEnterLive,
@@ -152,6 +182,7 @@ export function BandLiveHome({
   } = useScheduledLiveQuery(false);
 
   const enterLiveMutation = useEnterLiveMutation();
+  const respondCoHostInvitationMutation = useRespondCoHostInvitationMutation();
 
   const liveNowCards: LiveCard[] =
     data?.liveNow.map((live) => ({
@@ -187,22 +218,68 @@ export function BandLiveHome({
   const isLoading = isHomeLoading || isScheduledLoading;
   const isError = isHomeError && isScheduledError;
 
+  const isEnterPending =
+    enterLiveMutation.isPending || respondCoHostInvitationMutation.isPending;
+
   const handleRetry = () => {
     void refetchHome();
     void refetchScheduled();
   };
 
+  const enterAndMoveRoom = (enteredLive: EnterLiveResponse) => {
+    onEnterLive(enteredLive);
+    go("room");
+  };
+
   const handleEnterLive = async (liveId: number) => {
+    if (isEnterPending) return;
+
     try {
       const enteredLive = await enterLiveMutation.mutateAsync(liveId);
 
-      onEnterLive(enteredLive);
-      go("room");
+      enterAndMoveRoom(enteredLive);
     } catch (error) {
-      const apiMessage = (error as AxiosError<LiveApiResponse<null>>).response
-        ?.data?.message;
+      if (!isLiveEnterForbiddenError(error)) {
+        alert(getApiMessage(error, "라이브 입장에 실패했어요."));
+        return;
+      }
 
-      alert(apiMessage ?? "라이브 입장에 실패했어요.");
+      try {
+        await respondCoHostInvitationMutation.mutateAsync({
+          liveId,
+          request: {
+            isAccepted: true,
+          },
+        });
+
+        const enteredLive = await enterLiveMutation.mutateAsync(liveId);
+
+        enterAndMoveRoom(enteredLive);
+      } catch (coHostError) {
+        if (isAlreadyProcessedInvitationError(coHostError)) {
+          try {
+            const enteredLive = await enterLiveMutation.mutateAsync(liveId);
+
+            enterAndMoveRoom(enteredLive);
+            return;
+          } catch (retryError) {
+            alert(
+              getApiMessage(
+                retryError,
+                "공동 진행자 수락 후에도 라이브방에 입장하지 못했어요.",
+              ),
+            );
+            return;
+          }
+        }
+
+        alert(
+          getApiMessage(
+            coHostError,
+            "공동 진행자 초대 수락에 실패했어요. 알림 또는 초대 상태를 확인해주세요.",
+          ),
+        );
+      }
     }
   };
 
@@ -269,8 +346,8 @@ export function BandLiveHome({
                 <HomeLiveCard
                   key={live.id}
                   live={live}
-                  disabled={enterLiveMutation.isPending}
-                  onEnter={() => handleEnterLive(live.id)}
+                  disabled={isEnterPending}
+                  onEnter={() => void handleEnterLive(live.id)}
                 />
               ))
             ) : (

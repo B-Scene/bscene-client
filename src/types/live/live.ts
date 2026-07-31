@@ -290,6 +290,7 @@ export interface LiveReservationCoHostCandidate {
   nickname: string;
   part: string;
   status: LiveReservationCoHostStatus;
+  userId?: number;
 }
 
 export interface LiveReservationResponse {
