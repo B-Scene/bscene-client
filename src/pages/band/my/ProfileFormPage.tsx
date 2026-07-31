@@ -1,7 +1,7 @@
 import { useRef, useState, type ChangeEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import DefaultBandAvatar from "@/assets/icons/band/band-default-profile.svg";
-import { Header } from "@/components/band/home/Header";
+import { Header } from "@/components/common/Header/Header";
 import { ImagePickerSheet } from "@/components/band/home/ImagePickerSheet";
 import { Input, Textarea } from "@/components/common/Input/Input";
 import { Select } from "@/components/common/Select/Select";

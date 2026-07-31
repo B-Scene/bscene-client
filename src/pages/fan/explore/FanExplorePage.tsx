@@ -5,6 +5,7 @@ import ArrowDownIcon from "@/assets/icons/band/arrow-down-gray.svg";
 import BandImage from "@/assets/Img_Band.png";
 import Modal from "@/components/Modal/Modal";
 import BandCard from "@/components/common/Card/BandCard";
+import { Header } from "@/components/common/Header/Header";
 import { ModalOverlay } from "@/components/common/Modal/ModalOverlay";
 import { Toast } from "@/components/common/Toast/Toast";
 import {
@@ -162,22 +163,25 @@ const ExploreTopBar = () => {
   const navigate = useNavigate();
 
   return (
-    <header className="relative flex h-12 w-full max-w-[393px] items-center justify-center bg-neutral-0 px-6">
-      <h1 className="m-0 font-body text-label2 text-[#1D1A1A]">탐색</h1>
-
-      <button
-        type="button"
-        aria-label="검색"
-        onClick={() => navigate("/fan/explore/search")}
-        className="absolute right-6 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center"
-      >
-        <img
-          src={SearchIcon}
-          alt=""
-          className="h-[19.997px] w-[20.012px] brightness-0"
-        />
-      </button>
-    </header>
+    <Header
+      title="탐색"
+      align="mainWithAction"
+      showBack={false}
+      rightContent={
+        <button
+          type="button"
+          aria-label="검색"
+          onClick={() => navigate("/fan/explore/search")}
+          className="flex items-center justify-center"
+        >
+          <img
+            src={SearchIcon}
+            alt=""
+            className="h-[19.997px] w-[20.012px] brightness-0"
+          />
+        </button>
+      }
+    />
   );
 };
 

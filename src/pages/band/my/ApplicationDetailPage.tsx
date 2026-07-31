@@ -1,5 +1,5 @@
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { Header } from "@/components/band/home/Header";
+import { Header } from "@/components/common/Header/Header";
 import { SessionApplicationProfile } from "@/components/band/my/SessionApplicationProfile";
 import type { SessionApplicationProfileData } from "@/components/band/my/SessionApplicationProfile";
 import { useApplicationSubmissionDetailQuery } from "@/hooks/api/session/useSessionApplication";

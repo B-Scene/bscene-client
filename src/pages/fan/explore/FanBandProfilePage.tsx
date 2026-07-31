@@ -4,7 +4,6 @@ import {
   useNavigate,
   useParams,
 } from "react-router-dom";
-import ArrowLeftIcon from "@/assets/icons/arrow-left.svg";
 import OfficialIcon from "@/assets/icons/band/official-icon.svg";
 import PlusIcon from "@/assets/icons/Plus.svg";
 import SoundCloudIcon from "@/assets/icons/soundcloude.svg";
@@ -12,6 +11,7 @@ import SpotifyIcon from "@/assets/icons/Spotify.svg";
 import YouTubeIcon from "@/assets/icons/youtube.svg";
 import BandImage from "@/assets/Img_Band.png";
 import ConcertCard from "@/components/common/Card/ConcertCard";
+import { Header } from "@/components/common/Header/Header";
 import { ModalOverlay } from "@/components/common/Modal/ModalOverlay";
 import { Toast } from "@/components/common/Toast/Toast";
 import { FollowedNewsCard } from "@/components/fan/home/FollowedNewsCard";
@@ -486,19 +486,7 @@ const FanBandProfilePage = () => {
       className="min-h-dvh bg-neutral-0 pb-[calc(var(--bottom-nav-height)+24px)]"
       data-band-id={currentBandId}
     >
-      <header className="relative flex h-[48px] w-full max-w-[393px] items-center justify-center bg-neutral-0 px-[15px]">
-        <button
-          type="button"
-          aria-label="뒤로가기"
-          onClick={() => navigate(-1)}
-          className="absolute left-[15px] top-1/2 flex size-6 -translate-y-1/2 items-center justify-center"
-        >
-          <img src={ArrowLeftIcon} alt="" className="size-6" />
-        </button>
-        <h1 className="m-0 font-body text-label2 text-neutral-900">
-          {bandName}의 프로필
-        </h1>
-      </header>
+      <Header title={`${bandName}의 프로필`} />
 
       <section className="px-[32px] pt-[16px]">
         <div className="flex items-center gap-[21px]">

@@ -1,7 +1,7 @@
 import { useRef, useState, type ChangeEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import DefaultAvatarIcon from "@/assets/icons/profile.svg";
-import { Header } from "@/components/band/home/Header";
+import { Header } from "@/components/common/Header/Header";
 import { ImagePickerSheet } from "@/components/band/home/ImagePickerSheet";
 import { Input } from "@/components/common/Input/Input";
 import {
