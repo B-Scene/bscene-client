@@ -667,16 +667,18 @@ const FanContentDetailPage = () => {
             </p>
           ) : null}
 
-          <div className="mt-[16px] flex flex-wrap gap-[8px]">
-            {tags.map((tag) => (
-              <span
-                key={tag}
-                className="flex h-[26px] min-w-[51px] items-center justify-center rounded-full bg-primary-50 px-[15px] font-body text-caption3 text-primary-400"
-              >
-                {tag}
-              </span>
-            ))}
-          </div>
+          {tags.length > 0 ? (
+            <div className="mt-[16px] flex flex-wrap gap-[8px]">
+              {tags.map((tag) => (
+                <span
+                  key={tag}
+                  className="flex h-[26px] min-w-[51px] items-center justify-center rounded-full bg-primary-50 px-[15px] font-body text-caption3 text-primary-400"
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+          ) : null}
         </section>
       </article>
 
