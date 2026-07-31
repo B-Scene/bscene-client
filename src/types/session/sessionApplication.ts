@@ -77,6 +77,7 @@ export interface ApplicationSubmissionDetailResponse {
   recruitmentTitle: string;
   bandId: number;
   bandName: string;
+  isOwner: boolean;
   deadlineAt: string;
   sessionApplicationId: number;
   title: string;

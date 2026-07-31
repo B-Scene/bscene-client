@@ -3,10 +3,9 @@ import { Header } from "@/components/band/home/Header";
 import { SessionApplicationProfile } from "@/components/band/my/SessionApplicationProfile";
 import type { SessionApplicationProfileData } from "@/components/band/my/SessionApplicationProfile";
 import { useApplicationSubmissionDetailQuery } from "@/hooks/api/session/useSessionApplication";
+import { useCreateSessionChatRoomMutation } from "@/hooks/api/session/useSessionChat";
 import { useAcceptApplicationSubmissionMutation } from "@/hooks/api/user/useReceivedApplications";
 import { getApiErrorMessage } from "@/utils/getApiErrorMessage";
-
-const MOCK_IS_BAND_OWNER = true;
 
 const formatDeadline = (deadlineAt: string) => {
   const date = new Date(deadlineAt);
@@ -29,6 +28,34 @@ const ApplicationDetailPage = () => {
     useApplicationSubmissionDetailQuery(applicationSubmissionId);
 
   const acceptMutation = useAcceptApplicationSubmissionMutation();
+  const createChatRoom = useCreateSessionChatRoomMutation();
+
+  const handleChatClick = async () => {
+    if (createChatRoom.isPending) return;
+
+    try {
+      const room = await createChatRoom.mutateAsync({
+        contextType: "RECRUITMENT",
+        applicationSubmissionId: applicationSubmissionId,
+      });
+
+      navigate(`/band/session/messages/${room.chatRoomId}`, {
+        state: {
+          senderName: room.recipientName,
+          profileImageUrl: detail?.profileImageUrl ?? undefined,
+          chatRoomId: room.chatRoomId,
+          canSend: true,
+        },
+      });
+    } catch (error) {
+      window.alert(
+        getApiErrorMessage(
+          error,
+          "채팅방 생성에 실패했어요. 잠시 후 다시 시도해주세요.",
+        ),
+      );
+    }
+  };
 
   const handleDecision = async (isApproved: boolean) => {
     if (acceptMutation.isPending) return;
@@ -121,7 +148,8 @@ const ApplicationDetailPage = () => {
 
           <SessionApplicationProfile
             data={applicantProfile}
-            isBandOwner={MOCK_IS_BAND_OWNER}
+            isBandOwner={detail.isOwner}
+            onChatClick={handleChatClick}
           />
 
           <div className="flex items-center justify-center gap-4 px-8 pt-3 pb-9">
