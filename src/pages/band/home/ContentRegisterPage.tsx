@@ -5,14 +5,14 @@ import {
   type KeyboardEvent,
   type ReactNode,
 } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { Header } from "@/components/common/Header/Header";
 import { Input } from "@/components/common/Input/Input";
 import { useActiveBandId } from "@/hooks/api/user/useMyProfiles";
-import { useCreatePost } from "@/hooks/api/band/usePost";
+import { useCreatePost, usePostQuery, useUpdatePost } from "@/hooks/api/band/usePost";
 import { uploadMediaFile } from "@/utils/uploadMediaFile";
 import { getApiErrorMessage } from "@/utils/getApiErrorMessage";
-import type { PostType } from "@/types/band/post";
+import type { PostDetailResponse, PostType } from "@/types/band/post";
 import UploadIcon from "@/assets/icons/band/upload.svg";
 import CloseCircleIcon from "@/assets/icons/band/close-circle.svg";
 import CloseIcon from "@/assets/icons/close.svg";
@@ -25,6 +25,12 @@ const CONTENT_TYPE_TO_POST_TYPE: Record<ContentType, PostType> = {
   사진: "PHOTO",
   글: "TEXT",
   영상: "VIDEO",
+};
+
+const POST_TYPE_TO_CONTENT_TYPE: Record<PostType, ContentType> = {
+  PHOTO: "사진",
+  TEXT: "글",
+  VIDEO: "영상",
 };
 
 const MAX_IMAGES = 10;
@@ -78,19 +84,67 @@ const formatFileSize = (bytes: number) =>
   `${Math.round(bytes / 1024 / 1024)} MB`;
 
 const ContentRegisterPage = () => {
+  const { postId: postIdParam } = useParams();
+  const activeBandId = useActiveBandId();
+  const bandId = activeBandId ?? NaN;
+  const postId = postIdParam ? Number(postIdParam) : NaN;
+  const isEditMode = Boolean(postIdParam);
+
+  const { data: existingPost, isLoading } = usePostQuery(postId);
+
+  if (activeBandId === null || (isEditMode && isLoading)) {
+    return <main className="min-h-dvh bg-neutral-0" />;
+  }
+
+  return (
+    <ContentRegisterForm
+      bandId={bandId}
+      postId={postId}
+      isEditMode={isEditMode}
+      existingPost={existingPost}
+    />
+  );
+};
+
+interface ContentRegisterFormProps {
+  bandId: number;
+  postId: number;
+  isEditMode: boolean;
+  existingPost: PostDetailResponse | undefined;
+}
+
+const ContentRegisterForm = ({
+  bandId,
+  postId,
+  isEditMode,
+  existingPost,
+}: ContentRegisterFormProps) => {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const activeBandId = useActiveBandId();
-  const createPost = useCreatePost(activeBandId ?? NaN);
+  const createPost = useCreatePost(bandId);
+  const updatePost = useUpdatePost(postId);
 
-  const [contentType, setContentType] = useState<ContentType | null>(null);
+  const [contentType, setContentType] = useState<ContentType | null>(() =>
+    existingPost ? POST_TYPE_TO_CONTENT_TYPE[existingPost.type] : null,
+  );
   const [images, setImages] = useState<ImageFile[]>([]);
   const [video, setVideo] = useState<VideoFile | null>(null);
+  const [existingImageUrls, setExistingImageUrls] = useState<string[]>(() =>
+    existingPost?.type === "PHOTO" ? (existingPost.mediaUrls ?? []) : [],
+  );
+  const [existingVideoUrl, setExistingVideoUrl] = useState<string | null>(
+    () =>
+      existingPost?.type === "VIDEO"
+        ? (existingPost.mediaUrls?.[0] ?? null)
+        : null,
+  );
 
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
+  const [title, setTitle] = useState(() => existingPost?.title ?? "");
+  const [description, setDescription] = useState(
+    () => existingPost?.description ?? "",
+  );
 
-  const [tags, setTags] = useState<string[]>([]);
+  const [tags, setTags] = useState<string[]>(() => existingPost?.tags ?? []);
   const [tagInput, setTagInput] = useState("");
 
   const [showErrors, setShowErrors] = useState(false);
@@ -101,6 +155,10 @@ const ContentRegisterPage = () => {
 
   const contentTypeError = showErrors && !contentType;
   const titleError = showErrors && !title.trim();
+
+  const submitError = isEditMode ? updatePost.error : createPost.error;
+  const isSubmitting =
+    (isEditMode ? updatePost.isPending : createPost.isPending) || isUploading;
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -119,17 +177,22 @@ const ContentRegisterPage = () => {
           previewUrl: URL.createObjectURL(file),
         };
       });
-      setContentType("영상");
+      setExistingVideoUrl(null);
     } else {
+      const remainingSlots =
+        MAX_IMAGES - existingImageUrls.length - images.length;
       const newImages = Array.from(files)
-        .slice(0, MAX_IMAGES - images.length)
+        .slice(0, remainingSlots)
         .map((file) => ({
           id: crypto.randomUUID(),
           file,
           previewUrl: URL.createObjectURL(file),
         }));
       setImages((prev) => [...prev, ...newImages]);
-      setContentType((prev) => prev ?? "사진");
+    }
+
+    if (!isEditMode) {
+      setContentType((prev) => prev ?? (isVideo ? "영상" : "사진"));
     }
 
     event.target.value = "";
@@ -143,9 +206,14 @@ const ContentRegisterPage = () => {
     });
   };
 
+  const handleRemoveExistingImage = (url: string) => {
+    setExistingImageUrls((prev) => prev.filter((item) => item !== url));
+  };
+
   const handleRemoveVideo = () => {
     if (video) URL.revokeObjectURL(video.previewUrl);
     setVideo(null);
+    setExistingVideoUrl(null);
   };
 
   const handleTagInputKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
@@ -164,7 +232,7 @@ const ContentRegisterPage = () => {
   };
 
   const handleSubmit = async () => {
-    if (activeBandId === null) return;
+    if (!isEditMode && bandId === null) return;
 
     if (!isValid) {
       setShowErrors(true);
@@ -178,12 +246,20 @@ const ContentRegisterPage = () => {
     try {
       setIsUploading(true);
 
-      if (contentType === "영상" && video) {
-        mediaUrls = [await uploadMediaFile(video.file, "POST")];
-      } else if (contentType === "사진" && images.length > 0) {
-        mediaUrls = await Promise.all(
-          images.map((image) => uploadMediaFile(image.file, "POST")),
-        );
+      if (contentType === "영상") {
+        if (video) {
+          mediaUrls = [await uploadMediaFile(video.file, "POST")];
+        } else if (existingVideoUrl) {
+          mediaUrls = [existingVideoUrl];
+        }
+      } else if (contentType === "사진") {
+        const uploadedUrls =
+          images.length > 0
+            ? await Promise.all(
+                images.map((image) => uploadMediaFile(image.file, "POST")),
+              )
+            : [];
+        mediaUrls = [...existingImageUrls, ...uploadedUrls];
       }
     } catch {
       setIsUploading(false);
@@ -193,6 +269,36 @@ const ContentRegisterPage = () => {
 
     setIsUploading(false);
 
+    const onSuccess = () => {
+      navigate("/band/register/complete", {
+        state: {
+          title: isEditMode ? "콘텐츠가 수정됐어요" : "콘텐츠가 업로드됐어요",
+          description: isEditMode
+            ? "변경사항이 저장됐어요"
+            : "콘텐츠 탭에서 확인할 수 있어요",
+          rows: [
+            { label: "콘텐츠", value: contentType ?? "" },
+            { label: "콘텐츠 제목", value: title },
+          ],
+          primaryLabel: "콘텐츠 보기",
+          primaryTo: isEditMode ? `/band/contents/${postId}` : "/band/home",
+        },
+      });
+    };
+
+    if (isEditMode) {
+      updatePost.mutate(
+        {
+          title,
+          description: description || undefined,
+          mediaUrls,
+          tags,
+        },
+        { onSuccess },
+      );
+      return;
+    }
+
     createPost.mutate(
       {
         type: CONTENT_TYPE_TO_POST_TYPE[contentType!],
@@ -201,37 +307,22 @@ const ContentRegisterPage = () => {
         mediaUrls: mediaUrls.length > 0 ? mediaUrls : undefined,
         tags: tags.length > 0 ? tags : undefined,
       },
-      {
-        onSuccess: () => {
-          navigate("/band/register/complete", {
-            state: {
-              title: "콘텐츠가 업로드됐어요",
-              description: "콘텐츠 탭에서 확인할 수 있어요",
-              rows: [
-                { label: "콘텐츠", value: contentType ?? "" },
-                { label: "콘텐츠 제목", value: title },
-              ],
-              primaryLabel: "콘텐츠 보기",
-              primaryTo: "/band/home",
-            },
-          });
-        },
-      },
+      { onSuccess },
     );
   };
 
   return (
     <main className="relative min-h-dvh bg-neutral-0 pb-40">
-      <Header title="콘텐츠 등록" />
+      <Header title={isEditMode ? "콘텐츠 수정" : "콘텐츠 등록"} />
 
       <section className="flex flex-col gap-6 px-8 pt-6">
         <div className="flex flex-col gap-3">
-          {video ? (
+          {video || existingVideoUrl ? (
             <div className="flex items-center gap-19.75 rounded-xl border border-neutral-400 bg-neutral-200 px-3 py-3.25">
               <div className="flex min-w-0 flex-1 items-center gap-3">
                 <div className="relative flex h-15 w-27 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-neutral-300">
                   <video
-                    src={video.previewUrl}
+                    src={video?.previewUrl ?? existingVideoUrl ?? undefined}
                     muted
                     playsInline
                     preload="metadata"
@@ -246,10 +337,10 @@ const ContentRegisterPage = () => {
 
                 <div className="flex min-w-0 flex-1 flex-col gap-1">
                   <span className="truncate text-caption3 text-neutral-900">
-                    {video.name}
+                    {video?.name ?? "기존 영상"}
                   </span>
                   <span className="text-body5 text-neutral-500">
-                    {video.size} · 선택 완료
+                    {video ? `${video.size} · 선택 완료` : "선택 완료"}
                   </span>
                 </div>
               </div>
@@ -284,9 +375,30 @@ const ContentRegisterPage = () => {
                 </div>
               </button>
 
-              {images.length > 0 ? (
+              {existingImageUrls.length > 0 || images.length > 0 ? (
                 <div className="flex flex-col gap-2">
                   <div className="flex gap-2 overflow-x-auto">
+                    {existingImageUrls.map((url) => (
+                      <div key={url} className="relative size-13 shrink-0">
+                        <img
+                          src={url}
+                          alt=""
+                          className="size-13 rounded-lg object-cover"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveExistingImage(url)}
+                          aria-label="사진 삭제"
+                          className="absolute -top-1 -right-1"
+                        >
+                          <img
+                            src={CloseCircleIcon}
+                            alt=""
+                            className="size-4"
+                          />
+                        </button>
+                      </div>
+                    ))}
                     {images.map((image) => (
                       <div key={image.id} className="relative size-13 shrink-0">
                         <img
@@ -334,6 +446,7 @@ const ContentRegisterPage = () => {
                 <button
                   key={type}
                   type="button"
+                  disabled={isEditMode}
                   onClick={() => setContentType(type)}
                   className={`flex h-6.5 w-14 shrink-0 items-center justify-center gap-2.5 rounded-lg px-3.75 py-1.75 text-center text-caption3 ${
                     contentType === type
@@ -341,12 +454,17 @@ const ContentRegisterPage = () => {
                       : contentTypeError
                         ? "border border-error text-error"
                         : "bg-neutral-300 text-neutral-600"
-                  }`}
+                  } ${isEditMode ? "opacity-60" : ""}`}
                 >
                   {type}
                 </button>
               ))}
             </div>
+            {isEditMode ? (
+              <span className="text-body5 text-neutral-500">
+                콘텐츠 타입은 수정할 수 없어요
+              </span>
+            ) : null}
           </Field>
 
           <Field label="콘텐츠 제목" required error={titleError}>
@@ -418,11 +536,11 @@ const ContentRegisterPage = () => {
           <span className="text-center text-body5 text-error">
             {uploadError}
           </span>
-        ) : createPost.isError ? (
+        ) : submitError ? (
           <span className="text-center text-body5 text-error">
             {getApiErrorMessage(
-              createPost.error,
-              "업로드에 실패했어요. 다시 시도해주세요",
+              submitError,
+              "저장에 실패했어요. 다시 시도해주세요",
             )}
           </span>
         ) : null}
@@ -430,14 +548,18 @@ const ContentRegisterPage = () => {
         <button
           type="button"
           onClick={handleSubmit}
-          disabled={createPost.isPending || isUploading || activeBandId === null}
+          disabled={isSubmitting}
           className={`flex h-13 w-full items-center justify-center rounded-xl text-label1 ${
-            isValid && !createPost.isPending && !isUploading && activeBandId !== null
+            isValid && !isSubmitting
               ? "bg-secondary-500 text-neutral-0"
               : "bg-neutral-300 text-neutral-600"
           }`}
         >
-          {isUploading ? "업로드 중..." : "콘텐츠 등록"}
+          {isUploading
+            ? "업로드 중..."
+            : isEditMode
+              ? "수정 완료"
+              : "콘텐츠 등록"}
         </button>
       </div>
     </main>
