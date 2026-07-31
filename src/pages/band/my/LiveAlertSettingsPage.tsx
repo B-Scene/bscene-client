@@ -51,6 +51,7 @@ const LiveAlertSettingsPage = () => {
         <NotificationBandBanner
           bandName={bandName}
           description="현재 선택된 밴드의 라이브 운영 알림"
+          profileImageUrl={band?.profileImageUrl}
         />
 
         {statusMessage ? (

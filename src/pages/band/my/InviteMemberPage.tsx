@@ -118,6 +118,7 @@ const InviteMemberPage = () => {
           <NotificationBandBanner
             bandName={bandName}
             description={`현재 선택된 밴드 · 멤버 ${band?.memberCount ?? 0}명`}
+            profileImageUrl={band?.profileImageUrl}
             action={
               <button
                 type="button"

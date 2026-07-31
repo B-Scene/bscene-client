@@ -85,6 +85,7 @@ const PostingManagementPage = () => {
         <NotificationBandBanner
           bandName={bandName}
           description="현재 선택된 밴드의 모집 공고"
+          profileImageUrl={data?.pages[0]?.bandProfileImageUrl}
         />
 
         <div className="mt-6 flex flex-col gap-3">

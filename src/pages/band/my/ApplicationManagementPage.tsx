@@ -7,6 +7,7 @@ import { Header } from "@/components/band/home/Header";
 import { NotificationBandBanner } from "@/components/band/my/NotificationBandBanner";
 import { EmptyState } from "@/components/common/EmptyState/EmptyState";
 import { useBandMyPageQuery } from "@/hooks/api/user/useBandMyPage";
+import { useMyProfilesQuery } from "@/hooks/api/user/useMyProfiles";
 import { useReceivedApplicationsQuery } from "@/hooks/api/user/useReceivedApplications";
 import { useInfiniteScrollObserver } from "@/hooks/useInfiniteScrollObserver";
 import { useTodayTick } from "@/hooks/useTodayTick";
@@ -22,6 +23,10 @@ const ApplicationManagementPage = () => {
   const navigate = useNavigate();
   const { data: bandMyPage } = useBandMyPageQuery();
   const bandName = bandMyPage?.bandName ?? "";
+  const { data: bandProfiles } = useMyProfilesQuery({ type: "band" });
+  const activeBandProfileImageUrl = bandProfiles?.bandProfiles.find(
+    (band) => band.isActive,
+  )?.profileImageUrl;
   const today = useTodayTick();
 
   const [activeTab, setActiveTab] = useState<RecruitmentStatusFilter>("OPEN");
@@ -51,6 +56,7 @@ const ApplicationManagementPage = () => {
         <NotificationBandBanner
           bandName={bandName}
           description="현재 선택된 밴드의 모집 공고 지원자"
+          profileImageUrl={activeBandProfileImageUrl}
         />
 
         <div className="flex items-center justify-between gap-3 rounded-lg bg-neutral-0 p-3 shadow-[0_0_8px_0_rgba(0,0,0,0.10)]">
