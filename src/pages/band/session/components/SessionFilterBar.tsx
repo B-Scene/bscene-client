@@ -38,7 +38,7 @@ export const SessionFilterBar = ({
   return (
     <section
       className={[
-        "flex w-full items-center gap-2 bg-neutral-0 pl-[22px] pr-[26px]",
+        "sticky top-0 z-10 flex w-full items-center gap-2 bg-neutral-0 pl-[22px] pr-[26px]",
         compactHeight ? "h-[53px]" : "h-[48px]",
         showBottomBorder ? "border-b border-neutral-400" : "",
       ].join(" ")}
