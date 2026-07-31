@@ -46,7 +46,7 @@ import {
   FanLiveReplayPage,
   FanLiveScheduledPage,
 } from "@/pages/fan/live";
-import { BandLivePage } from "@/pages/band/live/BandLivePage";
+import BandLivePage from "@/pages/band/live/BandLivePage";
 import BandSessionPage from "@/pages/band/session/BandSessionPage";
 import MemberInviteSearchPage from "@/pages/band/home/MemberInviteSearchPage";
 import ApplicationManagementPage from "@/pages/band/my/ApplicationManagementPage";

@@ -5,6 +5,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import {
+  acceptCoHostUpgrade,
   blockLiveUser,
   cancelLiveReservation,
   closeLive,
@@ -20,6 +21,7 @@ import {
   getScheduledLiveList,
   leaveLive,
   reportLiveUser,
+  requestCoHostUpgrade,
   requestLiveReplay,
   respondCoHostInvitation,
   toggleLiveAlarm,
@@ -422,6 +424,40 @@ export const useRespondCoHostInvitationMutation = () => {
       });
       void queryClient.invalidateQueries({
         queryKey: liveKeys.reservation(variables.liveId),
+      });
+    },
+  });
+};
+
+export const useRequestCoHostUpgradeMutation = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: requestCoHostUpgrade,
+    onSuccess: (_, liveId) => {
+      void queryClient.invalidateQueries({ queryKey: liveKeys.home() });
+      void queryClient.invalidateQueries({ queryKey: liveKeys.enter(liveId) });
+      void queryClient.invalidateQueries({ queryKey: liveKeys.members(liveId) });
+      void queryClient.invalidateQueries({ queryKey: liveKeys.liveNow("all") });
+      void queryClient.invalidateQueries({
+        queryKey: liveKeys.liveNow("following"),
+      });
+    },
+  });
+};
+
+export const useAcceptCoHostUpgradeMutation = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: acceptCoHostUpgrade,
+    onSuccess: (_, liveId) => {
+      void queryClient.invalidateQueries({ queryKey: liveKeys.home() });
+      void queryClient.invalidateQueries({ queryKey: liveKeys.enter(liveId) });
+      void queryClient.invalidateQueries({ queryKey: liveKeys.members(liveId) });
+      void queryClient.invalidateQueries({ queryKey: liveKeys.liveNow("all") });
+      void queryClient.invalidateQueries({
+        queryKey: liveKeys.liveNow("following"),
       });
     },
   });

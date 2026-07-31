@@ -1,5 +1,6 @@
 import { axiosInstance } from "@/api/axiosInstance";
 import type {
+  AcceptCoHostUpgradeResponse,
   BlockLiveUserRequest,
   CloseLiveResponse,
   CreateLiveRequest,
@@ -18,6 +19,7 @@ import type {
   ReportLiveUserResponse,
   ReplayListResponse,
   ReplayPlaybackResponse,
+  RequestCoHostUpgradeResponse,
   RespondCoHostInvitationRequest,
   RespondCoHostInvitationResponse,
   ScheduledLiveListResponse,
@@ -418,6 +420,12 @@ export const getLiveHome = async (): Promise<LiveHomeResponse> => {
     liveNow: result.liveNow ?? [],
     replays: (result.replays ?? []).map(normalizeReplayLiveId),
     scheduled: result.scheduled ?? [],
+    myNickname: result.myNickname ?? result.nickname ?? null,
+    nickname: result.nickname ?? result.myNickname ?? null,
+    myProfileImageUrl: result.myProfileImageUrl ?? result.profileImageUrl ?? null,
+    profileImageUrl: result.profileImageUrl ?? result.myProfileImageUrl ?? null,
+    coHosts: result.coHosts ?? result.coHostList ?? [],
+    coHostList: result.coHostList ?? result.coHosts ?? [],
   };
 };
 
@@ -644,6 +652,26 @@ export const respondCoHostInvitation = async ({
   const response = await axiosInstance.patch<
     LiveApiResponse<RespondCoHostInvitationResponse>
   >(`/lives/${liveId}/co-host-invitation`, request);
+
+  return unwrapResult(response.data);
+};
+
+export const requestCoHostUpgrade = async (
+  liveId: number,
+): Promise<RequestCoHostUpgradeResponse> => {
+  const response = await axiosInstance.post<
+    LiveApiResponse<RequestCoHostUpgradeResponse>
+  >(`/lives/${liveId}/co-host`);
+
+  return unwrapResult(response.data);
+};
+
+export const acceptCoHostUpgrade = async (
+  liveId: number,
+): Promise<AcceptCoHostUpgradeResponse> => {
+  const response = await axiosInstance.post<
+    LiveApiResponse<AcceptCoHostUpgradeResponse>
+  >(`/lives/${liveId}/co-host/acceptance`);
 
   return unwrapResult(response.data);
 };

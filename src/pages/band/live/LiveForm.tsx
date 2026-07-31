@@ -160,6 +160,8 @@ export function LiveForm({
   const [reservedDate, setReservedDate] = useState(getTomorrowDateString);
   const [reservedTime, setReservedTime] = useState("20:00");
   const [submitErrorMessage, setSubmitErrorMessage] = useState("");
+  const [coHostErrorMessage, setCoHostErrorMessage] = useState("");
+
   const [isUploadingThumbnail, setIsUploadingThumbnail] = useState(false);
   const [isReservationLoading, setIsReservationLoading] = useState(false);
   const [isReservationSaving, setIsReservationSaving] = useState(false);
@@ -214,7 +216,22 @@ export function LiveForm({
     });
   };
 
+  const handleOpenCoHostScreen = () => {
+    setSubmitErrorMessage("");
+    setCoHostErrorMessage("");
+
+    if (!isEdit && cohostCandidates.length === 0) {
+      setCoHostErrorMessage(
+        "공동 진행 후보를 불러올 수 없어요. 라이브 생성 전 밴드 멤버 조회 API가 필요해요.",
+      );
+    }
+
+    setIsCoHostScreenOpen(true);
+  };
+
   const handleToggleCoHost = (bandMemberId: number) => {
+    setCoHostErrorMessage("");
+
     setSelectedCoHostIds((prevIds) => {
       if (prevIds.includes(bandMemberId)) {
         return prevIds.filter((id) => id !== bandMemberId);
@@ -377,6 +394,7 @@ export function LiveForm({
 
     setIsReservationLoading(true);
     setSubmitErrorMessage("");
+    setCoHostErrorMessage("");
 
     getLiveReservation(reservationLiveId)
       .then((reservation) => {
@@ -518,11 +536,17 @@ export function LiveForm({
           </FormCard>
         ) : null}
 
-        <CoHostCard onClick={() => setIsCoHostScreenOpen(true)} />
+        <CoHostCard onClick={handleOpenCoHostScreen} />
 
         {selectedCoHostCount > 0 ? (
           <p className="-mt-1 text-right text-caption2 text-secondary-500">
             공동 진행자 {selectedCoHostCount}명 선택됨
+          </p>
+        ) : null}
+
+        {coHostErrorMessage ? (
+          <p className="-mt-1 text-center text-caption2 text-error">
+            {coHostErrorMessage}
           </p>
         ) : null}
 
