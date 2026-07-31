@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useMyProfilesQuery } from "@/hooks/api/user/useMyProfiles";
 import { useChangeUserMode } from "@/hooks/api/user/useMode";
@@ -11,6 +11,7 @@ import BandAvatar from "@/assets/images/IMG_my.svg";
 import FanAvatar from "@/assets/icons/band/user-default-profile.svg";
 import CheckCircleYellowIcon from "@/assets/icons/band/check-circle-yellow.svg";
 import CheckApproveIcon from "@/assets/icons/band/check-approve.svg";
+import PlusIcon from "@/assets/icons/Plus.svg";
 
 interface ModeSwitchSheetProps {
   open: boolean;
@@ -18,11 +19,13 @@ interface ModeSwitchSheetProps {
 }
 
 const LAST_FAN_PATH_KEY = "bscene:last-fan-path";
+const FAN_START_ID = "fan-start";
 
 interface AccountRowProps {
-  avatar: string;
+  avatar?: string;
+  avatarNode?: ReactNode;
   name: string;
-  subtitle: string;
+  subtitle?: string;
   selected: boolean;
   selectedTone?: "fan" | "band";
   onSelect: () => void;
@@ -44,6 +47,7 @@ const getLastFanPath = () => {
 
 const AccountRow = ({
   avatar,
+  avatarNode,
   name,
   subtitle,
   selected,
@@ -56,17 +60,27 @@ const AccountRow = ({
     className="flex w-full items-center gap-3 rounded-lg bg-neutral-0 py-3 pr-3.75 pl-3 shadow-[0_0_8px_0_rgba(0,0,0,0.10)]"
   >
     <div className="flex min-w-0 flex-1 items-center gap-6.25">
-      <img
-        src={avatar}
-        alt=""
-        className="size-10 shrink-0 rounded-full object-cover"
-      />
+      {avatarNode ?? (
+        <img
+          src={avatar}
+          alt=""
+          className="size-10 shrink-0 rounded-full object-cover"
+        />
+      )}
 
-      <div className="flex min-w-0 flex-1 flex-col items-start gap-0">
-        <span className="truncate text-body1 text-neutral-900">{name}</span>
-        <span className="truncate text-caption2 text-neutral-600">
-          {subtitle}
+      <div className="flex min-w-0 flex-1 flex-col items-start justify-center gap-0">
+        <span
+          className={`truncate text-body1 ${
+            subtitle ? "text-neutral-900" : "text-neutral-700"
+          }`}
+        >
+          {name}
         </span>
+        {subtitle ? (
+          <span className="truncate text-caption2 text-neutral-600">
+            {subtitle}
+          </span>
+        ) : null}
       </div>
     </div>
 
@@ -113,8 +127,9 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
     email: fanProfile?.email || storedFanAccount.email,
   };
 
-  const resolvedBandProfiles =
-    bandProfiles?.bandProfiles.length ? bandProfiles.bandProfiles : myProfiles?.bandProfiles;
+  const resolvedBandProfiles = bandProfiles?.bandProfiles.length
+    ? bandProfiles.bandProfiles
+    : myProfiles?.bandProfiles;
 
   const bandAccounts = (resolvedBandProfiles ?? []).map((band) => ({
     id: `band-${band.bandId}`,
@@ -174,9 +189,17 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
             onSelect={() => setSelectedId(fanAccount.id)}
           />
         ) : (
-          <div className="flex w-full items-center justify-center rounded-lg bg-neutral-100 py-3 pr-3.75 pl-3 text-caption2 text-neutral-500">
-            아직 팬 프로필이 없어요
-          </div>
+          <AccountRow
+            avatarNode={
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-neutral-300">
+                <img src={PlusIcon} alt="" />
+              </div>
+            }
+            name="팬 모드 시작하기"
+            selected={selectedId === FAN_START_ID}
+            selectedTone="fan"
+            onSelect={() => setSelectedId(FAN_START_ID)}
+          />
         )}
       </div>
     </div>
@@ -211,8 +234,6 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
           <div className="flex w-full flex-col items-center gap-6">
             {isFanMode ? fanModeSection : bandModeSection}
 
-            <div className="h-px w-90.75 shrink-0 bg-neutral-400" />
-
             {isFanMode ? bandModeSection : fanModeSection}
 
             {!isFanMode ? (
@@ -235,6 +256,12 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
             <button
               type="button"
               onClick={() => {
+                if (selectedMode === "fan" && !hasFanProfile) {
+                  onClose();
+                  navigate("/onboarding/fan-nickname");
+                  return;
+                }
+
                 const proceed = () => {
                   setShowErrorToast(false);
                   setMode(selectedMode);
@@ -256,7 +283,10 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
                 if (selectedMode === "fan" && fanAccount.profileId) {
                   changeUserMode.mutate(
                     { profileId: fanAccount.profileId, type: "FAN" },
-                    { onSuccess: proceed, onError: () => setShowErrorToast(true) },
+                    {
+                      onSuccess: proceed,
+                      onError: () => setShowErrorToast(true),
+                    },
                   );
                   return;
                 }
@@ -271,7 +301,10 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
                       profileId: selectedBand.bandMemberProfileId,
                       type: "BAND",
                     },
-                    { onSuccess: proceed, onError: () => setShowErrorToast(true) },
+                    {
+                      onSuccess: proceed,
+                      onError: () => setShowErrorToast(true),
+                    },
                   );
                   return;
                 }
