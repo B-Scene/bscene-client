@@ -24,7 +24,14 @@ export interface BottomNavTab {
 
 export const FAN_NAV_TABS: BottomNavTab[] = [
   { id: 'home', label: '홈', path: '/fan/home', Icon: HomeIcon, ActiveIcon: HomeActiveIcon },
-  { id: 'explore', label: '탐색', path: '/fan/explore', Icon: ExploreIcon, ActiveIcon: ExploreActiveIcon },
+  {
+    id: 'explore',
+    label: '탐색',
+    path: '/fan/explore',
+    Icon: ExploreIcon,
+    ActiveIcon: ExploreActiveIcon,
+    activePrefixes: ['/fan/explore', '/fan/bands'],
+  },
   { id: 'live', label: '라이브', path: '/fan/live', Icon: LiveIcon, ActiveIcon: LiveIcon },
   { id: 'my', label: '마이', path: '/fan/my', Icon: MyIcon, ActiveIcon: MyActiveIcon },
 ];
