@@ -77,6 +77,7 @@ export interface ApplicationSubmissionDetailResponse {
   recruitmentTitle: string;
   bandId: number;
   bandName: string;
+  isOwner: boolean;
   deadlineAt: string;
   sessionApplicationId: number;
   title: string;
@@ -236,3 +237,11 @@ export interface ApplicationSubmissionsResponse {
   nextCursor: number | null;
   hasNext: boolean;
 }
+
+export interface FinalizeApplicationSubmissionRequest {
+  isAccepted: boolean;
+  nickname?: string;
+  part?: string;
+}
+
+export type FinalizeApplicationSubmissionResponse = null;

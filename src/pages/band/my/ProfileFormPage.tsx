@@ -350,6 +350,7 @@ const ProfileForm = ({
           <NotificationBandBanner
             bandName={`현재 선택된 밴드 · ${name || "밴드"}`}
             description="현재 선택된 밴드의 공개 프로필을 수정합니다"
+            profileImageUrl={avatarUrl}
           />
         </div>
       ) : null}

@@ -4,17 +4,19 @@ import DefaultAvatar from "@/assets/images/IMG_my.svg";
 interface NotificationBandBannerProps {
   bandName: string;
   description: string;
+  profileImageUrl?: string | null;
   action?: ReactNode;
 }
 
 export const NotificationBandBanner = ({
   bandName,
   description,
+  profileImageUrl,
   action,
 }: NotificationBandBannerProps) => (
   <div className="flex items-center gap-3 rounded-xl border border-secondary-300 bg-secondary-0 px-4 py-3">
     <img
-      src={DefaultAvatar}
+      src={profileImageUrl || DefaultAvatar}
       alt=""
       className="size-9 shrink-0 rounded-full object-cover"
     />

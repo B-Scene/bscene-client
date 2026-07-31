@@ -9,7 +9,7 @@ export interface ApiResponse<T> {
 
 export type RecruitmentStatusFilter = "OPEN" | "CLOSE";
 
-export type ApplicantStatus = "PENDING" | "ACCEPTED" | "REJECTED";
+export type ApplicantStatus = "PENDING" | "BAND_ACCEPTED" | "REJECTED";
 
 export interface GetReceivedApplicationsParams {
   status?: RecruitmentStatusFilter;

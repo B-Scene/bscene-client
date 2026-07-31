@@ -49,9 +49,7 @@ const MemberInviteSearchPage = () => {
   const [isFocused, setIsFocused] = useState(false);
   const [inviteTargetId, setInviteTargetId] = useState<number | null>(null);
   const [showCopyToast, setShowCopyToast] = useState(false);
-  const [copyErrorMessage, setCopyErrorMessage] = useState<string | null>(
-    null,
-  );
+  const [copyErrorMessage, setCopyErrorMessage] = useState<string | null>(null);
 
   const isSearchActive = isFocused || search.length > 0;
   const showResults = search.trim().length > 0;
@@ -129,7 +127,7 @@ const MemberInviteSearchPage = () => {
             onChange={(event) => setSearch(event.target.value)}
             onFocus={() => setIsFocused(true)}
             onBlur={() => setIsFocused(false)}
-            placeholder="닉네임 검색"
+            placeholder="이름 검색"
             className="w-full bg-transparent text-body2 text-neutral-900 outline-none placeholder:text-body2 placeholder:text-neutral-500"
           />
           {search ? (
@@ -162,7 +160,9 @@ const MemberInviteSearchPage = () => {
               className="flex w-67.5 h-9.5 items-center justify-center gap-4 rounded-lg bg-secondary-400 text-body1 text-neutral-0 disabled:opacity-60"
             >
               <img src={LinkIcon} alt="" />
-              {createInviteLink.isPending ? "링크 생성 중..." : "초대링크 복사하기"}
+              {createInviteLink.isPending
+                ? "링크 생성 중..."
+                : "초대링크 복사하기"}
             </button>
             {copyErrorMessage ? (
               <p className="text-caption2 text-error">{copyErrorMessage}</p>

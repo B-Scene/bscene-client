@@ -58,6 +58,7 @@ const RecruitAlertSettingsPage = () => {
         <NotificationBandBanner
           bandName={bandName}
           description="현재 선택된 밴드의 세션 모집 알림"
+          profileImageUrl={band?.profileImageUrl}
         />
 
         {statusMessage ? (
