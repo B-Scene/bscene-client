@@ -1,3 +1,5 @@
+import type { BandMemberPart } from "@/types/band/bandMember";
+
 export interface FanApiResponse<T> {
   isSuccess: boolean;
   status?: number;
@@ -331,14 +333,16 @@ export interface NormalizedPerformancesByDateResponse
 }
 
 export interface BandMemberProfile {
+  bandMemberId: number;
+  nickname: string;
+  part: BandMemberPart | string;
+  owner: boolean;
   memberId?: number;
   userId?: number;
   id?: number | string;
   name?: string | null;
-  nickname?: string | null;
   profileImageUrl?: string | null;
   imageUrl?: string | null;
-  part?: string | null;
   position?: string | null;
   role?: string | null;
 }

@@ -21,15 +21,17 @@ import {
   useFollowExploreBand,
   useUnfollowExploreBand,
 } from "@/hooks/api/fan/useFanExplore";
+import { useBandMemberProfilesQuery } from "@/hooks/api/fan/useFanHome";
 import { useMusicLinksQuery } from "@/hooks/api/band/useMusicLink";
 import { usePerformancesQuery } from "@/hooks/api/band/usePerformance";
 import { usePostsQuery } from "@/hooks/api/band/usePost";
 import { useEnterLiveMutation } from "@/hooks/api/live/useLive";
 import type { FanExploreBandDetail } from "@/types/fan/explore";
+import type { BandMemberProfile } from "@/types/fan/home";
 import type { MusicLinksResponse } from "@/types/band/musicLink";
 import type { PerformanceListItem } from "@/types/band/performance";
 import type { PostListItem, PostType } from "@/types/band/post";
-import { getGenreLabel, getRegionLabel } from "@/utils/bandLabels";
+import { getGenreLabel, getPartLabel, getRegionLabel } from "@/utils/bandLabels";
 import { getApiErrorMessage } from "@/utils/getApiErrorMessage";
 
 const TABS = ["콘텐츠", "일정", "음원"] as const;
@@ -231,6 +233,22 @@ const getMusicLinks = (links?: MusicLinksResponse | null) => {
   );
 };
 
+const MemberCard = ({ member }: { member: BandMemberProfile }) => (
+  <div className="flex shrink-0 flex-col items-center gap-[6px] rounded-[12px] bg-neutral-100 px-[14px] py-[10px]">
+    <span className="flex items-center gap-[4px] font-body text-caption3 text-neutral-900">
+      {member.nickname}
+      {member.owner ? (
+        <span className="rounded-full bg-primary-50 px-[6px] py-[1px] font-body text-caption5 text-primary-400">
+          리더
+        </span>
+      ) : null}
+    </span>
+    <span className="rounded-full bg-primary-50 px-[9px] py-[3px] font-body text-caption5 text-primary-400">
+      {getPartLabel(member.part)}
+    </span>
+  </div>
+);
+
 const FanBandProfilePage = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -254,6 +272,9 @@ const FanBandProfilePage = () => {
     canToggleFollow ? numericBandId : Number.NaN,
   );
   const musicLinksQuery = useMusicLinksQuery(
+    canToggleFollow ? numericBandId : Number.NaN,
+  );
+  const bandMemberProfilesQuery = useBandMemberProfilesQuery(
     canToggleFollow ? numericBandId : Number.NaN,
   );
   const followBandMutation = useFollowExploreBand();
@@ -296,6 +317,8 @@ const FanBandProfilePage = () => {
   const posts = postsQuery.data?.posts ?? [];
   const performances = performancesQuery.data?.performances ?? [];
   const musicLinks = getMusicLinks(musicLinksQuery.data);
+  const members = bandMemberProfilesQuery.data?.items ?? [];
+  const hasMembers = members.length > 0;
   const hasContent = posts.length > 0;
   const hasSchedules = performances.length > 0;
   const hasMusic = musicLinks.length > 0;
@@ -419,6 +442,17 @@ const FanBandProfilePage = () => {
           </button>
         </div>
       </section>
+
+      {hasMembers ? (
+        <section className="mt-[24px] px-[32px]">
+          <h3 className="m-0 font-body text-label3 text-neutral-900">멤버</h3>
+          <div className="mt-[12px] flex gap-[8px] overflow-x-auto">
+            {members.map((member) => (
+              <MemberCard key={member.bandMemberId} member={member} />
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <nav className="relative mt-[32px] grid h-[30px] grid-cols-3 px-[32px]">
         {TABS.map((tab) => (
