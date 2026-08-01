@@ -178,13 +178,13 @@ const ApplicationManagementPage = () => {
                           <button type="button" className="shrink-0">
                             <img src={ArrowRightIcon} alt="" />
                           </button>
-                        ) : applicant.status === "BAND_ACCEPTED" ? (
-                          <span className="flex py-0.5 px-3.75 shrink-0 items-center justify-center rounded-full bg-secondary-400 text-center text-caption3 text-neutral-0">
-                            수락
-                          </span>
-                        ) : (
+                        ) : applicant.status === "REJECTED" ? (
                           <span className="flex py-0.5 px-3.75 shrink-0 items-center justify-center rounded-full bg-neutral-300 text-center text-caption3 text-neutral-600">
                             거절
+                          </span>
+                        ) : (
+                          <span className="flex py-0.5 px-3.75 shrink-0 items-center justify-center rounded-full bg-secondary-400 text-center text-caption3 text-neutral-0">
+                            수락
                           </span>
                         )}
                       </div>
