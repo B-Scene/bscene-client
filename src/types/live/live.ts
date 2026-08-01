@@ -33,6 +33,8 @@ export interface LiveNowItem {
   viewerCount: number;
   viewCount?: number;
   isMine?: boolean;
+  // 진행자(송출자 + 공동 진행자)로 등록된 유저 ID 목록. 조회자가 없으면 업그레이드 요청 모달 노출
+  coHost?: number[];
   coHosts?: LiveCoHostItem[];
   coHostList?: LiveCoHostItem[];
 }
@@ -59,11 +61,14 @@ export interface ScheduledLiveItem {
   isAlarmSet?: boolean;
   alarmSet?: boolean;
   isMine?: boolean;
+  coHost?: number[];
   coHosts?: LiveCoHostItem[];
   coHostList?: LiveCoHostItem[];
 }
 
 export interface LiveHomeResponse {
+  // 밴드 모드 응답의 조회자 유저 ID (coHost 목록과 비교해 업그레이드 요청 모달 노출 판단)
+  userId?: number;
   liveNow: LiveNowItem[];
   replays: LiveReplayItem[];
   scheduled: ScheduledLiveItem[];
@@ -204,6 +209,12 @@ export interface LivePlayback {
   playbackUrl: string;
 }
 
+// 진행자 전용: 본인을 제외한 다른 진행자의 WHEP 모니터링 정보 (청취자 응답에서는 null)
+export interface LiveCoPublisher {
+  userId: number;
+  whepUrl: string;
+}
+
 export interface EnterLiveResponse {
   liveId: number;
   isLive: boolean;
@@ -215,6 +226,7 @@ export interface EnterLiveResponse {
   title: string;
   description: string | null;
   playback: LivePlayback;
+  coPublishers?: LiveCoPublisher[] | null;
 
   myNickname?: string | null;
   nickname?: string | null;
@@ -280,6 +292,8 @@ export type LiveReservationCoHostStatus =
   | "OWNER"
   | "APPROVED"
   | "INVITED"
+  // 라이브 진행 중 공동 송출자 업그레이드 요청 상태 (예약 편집 화면에는 사실상 등장하지 않음)
+  | "REQUESTED"
   | "REJECTED"
   | null;
 
@@ -325,4 +339,15 @@ export type RespondCoHostInvitationResponse = null;
 
 export type RequestCoHostUpgradeResponse = null;
 
+export interface AcceptCoHostUpgradeRequest {
+  // 업그레이드를 요청한 밴드 멤버의 유저 ID (coHostUpgradeRequested SSE payload의 userId)
+  userId: number;
+}
+
 export type AcceptCoHostUpgradeResponse = null;
+
+// 공동 송출자 업그레이드 SSE 이벤트 payload
+export interface CoHostUpgradeEvent {
+  userId: number;
+  nickname: string | null;
+}

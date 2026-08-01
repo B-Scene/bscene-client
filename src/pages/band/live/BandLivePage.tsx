@@ -268,7 +268,8 @@ export function BandLivePage() {
       ...prevMessages,
       {
         id: Date.now(),
-        sender: activeLive?.bandName ?? "나",
+        // 진행자는 서버가 밴드 이름을 nickname으로 내려준다 (enterLive 응답)
+        sender: activeLive?.nickname ?? activeLive?.bandName ?? "나",
         message,
         time: "지금",
         highlighted: true,

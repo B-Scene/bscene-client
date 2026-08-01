@@ -2,13 +2,24 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Modal from "@/components/Modal/Modal";
 import { ModalOverlay } from "@/components/common/Modal/ModalOverlay";
 import {
+  createWhepSession,
   createWhipSession,
+  deleteWhepSession,
   deleteWhipSession,
+  extractWhepPath,
   getLiveMembers,
   subscribeViewerCount,
 } from "@/api/live/live";
-import { useCloseLiveMutation } from "@/hooks/api/live/useLive";
-import type { LiveMemberItem } from "@/types/live/live";
+import {
+  useAcceptCoHostUpgradeMutation,
+  useCloseLiveMutation,
+  useLeaveLiveMutation,
+} from "@/hooks/api/live/useLive";
+import type {
+  CoHostUpgradeEvent,
+  LiveCoPublisher,
+  LiveMemberItem,
+} from "@/types/live/live";
 import type { ActiveLive, ChatMessage, GoLiveScreen } from "./types";
 import {
   ChatComposer,
@@ -169,10 +180,17 @@ export function LiveRoom({
   overlay,
 }: LiveRoomProps) {
   const closeLiveMutation = useCloseLiveMutation();
+  const leaveLiveMutation = useLeaveLiveMutation();
+  const acceptCoHostUpgradeMutation = useAcceptCoHostUpgradeMutation();
 
   const playbackRole = live?.playback?.role;
   const playbackProtocol = live?.playback?.protocol;
   const playbackUrl = live?.playback?.playbackUrl;
+
+  // 송출자·공동 진행자 모두 개인 멤버 path로 WHIP 송출한다
+  const isPublisherRole =
+    playbackRole === "BROADCASTER" || playbackRole === "CO_HOST";
+  const isCoHostRole = playbackRole === "CO_HOST";
 
   const [viewerCount, setViewerCount] = useState(() =>
     getInitialViewerCount(live),
@@ -189,6 +207,13 @@ export function LiveRoom({
   const [showListenerPlayButton, setShowListenerPlayButton] = useState(false);
   const [liveMembers, setLiveMembers] = useState<LiveMemberItem[]>([]);
   const [isMembersLoading, setIsMembersLoading] = useState(false);
+  // 본인을 제외한 다른 진행자들의 WHEP 모니터링 대상 (enterLive 응답 + coPublisherJoined SSE)
+  const [coPublishers, setCoPublishers] = useState<LiveCoPublisher[]>(
+    () => live?.coPublishers ?? [],
+  );
+  // 송출자에게 도착한 공동 송출자 업그레이드 요청 (수락 모달)
+  const [upgradeRequest, setUpgradeRequest] =
+    useState<CoHostUpgradeEvent | null>(null);
 
   const audioStatusRef = useRef<LiveAudioStatus>("idle");
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
@@ -201,6 +226,18 @@ export function LiveRoom({
   const audioContextRef = useRef<AudioContext | null>(null);
   const micSourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const micGainNodeRef = useRef<GainNode | null>(null);
+
+  // userId -> WHEP 모니터링 연결 (다른 진행자 원본 오디오 청취)
+  const whepConnectionsRef = useRef(
+    new Map<
+      number,
+      {
+        peerConnection: RTCPeerConnection;
+        audio: HTMLAudioElement;
+        sessionUrl: string | null;
+      }
+    >(),
+  );
 
   const isListenerPlayback =
     live?.isLive && playbackRole === "LISTENER" && Boolean(playbackUrl);
@@ -288,6 +325,98 @@ export function LiveRoom({
     setAudioStatusSafe("idle");
   }, [cleanupWhipBroadcast, setAudioStatusSafe]);
 
+  const disconnectWhepMonitor = useCallback(async (userId: number) => {
+    const connection = whepConnectionsRef.current.get(userId);
+
+    if (!connection) return;
+
+    whepConnectionsRef.current.delete(userId);
+
+    connection.audio.pause();
+    connection.audio.srcObject = null;
+    connection.peerConnection.close();
+
+    if (connection.sessionUrl) {
+      try {
+        await deleteWhepSession(connection.sessionUrl);
+      } catch {
+        // 이미 종료된 세션이면 무시
+      }
+    }
+  }, []);
+
+  const disconnectAllWhepMonitors = useCallback(async () => {
+    const userIds = Array.from(whepConnectionsRef.current.keys());
+
+    await Promise.all(userIds.map((userId) => disconnectWhepMonitor(userId)));
+  }, [disconnectWhepMonitor]);
+
+  // 다른 진행자의 원본 오디오(멤버 path)를 WHEP으로 직접 청취한다.
+  // 믹스 결과(HLS)를 들으면 본인 음성이 에코로 돌아오므로 진행자는 이 경로만 사용한다
+  const connectWhepMonitor = useCallback(
+    async (coPublisher: LiveCoPublisher) => {
+      if (whepConnectionsRef.current.has(coPublisher.userId)) return;
+
+      const peerConnection = new RTCPeerConnection();
+      const audio = new Audio();
+
+      audio.autoplay = true;
+
+      const connection = {
+        peerConnection,
+        audio,
+        sessionUrl: null as string | null,
+      };
+
+      whepConnectionsRef.current.set(coPublisher.userId, connection);
+
+      try {
+        peerConnection.addTransceiver("audio", { direction: "recvonly" });
+
+        peerConnection.ontrack = (event) => {
+          audio.srcObject =
+            event.streams[0] ?? new MediaStream([event.track]);
+
+          void audio.play().catch(() => {
+            // 자동재생 차단 시 마이크 제스처 이후 재시도된다
+          });
+        };
+
+        const offer = await peerConnection.createOffer();
+
+        await peerConnection.setLocalDescription(offer);
+        await waitForIceGatheringComplete(peerConnection);
+
+        const sdpOffer = peerConnection.localDescription?.sdp;
+
+        if (!sdpOffer) {
+          throw new Error("WHEP SDP Offer 생성에 실패했습니다.");
+        }
+
+        const path = extractWhepPath(coPublisher.whepUrl);
+
+        if (!path) {
+          throw new Error("WHEP path를 찾을 수 없습니다.");
+        }
+
+        const { sdpAnswer, sessionUrl } = await createWhepSession({
+          path,
+          sdpOffer,
+        });
+
+        await peerConnection.setRemoteDescription({
+          type: "answer",
+          sdp: sdpAnswer,
+        });
+
+        connection.sessionUrl = sessionUrl;
+      } catch {
+        await disconnectWhepMonitor(coPublisher.userId);
+      }
+    },
+    [disconnectWhepMonitor],
+  );
+
   const toggleMicTrackOnly = useCallback(() => {
     const originalTracks = micStreamRef.current?.getAudioTracks() ?? [];
     const processedTracks = processedMicStreamRef.current?.getAudioTracks() ?? [];
@@ -316,7 +445,7 @@ export function LiveRoom({
   const startWhipBroadcast = useCallback(async () => {
     if (!live?.liveId) return;
 
-    if (playbackRole !== "BROADCASTER") {
+    if (!isPublisherRole) {
       setAudioStatusSafe("unsupported");
       return;
     }
@@ -441,9 +570,9 @@ export function LiveRoom({
     }
   }, [
     cleanupWhipBroadcast,
+    isPublisherRole,
     live?.liveId,
     playbackProtocol,
-    playbackRole,
     playbackUrl,
     setAudioStatusSafe,
   ]);
@@ -483,6 +612,13 @@ export function LiveRoom({
   }, []);
 
   const handleToggleBroadcast = useCallback(() => {
+    // 확실한 유저 제스처 시점이므로, 자동재생 정책에 막혀 있던 WHEP 모니터링 오디오를 재개한다
+    whepConnectionsRef.current.forEach(({ audio }) => {
+      if (audio.paused && audio.srcObject) {
+        void audio.play().catch(() => {});
+      }
+    });
+
     if (audioStatus === "connecting") {
       return;
     }
@@ -504,10 +640,44 @@ export function LiveRoom({
     try {
       await stopWhipBroadcast();
       stopListenerPlayback();
+      await disconnectAllWhepMonitors();
+
+      // 라이브 종료 권한은 송출자(오너)에게만 있다. 공동 진행자는 방을 나가기만 한다
+      if (isCoHostRole) {
+        await leaveLiveMutation.mutateAsync(live.liveId);
+        go("home");
+        return;
+      }
+
       await closeLiveMutation.mutateAsync(live.liveId);
       go("ended");
     } catch {
-      alert("라이브 종료에 실패했어요. 잠시 후 다시 시도해주세요.");
+      alert(
+        isCoHostRole
+          ? "라이브 나가기에 실패했어요. 잠시 후 다시 시도해주세요."
+          : "라이브 종료에 실패했어요. 잠시 후 다시 시도해주세요.",
+      );
+    }
+  };
+
+  const handleAcceptUpgradeRequest = async () => {
+    if (!live?.liveId || !upgradeRequest) return;
+    if (acceptCoHostUpgradeMutation.isPending) return;
+
+    try {
+      await acceptCoHostUpgradeMutation.mutateAsync({
+        liveId: live.liveId,
+        userId: upgradeRequest.userId,
+      });
+
+      setUpgradeRequest(null);
+    } catch (error) {
+      setUpgradeRequest(null);
+      alert(
+        error instanceof Error && error.message
+          ? error.message
+          : "공동 송출자 업그레이드 수락에 실패했어요.",
+      );
     }
   };
 
@@ -531,12 +701,26 @@ export function LiveRoom({
     if (!live?.liveId) return;
 
     const controller = new AbortController();
-    const shouldExcludeMeFromViewerCount = playbackRole === "BROADCASTER";
 
+    // watchOnly=true(보기 전용)로 구독하면 coHostUpgradeRequested/coPublisherJoined 같은
+    // 유저 타깃 이벤트를 받지 못한다. 송출자는 BE가 시청자 수에서 자체 제외하므로 항상 유저 등록 구독을 쓴다
     subscribeViewerCount({
       liveId: live.liveId,
-      watchOnly: shouldExcludeMeFromViewerCount,
+      watchOnly: false,
       onViewerCount: setViewerCount,
+      onCoHostUpgradeRequested:
+        playbackRole === "BROADCASTER"
+          ? (event) => setUpgradeRequest(event)
+          : undefined,
+      onCoPublisherJoined: isPublisherRole
+        ? (joined) => {
+            setCoPublishers((prev) =>
+              prev.some((item) => item.userId === joined.userId)
+                ? prev
+                : [...prev, joined],
+            );
+          }
+        : undefined,
       signal: controller.signal,
     }).catch(() => {
       // SSE 연결 종료/취소는 조용히 처리
@@ -545,7 +729,55 @@ export function LiveRoom({
     return () => {
       controller.abort();
     };
-  }, [live?.liveId, playbackRole]);
+  }, [live?.liveId, playbackRole, isPublisherRole]);
+
+  // enterLive 응답이 갱신되면(재입장 등) 모니터링 목록을 응답 기준으로 리셋
+  useEffect(() => {
+    setCoPublishers(live?.coPublishers ?? []);
+  }, [live?.coPublishers]);
+
+  // 진행자 전용: 모니터링 대상과 실제 WHEP 연결을 동기화.
+  // coPublisherJoined는 상대가 enterRoom한 직후(마이크 송출 시작 전)에 도착하므로,
+  // 그 시점의 WHEP 구독은 MediaMTX에 path가 없어 404로 실패한다. 실패 시 연결을 버리기만 하면
+  // 상대가 송출을 시작해도 영영 들리지 않으므로 주기적으로 재연결을 시도한다
+  useEffect(() => {
+    if (!isPublisherRole) return;
+
+    const syncConnections = () => {
+      coPublishers.forEach((coPublisher) => {
+        // connectWhepMonitor는 이미 연결(시도) 중인 userId를 스스로 건너뛴다
+        void connectWhepMonitor(coPublisher);
+      });
+
+      // 자동재생 차단 등으로 멈춘 오디오 재생 재시도
+      whepConnectionsRef.current.forEach(({ audio }) => {
+        if (audio.paused && audio.srcObject) {
+          void audio.play().catch(() => {});
+        }
+      });
+    };
+
+    syncConnections();
+
+    const retryTimer = window.setInterval(syncConnections, 5000);
+
+    const activeUserIds = new Set(coPublishers.map((item) => item.userId));
+
+    Array.from(whepConnectionsRef.current.keys()).forEach((userId) => {
+      if (!activeUserIds.has(userId)) {
+        void disconnectWhepMonitor(userId);
+      }
+    });
+
+    return () => {
+      window.clearInterval(retryTimer);
+    };
+  }, [
+    coPublishers,
+    connectWhepMonitor,
+    disconnectWhepMonitor,
+    isPublisherRole,
+  ]);
 
   useEffect(() => {
     if (overlay !== "members" || !live?.liveId) return;
@@ -579,9 +811,10 @@ export function LiveRoom({
   useEffect(() => {
     return () => {
       void cleanupWhipBroadcast();
+      void disconnectAllWhepMonitors();
       stopListenerPlayback();
     };
-  }, [cleanupWhipBroadcast, stopListenerPlayback]);
+  }, [cleanupWhipBroadcast, disconnectAllWhepMonitors, stopListenerPlayback]);
 
   useEffect(() => {
     if (isListenerPlayback) {
@@ -598,6 +831,7 @@ export function LiveRoom({
         go={go}
         viewerCount={viewerCount}
         durationSeconds={durationSeconds}
+        isCoHost={isCoHostRole}
       />
 
       <LiveRoomHero
@@ -665,20 +899,61 @@ export function LiveRoom({
 
       {overlay === "endConfirm" ? (
         <ModalOverlay open onClose={() => go("room")}>
+          {isCoHostRole ? (
+            <Modal
+              tone="orange"
+              title="라이브에서 나갈까요?"
+              description={
+                <>
+                  나가더라도 라이브는
+                  <br />
+                  계속 진행돼요
+                </>
+              }
+              cancelLabel="취소"
+              confirmLabel={leaveLiveMutation.isPending ? "나가는 중" : "나가기"}
+              onCancel={() => go("room")}
+              onConfirm={handleConfirmEndLive}
+            />
+          ) : (
+            <Modal
+              tone="orange"
+              title="라이브를 종료할까요?"
+              description={
+                <>
+                  라이브를 종료하면 청취자들이
+                  <br />
+                  자동으로 퇴장해요
+                </>
+              }
+              cancelLabel="취소"
+              confirmLabel={closeLiveMutation.isPending ? "종료 중" : "종료"}
+              onCancel={() => go("room")}
+              onConfirm={handleConfirmEndLive}
+            />
+          )}
+        </ModalOverlay>
+      ) : null}
+
+      {/* 송출자 전용: 공동 송출자 업그레이드 요청 수락 모달 (coHostUpgradeRequested SSE 수신 시) */}
+      {upgradeRequest ? (
+        <ModalOverlay open onClose={() => setUpgradeRequest(null)}>
           <Modal
             tone="orange"
-            title="라이브를 종료할까요?"
+            title={`${upgradeRequest.nickname ?? "밴드 멤버"}님이 공동 송출을 요청했어요`}
             description={
               <>
-                라이브를 종료하면 청취자들이
+                수락하면 함께 라이브를
                 <br />
-                자동으로 퇴장해요
+                진행할 수 있어요
               </>
             }
-            cancelLabel="취소"
-            confirmLabel={closeLiveMutation.isPending ? "종료 중" : "종료"}
-            onCancel={() => go("room")}
-            onConfirm={handleConfirmEndLive}
+            cancelLabel="나중에"
+            confirmLabel={
+              acceptCoHostUpgradeMutation.isPending ? "수락 중" : "수락"
+            }
+            onCancel={() => setUpgradeRequest(null)}
+            onConfirm={() => void handleAcceptUpgradeRequest()}
           />
         </ModalOverlay>
       ) : null}

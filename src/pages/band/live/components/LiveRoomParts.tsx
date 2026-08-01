@@ -48,10 +48,13 @@ export function LiveRoomHeader({
   go,
   viewerCount,
   durationSeconds,
+  isCoHost = false,
 }: {
   go: GoLiveScreen;
   viewerCount: number;
   durationSeconds: number;
+  // 공동 진행자는 라이브를 종료할 수 없고 나가기만 가능
+  isCoHost?: boolean;
 }) {
   return (
     <header className="flex h-[52px] shrink-0 items-center justify-between px-[25px]">
@@ -77,7 +80,7 @@ export function LiveRoomHeader({
         onClick={() => go("endConfirm")}
         className="flex h-[28px] w-[74px] items-center justify-center rounded-full bg-neutral-0 text-caption3 text-error shadow-[0_2px_8px_rgba(198,40,40,0.18)]"
       >
-        라이브 종료
+        {isCoHost ? "나가기" : "라이브 종료"}
       </button>
     </header>
   );

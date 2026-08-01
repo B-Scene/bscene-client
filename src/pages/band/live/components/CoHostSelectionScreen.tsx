@@ -20,6 +20,8 @@ const STATUS_LABELS: Record<Exclude<LiveReservationCoHostStatus, null>, string> 
     OWNER: "진행자",
     APPROVED: "선택됨",
     INVITED: "초대 중",
+    // 라이브 중 업그레이드 요청 상태. 예약 편집 화면에는 사실상 등장하지 않음 (BE 주석 기준)
+    REQUESTED: "요청 중",
     REJECTED: "재초대",
   };
 

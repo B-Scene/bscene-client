@@ -1,10 +1,15 @@
+import { useEffect, useRef, useState } from "react";
 import type { AxiosError } from "axios";
 import LiveHeadIcon from "@/assets/icons/live-head.svg";
+import Modal from "@/components/Modal/Modal";
+import { ModalOverlay } from "@/components/common/Modal/ModalOverlay";
+import { subscribeViewerCount } from "@/api/live/live";
 import { Header } from "@/components/band/home/Header";
 import { BottomNavBar } from "@/components/layout/BottomNavBar";
 import {
   useEnterLiveMutation,
   useLiveHomeQuery,
+  useRequestCoHostUpgradeMutation,
   useRespondCoHostInvitationMutation,
   useScheduledLiveQuery,
 } from "@/hooks/api/live/useLive";
@@ -162,6 +167,16 @@ const isAlreadyProcessedInvitationError = (error: unknown) => {
   return status === 409 || code.startsWith("LIVE409");
 };
 
+// LIVE409_8: 이미 공동 진행자로 확정된 멤버 → 바로 입장 시도
+const isAlreadyAcceptedCoHostError = (error: unknown) => {
+  return (getApiErrorBody(error)?.code ?? "") === "LIVE409_8";
+};
+
+// LIVE409_9: 이미 처리 대기 중인 업그레이드 요청 → 수락 대기로 전환
+const isAlreadyRequestedUpgradeError = (error: unknown) => {
+  return (getApiErrorBody(error)?.code ?? "") === "LIVE409_9";
+};
+
 export function BandLiveHome({
   go,
   onEnterLive,
@@ -183,6 +198,18 @@ export function BandLiveHome({
 
   const enterLiveMutation = useEnterLiveMutation();
   const respondCoHostInvitationMutation = useRespondCoHostInvitationMutation();
+  const requestCoHostUpgradeMutation = useRequestCoHostUpgradeMutation();
+
+  // 공동 송출자 업그레이드 요청 플로우 상태
+  const [upgradeTargetLive, setUpgradeTargetLive] = useState<LiveCard | null>(
+    null,
+  );
+  const [upgradeStage, setUpgradeStage] = useState<"confirm" | "waiting">(
+    "confirm",
+  );
+  const upgradeSseAbortRef = useRef<AbortController | null>(null);
+
+  const myUserId = data?.userId;
 
   const liveNowCards: LiveCard[] =
     data?.liveNow.map((live) => ({
@@ -192,6 +219,7 @@ export function BandLiveHome({
       listeners: `${live.viewerCount}명 청취 중`,
       imageUrl: live.bandProfileImageUrl,
       isMine: live.isMine,
+      coHost: live.coHost,
     })) ?? [];
 
   const scheduledFromHome = data?.scheduled ?? [];
@@ -219,7 +247,9 @@ export function BandLiveHome({
   const isError = isHomeError && isScheduledError;
 
   const isEnterPending =
-    enterLiveMutation.isPending || respondCoHostInvitationMutation.isPending;
+    enterLiveMutation.isPending ||
+    respondCoHostInvitationMutation.isPending ||
+    requestCoHostUpgradeMutation.isPending;
 
   const handleRetry = () => {
     void refetchHome();
@@ -231,8 +261,106 @@ export function BandLiveHome({
     go("room");
   };
 
-  const handleEnterLive = async (liveId: number) => {
+  const closeUpgradeFlow = () => {
+    upgradeSseAbortRef.current?.abort();
+    upgradeSseAbortRef.current = null;
+    setUpgradeTargetLive(null);
+    setUpgradeStage("confirm");
+  };
+
+  // 업그레이드 요청 후 수락 대기: 수락(coHostUpgradeAccepted) SSE 수신 시 enterLive를 재호출해 입장한다.
+  // watchOnly=false(유저 등록 구독)여야만 타깃 이벤트를 받을 수 있다
+  useEffect(() => {
+    if (!upgradeTargetLive || upgradeStage !== "waiting") return;
+
+    const controller = new AbortController();
+
+    upgradeSseAbortRef.current = controller;
+
+    subscribeViewerCount({
+      liveId: upgradeTargetLive.id,
+      watchOnly: false,
+      onViewerCount: () => {},
+      onCoHostUpgradeAccepted: () => {
+        controller.abort();
+
+        void (async () => {
+          try {
+            const enteredLive = await enterLiveMutation.mutateAsync(
+              upgradeTargetLive.id,
+            );
+
+            closeUpgradeFlow();
+            enterAndMoveRoom(enteredLive);
+          } catch (error) {
+            closeUpgradeFlow();
+            alert(getApiMessage(error, "라이브 입장에 실패했어요."));
+          }
+        })();
+      },
+      signal: controller.signal,
+    }).catch(() => {
+      // SSE 연결 종료/취소는 조용히 처리
+    });
+
+    return () => {
+      controller.abort();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [upgradeTargetLive, upgradeStage]);
+
+  const handleConfirmUpgradeRequest = async () => {
+    if (!upgradeTargetLive || isEnterPending) return;
+
+    try {
+      await requestCoHostUpgradeMutation.mutateAsync(upgradeTargetLive.id);
+      setUpgradeStage("waiting");
+    } catch (error) {
+      // 이미 확정된 공동 진행자면 바로 입장
+      if (isAlreadyAcceptedCoHostError(error)) {
+        const targetLiveId = upgradeTargetLive.id;
+
+        closeUpgradeFlow();
+
+        try {
+          const enteredLive = await enterLiveMutation.mutateAsync(targetLiveId);
+
+          enterAndMoveRoom(enteredLive);
+        } catch (enterError) {
+          alert(getApiMessage(enterError, "라이브 입장에 실패했어요."));
+        }
+        return;
+      }
+
+      // 이미 대기 중인 요청이 있으면 수락 대기로 전환
+      if (isAlreadyRequestedUpgradeError(error)) {
+        setUpgradeStage("waiting");
+        return;
+      }
+
+      closeUpgradeFlow();
+      alert(
+        getApiMessage(error, "공동 송출자 업그레이드 요청에 실패했어요."),
+      );
+    }
+  };
+
+  const handleEnterLive = async (live: LiveCard) => {
     if (isEnterPending) return;
+
+    const liveId = live.id;
+
+    // 진행자(coHost) 목록에 없는 밴드 멤버는 입장 대신 공동 송출자 업그레이드 요청 모달을 노출한다
+    if (
+      !live.isMine &&
+      typeof myUserId === "number" &&
+      Array.isArray(live.coHost) &&
+      !live.coHost.includes(myUserId)
+    ) {
+      setUpgradeTargetLive(live);
+      setUpgradeStage("confirm");
+      return;
+    }
 
     try {
       const enteredLive = await enterLiveMutation.mutateAsync(liveId);
@@ -347,7 +475,7 @@ export function BandLiveHome({
                   key={live.id}
                   live={live}
                   disabled={isEnterPending}
-                  onEnter={() => void handleEnterLive(live.id)}
+                  onEnter={() => void handleEnterLive(live)}
                 />
               ))
             ) : (
@@ -380,6 +508,51 @@ export function BandLiveHome({
           </div>
         </section>
       </div>
+
+      {/* 공동 송출자 업그레이드 요청 모달: 확인 → 요청 전송, 이후 수락 대기 */}
+      {upgradeTargetLive ? (
+        <ModalOverlay
+          open
+          onClose={upgradeStage === "confirm" ? closeUpgradeFlow : undefined}
+        >
+          {upgradeStage === "confirm" ? (
+            <Modal
+              tone="orange"
+              title="공동 송출자로 참여할까요?"
+              description={
+                <>
+                  송출자가 수락하면
+                  <br />
+                  함께 라이브를 진행할 수 있어요
+                </>
+              }
+              cancelLabel="취소"
+              confirmLabel={
+                requestCoHostUpgradeMutation.isPending ? "요청 중" : "요청"
+              }
+              onCancel={closeUpgradeFlow}
+              onConfirm={() => void handleConfirmUpgradeRequest()}
+            />
+          ) : (
+            <Modal
+              tone="orange"
+              title="송출자의 수락을 기다리고 있어요"
+              description={
+                <>
+                  수락되면 자동으로
+                  <br />
+                  라이브에 입장해요
+                </>
+              }
+              cancelLabel="취소"
+              confirmLabel="대기 중"
+              confirmDisabled
+              onCancel={closeUpgradeFlow}
+              onConfirm={() => {}}
+            />
+          )}
+        </ModalOverlay>
+      ) : null}
 
       <BottomNavBar modeOverride="band" />
     </main>

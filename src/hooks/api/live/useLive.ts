@@ -450,11 +450,16 @@ export const useAcceptCoHostUpgradeMutation = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: acceptCoHostUpgrade,
-    onSuccess: (_, liveId) => {
+    mutationFn: ({ liveId, userId }: { liveId: number; userId: number }) =>
+      acceptCoHostUpgrade({ liveId, userId }),
+    onSuccess: (_, variables) => {
       void queryClient.invalidateQueries({ queryKey: liveKeys.home() });
-      void queryClient.invalidateQueries({ queryKey: liveKeys.enter(liveId) });
-      void queryClient.invalidateQueries({ queryKey: liveKeys.members(liveId) });
+      void queryClient.invalidateQueries({
+        queryKey: liveKeys.enter(variables.liveId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: liveKeys.members(variables.liveId),
+      });
       void queryClient.invalidateQueries({ queryKey: liveKeys.liveNow("all") });
       void queryClient.invalidateQueries({
         queryKey: liveKeys.liveNow("following"),

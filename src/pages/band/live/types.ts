@@ -25,6 +25,8 @@ export type LiveCard = {
   listeners?: string;
   imageUrl?: string | null;
   isMine?: boolean;
+  // 진행자(송출자 + 공동 진행자)로 등록된 유저 ID 목록
+  coHost?: number[];
 };
 
 export type ScheduledLiveCardData = {

@@ -2,6 +2,8 @@ import { axiosInstance } from "@/api/axiosInstance";
 import type {
   AcceptCoHostUpgradeResponse,
   BlockLiveUserRequest,
+  CoHostUpgradeEvent,
+  LiveCoPublisher,
   CloseLiveResponse,
   CreateLiveRequest,
   CreateLiveResponse,
@@ -32,6 +34,13 @@ interface SubscribeViewerCountParams {
   liveId: number;
   watchOnly?: boolean;
   onViewerCount: (viewerCount: number) => void;
+  // 아래 이벤트들은 watchOnly=false(유저 등록 연결)로 구독해야만 수신된다.
+  // 송출자에게만: 공동 송출자 업그레이드 요청 수신 (수락 모달용)
+  onCoHostUpgradeRequested?: (event: CoHostUpgradeEvent) => void;
+  // 요청자에게만: 업그레이드 수락 수신 (수신 시 enterLive 재호출)
+  onCoHostUpgradeAccepted?: (event: CoHostUpgradeEvent) => void;
+  // 기존 진행자에게만: 새 진행자 합류 (WHEP 모니터링 추가용)
+  onCoPublisherJoined?: (coPublisher: LiveCoPublisher) => void;
   signal?: AbortSignal;
 }
 
@@ -417,6 +426,7 @@ export const getLiveHome = async (): Promise<LiveHomeResponse> => {
   const result = unwrapResult(response.data);
 
   return {
+    userId: result.userId,
     liveNow: result.liveNow ?? [],
     replays: (result.replays ?? []).map(normalizeReplayLiveId),
     scheduled: result.scheduled ?? [],
@@ -666,12 +676,17 @@ export const requestCoHostUpgrade = async (
   return unwrapResult(response.data);
 };
 
-export const acceptCoHostUpgrade = async (
-  liveId: number,
-): Promise<AcceptCoHostUpgradeResponse> => {
+export const acceptCoHostUpgrade = async ({
+  liveId,
+  userId,
+}: {
+  liveId: number;
+  // 업그레이드를 요청한 밴드 멤버의 유저 ID (coHostUpgradeRequested SSE payload의 userId)
+  userId: number;
+}): Promise<AcceptCoHostUpgradeResponse> => {
   const response = await axiosInstance.post<
     LiveApiResponse<AcceptCoHostUpgradeResponse>
-  >(`/lives/${liveId}/co-host/acceptance`);
+  >(`/lives/${liveId}/co-host/acceptance`, { userId });
 
   return unwrapResult(response.data);
 };
@@ -753,10 +768,86 @@ export const deleteWhipSession = async (
   }
 };
 
+// whepUrl(예: https://host/rtc/{memberPath}/whep 또는 /{memberPath}/whep)에서 path만 추출
+export const extractWhepPath = (whepUrl: string) => {
+  try {
+    const url = new URL(whepUrl, window.location.origin);
+
+    return decodeURIComponent(url.pathname)
+      .replace(/\/whep\/?$/, "")
+      .replace(/^\/(api\/)?rtc\//, "")
+      .replace(/^\/+|\/+$/g, "");
+  } catch {
+    return whepUrl
+      .replace(/^https?:\/\/[^/]+/i, "")
+      .replace(/\/whep\/?$/, "")
+      .replace(/^\/(api\/)?rtc\//, "")
+      .replace(/^\/+|\/+$/g, "");
+  }
+};
+
+// 다른 진행자의 멤버 path 오디오를 WHEP으로 구독 (진행자 전용 모니터링)
+export const createWhepSession = async ({
+  path,
+  sdpOffer,
+}: {
+  path: string;
+  sdpOffer: string;
+}): Promise<{ sdpAnswer: string; sessionUrl: string }> => {
+  const normalizedPath = path.replace(/^\/+|\/+$/g, "");
+  const requestUrl = resolveRtcUrl(`/rtc/${normalizedPath}/whep`);
+
+  const response = await fetch(requestUrl, {
+    method: "POST",
+    headers: {
+      Authorization: getWhipAuthorization(),
+      "Content-Type": "application/sdp",
+      Accept: "application/sdp",
+    },
+    body: sdpOffer,
+  });
+
+  const responseText = await response.text();
+
+  if (!response.ok) {
+    throw new Error(
+      parseErrorMessage(responseText, `WHEP 세션 생성 실패: ${response.status}`),
+    );
+  }
+
+  const sessionUrl =
+    response.headers.get("Location") ?? response.headers.get("location");
+
+  return {
+    sdpAnswer: responseText,
+    sessionUrl: sessionUrl ?? "",
+  };
+};
+
+export const deleteWhepSession = async (
+  sessionUrl: string,
+): Promise<void> => {
+  if (!sessionUrl) return;
+
+  const response = await fetch(resolveRtcUrl(sessionUrl), {
+    method: "DELETE",
+    headers: {
+      Authorization: getWhipAuthorization(),
+    },
+  });
+
+  if (!response.ok && response.status !== 204 && response.status !== 404) {
+    throw new Error(`WHEP 세션 종료 실패: ${response.status}`);
+  }
+};
+
 export const subscribeViewerCount = async ({
   liveId,
   watchOnly = false,
   onViewerCount,
+  onCoHostUpgradeRequested,
+  onCoHostUpgradeAccepted,
+  onCoPublisherJoined,
   signal,
 }: SubscribeViewerCountParams): Promise<void> => {
   const requestUrl = resolveLiveApiUrl(
@@ -797,6 +888,42 @@ export const subscribeViewerCount = async ({
     }
   };
 
+  const parseJsonEvent = <T>(rawData: string): T | null => {
+    const trimmedData = rawData.trim();
+
+    if (!trimmedData) return null;
+
+    try {
+      return JSON.parse(trimmedData) as T;
+    } catch {
+      return null;
+    }
+  };
+
+  const handleNamedEvent = (eventName: string, rawData: string) => {
+    if (eventName === "coHostUpgradeRequested" && onCoHostUpgradeRequested) {
+      const event = parseJsonEvent<CoHostUpgradeEvent>(rawData);
+
+      if (event?.userId) onCoHostUpgradeRequested(event);
+      return;
+    }
+
+    if (eventName === "coHostUpgradeAccepted" && onCoHostUpgradeAccepted) {
+      const event = parseJsonEvent<CoHostUpgradeEvent>(rawData);
+
+      if (event?.userId) onCoHostUpgradeAccepted(event);
+      return;
+    }
+
+    if (eventName === "coPublisherJoined" && onCoPublisherJoined) {
+      const coPublisher = parseJsonEvent<LiveCoPublisher>(rawData);
+
+      if (coPublisher?.userId && coPublisher.whepUrl) {
+        onCoPublisherJoined(coPublisher);
+      }
+    }
+  };
+
   try {
     while (true) {
       const { value, done } = await reader.read();
@@ -820,12 +947,14 @@ export const subscribeViewerCount = async ({
           .filter((line) => line.startsWith("data:"))
           .map((line) => line.replace(/^data:\s?/, ""));
 
-        if (
-          (eventName === "viewerCount" || !eventName) &&
-          dataLines.length > 0
-        ) {
+        if (dataLines.length === 0) return;
+
+        if (eventName === "viewerCount" || !eventName) {
           parseViewerCount(dataLines.join("\n"));
+          return;
         }
+
+        handleNamedEvent(eventName, dataLines.join("\n"));
       });
     }
   } finally {
