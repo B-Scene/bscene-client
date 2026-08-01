@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useMyProfilesQuery } from "@/hooks/api/user/useMyProfiles";
-import { useChangeUserMode } from "@/hooks/api/user/useMode";
+import { useChangeUserMode, useToggleUserMode } from "@/hooks/api/user/useMode";
 import { useSlideUpSheet } from "@/hooks/useSlideUpSheet";
 import { Toast } from "@/components/common/Toast/Toast";
 import { useModeStore } from "@/stores/useModeStore";
@@ -114,6 +114,7 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
   const location = useLocation();
   const setMode = useModeStore((state) => state.setMode);
   const changeUserMode = useChangeUserMode();
+  const toggleUserMode = useToggleUserMode();
   const { data: myProfiles } = useMyProfilesQuery({ type: "all" });
   const { data: bandProfiles } = useMyProfilesQuery({ type: "band" });
 
@@ -272,14 +273,26 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
               type="button"
               onClick={() => {
                 if (selectedMode === "fan" && !hasFanProfile) {
-                  onClose();
-                  navigate("/onboarding/fan-nickname");
+                  toggleUserMode.mutate(undefined, {
+                    onSuccess: () => {
+                      setMode("fan");
+                      onClose();
+                      navigate("/onboarding/fan-nickname");
+                    },
+                    onError: () => setShowErrorToast(true),
+                  });
                   return;
                 }
 
                 if (selectedMode === "band" && !hasBandAccount) {
-                  onClose();
-                  navigate("/band/profile/new");
+                  toggleUserMode.mutate(undefined, {
+                    onSuccess: () => {
+                      setMode("band");
+                      onClose();
+                      navigate("/band/profile/new");
+                    },
+                    onError: () => setShowErrorToast(true),
+                  });
                   return;
                 }
 
@@ -332,7 +345,7 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
 
                 proceed();
               }}
-              disabled={changeUserMode.isPending}
+              disabled={changeUserMode.isPending || toggleUserMode.isPending}
               className={`flex h-[52px] w-[353px] items-center justify-center rounded-[12px] text-label1 text-neutral-0 ${
                 selectedMode === "fan" ? "bg-primary-400" : "bg-secondary-500"
               }`}
