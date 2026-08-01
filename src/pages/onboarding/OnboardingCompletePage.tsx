@@ -32,8 +32,9 @@ const OnboardingCompletePage = () => {
     const initialMode =
       (sessionStorage.getItem("onboardingInitialMode") as ModeCode | null) ??
       "FAN";
-    const fanNickname =
-      sessionStorage.getItem("onboardingFanNickname") ?? undefined;
+    const fanNickname = selectedModes.includes("FAN")
+      ? (sessionStorage.getItem("onboardingFanNickname") ?? undefined)
+      : undefined;
     const genres = getJsonItem<string[]>("onboardingGenres", []);
     const regions = getJsonItem<string[]>("onboardingRegions", []);
 

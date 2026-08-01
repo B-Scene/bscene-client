@@ -54,6 +54,11 @@ const ModeSelectPage = () => {
     );
     sessionStorage.setItem("onboardingInitialMode", getInitialMode(selectedMode));
 
+    if (selectedMode === "band") {
+      navigate("/onboarding/genre");
+      return;
+    }
+
     navigate("/onboarding/fan-nickname");
   };
 
