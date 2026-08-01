@@ -37,6 +37,24 @@ import { getApiErrorMessage } from "@/utils/getApiErrorMessage";
 const TABS = ["콘텐츠", "일정", "음원"] as const;
 type ProfileTab = (typeof TABS)[number];
 
+const LIVE_AUDIO_SESSION_NOT_FOUND_CODE = "LIVE404_1";
+
+const getApiErrorCode = (error: unknown) => {
+  if (!error || typeof error !== "object") return null;
+
+  const response = (error as { response?: unknown }).response;
+
+  if (!response || typeof response !== "object") return null;
+
+  const data = (response as { data?: unknown }).data;
+
+  if (!data || typeof data !== "object") return null;
+
+  const code = (data as { code?: unknown }).code;
+
+  return typeof code === "string" ? code : null;
+};
+
 const toNumericId = (value?: number | string | null) => {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value === "string") {
@@ -312,7 +330,17 @@ const FanBandProfilePage = () => {
   const followBandMutation = useFollowExploreBand();
   const unfollowBandMutation = useUnfollowExploreBand();
   const enterLiveMutation = useEnterLiveMutation();
-  const bandDetail = bandDetailQuery.data ?? bandPreview;
+  const isLiveAudioSessionError =
+    getApiErrorCode(bandDetailQuery.error) === LIVE_AUDIO_SESSION_NOT_FOUND_CODE;
+  const bandDetailFallback =
+    isLiveAudioSessionError && bandPreview
+      ? {
+          ...bandPreview,
+          isLive: false,
+          liveId: null,
+        }
+      : bandPreview;
+  const bandDetail = bandDetailQuery.data ?? bandDetailFallback;
   const bandName = bandDetail?.bandName ?? bandDetail?.name ?? "밴드";
   const bandGenre = bandDetail?.genre ? getGenreLabel(bandDetail.genre) : "장르";
   const bandRegion = bandDetail?.region
