@@ -2,6 +2,8 @@ import { createBrowserRouter, Navigate, Outlet } from "react-router-dom";
 import { MobileLayout } from "@/components/layout/MobileLayout";
 import Splash from "@/pages/auth/Splash";
 import Login from "@/pages/auth/LoginPage";
+import FindLoginIdPage from "@/pages/auth/FindLoginIdPage";
+import ResetPasswordPage from "@/pages/auth/ResetPasswordPage";
 import AgreementPage from "@/pages/onboarding/AgreementPage";
 import SignupPage from "@/pages/onboarding/SignupPage";
 import ModeSelecPage from "@/pages/onboarding/ModeSelectPage";
@@ -74,6 +76,14 @@ export const router = createBrowserRouter([
       {
         path: "/login",
         element: <Login />,
+      },
+      {
+        path: "/find-id",
+        element: <FindLoginIdPage />,
+      },
+      {
+        path: "/reset-password",
+        element: <ResetPasswordPage />,
       },
       {
         path: "/oauth/callback/kakao",

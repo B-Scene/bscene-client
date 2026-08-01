@@ -103,3 +103,19 @@ export type OAuthExchangeResponse = {
   email: string | null;
   token: LoginResponse | null;
 };
+
+export type FindLoginIdRequest = {
+  name: string;
+  phone: string;
+};
+
+export type FindLoginIdResponse = {
+  loginId: string;
+};
+
+export type ResetPasswordRequest = {
+  loginId: string;
+  phone: string;
+  newPassword: string;
+  newPasswordConfirm: string;
+};

@@ -119,11 +119,15 @@ export default function Login() {
 
           <span className="text-neutral-400">|</span>
 
-          <button type="button">아이디 찾기</button>
+          <button type="button" onClick={() => navigate("/find-id")}>
+            아이디 찾기
+          </button>
 
           <span className="text-neutral-400">|</span>
 
-          <button type="button">비밀번호 찾기</button>
+          <button type="button" onClick={() => navigate("/reset-password")}>
+            비밀번호 찾기
+          </button>
         </div>
 
         <div className="mt-[54px] h-px w-full bg-neutral-400 opacity-40" />

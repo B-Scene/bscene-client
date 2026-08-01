@@ -14,6 +14,9 @@ import type {
   LogoutRequest,
   OAuthSignupRequest,
   OAuthExchangeResponse,
+  FindLoginIdRequest,
+  FindLoginIdResponse,
+  ResetPasswordRequest,
 } from "@/types/auth/auth";
 
 export const checkLoginId = async (loginId: string) => {
@@ -97,6 +100,24 @@ export const exchangeOAuthCode = async (code: string) => {
   >("/auth/oauth/exchange", {
     code,
   });
+
+  return data.result;
+};
+
+export const findLoginId = async (params: FindLoginIdRequest) => {
+  const { data } = await axiosInstance.get<ApiResponse<FindLoginIdResponse>>(
+    "/auth/login-id/find",
+    { params },
+  );
+
+  return data.result;
+};
+
+export const resetPassword = async (body: ResetPasswordRequest) => {
+  const { data } = await axiosInstance.patch<ApiResponse<null>>(
+    "/auth/password-reset",
+    body,
+  );
 
   return data.result;
 };

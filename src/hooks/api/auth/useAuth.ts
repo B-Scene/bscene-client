@@ -9,6 +9,8 @@ import {
   logout,
   oauthSignup,
   exchangeOAuthCode,
+  findLoginId,
+  resetPassword,
 } from "@/api/auth/auth";
 
 import type {
@@ -19,6 +21,8 @@ import type {
   ReissueRequest,
   LogoutRequest,
   OAuthSignupRequest,
+  FindLoginIdRequest,
+  ResetPasswordRequest,
 } from "@/types/auth/auth";
 
 export const useCheckLoginId = () => {
@@ -73,5 +77,17 @@ export const useOAuthSignup = () => {
 export const useOAuthExchange = () => {
   return useMutation({
     mutationFn: exchangeOAuthCode,
+  });
+};
+
+export const useFindLoginId = () => {
+  return useMutation({
+    mutationFn: (body: FindLoginIdRequest) => findLoginId(body),
+  });
+};
+
+export const useResetPassword = () => {
+  return useMutation({
+    mutationFn: (body: ResetPasswordRequest) => resetPassword(body),
   });
 };
