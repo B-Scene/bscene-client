@@ -104,13 +104,13 @@ const getCoHostInvitePath = (liveId: string | number) =>
     String(liveId),
   )}&action=accept`;
 
+// 명시적인 공동 진행자 초대 타입일 때만 밴드 라이브 자동 수락 경로를 만든다.
+// BE가 일반 라이브 알림(시작/예약/다시보기)에도 type=LIVE를 쓰므로,
+// type=LIVE만으로 이 경로를 타면 팬 라이브 딥링크(/fan/live/...)가 밴드 라이브로 오라우팅된다
 const getLiveReferencePath = (notification: NotificationItem) => {
   const type = notification.type.toUpperCase();
 
-  if (
-    !isCoHostInviteNotificationType(type) &&
-    !isLiveReferenceNotificationType(type)
-  ) {
+  if (!isCoHostInviteNotificationType(type)) {
     return null;
   }
 
@@ -130,7 +130,8 @@ export const FAN_NOTIFICATION_ROUTES: NotificationRouteMapping = {
   knownPrefixes: [
     "/fan/explore/contents/",
     "/fan/home/concerts/",
-    "/fan/live/room/",
+    // /fan/live/room/{id} 외에 /fan/live/scheduled, /fan/live/replays/{id} 딥링크도 그대로 통과시킨다
+    "/fan/live/",
     "/fan/bands/",
     "/band/session/messages/",
   ],
@@ -287,10 +288,7 @@ export const getNotificationTargetPath = (
   notification: NotificationItem,
   routes: NotificationRouteMapping,
 ) => {
-  const liveReferencePath = getLiveReferencePath(notification);
-
-  if (liveReferencePath) return liveReferencePath;
-
+  // BE가 내려주는 deepLink(FE 라우트)를 최우선으로 신뢰한다
   const deepLink = notification.deepLink?.trim();
 
   if (deepLink) {
@@ -298,6 +296,11 @@ export const getNotificationTargetPath = (
 
     if (mappedPath) return mappedPath;
   }
+
+  // 공동 진행자 초대 등 특수 타입 폴백은 deepLink 매핑 실패 시에만 적용
+  const liveReferencePath = getLiveReferencePath(notification);
+
+  if (liveReferencePath) return liveReferencePath;
 
   return routes.fallback(notification);
 };

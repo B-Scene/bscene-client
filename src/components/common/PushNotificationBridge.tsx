@@ -20,11 +20,25 @@ export const PushNotificationBridge = () => {
       "BroadcastChannel" in window
         ? new BroadcastChannel("bscene-push")
         : null;
+    // SW가 제어권 밖 클라이언트를 navigate()할 수 없어, 알림 클릭 이동을 브로드캐스트로 위임받는다
+    const navigateChannel =
+      "BroadcastChannel" in window
+        ? new BroadcastChannel("bscene-push-navigate")
+        : null;
 
     window.__bscenePushDebug = getWebPushDebugInfo;
 
     broadcastChannel?.addEventListener("message", (event) => {
       console.info("[BScene Push] background message", event.data);
+    });
+
+    navigateChannel?.addEventListener("message", (event) => {
+      const deepLink = (event.data as { deepLink?: string } | null)?.deepLink;
+
+      if (typeof deepLink === "string" && deepLink) {
+        window.focus();
+        window.location.assign(deepLink);
+      }
     });
 
     void onForegroundPushMessage((payload) => {
@@ -55,6 +69,7 @@ export const PushNotificationBridge = () => {
     return () => {
       unsubscribe?.();
       broadcastChannel?.close();
+      navigateChannel?.close();
       delete window.__bscenePushDebug;
     };
   }, []);
