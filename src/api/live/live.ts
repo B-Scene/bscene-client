@@ -385,12 +385,17 @@ const getWhipAuthorization = () => {
 };
 
 export const getLivePlaybackAuthorization = () => {
+  return getWhipAuthorization();
+};
+
+export const getLiveReplayAuthorization = () => {
   return getLiveBearerAuthorization();
 };
 
-export const setupLivePlaybackXhr = (
+const setupAuthenticatedHlsXhr = (
   xhr: XMLHttpRequest,
   requestUrl: string,
+  getAuthorization: () => string,
 ) => {
   xhr.withCredentials = false;
 
@@ -404,9 +409,31 @@ export const setupLivePlaybackXhr = (
   if (!hasUrlAuthorization) {
     xhr.setRequestHeader(
       "Authorization",
-      getLivePlaybackAuthorization(),
+      getAuthorization(),
     );
   }
+};
+
+export const setupLivePlaybackXhr = (
+  xhr: XMLHttpRequest,
+  requestUrl: string,
+) => {
+  setupAuthenticatedHlsXhr(
+    xhr,
+    requestUrl,
+    getLivePlaybackAuthorization,
+  );
+};
+
+export const setupLiveReplayXhr = (
+  xhr: XMLHttpRequest,
+  requestUrl: string,
+) => {
+  setupAuthenticatedHlsXhr(
+    xhr,
+    requestUrl,
+    getLiveReplayAuthorization,
+  );
 };
 
 const parseErrorMessage = (responseText: string, fallbackMessage: string) => {
