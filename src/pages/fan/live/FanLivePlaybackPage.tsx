@@ -2,8 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
 import { useNavigate, useParams } from "react-router-dom";
 import {
-  getLivePlaybackAuthorization,
   resolveLiveApiUrl,
+  setupLivePlaybackXhr,
 } from "@/api/live/live";
 import HeadsetIcon from "@/assets/Headset.svg";
 import FallbackSeekIcon from "@/assets/icons/band/menu-reload.svg";
@@ -219,13 +219,7 @@ export function FanLivePlaybackPage() {
     const hls = new Hls({
       lowLatencyMode: false,
       backBufferLength: 60,
-      xhrSetup: (xhr) => {
-        xhr.withCredentials = true;
-        xhr.setRequestHeader(
-          "Authorization",
-          getLivePlaybackAuthorization(),
-        );
-      },
+      xhrSetup: setupLivePlaybackXhr,
     });
 
     hlsRef.current = hls;

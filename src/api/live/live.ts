@@ -385,7 +385,28 @@ const getWhipAuthorization = () => {
 };
 
 export const getLivePlaybackAuthorization = () => {
-  return getWhipAuthorization();
+  return getLiveBearerAuthorization();
+};
+
+export const setupLivePlaybackXhr = (
+  xhr: XMLHttpRequest,
+  requestUrl: string,
+) => {
+  xhr.withCredentials = false;
+
+  const url = new URL(requestUrl, window.location.href);
+  const hasUrlAuthorization =
+    url.searchParams.has("access_token") ||
+    url.searchParams.has("X-Amz-Signature") ||
+    url.searchParams.has("X-Amz-Credential") ||
+    url.searchParams.has("X-Amz-Algorithm");
+
+  if (!hasUrlAuthorization) {
+    xhr.setRequestHeader(
+      "Authorization",
+      getLivePlaybackAuthorization(),
+    );
+  }
 };
 
 const parseErrorMessage = (responseText: string, fallbackMessage: string) => {

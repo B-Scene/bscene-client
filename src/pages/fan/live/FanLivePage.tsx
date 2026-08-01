@@ -4,8 +4,8 @@ import Hls from "hls.js";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   getLiveMembers,
-  getLivePlaybackAuthorization,
   resolveLiveApiUrl,
+  setupLivePlaybackXhr,
   subscribeViewerCount,
 } from "@/api/live/live";
 import Modal from "@/components/Modal/Modal";
@@ -330,30 +330,12 @@ export function FanLivePage() {
     return;
   }
 
-  let authorization: string;
-
-  try {
-    authorization = getLivePlaybackAuthorization();
-  } catch (error) {
-    window.setTimeout(() => {
-      setAudioMessage(
-        error instanceof Error
-          ? error.message
-          : "오디오 인증 정보를 확인하지 못했어요.",
-      );
-    }, 0);
-    return;
-  }
-
   const playbackUrl = resolveLiveApiUrl(playback.playbackUrl);
 
   const hls = new Hls({
     lowLatencyMode: true,
     backBufferLength: 30,
-    xhrSetup: (xhr) => {
-      xhr.withCredentials = true;
-      xhr.setRequestHeader("Authorization", authorization);
-    },
+    xhrSetup: setupLivePlaybackXhr,
   });
 
   hlsRef.current = hls;
