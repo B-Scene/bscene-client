@@ -47,6 +47,10 @@ export interface AcceptBandInviteResponse {
   status: string;
 }
 
+export interface TransferBandOwnerRequest {
+  newOwnerUserId: number;
+}
+
 export interface BandMemberSearchItem {
   userId: number;
   nickname: string;

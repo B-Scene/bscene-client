@@ -11,6 +11,7 @@ import { useBandQuery } from "@/hooks/api/band/useBand";
 import {
   useBandMembersQuery,
   useRemoveBandMember,
+  useTransferBandOwner,
 } from "@/hooks/api/band/useBandMember";
 import { useBandMemberProfileQuery } from "@/hooks/api/band/useBandMemberProfile";
 import { getStoredAuthUser } from "@/utils/authUser";
@@ -29,10 +30,20 @@ const MEMBER_TYPE_LABELS: Record<BandMemberType, string> = {
 interface MemberRowProps {
   member: BandMemberListItem;
   isSelf: boolean;
+  isOwnerRow: boolean;
+  canManage: boolean;
   onRemoveClick: (userId: number) => void;
+  onTransferClick: (userId: number) => void;
 }
 
-const MemberRow = ({ member, isSelf, onRemoveClick }: MemberRowProps) => {
+const MemberRow = ({
+  member,
+  isSelf,
+  isOwnerRow,
+  canManage,
+  onRemoveClick,
+  onTransferClick,
+}: MemberRowProps) => {
   const profileQuery = useBandMemberProfileQuery(
     member.bandMemberProfileId ?? NaN,
   );
@@ -63,19 +74,32 @@ const MemberRow = ({ member, isSelf, onRemoveClick }: MemberRowProps) => {
         </div>
       </div>
 
-      {isSelf ? (
-        <span className="shrink-0 rounded-full border border-secondary-500 px-3 py-1 text-caption3 text-secondary-500">
-          운영자
-        </span>
-      ) : (
-        <button
-          type="button"
-          onClick={() => onRemoveClick(member.userId)}
-          className="shrink-0 text-caption4 text-neutral-500"
-        >
-          내보내기
-        </button>
-      )}
+      <div className="flex shrink-0 items-center gap-3">
+        {isOwnerRow ? (
+          <span className="shrink-0 rounded-full border border-secondary-500 px-3 py-1 text-caption3 text-secondary-500">
+            운영자
+          </span>
+        ) : null}
+
+        {canManage && !isOwnerRow ? (
+          <>
+            <button
+              type="button"
+              onClick={() => onTransferClick(member.userId)}
+              className="shrink-0 text-caption4 text-neutral-500"
+            >
+              오너 양도 {/* FIXME: 디자인 확정 전 임시 문구 */}
+            </button>
+            <button
+              type="button"
+              onClick={() => onRemoveClick(member.userId)}
+              className="shrink-0 text-caption4 text-neutral-500"
+            >
+              내보내기
+            </button>
+          </>
+        ) : null}
+      </div>
     </div>
   );
 };
@@ -90,14 +114,19 @@ const InviteMemberPage = () => {
   const { data: band } = useBandQuery(bandId);
   const { data: members = [] } = useBandMembersQuery(bandId);
   const removeMember = useRemoveBandMember(bandId);
+  const transferOwner = useTransferBandOwner(bandId);
 
   const bandName = band?.name ?? "";
+  const isOwner = band?.ownerId !== undefined && band.ownerId === myUserId;
   const activeMembers = members.filter((member) => member.status !== "INVITED");
   const pendingMembers = members.filter(
     (member) => member.status === "INVITED",
   );
 
   const [removeTargetId, setRemoveTargetId] = useState<number | null>(null);
+  const [transferTargetId, setTransferTargetId] = useState<number | null>(
+    null,
+  );
 
   const [toastOpen, setToastOpen] = useState(
     () => Boolean((location.state as { invited?: boolean } | null)?.invited),
@@ -135,7 +164,10 @@ const InviteMemberPage = () => {
                 key={member.id}
                 member={member}
                 isSelf={member.userId === myUserId}
+                isOwnerRow={member.userId === band?.ownerId}
+                canManage={isOwner}
                 onRemoveClick={setRemoveTargetId}
+                onTransferClick={setTransferTargetId}
               />
             ))}
           </div>
@@ -203,6 +235,27 @@ const InviteMemberPage = () => {
               await removeMember.mutateAsync(removeTargetId);
             }
             setRemoveTargetId(null);
+          }}
+        />
+      </ModalOverlay>
+
+      <ModalOverlay
+        open={transferTargetId !== null}
+        onClose={() => setTransferTargetId(null)}
+      >
+        <Modal
+          tone="orange"
+          title="오너를 양도할까요?" // FIXME: 디자인 확정 전 임시 문구
+          description="양도하면 해당 멤버가 새로운 운영자가 돼요" // FIXME: 디자인 확정 전 임시 문구
+          confirmLabel="양도" // FIXME: 디자인 확정 전 임시 문구
+          onCancel={() => setTransferTargetId(null)}
+          onConfirm={async () => {
+            if (transferTargetId !== null) {
+              await transferOwner.mutateAsync({
+                newOwnerUserId: transferTargetId,
+              });
+            }
+            setTransferTargetId(null);
           }}
         />
       </ModalOverlay>

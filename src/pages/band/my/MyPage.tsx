@@ -8,6 +8,8 @@ import Modal from "@/components/Modal/Modal";
 import { ProfileSummary } from "@/components/band/my/ProfileSummary";
 import { MenuSection } from "@/components/band/my/MenuSection";
 import { useBandMyPageQuery } from "@/hooks/api/user/useBandMyPage";
+import { useActiveBandId } from "@/hooks/api/user/useMyProfiles";
+import { useLeaveBand } from "@/hooks/api/band/useBandMember";
 import { useLogoutAndRedirect } from "@/hooks/useLogoutAndRedirect";
 import { getPartLabel } from "@/utils/bandLabels";
 
@@ -15,9 +17,12 @@ const MyPage = () => {
   const navigate = useNavigate();
   const { data } = useBandMyPageQuery();
   const logout = useLogoutAndRedirect();
+  const activeBandId = useActiveBandId();
+  const leaveBand = useLeaveBand(activeBandId ?? NaN);
 
   const [isModeSwitchOpen, setIsModeSwitchOpen] = useState(false);
   const [isLogoutOpen, setIsLogoutOpen] = useState(false);
+  const [isLeaveBandOpen, setIsLeaveBandOpen] = useState(false);
 
   const bandName = data?.bandName ?? "";
   const partsLabel = data?.parts.map(getPartLabel).join(" · ") ?? "";
@@ -71,6 +76,11 @@ const MyPage = () => {
                   label: "받은 지원 관리",
                   onClick: () => navigate("/band/profile/applications"),
                 },
+                {
+                  id: "leave-band",
+                  label: "밴드 탈퇴", // FIXME: 디자인 확정 전 임시 문구
+                  onClick: () => setIsLeaveBandOpen(true),
+                },
               ]}
             />
 
@@ -118,6 +128,24 @@ const MyPage = () => {
           onConfirm={() => {
             setIsLogoutOpen(false);
             logout();
+          }}
+        />
+      </ModalOverlay>
+
+      <ModalOverlay
+        open={isLeaveBandOpen}
+        onClose={() => setIsLeaveBandOpen(false)}
+      >
+        <Modal
+          tone="orange"
+          title="밴드를 탈퇴할까요?" // FIXME: 디자인 확정 전 임시 문구
+          description="탈퇴하면 밴드 멤버 자격이 사라져요" // FIXME: 디자인 확정 전 임시 문구
+          confirmLabel="탈퇴" // FIXME: 디자인 확정 전 임시 문구
+          onCancel={() => setIsLeaveBandOpen(false)}
+          onConfirm={async () => {
+            await leaveBand.mutateAsync();
+            setIsLeaveBandOpen(false);
+            navigate("/band/my", { replace: true });
           }}
         />
       </ModalOverlay>

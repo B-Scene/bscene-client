@@ -3,15 +3,19 @@ import {
   acceptBandInvite,
   getBandMembers,
   inviteBandMember,
+  leaveBand,
   rejectBandInvite,
   removeBandMember,
   searchBandMemberCandidates,
+  transferBandOwner,
 } from "@/api/band/bandMember";
 import type {
   AcceptBandInviteRequest,
   InviteBandMemberRequest,
+  TransferBandOwnerRequest,
 } from "@/types/band/bandMember";
 import { bandMemberProfileKeys } from "@/hooks/api/band/useBandMemberProfile";
+import { bandKeys } from "@/hooks/api/band/useBand";
 import { myProfilesKeys, useActiveBandId } from "@/hooks/api/user/useMyProfiles";
 import { getStoredAuthUser } from "@/utils/authUser";
 
@@ -127,6 +131,33 @@ export const useRemoveBandMember = (bandId: number) => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: bandMemberKeys.lists(bandId) });
       queryClient.invalidateQueries({ queryKey: bandMemberProfileKeys.all });
+    },
+  });
+};
+
+export const useLeaveBand = (bandId: number) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => leaveBand(bandId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: bandMemberKeys.lists(bandId) });
+      queryClient.invalidateQueries({ queryKey: bandMemberProfileKeys.all });
+      queryClient.invalidateQueries({ queryKey: bandKeys.detail(bandId) });
+      queryClient.invalidateQueries({ queryKey: myProfilesKeys.all });
+    },
+  });
+};
+
+export const useTransferBandOwner = (bandId: number) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (body: TransferBandOwnerRequest) =>
+      transferBandOwner(bandId, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: bandMemberKeys.lists(bandId) });
+      queryClient.invalidateQueries({ queryKey: bandKeys.detail(bandId) });
     },
   });
 };

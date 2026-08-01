@@ -7,6 +7,7 @@ import type {
   BandMemberSearchItem,
   InviteBandMemberRequest,
   InviteBandMemberResponse,
+  TransferBandOwnerRequest,
 } from "@/types/band/bandMember";
 
 export const inviteBandMember = async (
@@ -50,6 +51,26 @@ export const rejectBandInvite = async (bandId: number) => {
 export const removeBandMember = async (bandId: number, userId: number) => {
   const { data } = await axiosInstance.delete<BandApiResponse<null>>(
     `/bands/${bandId}/members/${userId}`,
+  );
+
+  return data.result;
+};
+
+export const leaveBand = async (bandId: number) => {
+  const { data } = await axiosInstance.delete<BandApiResponse<null>>(
+    `/bands/${bandId}/leave`,
+  );
+
+  return data.result;
+};
+
+export const transferBandOwner = async (
+  bandId: number,
+  body: TransferBandOwnerRequest,
+) => {
+  const { data } = await axiosInstance.patch<BandApiResponse<null>>(
+    `/bands/${bandId}/owner`,
+    body,
   );
 
   return data.result;
