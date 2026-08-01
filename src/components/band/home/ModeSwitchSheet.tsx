@@ -289,7 +289,7 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
                     onSuccess: () => {
                       setMode("band");
                       onClose();
-                      navigate("/band/profile/new");
+                      navigate("/band/home");
                     },
                     onError: () => setShowErrorToast(true),
                   });
