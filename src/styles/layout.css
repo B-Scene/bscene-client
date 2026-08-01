@@ -7,14 +7,14 @@
   align-items: center;
   justify-content: center;
   width: 100%;
-  height: 100dvh;
+  height: var(--app-height, 100dvh);
   background-color: #2e2e2e;
 }
 
 .phone-frame {
   position: relative;
   width: 100%;
-  height: 100dvh;
+  height: var(--app-height, 100dvh);
   overflow: hidden;
   background-color: var(--color-neutral-0);
   /* establishes a containing block so fixed-position children (e.g. bottom action buttons)
@@ -25,7 +25,7 @@
     width: min(393px, 100vw);
 
     @media (min-height: 852px) {
-      height: min(852px, 100dvh);
+      height: min(852px, var(--app-height, 100dvh));
     }
   }
 }
