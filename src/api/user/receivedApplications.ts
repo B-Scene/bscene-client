@@ -14,3 +14,15 @@ export const getReceivedApplications = async (
 
   return data.result;
 };
+
+export const decideSessionApply = async (
+  applySubmissionId: number,
+  isApproved: boolean,
+) => {
+  const { data } = await axiosInstance.post<ApiResponse<null>>(
+    `/users/me/${applySubmissionId}/acceptance`,
+    { isApproved },
+  );
+
+  return data.result;
+};

@@ -1,14 +1,17 @@
 import { useRef, useState } from "react";
+import type { AxiosError } from "axios";
 import { useNavigate } from "react-router-dom";
 
 import ArrowLeftIcon from "@/assets/icons/arrow-left.svg";
 import UserDefaultProfileIcon from "@/assets/icons/band/user-default-profile.svg";
 import PlayButtonIcon from "@/assets/icons/band/play-button.svg";
 import Button from "@/components/common/Button/Button";
+import { useCreateChatRoomMutation } from "@/hooks/api/session/useSessionChat";
 import {
   useMySessionApplicationDetailQuery,
   useSessionApplicationDetailQuery,
 } from "@/hooks/api/session/useSessionApplication";
+import type { SessionChatApiResponse } from "@/types/session/sessionChat";
 import { getRenderableProfileImageUrl } from "@/utils/profileImageUrl";
 
 interface SessionApplicationDetailScreenProps {
@@ -95,6 +98,52 @@ export const SessionApplicationDetailScreen = ({
         }
       : undefined
     : publicDetailQuery.data;
+
+  const createChatRoomMutation =
+    useCreateChatRoomMutation();
+
+  const sendMessage = async () => {
+    if (
+      isOwnApplication ||
+      createChatRoomMutation.isPending
+    ) {
+      return;
+    }
+
+    try {
+      const room =
+        await createChatRoomMutation.mutateAsync(
+          {
+            contextType: "SESSION_SEARCH",
+            sessionApplicationId,
+          },
+        );
+
+      navigate(
+        `/band/session/messages/${room.chatRoomId}`,
+        {
+          state: {
+            senderName: room.recipientName,
+            profileImageUrl:
+              detail?.profileImageUrl,
+            chatRoomId: room.chatRoomId,
+            canSend: true,
+          },
+        },
+      );
+    } catch (error) {
+      const apiMessage = (
+        error as AxiosError<
+          SessionChatApiResponse<null>
+        >
+      ).response?.data?.message;
+
+      window.alert(
+        apiMessage ??
+          "쪽지방 생성에 실패했어요. 잠시 후 다시 시도해주세요.",
+      );
+    }
+  };
 
   const [activeSection, setActiveSection] =
     useState<DetailSectionId>(
@@ -447,18 +496,10 @@ export const SessionApplicationDetailScreen = ({
           <Button
             tone="orange"
             className="w-full"
-            onClick={() =>
-              navigate(
-                `/band/session/messages/${detail.userId}`,
-                {
-                  state: {
-                    senderName: detail.nickname,
-                    profileImageUrl:
-                      detail.profileImageUrl,
-                  },
-                },
-              )
-            }
+            disabled={createChatRoomMutation.isPending}
+            onClick={() => {
+              void sendMessage();
+            }}
           >
             쪽지 보내기
           </Button>

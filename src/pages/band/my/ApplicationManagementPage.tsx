@@ -168,7 +168,15 @@ const ApplicationManagementPage = () => {
                         </div>
 
                         {applicant.status === "PENDING" ? (
-                          <button type="button" className="shrink-0">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              navigate(
+                                `/band/my/applications/${applicant.applySubmissionId}`,
+                              )
+                            }
+                            className="shrink-0"
+                          >
                             <img src={ArrowRightIcon} alt="" />
                           </button>
                         ) : applicant.status === "ACCEPTED" ? (

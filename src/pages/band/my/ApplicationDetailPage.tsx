@@ -1,10 +1,9 @@
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { Header } from "@/components/band/home/Header";
 import { SessionApplicationProfile } from "@/components/band/my/SessionApplicationProfile";
 import type { SessionApplicationProfileData } from "@/components/band/my/SessionApplicationProfile";
 import { useApplicationSubmissionDetailQuery } from "@/hooks/api/session/useSessionApplication";
-
-const MOCK_IS_BAND_OWNER = true;
+import { useDecideSessionApplyMutation } from "@/hooks/api/user/useReceivedApplications";
 
 const formatDeadline = (deadlineAt: string) => {
   const date = new Date(deadlineAt);
@@ -19,11 +18,33 @@ const formatDeadline = (deadlineAt: string) => {
 };
 
 const ApplicationDetailPage = () => {
+  const navigate = useNavigate();
   const { applySubmissionId } = useParams<{ applySubmissionId: string }>();
   const applicationSubmissionId = Number(applySubmissionId);
 
   const { data: detail, isLoading, isError, refetch } =
     useApplicationSubmissionDetailQuery(applicationSubmissionId);
+
+  const decideSessionApplyMutation = useDecideSessionApplyMutation();
+
+  const handleDecide = (isApproved: boolean) => {
+    if (decideSessionApplyMutation.isPending) {
+      return;
+    }
+
+    decideSessionApplyMutation.mutate(
+      { applySubmissionId: applicationSubmissionId, isApproved },
+      {
+        onSuccess: () => {
+          navigate("/band/profile/applications");
+        },
+        onError: () => {
+          // FIXME: 실패 안내 문구 확정 필요
+          window.alert("처리에 실패했어요. 잠시 후 다시 시도해주세요.");
+        },
+      },
+    );
+  };
 
   const applicantProfile: SessionApplicationProfileData | null = detail
     ? {
@@ -94,23 +115,29 @@ const ApplicationDetailPage = () => {
 
           <SessionApplicationProfile
             data={applicantProfile}
-            isBandOwner={MOCK_IS_BAND_OWNER}
+            isBandOwner={detail.isOwner ?? false}
           />
 
-          <div className="flex items-center justify-center gap-4 px-8 pt-3 pb-9">
-            <button
-              type="button"
-              className="flex h-9.5 w-39.25 items-center justify-center rounded-lg border border-secondary-500 text-body1 text-secondary-500"
-            >
-              거절
-            </button>
-            <button
-              type="button"
-              className="flex h-9.5 w-39.25 items-center justify-center rounded-lg bg-secondary-500 text-body1 text-neutral-0"
-            >
-              수락
-            </button>
-          </div>
+          {detail.isOwner ? (
+            <div className="flex items-center justify-center gap-4 px-8 pt-3 pb-9">
+              <button
+                type="button"
+                disabled={decideSessionApplyMutation.isPending}
+                onClick={() => handleDecide(false)}
+                className="flex h-9.5 w-39.25 items-center justify-center rounded-lg border border-secondary-500 text-body1 text-secondary-500 disabled:opacity-50"
+              >
+                거절
+              </button>
+              <button
+                type="button"
+                disabled={decideSessionApplyMutation.isPending}
+                onClick={() => handleDecide(true)}
+                className="flex h-9.5 w-39.25 items-center justify-center rounded-lg bg-secondary-500 text-body1 text-neutral-0 disabled:opacity-50"
+              >
+                수락
+              </button>
+            </div>
+          ) : null}
         </>
       )}
     </main>
