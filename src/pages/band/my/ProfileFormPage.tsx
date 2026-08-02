@@ -440,7 +440,7 @@ const ProfileForm = ({
             value={bio}
             onChange={(event) => setBio(event.target.value)}
             placeholder="밴드 소개글을 입력해주세요"
-            maxLength={60}
+            maxLength={1000}
             className="h-15 w-full overflow-hidden rounded-[5px] pt-2.25 pr-6.5 pb-8.25 pl-4"
           />
         </div>
