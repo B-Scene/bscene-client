@@ -517,7 +517,7 @@ const FanBandProfilePage = () => {
       <Header title={`${bandName}의 프로필`} />
 
       <section className="px-[32px] pt-[16px]">
-        <div className="flex items-center gap-[21px]">
+        <div className="flex items-start gap-[21px]">
           <img
             src={bandProfileImage}
             alt={`${bandName} 프로필`}
