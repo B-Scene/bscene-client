@@ -31,6 +31,7 @@ export const useSaveOnboarding = () => {
   return useMutation({
     mutationFn: (body: SaveOnboardingRequest) => saveOnboarding(body),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["onboarding", "status"] });
       queryClient.invalidateQueries({ queryKey: myProfilesKeys.all });
       queryClient.invalidateQueries({ queryKey: bandMemberProfileKeys.all });
       queryClient.invalidateQueries({ queryKey: fanMyPageKeys.all });

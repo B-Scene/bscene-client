@@ -34,7 +34,7 @@ export default function Login() {
               .fanNickname,
           });
 
-          if (data.user.onboardingCompleted) {
+          if (data.user.currentMode !== null) {
             setMode(data.user.currentMode === "BAND" ? "band" : "fan");
             navigate(getHomePathForMode(data.user.currentMode), {
               replace: true,

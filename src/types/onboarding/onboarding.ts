@@ -35,8 +35,8 @@ export type SaveOnboardingRequest = {
   selectedModes: ModeCode[];
   initialMode: ModeCode;
   fanNickname?: string;
-  genres: string[];
-  regions: string[];
+  genres?: string[];
+  regions?: string[];
 };
 
 export type SaveOnboardingResponse = OnboardingStatusResponse;

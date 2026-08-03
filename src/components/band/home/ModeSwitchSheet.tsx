@@ -273,14 +273,13 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
               type="button"
               onClick={() => {
                 if (selectedMode === "fan" && !hasFanProfile) {
-                  toggleUserMode.mutate(undefined, {
-                    onSuccess: () => {
-                      setMode("fan");
-                      onClose();
-                      navigate("/onboarding/fan-nickname");
-                    },
-                    onError: () => setShowErrorToast(true),
-                  });
+                  sessionStorage.setItem(
+                    "onboardingSelectedModes",
+                    JSON.stringify(["FAN", "BAND"]),
+                  );
+                  sessionStorage.setItem("onboardingInitialMode", "FAN");
+                  onClose();
+                  navigate("/onboarding/fan-nickname");
                   return;
                 }
 

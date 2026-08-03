@@ -2,6 +2,8 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ArrowLeftIcon from "@/assets/icons/arrow-left.svg";
 import Button from "@/components/common/Button/Button";
+import { useSaveOnboarding } from "@/hooks/api/onboarding/useOnboarding";
+import { useModeStore } from "@/stores/useModeStore";
 import type { ModeCode } from "@/types/onboarding/onboarding";
 
 type Mode = "fan" | "band" | "both";
@@ -41,24 +43,48 @@ const getInitialMode = (mode: Mode): ModeCode => {
 
 const ModeSelectPage = () => {
   const navigate = useNavigate();
+  const setMode = useModeStore((state) => state.setMode);
+  const { mutate: saveOnboarding, isPending } = useSaveOnboarding();
   const [selectedMode, setSelectedMode] = useState<Mode | null>("fan");
 
-  const isNextEnabled = useMemo(() => Boolean(selectedMode), [selectedMode]);
+  const isNextEnabled = useMemo(
+    () => Boolean(selectedMode) && !isPending,
+    [isPending, selectedMode],
+  );
 
   const handleNext = () => {
     if (!selectedMode) return;
 
-    sessionStorage.setItem(
-      "onboardingSelectedModes",
-      JSON.stringify(getSelectedModes(selectedMode)),
-    );
-    sessionStorage.setItem("onboardingInitialMode", getInitialMode(selectedMode));
+    const selectedModes = getSelectedModes(selectedMode);
+    const initialMode = getInitialMode(selectedMode);
 
     if (selectedMode === "band") {
-      navigate("/onboarding/genre");
+      saveOnboarding(
+        { selectedModes, initialMode },
+        {
+          onSuccess: () => {
+            sessionStorage.removeItem("onboardingSelectedModes");
+            sessionStorage.removeItem("onboardingInitialMode");
+            sessionStorage.removeItem("onboardingFanNickname");
+            sessionStorage.removeItem("onboardingGenres");
+            sessionStorage.removeItem("onboardingRegions");
+            setMode("band");
+            navigate("/band/home", { replace: true });
+          },
+          onError: (error) => {
+            console.error(error);
+            alert("온보딩 저장에 실패했습니다.");
+          },
+        },
+      );
       return;
     }
 
+    sessionStorage.setItem(
+      "onboardingSelectedModes",
+      JSON.stringify(selectedModes),
+    );
+    sessionStorage.setItem("onboardingInitialMode", initialMode);
     navigate("/onboarding/fan-nickname");
   };
 
@@ -131,7 +157,7 @@ const ModeSelectPage = () => {
           className="w-full"
           onClick={handleNext}
         >
-          다음
+          {isPending ? "저장 중..." : "다음"}
         </Button>
       </div>
     </main>
