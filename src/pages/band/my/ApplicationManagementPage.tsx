@@ -39,7 +39,7 @@ const ApplicationManagementPage = () => {
     [data],
   );
   const applicantCount = postings.reduce(
-    (sum, posting) => sum + posting.recruiters.length,
+    (sum, posting) => sum + posting.totalApplicants,
     0,
   );
 
@@ -130,7 +130,7 @@ const ApplicationManagementPage = () => {
                       {`${posting.part} · ${posting.genre} · ${posting.region}`}
                       <span className="mx-1.5 text-neutral-300">|</span>
                       <span className="text-secondary-500">
-                        지원자 {posting.recruiters.length}명
+                        지원자 {posting.totalApplicants}명
                       </span>
                     </p>
                   </div>
@@ -153,7 +153,7 @@ const ApplicationManagementPage = () => {
 
                           <div className="flex min-w-0 flex-col gap-1">
                             <span className="truncate text-label1 text-black">
-                              {applicant.nickname}
+                              {applicant.name}
                             </span>
                             <span className="truncate text-caption2 text-neutral-600">
                               {`${applicant.part} · ${applicant.level} · ${applicant.region}`}{" "}
@@ -182,9 +182,13 @@ const ApplicationManagementPage = () => {
                           <span className="flex py-0.5 px-3.75 shrink-0 items-center justify-center rounded-full bg-neutral-300 text-center text-caption3 text-neutral-600">
                             거절
                           </span>
+                        ) : applicant.status === "BAND_ACCEPTED" ? (
+                          <span className="flex py-0.5 px-3.75 shrink-0 items-center justify-center rounded-full border border-secondary-500 text-center text-caption3 text-secondary-500">
+                            확정 대기
+                          </span>
                         ) : (
                           <span className="flex py-0.5 px-3.75 shrink-0 items-center justify-center rounded-full bg-secondary-400 text-center text-caption3 text-neutral-0">
-                            수락
+                            참여 확정
                           </span>
                         )}
                       </div>
