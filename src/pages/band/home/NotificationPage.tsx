@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ArrowLeftIcon from "@/assets/icons/arrow-left.svg";
 import BandDefaultProfileImage from "@/assets/icons/band/band-default-profile.svg";
@@ -120,10 +120,16 @@ const getHandledSessionFinalizeIds = (): Set<number> => {
 const markSessionFinalizeIdHandled = (applySubmissionId: number) => {
   const ids = getHandledSessionFinalizeIds();
   ids.add(applySubmissionId);
-  window.localStorage.setItem(
-    HANDLED_SESSION_FINALIZE_IDS_STORAGE_KEY,
-    JSON.stringify([...ids]),
-  );
+
+  try {
+    window.localStorage.setItem(
+      HANDLED_SESSION_FINALIZE_IDS_STORAGE_KEY,
+      JSON.stringify([...ids]),
+    );
+  } catch {
+    // The server action already succeeded. Keep the in-memory state updated even
+    // when storage is unavailable or full.
+  }
 
   return ids;
 };
@@ -144,6 +150,7 @@ const NotificationPage = () => {
   const rejectBandInvite = useRejectBandInviteMutation();
   const finalizeApplicationSubmission = useFinalizeApplicationSubmissionMutation();
   const { data: activeMemberProfile } = useActiveBandMemberProfileQuery();
+  const [retentionNow, setRetentionNow] = useState(() => Date.now());
   const [handledSessionFinalizeIds, setHandledSessionFinalizeIds] = useState(
     () => getHandledSessionFinalizeIds(),
   );
@@ -153,18 +160,48 @@ const NotificationPage = () => {
         .flatMap((page) => page.items)
         .filter(
           (notification) =>
-            isNotificationWithinRetention(notification) &&
+            isNotificationWithinRetention(notification, retentionNow) &&
             isNotificationForMode(notification, "BAND") &&
             !isPostRegistrationNotification(notification),
         ) ??
       [],
-    [data],
+    [data, retentionNow],
   );
   const hasNotifications = notifications.length > 0;
   const sentinelRef = useInfiniteScrollObserver({
     enabled: Boolean(hasNextPage) && !isFetchingNextPage,
     onIntersect: fetchNextPage,
   });
+
+  useEffect(() => {
+    const intervalId = window.setInterval(
+      () => setRetentionNow(Date.now()),
+      60_000,
+    );
+
+    return () => window.clearInterval(intervalId);
+  }, []);
+
+  useEffect(() => {
+    if (
+      isLoading ||
+      isError ||
+      hasNotifications ||
+      !hasNextPage ||
+      isFetchingNextPage
+    ) {
+      return;
+    }
+
+    void fetchNextPage();
+  }, [
+    fetchNextPage,
+    hasNextPage,
+    hasNotifications,
+    isError,
+    isFetchingNextPage,
+    isLoading,
+  ]);
 
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
   const [isCompleteModalOpen, setIsCompleteModalOpen] = useState(false);

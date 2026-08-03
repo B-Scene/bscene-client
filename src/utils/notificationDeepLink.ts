@@ -40,12 +40,13 @@ export const formatNotificationTime = (createdAt: string) => {
 
 export const isNotificationWithinRetention = (
   notification: NotificationItem,
+  now = Date.now(),
 ) => {
   const createdTime = new Date(notification.createdAt).getTime();
 
   if (Number.isNaN(createdTime)) return true;
 
-  return Date.now() - createdTime < NOTIFICATION_RETENTION_MS;
+  return now - createdTime < NOTIFICATION_RETENTION_MS;
 };
 
 export const normalizeDeepLink = (deepLink: string) => {

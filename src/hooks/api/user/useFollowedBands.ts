@@ -8,12 +8,13 @@ export const followedBandsKeys = {
 
 const PAGE_SIZE = 10;
 
-export const useFollowedBandsQuery = (pageSize = PAGE_SIZE) => {
+export const useFollowedBandsQuery = (pageSize = PAGE_SIZE, enabled = true) => {
   return useInfiniteQuery({
     queryKey: followedBandsKeys.list(pageSize),
     queryFn: ({ pageParam }) =>
       getFollowedBands({ page: pageParam, size: pageSize }),
     initialPageParam: 0,
+    enabled,
     getNextPageParam: (lastPage) =>
       lastPage.hasNext ? lastPage.page + 1 : undefined,
   });

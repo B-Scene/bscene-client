@@ -4,7 +4,11 @@ import BSceneSymbol from "@/assets/bscene-symbol.svg";
 import Button from "@/components/common/Button/Button";
 import { useSaveOnboarding } from "@/hooks/api/onboarding/useOnboarding";
 import type { ModeCode } from "@/types/onboarding/onboarding";
-import { getHomePathForMode, saveFanNickname } from "@/utils/authUser";
+import {
+  consumePostLoginRedirect,
+  getHomePathForMode,
+  saveFanNickname,
+} from "@/utils/authUser";
 import { useModeStore } from "@/stores/useModeStore";
 
 const getJsonItem = <T,>(key: string, fallback: T): T => {
@@ -59,7 +63,10 @@ const OnboardingCompletePage = () => {
           sessionStorage.removeItem("onboardingRegions");
 
           setMode(initialMode === "BAND" ? "band" : "fan");
-          navigate(getHomePathForMode(initialMode), { replace: true });
+          navigate(
+            consumePostLoginRedirect() ?? getHomePathForMode(initialMode),
+            { replace: true },
+          );
         },
         onError: (error) => {
           console.error(error);

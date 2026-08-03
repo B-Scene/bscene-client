@@ -1,7 +1,11 @@
 import { useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useOAuthExchange } from "@/hooks/api/auth/useAuth";
-import { getHomePathForMode, saveAuthenticatedUser } from "@/utils/authUser";
+import {
+  consumePostLoginRedirect,
+  getHomePathForMode,
+  saveAuthenticatedUser,
+} from "@/utils/authUser";
 import { useModeStore } from "@/stores/useModeStore";
 
 const OAuthCallbackPage = () => {
@@ -50,9 +54,11 @@ const OAuthCallbackPage = () => {
 
           if (data.token.user.currentMode !== null) {
             setMode(data.token.user.currentMode === "BAND" ? "band" : "fan");
-            navigate(getHomePathForMode(data.token.user.currentMode), {
-              replace: true,
-            });
+            navigate(
+              consumePostLoginRedirect() ??
+                getHomePathForMode(data.token.user.currentMode),
+              { replace: true },
+            );
           } else {
             navigate("/onboarding/agreement", { replace: true });
           }

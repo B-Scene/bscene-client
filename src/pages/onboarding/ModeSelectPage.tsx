@@ -5,6 +5,7 @@ import Button from "@/components/common/Button/Button";
 import { useSaveOnboarding } from "@/hooks/api/onboarding/useOnboarding";
 import { useModeStore } from "@/stores/useModeStore";
 import type { ModeCode } from "@/types/onboarding/onboarding";
+import { consumePostLoginRedirect } from "@/utils/authUser";
 
 type Mode = "fan" | "band" | "both";
 
@@ -69,7 +70,9 @@ const ModeSelectPage = () => {
             sessionStorage.removeItem("onboardingGenres");
             sessionStorage.removeItem("onboardingRegions");
             setMode("band");
-            navigate("/band/home", { replace: true });
+            navigate(consumePostLoginRedirect() ?? "/band/home", {
+              replace: true,
+            });
           },
           onError: (error) => {
             console.error(error);
