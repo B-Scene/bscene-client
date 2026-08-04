@@ -48,16 +48,42 @@ const DEFAULT_APPLIED_FILTERS: AppliedExploreFilters = {
 
 const FILTER_OPTIONS = {
   genre: [
-    { options: ["전체", "인디", "팝", "팝록", "재즈", "블루스"] },
-    { options: ["얼터너티브록", "사이키델릭록", "일렉트로닉록"] },
-    { options: ["포크록", "펑크록", "하드록", "메탈", "etc."] },
+    "전체",
+    "인디",
+    "팝",
+    "팝록",
+    "재즈",
+    "블루스",
+    "얼터너티브록",
+    "사이키델릭록",
+    "일렉트로닉록",
+    "포크록",
+    "펑크록",
+    "하드록",
+    "메탈",
+    "etc.",
   ],
   region: [
-    { options: ["전체", "서울", "경기", "인천", "부산", "대구"] },
-    { options: ["광주", "대전", "울산", "세종", "충남", "충북"] },
-    { options: ["전남", "전북", "경남", "경북", "강원", "제주"] },
+    "전체",
+    "서울",
+    "경기",
+    "인천",
+    "부산",
+    "대구",
+    "광주",
+    "대전",
+    "울산",
+    "세종",
+    "충남",
+    "충북",
+    "전남",
+    "전북",
+    "경남",
+    "경북",
+    "강원",
+    "제주",
   ],
-  content: [{ options: ["전체", "밴드", "공연", "영상"] }],
+  content: ["전체", "밴드", "공연", "영상"],
 };
 
 const EXPLORE_GENRE_LABELS: Record<string, string> = {
@@ -320,33 +346,26 @@ const FilterOptionButton = ({
 
 const FilterOptionGroup = ({
   title,
-  optionRows,
+  options,
   selected,
   onSelect,
 }: {
   title: string;
-  optionRows: Array<{ options: string[] }>;
+  options: string[];
   selected: string;
   onSelect: (value: string) => void;
 }) => {
   return (
     <section>
       <h3 className="m-0 font-body text-body1 text-neutral-900">{title}</h3>
-      <div className="mt-[8px] flex flex-col gap-[8px]">
-        {optionRows.map(({ options }) => (
-          <div
-            key={options.join("-")}
-            className="flex flex-wrap items-center gap-[4px]"
-          >
-            {options.map((option) => (
-              <FilterOptionButton
-                key={option}
-                label={option}
-                selected={selected === option}
-                onClick={() => onSelect(option)}
-              />
-            ))}
-          </div>
+      <div className="mt-[8px] flex flex-wrap items-center gap-x-[4px] gap-y-[8px]">
+        {options.map((option) => (
+          <FilterOptionButton
+            key={option}
+            label={option}
+            selected={selected === option}
+            onClick={() => onSelect(option)}
+          />
         ))}
       </div>
     </section>
@@ -407,19 +426,19 @@ const ExploreFilterSheet = ({
         <div className="mt-[16px] ml-[32px] mr-[31px] flex min-h-0 flex-1 flex-col gap-[16px] overflow-y-auto pb-[8px] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <FilterOptionGroup
             title="장르"
-            optionRows={FILTER_OPTIONS.genre}
+            options={FILTER_OPTIONS.genre}
             selected={selectedGenre}
             onSelect={setSelectedGenre}
           />
           <FilterOptionGroup
             title="지역"
-            optionRows={FILTER_OPTIONS.region}
+            options={FILTER_OPTIONS.region}
             selected={selectedRegion}
             onSelect={setSelectedRegion}
           />
           <FilterOptionGroup
             title="콘텐츠"
-            optionRows={FILTER_OPTIONS.content}
+            options={FILTER_OPTIONS.content}
             selected={selectedContent}
             onSelect={setSelectedContent}
           />
