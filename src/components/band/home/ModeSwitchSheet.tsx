@@ -148,7 +148,9 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
   const initialSelectedId =
     isFanMode && hasFanProfile
       ? fanAccount.id
-      : (activeBand?.id ?? bandAccounts[0]?.id ?? (isFanMode ? FAN_START_ID : BAND_START_ID));
+      : (activeBand?.id ??
+        bandAccounts[0]?.id ??
+        (isFanMode ? FAN_START_ID : BAND_START_ID));
   const [selectedId, setSelectedId] = useState(initialSelectedId);
   const [showErrorToast, setShowErrorToast] = useState(false);
   const { rendered, isVisible, handleTransitionEnd } = useSlideUpSheet(
@@ -346,7 +348,7 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
                 proceed();
               }}
               disabled={changeUserMode.isPending || toggleUserMode.isPending}
-              className={`flex h-[52px] w-[353px] items-center justify-center rounded-[12px] text-label1 text-neutral-0 ${
+              className={`flex h-13 w-[353px] items-center justify-center rounded-xl text-label1 text-neutral-0 ${
                 selectedMode === "fan" ? "bg-primary-400" : "bg-secondary-500"
               }`}
             >
