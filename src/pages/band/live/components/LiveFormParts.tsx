@@ -94,7 +94,7 @@ function TextField({
           maxLength={maxLength}
           placeholder={placeholder}
           onChange={(event) => onChange(event.target.value)}
-          className="h-[56px] resize-none rounded border border-neutral-300 px-4 py-1 text-caption2 outline-none placeholder:text-neutral-400"
+          className="h-[56px] w-full min-w-0 resize-none rounded border border-neutral-300 px-4 py-1 text-caption2 outline-none placeholder:text-neutral-400"
         />
       ) : (
         <input
@@ -102,7 +102,7 @@ function TextField({
           maxLength={maxLength}
           placeholder={placeholder}
           onChange={(event) => onChange(event.target.value)}
-          className="h-7 rounded border border-neutral-300 px-4 text-caption2 outline-none placeholder:text-neutral-400"
+          className="h-7 w-full min-w-0 rounded border border-neutral-300 px-4 text-caption2 outline-none placeholder:text-neutral-400"
         />
       )}
     </label>

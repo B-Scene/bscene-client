@@ -288,9 +288,9 @@ export function BandLiveHome({
       <Header title="라이브" showBack={false} variant="main" />
 
       <div className="px-5">
-        <section className="mt-5 flex h-[164px] w-full items-center justify-between rounded-xl bg-secondary-0 px-[18px] shadow-[0_4px_15px_rgba(20,20,20,0.08)]">
+        <section className="mt-5 flex min-h-[164px] w-full items-center justify-between rounded-xl bg-[#FFF6E5] p-[19px] shadow-[0_0_8px_0_rgba(0,0,0,0.10)]">
           <div className="min-w-0">
-            <h2 className="text-[17px] leading-5 font-bold text-neutral-900">
+            <h2 className="text-label1 text-neutral-900">
               지금, 오디오 라이브를
               <br />
               시작 해보세요!
@@ -298,9 +298,7 @@ export function BandLiveHome({
             <p className="mt-2 text-caption2 text-neutral-700">
               목소리만으로 팬들과 실시간 소통,
               <br />
-              팔로워가 없어도 바로
-              <br />
-              시작할 수 있어요.
+              팔로워가 없어도 바로 시작할 수 있어요.
             </p>
             <button
               type="button"

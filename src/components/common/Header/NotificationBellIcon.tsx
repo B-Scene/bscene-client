@@ -1,4 +1,12 @@
-export const NotificationBellIcon = ({ hasUnread }: { hasUnread: boolean }) => (
+interface NotificationBellIconProps {
+  hasUnread: boolean;
+  dotColor?: string;
+}
+
+export const NotificationBellIcon = ({
+  hasUnread,
+  dotColor = "var(--color-primary-400)",
+}: NotificationBellIconProps) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
     width="25"
@@ -23,7 +31,7 @@ export const NotificationBellIcon = ({ hasUnread }: { hasUnread: boolean }) => (
     />
     <circle cx="12" cy="4" r="1" stroke="currentColor" strokeWidth="2" />
     {hasUnread ? (
-      <circle cx="23" cy="2" r="2" fill="var(--color-primary-400)" />
+      <circle cx="23" cy="2" r="2" fill={dotColor} />
     ) : null}
   </svg>
 );

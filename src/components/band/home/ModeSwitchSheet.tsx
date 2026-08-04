@@ -145,11 +145,12 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
   const isFanMode = location.pathname.startsWith("/fan");
   const hasBandAccount = bandAccounts.length > 0;
   const activeBand = bandAccounts.find((band) => band.isActive);
-  const initialSelectedId = isFanMode
-    ? hasFanProfile
+  const initialSelectedId =
+    isFanMode && hasFanProfile
       ? fanAccount.id
-      : FAN_START_ID
-    : (activeBand?.id ?? bandAccounts[0]?.id ?? BAND_START_ID);
+      : (activeBand?.id ??
+        bandAccounts[0]?.id ??
+        (isFanMode ? FAN_START_ID : BAND_START_ID));
   const [selectedId, setSelectedId] = useState(initialSelectedId);
   const [showErrorToast, setShowErrorToast] = useState(false);
   const { rendered, isVisible, handleTransitionEnd } = useSlideUpSheet(
