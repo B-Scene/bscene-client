@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Header } from "@/components/band/home/Header";
+import { Header } from "@/components/common/Header/Header";
 import { StatRow } from "@/components/band/home/StatRow";
 import { ModalOverlay } from "@/components/common/Modal/ModalOverlay";
 import Modal from "@/components/Modal/Modal";
 import { ProfileSummary } from "@/components/fan/my/ProfileSummary";
 import { MenuSection } from "@/components/band/my/MenuSection";
 import { useFanMyPageQuery } from "@/hooks/api/user/useFanMyPage";
+import { useFanInformationQuery } from "@/hooks/api/user/useFanInformation";
 import { useGenres, useRegions } from "@/hooks/api/onboarding/useOnboarding";
 import { useLogoutAndRedirect } from "@/hooks/useLogoutAndRedirect";
 import type { CodeName } from "@/types/onboarding/onboarding";
@@ -39,18 +40,20 @@ const MyPage = () => {
   const navigate = useNavigate();
   const [isLogoutOpen, setIsLogoutOpen] = useState(false);
   const { data } = useFanMyPageQuery();
+  const { data: fanInformation } = useFanInformationQuery();
   const logout = useLogoutAndRedirect();
   const { data: genres = [] } = useGenres();
   const { data: regions = [] } = useRegions();
 
   return (
-    <main className="relative flex min-h-dvh flex-col bg-neutral-0">
+    <main className="relative flex min-h-dvh flex-col bg-neutral-0 pb-[calc(var(--bottom-nav-height)+24px)]">
       <Header title="마이" showBack={false} variant="main" />
 
       <section className="bg-primary-0 px-5 py-6">
         <ProfileSummary
           name={data?.nickname ?? ""}
           subtitle={data ? buildSubtitle(data, genres, regions) : ""}
+          profileImageUrl={fanInformation?.profileImageUrl}
         />
 
         <div className="mt-4">

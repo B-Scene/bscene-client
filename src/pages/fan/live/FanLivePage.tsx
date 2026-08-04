@@ -4,8 +4,8 @@ import Hls from "hls.js";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   getLiveMembers,
-  getLiveBearerAuthorization,
   resolveLiveApiUrl,
+  setupLivePlaybackXhr,
   subscribeViewerCount,
 } from "@/api/live/live";
 import Modal from "@/components/Modal/Modal";
@@ -330,33 +330,12 @@ export function FanLivePage() {
     return;
   }
 
-  let authorization: string;
-
-  try {
-    authorization = getLiveBearerAuthorization();
-  } catch (error) {
-    window.setTimeout(() => {
-      setAudioMessage(
-        error instanceof Error
-          ? error.message
-          : "오디오 인증 정보를 확인하지 못했어요.",
-      );
-    }, 0);
-    return;
-  }
-
   const playbackUrl = resolveLiveApiUrl(playback.playbackUrl);
 
   const hls = new Hls({
     lowLatencyMode: true,
     backBufferLength: 30,
-    xhrSetup: (xhr, url) => {
-      xhr.withCredentials = true;
-
-      if (url.includes("/api/") || url.includes("api.bscene.app")) {
-        xhr.setRequestHeader("Authorization", authorization);
-      }
-    },
+    xhrSetup: setupLivePlaybackXhr,
   });
 
   hlsRef.current = hls;
@@ -369,6 +348,10 @@ export function FanLivePage() {
   hls.on(Hls.Events.MANIFEST_PARSED, () => {
     setAudioMessage("");
     void startPlayback();
+  });
+
+  hls.on(Hls.Events.FRAG_LOADED, () => {
+    setAudioMessage("");
   });
 
   hls.on(Hls.Events.ERROR, (_, data) => {

@@ -447,9 +447,11 @@ const normalizeBandDetail = (
     followers: result.followers ?? bandInfo.followers,
     isFollowing:
       result.isFollowing ??
+      result.isFollowed ??
       result.following ??
       result.followed ??
       bandInfo.isFollowing ??
+      bandInfo.isFollowed ??
       bandInfo.following ??
       bandInfo.followed,
     following: result.following ?? bandInfo.following,

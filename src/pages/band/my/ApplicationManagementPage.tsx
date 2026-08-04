@@ -3,10 +3,11 @@ import { useNavigate } from "react-router-dom";
 import ApplyMemberIcon from "@/assets/icons/band/apply-member.svg";
 import ArrowRightIcon from "@/assets/icons/band/arrow-right-my.svg";
 import DefaultAvatar from "@/assets/icons/band/user-default-profile.svg";
-import { Header } from "@/components/band/home/Header";
+import { Header } from "@/components/common/Header/Header";
 import { NotificationBandBanner } from "@/components/band/my/NotificationBandBanner";
 import { EmptyState } from "@/components/common/EmptyState/EmptyState";
 import { useBandMyPageQuery } from "@/hooks/api/user/useBandMyPage";
+import { useMyProfilesQuery } from "@/hooks/api/user/useMyProfiles";
 import { useReceivedApplicationsQuery } from "@/hooks/api/user/useReceivedApplications";
 import { useInfiniteScrollObserver } from "@/hooks/useInfiniteScrollObserver";
 import { useTodayTick } from "@/hooks/useTodayTick";
@@ -22,6 +23,10 @@ const ApplicationManagementPage = () => {
   const navigate = useNavigate();
   const { data: bandMyPage } = useBandMyPageQuery();
   const bandName = bandMyPage?.bandName ?? "";
+  const { data: bandProfiles } = useMyProfilesQuery({ type: "band" });
+  const activeBandProfileImageUrl = bandProfiles?.bandProfiles.find(
+    (band) => band.isActive,
+  )?.profileImageUrl;
   const today = useTodayTick();
 
   const [activeTab, setActiveTab] = useState<RecruitmentStatusFilter>("OPEN");
@@ -51,6 +56,7 @@ const ApplicationManagementPage = () => {
         <NotificationBandBanner
           bandName={bandName}
           description="현재 선택된 밴드의 모집 공고 지원자"
+          profileImageUrl={activeBandProfileImageUrl}
         />
 
         <div className="flex items-center justify-between gap-3 rounded-lg bg-neutral-0 p-3 shadow-[0_0_8px_0_rgba(0,0,0,0.10)]">
@@ -157,6 +163,7 @@ const ApplicationManagementPage = () => {
                                 onClick={() =>
                                   navigate(
                                     `/band/my/applications/${applicant.applySubmissionId}`,
+                                    { state: { status: applicant.status } },
                                   )
                                 }
                                 className="text-caption3 text-secondary-500"
@@ -171,13 +178,13 @@ const ApplicationManagementPage = () => {
                           <button type="button" className="shrink-0">
                             <img src={ArrowRightIcon} alt="" />
                           </button>
-                        ) : applicant.status === "ACCEPTED" ? (
-                          <span className="flex py-0.5 px-3.75 shrink-0 items-center justify-center rounded-full bg-secondary-400 text-center text-caption3 text-neutral-0">
-                            수락
-                          </span>
-                        ) : (
+                        ) : applicant.status === "REJECTED" ? (
                           <span className="flex py-0.5 px-3.75 shrink-0 items-center justify-center rounded-full bg-neutral-300 text-center text-caption3 text-neutral-600">
                             거절
+                          </span>
+                        ) : (
+                          <span className="flex py-0.5 px-3.75 shrink-0 items-center justify-center rounded-full bg-secondary-400 text-center text-caption3 text-neutral-0">
+                            수락
                           </span>
                         )}
                       </div>

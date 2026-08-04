@@ -80,6 +80,7 @@ export interface FanExploreBandDetail {
   followerCnt?: number;
   followers?: number;
   isFollowing?: boolean;
+  isFollowed?: boolean;
   following?: boolean;
   followed?: boolean;
   isOfficial?: boolean;
@@ -227,7 +228,9 @@ export interface FanExploreBand {
   followerCount?: number;
   followers?: number;
   isFollowing?: boolean;
+  isFollowed?: boolean;
   following?: boolean;
+  followed?: boolean;
   score?: number;
   recommendationScore?: number;
   contentTypes?: string[];

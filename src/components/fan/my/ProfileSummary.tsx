@@ -1,15 +1,21 @@
 import DefaultAvatar from "@/assets/images/IMG_my.svg";
+import { getRenderableProfileImageUrl } from "@/utils/profileImageUrl";
 
 interface ProfileSummaryProps {
   name: string;
   subtitle: string;
+  profileImageUrl?: string | null;
 }
 
-export const ProfileSummary = ({ name, subtitle }: ProfileSummaryProps) => {
+export const ProfileSummary = ({
+  name,
+  subtitle,
+  profileImageUrl,
+}: ProfileSummaryProps) => {
   return (
     <div className="flex items-center gap-3">
       <img
-        src={DefaultAvatar}
+        src={getRenderableProfileImageUrl(profileImageUrl) ?? DefaultAvatar}
         alt=""
         className="size-14 shrink-0 rounded-full object-cover"
       />

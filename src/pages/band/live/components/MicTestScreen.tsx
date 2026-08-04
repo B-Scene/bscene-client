@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import "@/styles/tokens/color.css";
-import { Header } from "@/components/band/home/Header";
+import { Header } from "@/components/common/Header/Header";
 import MicIcon from "@/assets/icons/ic_Mic.svg";
 import MicEllipseIcon from "@/assets/icons/Mic_Ellipse.svg";
 import LiveStartIcon from "@/assets/icons/band/live-start.svg";

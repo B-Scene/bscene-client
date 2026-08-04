@@ -1,4 +1,4 @@
-import { Header } from "@/components/band/home/Header";
+import { Header } from "@/components/common/Header/Header";
 import { useActiveBandId } from "@/hooks/api/user/useMyProfiles";
 import { useBandQuery } from "@/hooks/api/band/useBand";
 import { useNotificationSettingToggle } from "@/hooks/useNotificationSettingToggle";
@@ -58,6 +58,7 @@ const RecruitAlertSettingsPage = () => {
         <NotificationBandBanner
           bandName={bandName}
           description="현재 선택된 밴드의 세션 모집 알림"
+          profileImageUrl={band?.profileImageUrl}
         />
 
         {statusMessage ? (

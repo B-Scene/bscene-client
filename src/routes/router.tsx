@@ -18,6 +18,7 @@ import ConcertRegisterPage from "@/pages/band/home/ConcertRegisterPage";
 import CompletePage from "@/pages/band/home/CompletePage";
 import MusicRegisterPage from "@/pages/band/home/MusicRegisterPage";
 import ContentRegisterPage from "@/pages/band/home/ContentRegisterPage";
+import BandScheduleDetailPage from "@/pages/band/home/BandScheduleDetailPage";
 import FanHomePage from "@/pages/fan/home/FanHomePage";
 import FanMyPage from "@/pages/fan/my/MyPage";
 import FollowedBandsPage from "@/pages/fan/my/FollowedBandsPage";
@@ -57,6 +58,7 @@ import LiveAlertSettingsPage from "@/pages/band/my/LiveAlertSettingsPage";
 import SessionMailboxPage from "@/pages/band/session/components/SessionMailboxPage";
 import SessionChatPage from "@/pages/band/session/components/SessionChatPage";
 import ApplicationDetailPage from "@/pages/band/my/ApplicationDetailPage";
+import BandInviteLinkPage from "@/pages/band/home/BandInviteLinkPage";
 
 export const router = createBrowserRouter([
   {
@@ -192,6 +194,10 @@ export const router = createBrowserRouter([
         element: <MemberInviteSearchPage />,
       },
       {
+        path: "/band/invite-links/:token",
+        element: <BandInviteLinkPage />,
+      },
+      {
         path: "/band/profile/applications",
         element: <ApplicationManagementPage />,
       },
@@ -300,6 +306,14 @@ export const router = createBrowserRouter([
       {
         path: "/band/concerts/:concertId/edit",
         element: <ConcertRegisterPage />,
+      },
+      {
+        path: "/band/concerts/:performanceId",
+        element: <BandScheduleDetailPage />,
+      },
+      {
+        path: "/band/contents/:postId/edit",
+        element: <ContentRegisterPage />,
       },
       {
         path: "/band/register/complete",

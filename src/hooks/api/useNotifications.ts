@@ -6,6 +6,7 @@ import {
   type InfiniteData,
 } from "@tanstack/react-query";
 import {
+  deletePushToken,
   getNotifications,
   getNotificationSettings,
   getNotificationSettingKey,
@@ -56,6 +57,12 @@ export const useNotificationSettingsQuery = (
 export const useRegisterPushTokenMutation = () => {
   return useMutation({
     mutationFn: registerPushToken,
+  });
+};
+
+export const useDeletePushTokenMutation = () => {
+  return useMutation({
+    mutationFn: deletePushToken,
   });
 };
 
@@ -118,6 +125,11 @@ export const useMarkNotificationAsReadMutation = () => {
     onMutate: async (notificationId: number) => {
       await queryClient.cancelQueries({ queryKey: notificationKeys.all });
 
+      const previousNotifications =
+        queryClient.getQueriesData<InfiniteData<NotificationsPageResponse>>({
+          queryKey: notificationKeys.all,
+        });
+
       queryClient.setQueriesData<InfiniteData<NotificationsPageResponse>>(
         { queryKey: notificationKeys.all },
         (currentData) => {
@@ -142,6 +154,13 @@ export const useMarkNotificationAsReadMutation = () => {
           };
         },
       );
+
+      return { previousNotifications };
+    },
+    onError: (_error, _notificationId, context) => {
+      context?.previousNotifications.forEach(([queryKey, previousData]) => {
+        queryClient.setQueryData(queryKey, previousData);
+      });
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: notificationKeys.all });

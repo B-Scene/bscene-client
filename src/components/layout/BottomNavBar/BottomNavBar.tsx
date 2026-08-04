@@ -32,7 +32,7 @@ export const BottomNavBar = ({
   const tabs = mode === "fan" ? FAN_NAV_TABS : BAND_NAV_TABS;
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 mx-auto flex h-(--bottom-nav-height) w-full max-w-[393px] items-center justify-between bg-neutral-0 px-7.5 py-4 shadow-[0_-5px_20px_0_rgba(0,0,0,0.03)]">
+    <nav className="fixed inset-x-0 bottom-0 z-40 flex h-(--bottom-nav-height) w-full items-center justify-between bg-neutral-0 px-7.5 py-4 shadow-[0_-5px_20px_0_rgba(0,0,0,0.03)]">
       {tabs.map((tab) => {
         const isLiveRoute = location.pathname.includes("/live") && tab.id === "live";
         const isActive =

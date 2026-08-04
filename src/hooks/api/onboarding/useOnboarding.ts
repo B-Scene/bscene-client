@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   checkFanNickname,
   getGenres,
@@ -7,6 +7,10 @@ import {
   saveOnboarding,
 } from "@/api/onboarding/onboarding";
 import type { SaveOnboardingRequest } from "@/types/onboarding/onboarding";
+import { myProfilesKeys } from "@/hooks/api/user/useMyProfiles";
+import { bandMemberProfileKeys } from "@/hooks/api/band/useBandMemberProfile";
+import { fanMyPageKeys } from "@/hooks/api/user/useFanMyPage";
+import { bandMyPageKeys } from "@/hooks/api/user/useBandMyPage";
 
 export const useOnboardingStatus = () => {
   return useQuery({
@@ -22,8 +26,17 @@ export const useCheckFanNickname = () => {
 };
 
 export const useSaveOnboarding = () => {
+  const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: (body: SaveOnboardingRequest) => saveOnboarding(body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["onboarding", "status"] });
+      queryClient.invalidateQueries({ queryKey: myProfilesKeys.all });
+      queryClient.invalidateQueries({ queryKey: bandMemberProfileKeys.all });
+      queryClient.invalidateQueries({ queryKey: fanMyPageKeys.all });
+      queryClient.invalidateQueries({ queryKey: bandMyPageKeys.all });
+    },
   });
 };
 

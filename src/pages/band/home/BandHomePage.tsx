@@ -13,7 +13,7 @@ import {
   useDeletePerformance,
   usePerformancesQuery,
 } from "@/hooks/api/band/usePerformance";
-import { usePostsQuery } from "@/hooks/api/band/usePost";
+import { useDeletePost, usePostsQuery } from "@/hooks/api/band/usePost";
 import { useMusicLinksQuery } from "@/hooks/api/band/useMusicLink";
 import { BAND_GENRE_LABELS, BAND_REGION_LABELS } from "@/utils/bandLabels";
 import { BandProfileCard } from "@/components/band/home/BandProfileCard";
@@ -75,6 +75,7 @@ const BandHomePage = () => {
   const { data: postsData } = usePostsQuery(bandId);
   const { data: musicLinks } = useMusicLinksQuery(bandId);
   const deletePerformance = useDeletePerformance();
+  const deletePost = useDeletePost();
 
   const performances = performancesData?.performances ?? [];
   const posts = postsData?.posts ?? [];
@@ -95,6 +96,9 @@ const BandHomePage = () => {
 
   const [activeTab, setActiveTab] = useState("content");
   const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
+  const [deletePostTargetId, setDeletePostTargetId] = useState<number | null>(
+    null,
+  );
   const [isModeSwitchOpen, setIsModeSwitchOpen] = useState(false);
 
   const subtitle = band
@@ -269,6 +273,26 @@ const BandHomePage = () => {
                       post.title ||
                       "팬분들께 전하고 싶은 소식을 적어보세요"
                     }
+                    actions={
+                      <>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            navigate(`/band/contents/${post.postId}/edit`)
+                          }
+                          className="flex h-6.5 items-center justify-center gap-2.5 rounded-lg bg-[#FFF6E5] px-3.75 py-1.75 text-center text-caption3 text-neutral-600"
+                        >
+                          수정
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDeletePostTargetId(post.postId)}
+                          className="flex h-6.5 items-center justify-center gap-2.5 rounded-lg bg-neutral-300 px-3.75 py-1.75 text-caption3 text-neutral-600"
+                        >
+                          삭제
+                        </button>
+                      </>
+                    }
                   />
                 ))}
               </div>
@@ -297,6 +321,9 @@ const BandHomePage = () => {
                   return (
                     <ConcertCard
                       key={performance.performanceId}
+                      onClick={() =>
+                        navigate(`/band/concerts/${performance.performanceId}`)
+                      }
                       month={cardProps.month}
                       day={cardProps.day}
                       title={performance.title}
@@ -309,20 +336,22 @@ const BandHomePage = () => {
                         <>
                           <button
                             type="button"
-                            onClick={() =>
+                            onClick={(event) => {
+                              event.stopPropagation();
                               navigate(
                                 `/band/concerts/${performance.performanceId}/edit`,
-                              )
-                            }
+                              );
+                            }}
                             className="flex h-6.5 items-center justify-center gap-2.5 rounded-lg bg-[#FFF6E5] px-3.75 py-1.75 text-center text-caption3 text-neutral-600"
                           >
                             수정
                           </button>
                           <button
                             type="button"
-                            onClick={() =>
-                              setDeleteTargetId(performance.performanceId)
-                            }
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setDeleteTargetId(performance.performanceId);
+                            }}
                             className="flex h-6.5 items-center justify-center gap-2.5 rounded-lg bg-neutral-300 px-3.75 py-1.75 text-caption3 text-neutral-600"
                           >
                             삭제
@@ -380,6 +409,25 @@ const BandHomePage = () => {
               deletePerformance.mutate(deleteTargetId);
             }
             setDeleteTargetId(null);
+          }}
+        />
+      </ModalOverlay>
+
+      <ModalOverlay
+        open={deletePostTargetId !== null}
+        onClose={() => setDeletePostTargetId(null)}
+      >
+        <Modal
+          tone="orange"
+          title="콘텐츠를 삭제할까요?"
+          description={<>삭제된 콘텐츠는 복구할 수 없어요</>}
+          confirmLabel="삭제"
+          onCancel={() => setDeletePostTargetId(null)}
+          onConfirm={() => {
+            if (deletePostTargetId !== null) {
+              deletePost.mutate(deletePostTargetId);
+            }
+            setDeletePostTargetId(null);
           }}
         />
       </ModalOverlay>

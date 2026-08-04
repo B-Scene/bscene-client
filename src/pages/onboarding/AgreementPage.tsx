@@ -20,6 +20,7 @@ const AgreementPage = () => {
     age: false,
     service: false,
     privacy: false,
+    notification: false,
     marketing: false,
   });
 
@@ -46,6 +47,7 @@ const AgreementPage = () => {
       age: nextChecked,
       service: nextChecked,
       privacy: nextChecked,
+      notification: nextChecked,
       marketing: nextChecked,
     });
   };

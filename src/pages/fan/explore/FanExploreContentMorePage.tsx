@@ -1,8 +1,8 @@
 import type { FormEvent } from "react";
 import { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import ArrowLeftIcon from "@/assets/icons/arrow-left.svg";
 import TimesCircleIcon from "@/assets/icons/ic_Times Circle.svg";
+import { Header } from "@/components/common/Header/Header";
 import {
   useFanExploreContentSearchQuery,
   useFanExploreSearchQuery,
@@ -63,20 +63,13 @@ const ContentMoreTopBar = ({ initialKeyword }: { initialKeyword: string }) => {
   };
 
   return (
-    <header className="flex h-[48px] w-full max-w-[393px] items-center gap-[16px] bg-neutral-0 px-[15px]">
-      <button
-        type="button"
-        aria-label="뒤로가기"
-        onClick={() => navigate(-1)}
-        className="flex size-6 shrink-0 items-center justify-center"
-      >
-        <img src={ArrowLeftIcon} alt="" className="size-6" />
-      </button>
+    <>
+      <Header title="" />
 
       <form
         role="search"
         onSubmit={submitSearch}
-        className="flex h-[36px] min-w-0 flex-1 items-center rounded-full border border-neutral-500 bg-neutral-0 px-[15px]"
+        className="mx-3.75 mt-2.5 flex h-9 items-center rounded-full border border-neutral-500 bg-neutral-0 px-3.75"
       >
         <input
           type="text"
@@ -96,7 +89,7 @@ const ContentMoreTopBar = ({ initialKeyword }: { initialKeyword: string }) => {
           </button>
         ) : null}
       </form>
-    </header>
+    </>
   );
 };
 

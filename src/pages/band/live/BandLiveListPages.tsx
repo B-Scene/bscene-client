@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from "react";
 import type { AxiosError } from "axios";
-import { Header } from "@/components/band/home/Header";
+import { Header } from "@/components/common/Header/Header";
 import {
   useEnterLiveMutation,
   useLiveHomeQuery,

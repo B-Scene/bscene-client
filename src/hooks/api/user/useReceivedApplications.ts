@@ -1,5 +1,9 @@
-import { useInfiniteQuery } from "@tanstack/react-query";
-import { getReceivedApplications } from "@/api/user/receivedApplications";
+import { useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
+import {
+  acceptApplicationSubmission,
+  getReceivedApplications,
+} from "@/api/user/receivedApplications";
+import { sessionApplicationKeys } from "@/hooks/api/session/useSessionApplication";
 import type { RecruitmentStatusFilter } from "@/types/user/receivedApplications";
 
 export const receivedApplicationsKeys = {
@@ -22,5 +26,30 @@ export const useReceivedApplicationsQuery = (
       lastPage.pageInfo.hasNext
         ? (lastPage.pageInfo.nextCursor ?? undefined)
         : undefined,
+  });
+};
+
+export const useAcceptApplicationSubmissionMutation = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      applySubmissionId,
+      isApproved,
+    }: {
+      applySubmissionId: number;
+      isApproved: boolean;
+    }) => acceptApplicationSubmission(applySubmissionId, { isApproved }),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: receivedApplicationsKeys.all,
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: sessionApplicationKeys.submissionDetail(
+          variables.applySubmissionId,
+        ),
+      });
+    },
   });
 };
