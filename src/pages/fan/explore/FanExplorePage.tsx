@@ -336,7 +336,7 @@ const FilterOptionGroup = ({
         {optionRows.map(({ options }) => (
           <div
             key={options.join("-")}
-            className="flex items-center gap-[4px]"
+            className="flex flex-wrap items-center gap-[4px]"
           >
             {options.map((option) => (
               <FilterOptionButton
