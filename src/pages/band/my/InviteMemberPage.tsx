@@ -29,10 +29,11 @@ const MEMBER_TYPE_LABELS: Record<BandMemberType, string> = {
 interface MemberRowProps {
   member: BandMemberListItem;
   isSelf: boolean;
+  isOwner: boolean;
   onRemoveClick: (userId: number) => void;
 }
 
-const MemberRow = ({ member, isSelf, onRemoveClick }: MemberRowProps) => {
+const MemberRow = ({ member, isSelf, isOwner, onRemoveClick }: MemberRowProps) => {
   const profileQuery = useBandMemberProfileQuery(
     member.bandMemberProfileId ?? NaN,
   );
@@ -63,7 +64,7 @@ const MemberRow = ({ member, isSelf, onRemoveClick }: MemberRowProps) => {
         </div>
       </div>
 
-      {isSelf ? (
+      {isOwner ? (
         <span className="shrink-0 rounded-full border border-secondary-500 px-3 py-1 text-caption3 text-secondary-500">
           운영자
         </span>
@@ -136,6 +137,7 @@ const InviteMemberPage = () => {
                 key={member.id}
                 member={member}
                 isSelf={member.userId === myUserId}
+                isOwner={member.userId === band?.ownerId}
                 onRemoveClick={setRemoveTargetId}
               />
             ))}

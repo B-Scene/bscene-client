@@ -117,7 +117,23 @@ const ApplicationManagementPage = () => {
                 key={posting.recruitmentPostId}
                 className="flex flex-col gap-7 rounded-lg bg-neutral-0 px-3.75 py-3 shadow-[0_0_8px_0_rgba(0,0,0,0.10)]"
               >
-                <div className="flex flex-col gap-3">
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() =>
+                    navigate("/band/session", {
+                      state: { openPostId: posting.recruitmentPostId },
+                    })
+                  }
+                  onKeyDown={(event) => {
+                    if (event.key !== "Enter" && event.key !== " ") return;
+                    event.preventDefault();
+                    navigate("/band/session", {
+                      state: { openPostId: posting.recruitmentPostId },
+                    });
+                  }}
+                  className="flex cursor-pointer flex-col gap-3"
+                >
                   <span className="self-start rounded-full border border-secondary-500 px-3 py-0.5 text-center text-caption3 text-secondary-400">
                     {formatDDayLabel(getDDay(posting.dueDate.split(" ")[0], today))}
                   </span>
