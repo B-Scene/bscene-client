@@ -148,7 +148,7 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
   const initialSelectedId =
     isFanMode && hasFanProfile
       ? fanAccount.id
-      : (activeBand?.id ?? bandAccounts[0]?.id ?? (isFanMode ? BAND_START_ID : fanAccount.id));
+      : (activeBand?.id ?? bandAccounts[0]?.id ?? (isFanMode ? FAN_START_ID : BAND_START_ID));
   const [selectedId, setSelectedId] = useState(initialSelectedId);
   const [showErrorToast, setShowErrorToast] = useState(false);
   const { rendered, isVisible, handleTransitionEnd } = useSlideUpSheet(

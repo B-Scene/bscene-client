@@ -47,6 +47,7 @@ const MyPage = () => {
           bandLabel={bandName}
           profileImageUrl={activeBandProfile?.profileImageUrl}
           onSwitchBand={() => setIsModeSwitchOpen(true)}
+          showSwitchButton={hasBand}
         />
 
         <div className="mt-4">
