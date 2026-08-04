@@ -2,6 +2,7 @@ import type { NotificationItem } from "@/types/notification";
 
 type RouteBuilder = (id: string | number, suffix: string) => string;
 export type NotificationMode = "FAN" | "BAND";
+const NOTIFICATION_RETENTION_MS = 72 * 60 * 60 * 1000;
 
 export interface NotificationRouteMapping {
   post: RouteBuilder;
@@ -35,6 +36,17 @@ export const formatNotificationTime = (createdAt: string) => {
   if (diffDays < 7) return `${diffDays}일 전`;
 
   return `${createdDate.getFullYear()}.${createdDate.getMonth() + 1}.${createdDate.getDate()}.`;
+};
+
+export const isNotificationWithinRetention = (
+  notification: NotificationItem,
+  now = Date.now(),
+) => {
+  const createdTime = new Date(notification.createdAt).getTime();
+
+  if (Number.isNaN(createdTime)) return true;
+
+  return now - createdTime < NOTIFICATION_RETENTION_MS;
 };
 
 export const normalizeDeepLink = (deepLink: string) => {
@@ -103,7 +115,7 @@ export const BAND_NOTIFICATION_ROUTES: NotificationRouteMapping = {
   live: (_id, suffix) => `/band/live${suffix}`,
   band: (_id, suffix) => `/band/home${suffix}`,
   message: (id, suffix) => `/band/session/messages/${id}${suffix}`,
-  application: (id, suffix) => `/band/my/applications/${id}${suffix}`,
+  application: (_id, suffix) => `/band/profile/applications${suffix}`,
   recruitment: (_id, suffix) => `/band/profile/postings${suffix}`,
   knownPrefixes: [
     "/band/home",
@@ -128,7 +140,7 @@ export const BAND_NOTIFICATION_ROUTES: NotificationRouteMapping = {
     }
 
     if (type.includes("APPLICATION")) {
-      return `/band/my/applications/${notification.referenceId}`;
+      return "/band/profile/applications";
     }
 
     if (type.includes("RECRUITMENT")) {
@@ -240,15 +252,8 @@ const getDeepLinkMode = (deepLink?: string | null): NotificationMode | null => {
 export const getNotificationMode = (
   notification: NotificationItem,
 ): NotificationMode | null => {
-  if (notification.mode === "FAN" || notification.mode === "BAND") {
-    return notification.mode;
-  }
-
-  const deepLinkMode = getDeepLinkMode(notification.deepLink);
-
-  if (deepLinkMode) return deepLinkMode;
-
   const type = notification.type.toUpperCase();
+  const titleAndBody = `${notification.title} ${notification.body}`;
 
   if (type === "BAND_INVITE" || type.startsWith("BAND_")) return "BAND";
   if (type.startsWith("FAN_")) return "FAN";
@@ -259,11 +264,43 @@ export const getNotificationMode = (
     type.includes("DM") ||
     type.includes("SESSION_APPLICATION") ||
     type.includes("APPLICATION_STATUS") ||
+    (type.includes("APPLICATION") &&
+      (type.includes("NEW") ||
+        type.includes("ARRIV") ||
+        type.includes("SUBMIT"))) ||
+    type.includes("SESSION_RECRUITMENT") ||
     type.includes("RECRUITMENT") ||
     type.includes("NEW_SESSION") ||
     type.includes("LIVE_START_STATUS")
   ) {
     return "BAND";
+  }
+
+  if (
+    titleAndBody.includes("지원서") &&
+    (titleAndBody.includes("도착") ||
+      titleAndBody.includes("제출") ||
+      titleAndBody.includes("지원했습니다"))
+  ) {
+    return "BAND";
+  }
+
+  if (
+    titleAndBody.includes("세션") &&
+    titleAndBody.includes("모집") &&
+    (titleAndBody.includes("마감") ||
+      titleAndBody.includes("공고") ||
+      titleAndBody.includes("지원"))
+  ) {
+    return "BAND";
+  }
+
+  const deepLinkMode = getDeepLinkMode(notification.deepLink);
+
+  if (deepLinkMode) return deepLinkMode;
+
+  if (notification.mode === "FAN" || notification.mode === "BAND") {
+    return notification.mode;
   }
 
   if (

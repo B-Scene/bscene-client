@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import type { AxiosError } from "axios";
 import { useNavigate } from "react-router-dom";
 
 import ArrowLeftIcon from "@/assets/icons/arrow-left.svg";
@@ -9,6 +10,8 @@ import {
   useMySessionApplicationDetailQuery,
   useSessionApplicationDetailQuery,
 } from "@/hooks/api/session/useSessionApplication";
+import { useCreateSessionChatRoomMutation } from "@/hooks/api/session/useSessionChat";
+import type { SessionChatApiResponse } from "@/types/session/sessionChat";
 import { getRenderableProfileImageUrl } from "@/utils/profileImageUrl";
 
 interface SessionApplicationDetailScreenProps {
@@ -65,6 +68,8 @@ export const SessionApplicationDetailScreen = ({
   isOwnApplication = false,
 }: SessionApplicationDetailScreenProps) => {
   const navigate = useNavigate();
+  const createChatRoomMutation =
+    useCreateSessionChatRoomMutation();
 
   const publicDetailQuery =
     useSessionApplicationDetailQuery(
@@ -143,6 +148,49 @@ export const SessionApplicationDetailScreen = ({
         47,
       behavior: "smooth",
     });
+  };
+
+  const handleCreateChatRoom = async () => {
+    if (
+      !detail ||
+      isOwnApplication ||
+      createChatRoomMutation.isPending
+    ) {
+      return;
+    }
+
+    try {
+      const room =
+        await createChatRoomMutation.mutateAsync({
+          contextType: "SESSION_SEARCH",
+          sessionApplicationId,
+        });
+
+      navigate(
+        `/band/session/messages/${room.chatRoomId}`,
+        {
+          state: {
+            senderName:
+              room.recipientName || detail.nickname,
+            profileImageUrl:
+              detail.profileImageUrl,
+            chatRoomId: room.chatRoomId,
+            canSend: true,
+          },
+        },
+      );
+    } catch (error) {
+      const apiMessage = (
+        error as AxiosError<
+          SessionChatApiResponse<null>
+        >
+      ).response?.data?.message;
+
+      window.alert(
+        apiMessage ??
+          "쪽지방 생성에 실패했어요. 잠시 후 다시 시도해주세요.",
+      );
+    }
   };
 
   return (
@@ -447,20 +495,14 @@ export const SessionApplicationDetailScreen = ({
           <Button
             tone="orange"
             className="w-full"
+            disabled={createChatRoomMutation.isPending}
             onClick={() =>
-              navigate(
-                `/band/session/messages/${detail.userId}`,
-                {
-                  state: {
-                    senderName: detail.nickname,
-                    profileImageUrl:
-                      detail.profileImageUrl,
-                  },
-                },
-              )
+              void handleCreateChatRoom()
             }
           >
-            쪽지 보내기
+            {createChatRoomMutation.isPending
+              ? "쪽지방 여는 중"
+              : "쪽지 보내기"}
           </Button>
         </div>
       ) : null}

@@ -400,6 +400,54 @@ export const getLivePlaybackAuthorization = () => {
   return getWhipAuthorization();
 };
 
+export const getLiveReplayAuthorization = () => {
+  return getLiveBearerAuthorization();
+};
+
+const setupAuthenticatedHlsXhr = (
+  xhr: XMLHttpRequest,
+  requestUrl: string,
+  getAuthorization: () => string,
+) => {
+  xhr.withCredentials = false;
+
+  const url = new URL(requestUrl, window.location.href);
+  const hasUrlAuthorization =
+    url.searchParams.has("access_token") ||
+    url.searchParams.has("X-Amz-Signature") ||
+    url.searchParams.has("X-Amz-Credential") ||
+    url.searchParams.has("X-Amz-Algorithm");
+
+  if (!hasUrlAuthorization) {
+    xhr.setRequestHeader(
+      "Authorization",
+      getAuthorization(),
+    );
+  }
+};
+
+export const setupLivePlaybackXhr = (
+  xhr: XMLHttpRequest,
+  requestUrl: string,
+) => {
+  setupAuthenticatedHlsXhr(
+    xhr,
+    requestUrl,
+    getLivePlaybackAuthorization,
+  );
+};
+
+export const setupLiveReplayXhr = (
+  xhr: XMLHttpRequest,
+  requestUrl: string,
+) => {
+  setupAuthenticatedHlsXhr(
+    xhr,
+    requestUrl,
+    getLiveReplayAuthorization,
+  );
+};
+
 const parseErrorMessage = (responseText: string, fallbackMessage: string) => {
   if (!responseText) return fallbackMessage;
 

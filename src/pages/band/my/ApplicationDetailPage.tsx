@@ -1,10 +1,16 @@
-import { useParams } from "react-router-dom";
-import { Header } from "@/components/band/home/Header";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { Header } from "@/components/common/Header/Header";
 import { SessionApplicationProfile } from "@/components/band/my/SessionApplicationProfile";
 import type { SessionApplicationProfileData } from "@/components/band/my/SessionApplicationProfile";
 import { useApplicationSubmissionDetailQuery } from "@/hooks/api/session/useSessionApplication";
+import { useCreateSessionChatRoomMutation } from "@/hooks/api/session/useSessionChat";
+import { useAcceptApplicationSubmissionMutation } from "@/hooks/api/user/useReceivedApplications";
+import type { ApplicantStatus } from "@/types/user/receivedApplications";
+import { getApiErrorMessage } from "@/utils/getApiErrorMessage";
 
-const MOCK_IS_BAND_OWNER = true;
+interface ApplicationDetailLocationState {
+  status?: ApplicantStatus;
+}
 
 const formatDeadline = (deadlineAt: string) => {
   const date = new Date(deadlineAt);
@@ -19,11 +25,69 @@ const formatDeadline = (deadlineAt: string) => {
 };
 
 const ApplicationDetailPage = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
   const { applySubmissionId } = useParams<{ applySubmissionId: string }>();
   const applicationSubmissionId = Number(applySubmissionId);
+  const initialStatus = (location.state as ApplicationDetailLocationState | null)
+    ?.status;
+  const isAlreadyDecided =
+    initialStatus != null && initialStatus !== "PENDING";
 
   const { data: detail, isLoading, isError, refetch } =
     useApplicationSubmissionDetailQuery(applicationSubmissionId);
+
+  const acceptMutation = useAcceptApplicationSubmissionMutation();
+  const createChatRoom = useCreateSessionChatRoomMutation();
+
+  const handleChatClick = async () => {
+    if (createChatRoom.isPending) return;
+
+    try {
+      const room = await createChatRoom.mutateAsync({
+        contextType: "RECRUITMENT",
+        applicationSubmissionId: applicationSubmissionId,
+      });
+
+      navigate(`/band/session/messages/${room.chatRoomId}`, {
+        state: {
+          senderName: room.recipientName,
+          profileImageUrl: detail?.profileImageUrl ?? undefined,
+          chatRoomId: room.chatRoomId,
+          canSend: true,
+        },
+      });
+    } catch (error) {
+      window.alert(
+        getApiErrorMessage(
+          error,
+          "채팅방 생성에 실패했어요. 잠시 후 다시 시도해주세요.",
+        ),
+      );
+    }
+  };
+
+  const handleDecision = async (isApproved: boolean) => {
+    if (acceptMutation.isPending) return;
+
+    try {
+      await acceptMutation.mutateAsync({
+        applySubmissionId: applicationSubmissionId,
+        isApproved,
+      });
+
+      navigate(-1);
+    } catch (error) {
+      window.alert(
+        getApiErrorMessage(
+          error,
+          isApproved
+            ? "지원 수락에 실패했어요. 잠시 후 다시 시도해주세요."
+            : "지원 거절에 실패했어요. 잠시 후 다시 시도해주세요.",
+        ),
+      );
+    }
+  };
 
   const applicantProfile: SessionApplicationProfileData | null = detail
     ? {
@@ -94,22 +158,43 @@ const ApplicationDetailPage = () => {
 
           <SessionApplicationProfile
             data={applicantProfile}
-            isBandOwner={MOCK_IS_BAND_OWNER}
+            isBandOwner={detail.isOwner}
+            onChatClick={handleChatClick}
           />
 
-          <div className="flex items-center justify-center gap-4 px-8 pt-3 pb-9">
-            <button
-              type="button"
-              className="flex h-9.5 w-39.25 items-center justify-center rounded-lg border border-secondary-500 text-body1 text-secondary-500"
-            >
-              거절
-            </button>
-            <button
-              type="button"
-              className="flex h-9.5 w-39.25 items-center justify-center rounded-lg bg-secondary-500 text-body1 text-neutral-0"
-            >
-              수락
-            </button>
+          <div className="flex flex-col items-center gap-2 px-8 pt-3 pb-9">
+            {isAlreadyDecided ? (
+              <p className="text-caption2 text-neutral-500">
+                이미 처리되었거나 취소된 지원이에요
+              </p>
+            ) : null}
+
+            <div className="flex items-center justify-center gap-4">
+              <button
+                type="button"
+                onClick={() => handleDecision(false)}
+                disabled={isAlreadyDecided || acceptMutation.isPending}
+                className={`flex h-9.5 w-39.25 items-center justify-center rounded-lg border text-body1 disabled:cursor-not-allowed ${
+                  isAlreadyDecided
+                    ? "border-neutral-400 text-neutral-400"
+                    : "border-secondary-500 text-secondary-500 disabled:opacity-60"
+                }`}
+              >
+                거절
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDecision(true)}
+                disabled={isAlreadyDecided || acceptMutation.isPending}
+                className={`flex h-9.5 w-39.25 items-center justify-center rounded-lg text-body1 disabled:cursor-not-allowed ${
+                  isAlreadyDecided
+                    ? "bg-neutral-300 text-neutral-500"
+                    : "bg-secondary-500 text-neutral-0 disabled:opacity-60"
+                }`}
+              >
+                수락
+              </button>
+            </div>
           </div>
         </>
       )}

@@ -97,7 +97,9 @@ const normalizeNotification = (
     isRead: toBoolean(item.isRead),
     readAt: toStringOrNull(item.readAt),
     createdAt: normalizeServerDateTime(item.createdAt),
-    actionable: toBoolean(item.actionable),
+    actionable:
+      toBoolean(item.actionable) ||
+      toBoolean(isRecord(item.bandInvite) ? item.bandInvite.actionable : null),
     bandInvite: normalizeBandInvite(item.bandInvite),
   };
 };

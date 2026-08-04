@@ -2,6 +2,7 @@ import type { LoginResponse } from "@/types/auth/auth";
 
 const AUTH_USER_STORAGE_KEY = "bscene:auth-user";
 const SIGNUP_EMAIL_STORAGE_KEY = "bscene:signup-email";
+const POST_LOGIN_REDIRECT_STORAGE_KEY = "bscene:post-login-redirect";
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export type StoredAuthUser = {
@@ -86,6 +87,31 @@ export const saveSignupEmail = (email: string) => {
   if (!EMAIL_PATTERN.test(trimmedEmail)) return;
 
   window.localStorage.setItem(SIGNUP_EMAIL_STORAGE_KEY, trimmedEmail);
+};
+
+const isSafeInternalPath = (path: string) =>
+  path.startsWith("/") && !path.startsWith("//");
+
+export const savePostLoginRedirect = (path: string) => {
+  if (!isSafeInternalPath(path)) return;
+
+  try {
+    window.sessionStorage.setItem(POST_LOGIN_REDIRECT_STORAGE_KEY, path);
+  } catch {
+    // Login should remain usable when session storage is unavailable.
+  }
+};
+
+export const consumePostLoginRedirect = () => {
+  try {
+    const path = window.sessionStorage.getItem(POST_LOGIN_REDIRECT_STORAGE_KEY);
+
+    window.sessionStorage.removeItem(POST_LOGIN_REDIRECT_STORAGE_KEY);
+
+    return path && isSafeInternalPath(path) ? path : null;
+  } catch {
+    return null;
+  }
 };
 
 export const saveAuthenticatedUser = (

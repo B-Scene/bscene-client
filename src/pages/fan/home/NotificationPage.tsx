@@ -1,8 +1,8 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { KeyboardEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import ArrowLeftIcon from "@/assets/icons/arrow-left.svg";
 import BandDefaultProfileImage from "@/assets/icons/band/band-default-profile.svg";
+import { Header } from "@/components/common/Header/Header";
 import {
   useMarkNotificationAsReadMutation,
   useNotificationsInfiniteQuery,
@@ -12,6 +12,7 @@ import {
   FAN_NOTIFICATION_ROUTES,
   formatNotificationTime,
   getNotificationTargetPath,
+  isNotificationWithinRetention,
   isNotificationForMode,
 } from "@/utils/notificationDeepLink";
 import type { NotificationItem } from "@/types/notification";
@@ -102,7 +103,6 @@ const NotificationCard = ({
 };
 
 const NotificationPage = () => {
-  const navigate = useNavigate();
   const {
     data,
     fetchNextPage,
@@ -112,13 +112,18 @@ const NotificationPage = () => {
     isLoading,
     refetch,
   } = useNotificationsInfiniteQuery(NOTIFICATION_PAGE_SIZE);
+  const [retentionNow, setRetentionNow] = useState(() => Date.now());
   const notifications = useMemo(
     () =>
       data?.pages
         .flatMap((page) => page.items)
-        .filter((notification) => isNotificationForMode(notification, "FAN")) ??
+        .filter(
+          (notification) =>
+            isNotificationWithinRetention(notification, retentionNow) &&
+            isNotificationForMode(notification, "FAN"),
+        ) ??
       [],
-    [data],
+    [data, retentionNow],
   );
   const hasNotifications = notifications.length > 0;
   const sentinelRef = useInfiniteScrollObserver({
@@ -126,34 +131,39 @@ const NotificationPage = () => {
     onIntersect: fetchNextPage,
   });
 
+  useEffect(() => {
+    const intervalId = window.setInterval(
+      () => setRetentionNow(Date.now()),
+      60_000,
+    );
+
+    return () => window.clearInterval(intervalId);
+  }, []);
+
+  useEffect(() => {
+    if (
+      isLoading ||
+      isError ||
+      hasNotifications ||
+      !hasNextPage ||
+      isFetchingNextPage
+    ) {
+      return;
+    }
+
+    void fetchNextPage();
+  }, [
+    fetchNextPage,
+    hasNextPage,
+    hasNotifications,
+    isError,
+    isFetchingNextPage,
+    isLoading,
+  ]);
+
   return (
     <main className="mx-auto min-h-dvh w-full max-w-[393px] bg-primary-0">
-      <header className="flex h-[60px] items-center justify-between bg-neutral-0 px-[15px]">
-        <button
-          type="button"
-          aria-label="뒤로가기"
-          onClick={() => navigate(-1)}
-          className="flex size-6 items-center justify-center"
-        >
-          <img src={ArrowLeftIcon} alt="" className="size-6" />
-        </button>
-
-        <h1
-          className="m-0"
-          style={{
-            color: "var(--Gray-Scale-900, #1D1A1A)",
-            fontFamily: "Pretendard",
-            fontSize: "20px",
-            fontStyle: "normal",
-            fontWeight: 600,
-            lineHeight: "28px",
-          }}
-        >
-          알림
-        </h1>
-
-        <span aria-hidden="true" className="size-6" />
-      </header>
+      <Header title="알림" align="betweenCompact" />
 
       {isLoading ? (
         <section className="flex flex-col gap-3 pl-[23px] pr-[22px] pt-6">
@@ -165,7 +175,7 @@ const NotificationPage = () => {
           ))}
         </section>
       ) : isError ? (
-        <section className="flex h-[calc(100dvh-60px)] flex-col items-center justify-center px-5 text-center">
+        <section className="flex h-[calc(100dvh-48px)] flex-col items-center justify-center px-5 text-center">
           <h2 className="m-0 font-body text-label1 text-neutral-900">
             알림을 불러오지 못했어요
           </h2>
@@ -193,7 +203,7 @@ const NotificationPage = () => {
           ) : null}
         </section>
       ) : (
-        <section className="flex h-[calc(100dvh-60px)] flex-col items-center pt-[274px] text-center">
+        <section className="flex h-[calc(100dvh-48px)] flex-col items-center pt-[274px] text-center">
           <h2 className="m-0 font-body text-label1 text-neutral-900">
             밴드 알림이 없어요
           </h2>

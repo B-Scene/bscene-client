@@ -3,8 +3,12 @@ import type {
   AcceptBandInviteRequest,
   AcceptBandInviteResponse,
   BandApiResponse,
+  BandInviteLinkInfoResponse,
+  BandInviteLinkResponse,
   BandMemberListItem,
   BandMemberSearchItem,
+  CreateBandInviteLinkRequest,
+  EnterBandInviteLinkResponse,
   InviteBandMemberRequest,
   InviteBandMemberResponse,
 } from "@/types/band/bandMember";
@@ -51,6 +55,33 @@ export const removeBandMember = async (bandId: number, userId: number) => {
   const { data } = await axiosInstance.delete<BandApiResponse<null>>(
     `/bands/${bandId}/members/${userId}`,
   );
+
+  return data.result;
+};
+
+export const createBandInviteLink = async (
+  bandId: number,
+  body: CreateBandInviteLinkRequest,
+) => {
+  const { data } = await axiosInstance.post<
+    BandApiResponse<BandInviteLinkResponse>
+  >(`/bands/${bandId}/invite-links`, body);
+
+  return data.result;
+};
+
+export const getBandInviteLinkInfo = async (token: string) => {
+  const { data } = await axiosInstance.get<
+    BandApiResponse<BandInviteLinkInfoResponse>
+  >(`/band-invite-links/${token}`);
+
+  return data.result;
+};
+
+export const enterBandInviteLink = async (token: string) => {
+  const { data } = await axiosInstance.post<
+    BandApiResponse<EnterBandInviteLinkResponse>
+  >(`/band-invite-links/${token}/entries`);
 
   return data.result;
 };

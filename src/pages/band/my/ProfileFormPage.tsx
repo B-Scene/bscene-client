@@ -1,7 +1,7 @@
 import { useRef, useState, type ChangeEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import DefaultBandAvatar from "@/assets/icons/band/band-default-profile.svg";
-import { Header } from "@/components/band/home/Header";
+import { Header } from "@/components/common/Header/Header";
 import { ImagePickerSheet } from "@/components/band/home/ImagePickerSheet";
 import { Input, Textarea } from "@/components/common/Input/Input";
 import { Select } from "@/components/common/Select/Select";
@@ -280,10 +280,12 @@ const ProfileForm = ({
           name,
           genre: genreValue,
           region: regionValue,
-          profileImageUrl: isAvatarRemoved
-            ? null
-            : uploadedAvatarUrl || undefined,
           description: bio || undefined,
+          ...(isAvatarRemoved
+            ? { deleteProfileImage: true }
+            : uploadedAvatarUrl
+              ? { profileImageUrl: uploadedAvatarUrl }
+              : {}),
         });
 
         if (memberProfileId && myActivityName.trim() && myPart) {
@@ -348,6 +350,7 @@ const ProfileForm = ({
           <NotificationBandBanner
             bandName={`현재 선택된 밴드 · ${name || "밴드"}`}
             description="현재 선택된 밴드의 공개 프로필을 수정합니다"
+            profileImageUrl={avatarUrl}
           />
         </div>
       ) : null}
@@ -437,7 +440,7 @@ const ProfileForm = ({
             value={bio}
             onChange={(event) => setBio(event.target.value)}
             placeholder="밴드 소개글을 입력해주세요"
-            maxLength={60}
+            maxLength={1000}
             className="h-15 w-full overflow-hidden rounded-[5px] pt-2.25 pr-6.5 pb-8.25 pl-4"
           />
         </div>
