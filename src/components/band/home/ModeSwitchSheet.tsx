@@ -159,6 +159,7 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
     () => setShowErrorToast(false),
   );
   const selectedMode = selectedId.startsWith("fan") ? "fan" : "band";
+  const isSelectionUnchanged = selectedId === initialSelectedId;
 
   const bandModeSection = (
     <div className="flex w-82.5 flex-col gap-4">
@@ -347,9 +348,21 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
 
                 proceed();
               }}
-              disabled={changeUserMode.isPending || toggleUserMode.isPending}
-              className={`flex h-13 w-[353px] items-center justify-center rounded-xl text-label1 text-neutral-0 ${
-                selectedMode === "fan" ? "bg-primary-400" : "bg-secondary-500"
+              disabled={
+                isSelectionUnchanged ||
+                changeUserMode.isPending ||
+                toggleUserMode.isPending
+              }
+              className={`flex h-13 w-[353px] items-center justify-center rounded-xl text-label1 ${
+                isSelectionUnchanged ||
+                changeUserMode.isPending ||
+                toggleUserMode.isPending
+                  ? "cursor-not-allowed bg-neutral-300 text-neutral-500"
+                  : `text-neutral-0 ${
+                      selectedMode === "fan"
+                        ? "bg-primary-400"
+                        : "bg-secondary-500"
+                    }`
               }`}
             >
               모드 전환
