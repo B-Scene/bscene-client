@@ -232,9 +232,11 @@ export function LiveRoom({
   const micGainNodeRef = useRef<GainNode | null>(null);
 
   const isListenerPlayback =
-    live?.isLive && playbackRole === "LISTENER" && Boolean(playbackUrl);
+    Boolean(live?.liveId) &&
+    playbackRole === "LISTENER" &&
+    Boolean(playbackUrl);
   const isBroadcasterMonitorPlayback =
-    live?.isLive && canBroadcast && Boolean(monitorPlaybackUrl);
+    Boolean(live?.liveId) && canBroadcast && Boolean(monitorPlaybackUrl);
 
   const handleAcceptCoHostUpgrade = async () => {
     if (!live?.liveId || acceptCoHostUpgradeMutation.isPending) return;
