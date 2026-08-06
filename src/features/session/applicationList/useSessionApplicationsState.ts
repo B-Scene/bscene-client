@@ -1,11 +1,15 @@
+// src/features/session/applicationList/useSessionApplicationsState.ts
+
 import { useMemo, useState } from "react";
 
+import { createInitialApplicationForm } from "@/features/session/applicationForm/applicationForm.constants";
 import type {
   SessionApplicationDraft,
   SessionApplicationFormMode,
 } from "@/features/session/applicationForm/applicationForm.types";
 
 import {
+  isDefaultSessionApplication,
   mapApplicationToDetail,
   mapServerApplications,
 } from "@/features/session/applicationList/sessionApplicationList.mapper";
@@ -23,12 +27,31 @@ interface UseSessionApplicationsStateParams {
     isPublic: boolean,
   ) => void;
 
+  onVisibilityBlocked?: () => void;
+
   onServerDelete?: (sessionApplicationId: number) => void | Promise<void>;
 }
+
+const shouldCreateDefaultApplication = ({
+  summary,
+  localApplicationCount,
+}: {
+  summary?: SessionApplicationSummary;
+  localApplicationCount: number;
+}) => {
+  const serverApplicationCount =
+    summary?.applicationCount ?? summary?.applications?.length ?? 0;
+
+  return (
+    !summary?.hasDefaultApplication &&
+    serverApplicationCount + localApplicationCount === 0
+  );
+};
 
 export const useSessionApplicationsState = ({
   summary,
   onServerVisibilityChange,
+  onVisibilityBlocked,
   onServerDelete,
 }: UseSessionApplicationsStateParams) => {
   const [isApplicationFormOpen, setIsApplicationFormOpen] = useState(false);
@@ -73,9 +96,19 @@ export const useSessionApplicationsState = ({
   }, [selectedApplication, summary]);
 
   const handleOpenCreatePage = () => {
+    const defaultInitialValue = shouldCreateDefaultApplication({
+      summary,
+      localApplicationCount: localApplications.length,
+    })
+      ? {
+          ...createInitialApplicationForm(),
+          applicationType: "기본",
+        }
+      : null;
+
     setApplicationFormMode("create");
     setEditingApplicationId(null);
-    setEditingInitialValue(null);
+    setEditingInitialValue(defaultInitialValue);
     setIsApplicationFormOpen(true);
   };
 
@@ -120,6 +153,11 @@ export const useSessionApplicationsState = ({
     application: ApplicationCardItem,
     nextChecked: boolean,
   ) => {
+    if (!application.isDefault) {
+      onVisibilityBlocked?.();
+      return;
+    }
+
     if (application.isLocal) {
       setLocalApplications((previousApplications) =>
         previousApplications.map((item) =>

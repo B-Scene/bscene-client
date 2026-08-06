@@ -15,6 +15,28 @@ interface CreateDraftParams {
   summary?: SessionApplicationSummary;
 }
 
+const DEFAULT_APPLICATION_LABELS = new Set(["기본", "DEFAULT", "BASIC"]);
+
+const normalizeText = (value?: string | null) => value?.trim() ?? "";
+
+export const isDefaultSessionApplication = ({
+  title,
+  purpose,
+}: {
+  title?: string | null;
+  purpose?: string | null;
+}) => {
+  const normalizedTitle = normalizeText(title);
+  const normalizedPurpose = normalizeText(purpose);
+
+  return (
+    DEFAULT_APPLICATION_LABELS.has(normalizedTitle.toUpperCase()) ||
+    DEFAULT_APPLICATION_LABELS.has(normalizedPurpose.toUpperCase()) ||
+    normalizedTitle === "기본" ||
+    normalizedPurpose === "기본"
+  );
+};
+
 export const createApplicationDraftFromSummary = ({
   application,
   summary,
@@ -85,6 +107,11 @@ export const mapServerApplications = (
       return override;
     }
 
+    const isDefault = isDefaultSessionApplication({
+      title: application.title,
+      purpose: application.purpose,
+    });
+
     return {
       sessionApplicationId: applicationId,
       displayDate:
@@ -93,9 +120,11 @@ export const mapServerApplications = (
       title: application.title ?? "",
       purpose: application.purpose ?? "",
 
-      isPublic:
-        application.isPublic ?? false,
+      // 기본지원서가 아닌 지원서는 공개 토글 대상이 아니므로
+      // 프론트 표시상 항상 비공개로 고정합니다.
+      isPublic: isDefault ? (application.isPublic ?? false) : false,
 
+      isDefault,
       isLocal: false,
 
       draft: createApplicationDraftFromSummary({
