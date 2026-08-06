@@ -7,7 +7,7 @@ import { Toast } from "@/components/common/Toast/Toast";
 import { useModeStore } from "@/stores/useModeStore";
 import { getFanAccountDisplay } from "@/utils/authUser";
 import { BAND_GENRE_LABELS, BAND_REGION_LABELS } from "@/utils/bandLabels";
-import BandAvatar from "@/assets/images/IMG_my.svg";
+import BandAvatar from "@/assets/icons/band/band-default-profile.svg";
 import FanAvatar from "@/assets/icons/band/user-default-profile.svg";
 import CheckCircleYellowIcon from "@/assets/icons/band/check-circle-yellow.svg";
 import CheckApproveIcon from "@/assets/icons/band/check-approve.svg";

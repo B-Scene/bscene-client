@@ -594,7 +594,7 @@ const BandRecommendationStrip = ({ bands }: { bands: HomeBandItem[] }) => {
 
   return (
     <>
-      <div className="flex gap-5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="flex gap-[clamp(8px,calc((100vw-312px)/4),20px)] overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {bands.map((band) => {
           const isFollowing = followOverrides[band.id] ?? band.isFollowing;
           const isBandPending = isFollowPending && pendingBandId === band.bandId;
@@ -602,7 +602,7 @@ const BandRecommendationStrip = ({ bands }: { bands: HomeBandItem[] }) => {
           return (
             <article
               key={band.id}
-              className="flex w-[54px] shrink-0 flex-col items-center text-center"
+              className="flex w-[clamp(48px,15vw,54px)] shrink-0 flex-col items-center text-center"
             >
               <button
                 type="button"
@@ -632,7 +632,7 @@ const BandRecommendationStrip = ({ bands }: { bands: HomeBandItem[] }) => {
                 <img
                   src={band.profileImageSrc}
                   alt=""
-                  className="size-[54px] rounded-full object-cover"
+                  className="size-[clamp(48px,15vw,54px)] rounded-full object-cover"
                 />
                 <strong className="mt-2 max-w-full truncate font-body text-body4 text-neutral-900">
                   {band.name}
@@ -670,7 +670,7 @@ const BandRecommendationStrip = ({ bands }: { bands: HomeBandItem[] }) => {
                     onSettled: () => setPendingBandId(null),
                   });
                 }}
-                className="mt-2 h-[16px] w-[54px] rounded-full border-[1px] border-primary-400 font-body text-label4 text-primary-400 disabled:opacity-60"
+                className="mt-2 h-[16px] w-full rounded-full border-[1px] border-primary-400 font-body text-label4 text-primary-400 disabled:opacity-60"
               >
                 {isFollowing ? "팔로잉" : "팔로우"}
               </button>

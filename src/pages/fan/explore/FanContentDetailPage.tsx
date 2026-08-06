@@ -9,7 +9,8 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import CommentIcon from "@/assets/icons/Comment.svg";
 import HeartIcon from "@/assets/icons/Heart.svg";
 import LikedHeartIcon from "@/assets/icons/Union.svg";
-import BandImage from "@/assets/Img_Band.png";
+import BandImage from "@/assets/icons/band/band-default-profile.svg";
+import FanImage from "@/assets/images/IMG_my.svg";
 import { Header } from "@/components/common/Header/Header";
 import {
   useCreateFanExplorePostComment,
@@ -203,7 +204,7 @@ const CommentItem = ({
   return (
     <article className="flex w-full gap-[16px]">
       <img
-        src={comment.profileImageUrl ?? BandImage}
+        src={comment.profileImageUrl ?? FanImage}
         alt=""
         className="size-[35px] shrink-0 rounded-full object-cover"
       />
@@ -566,13 +567,11 @@ const FanContentDetailPage = () => {
       <article className="bg-neutral-0 px-[25px] p-[24px]">
         <header className="flex items-center gap-[16px]">
           <div className="flex size-[42px] shrink-0 items-center justify-center overflow-hidden rounded-full bg-neutral-300 text-neutral-600">
-            {profileImageUrl ? (
-              <img
-                src={profileImageUrl}
-                alt={`${bandName} 프로필`}
-                className="h-full w-full object-cover"
-              />
-            ) : null}
+            <img
+              src={profileImageUrl ?? BandImage}
+              alt={`${bandName} 프로필`}
+              className="h-full w-full object-cover"
+            />
           </div>
           <div className="min-w-0">
             <h1 className="m-0 truncate font-body text-label1 text-neutral-900">
