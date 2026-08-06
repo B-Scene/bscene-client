@@ -357,7 +357,7 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
                 isSelectionUnchanged ||
                 changeUserMode.isPending ||
                 toggleUserMode.isPending
-                  ? "cursor-not-allowed bg-neutral-300 text-neutral-500"
+                  ? "cursor-not-allowed bg-neutral-300 text-neutral-600"
                   : `text-neutral-0 ${
                       selectedMode === "fan"
                         ? "bg-primary-400"
