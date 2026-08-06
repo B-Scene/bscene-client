@@ -1,5 +1,5 @@
 import OfficialIcon from "@/assets/icons/band/official-icon.svg";
-import DefaultAvatar from "@/assets/images/IMG_my.svg";
+import DefaultAvatar from "@/assets/icons/band/band-default-profile.svg";
 
 interface BandProfileCardProps {
   name: string;

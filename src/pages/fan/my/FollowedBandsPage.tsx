@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ArrowLeftIcon from "@/assets/icons/arrow-left.svg";
-import DefaultAvatar from "@/assets/images/IMG_my.svg";
+import DefaultAvatar from "@/assets/icons/band/band-default-profile.svg";
 import Modal from "@/components/Modal/Modal";
 import { ModalOverlay } from "@/components/common/Modal/ModalOverlay";
 import { Toast } from "@/components/common/Toast/Toast";

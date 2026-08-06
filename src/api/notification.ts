@@ -80,6 +80,7 @@ const normalizeNotification = (
     toNumberOrNull(item.id) ??
     toNumberOrNull(item.notification_id) ??
     -fallbackIndex - 1;
+  const readAt = toStringOrNull(item.readAt);
 
   return {
     notificationId,
@@ -94,8 +95,12 @@ const normalizeNotification = (
     referenceId: toNumberOrNull(item.referenceId),
     title: toStringOrNull(item.title) ?? "",
     body: toStringOrNull(item.body) ?? "",
-    isRead: toBoolean(item.isRead),
-    readAt: toStringOrNull(item.readAt),
+    isRead:
+      toBooleanOrNull(item.isRead) ??
+      toBooleanOrNull(item.read) ??
+      toBooleanOrNull(item.readStatus) ??
+      Boolean(readAt),
+    readAt,
     createdAt: normalizeServerDateTime(item.createdAt),
     actionable:
       toBoolean(item.actionable) ||

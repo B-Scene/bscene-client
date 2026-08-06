@@ -3,7 +3,7 @@ import AirplaneIcon from "@/assets/icons/airplane.svg";
 import BadgeIcon from "@/assets/icons/Badge.svg";
 import BtnSendIcon from "@/assets/icons/Btn_send.svg";
 import ChatIcon from "@/assets/icons/chat.svg";
-import FBandProfileIcon from "@/assets/icons/F_band_img.svg";
+import FBandProfileIcon from "@/assets/icons/band/band-default-profile.svg";
 import IcMicIcon from "@/assets/icons/ic_Mic.svg";
 import LiveHeadIcon from "@/assets/icons/live-head.svg";
 import UsersIcon from "@/assets/icons/users.svg";

@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { AxiosError } from "axios";
 import { useNavigate } from "react-router-dom";
 
-import BandProfileImage from "@/assets/Img_Band.png";
+import BandProfileImage from "@/assets/icons/band/band-default-profile.svg";
 import { useCreateSessionChatRoomMutation } from "@/hooks/api/session/useSessionChat";
 import {
   useDeleteSessionRecruitment,

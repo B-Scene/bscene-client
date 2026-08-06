@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import ArrowIcon from "@/assets/Arrow.svg";
 import CheckActiveIcon from "@/assets/icons/check-active.svg";
 import TimesCircleIcon from "@/assets/icons/ic_Times Circle.svg";
-import BandImage from "@/assets/Img_Band.png";
+import BandImage from "@/assets/icons/band/band-default-profile.svg";
 import BandCard from "@/components/common/Card/BandCard";
 import ConcertCard from "@/components/common/Card/ConcertCard";
 import { Header } from "@/components/common/Header/Header";

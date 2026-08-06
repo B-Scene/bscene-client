@@ -9,7 +9,7 @@ import PlusIcon from "@/assets/icons/Plus.svg";
 import SoundCloudIcon from "@/assets/icons/soundcloude.svg";
 import SpotifyIcon from "@/assets/icons/Spotify.svg";
 import YouTubeIcon from "@/assets/icons/youtube.svg";
-import BandImage from "@/assets/Img_Band.png";
+import BandImage from "@/assets/icons/band/band-default-profile.svg";
 import ConcertCard from "@/components/common/Card/ConcertCard";
 import { Header } from "@/components/common/Header/Header";
 import { ModalOverlay } from "@/components/common/Modal/ModalOverlay";
