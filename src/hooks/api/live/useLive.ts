@@ -451,7 +451,7 @@ export const useAcceptCoHostUpgradeMutation = () => {
 
   return useMutation({
     mutationFn: acceptCoHostUpgrade,
-    onSuccess: (_, liveId) => {
+    onSuccess: (_, { liveId }) => {
       void queryClient.invalidateQueries({ queryKey: liveKeys.home() });
       void queryClient.invalidateQueries({ queryKey: liveKeys.enter(liveId) });
       void queryClient.invalidateQueries({ queryKey: liveKeys.members(liveId) });

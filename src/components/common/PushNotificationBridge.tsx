@@ -16,8 +16,53 @@ declare global {
   }
 }
 
-const getPayloadDeepLink = (data?: Record<string, string>) =>
-  data?.deepLink ?? data?.link ?? "/";
+const getPayloadDeepLink = ({
+  data,
+  title,
+  body,
+}: {
+  data?: Record<string, string>;
+  title: string;
+  body: string;
+}) => {
+  if (data?.deepLink || data?.link) {
+    return data.deepLink ?? data.link ?? "/";
+  }
+
+  const type = (
+    data?.type ??
+    data?.notificationType ??
+    data?.eventType ??
+    ""
+  ).toUpperCase();
+  const content = `${title} ${body}`.toUpperCase();
+  const liveId =
+    data?.liveId ?? data?.referenceId ?? data?.targetId ?? data?.resourceId;
+  const isCoHostUpgradeRequest =
+    (type.includes("CO_HOST") ||
+      type.includes("COHOST") ||
+      content.includes("공동 송출") ||
+      content.includes("공동 진행")) &&
+    (type.includes("UPGRADE") ||
+      type.includes("REQUEST") ||
+      type.includes("ACCEPT") ||
+      type.includes("APPROVAL") ||
+      content.includes("업그레이드 요청") ||
+      content.includes("승급 요청") ||
+      content.includes("권한 요청") ||
+      content.includes("공동 진행 요청") ||
+      content.includes("공동 송출 요청") ||
+      content.includes("승인") ||
+      content.includes("수락"));
+
+  if (isCoHostUpgradeRequest && liveId) {
+    return `/band/live?type=LIVE_CO_HOST_UPGRADE_REQUEST&liveId=${encodeURIComponent(
+      liveId,
+    )}&action=approve`;
+  }
+
+  return "/";
+};
 
 const toNotificationMode = (
   value?: string,
@@ -85,7 +130,11 @@ export const PushNotificationBridge = () => {
       const title =
         payload.notification?.title ?? payload.data?.title ?? "B:Scene";
       const body = payload.notification?.body ?? payload.data?.body;
-      const deepLink = getPayloadDeepLink(payload.data);
+      const deepLink = getPayloadDeepLink({
+        data: payload.data,
+        title,
+        body: body ?? "",
+      });
       const payloadMode = getPayloadMode({
         data: payload.data,
         title,

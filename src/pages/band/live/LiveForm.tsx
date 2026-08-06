@@ -13,9 +13,13 @@ import {
   updateLiveReservation,
 } from "@/api/live/live";
 import { getBandMembers } from "@/api/band/bandMember";
-import { getActiveBandMemberProfile } from "@/api/band/bandMemberProfile";
+import {
+  getActiveBandMemberProfile,
+  getBandMemberProfile,
+} from "@/api/band/bandMemberProfile";
 import { uploadMediaFile } from "@/api/media/media";
 import type { BandMemberListItem } from "@/types/band/bandMember";
+import type { BandMemberProfileResponse } from "@/types/band/bandMemberProfile";
 import type {
   LiveApiResponse,
   LiveReservationCoHostCandidate,
@@ -132,12 +136,12 @@ const isInactiveMemberStatus = (status: string | null | undefined) => {
 const mapBandMemberToCoHostCandidate = (
   member: BandMemberListItem,
   activeProfileId?: number | null,
+  profile?: BandMemberProfileResponse | null,
 ): LiveReservationCoHostCandidate | null => {
-  if (!member.id || !member.bandMemberProfileId || !member.profileNickname) {
-    return null;
-  }
+  const nickname = member.profileNickname ?? profile?.nickname;
+  const resolvedProfileId = member.bandMemberProfileId ?? member.id;
 
-  if (member.memberType === "SESSION") {
+  if (!member.id || !member.userId || !resolvedProfileId || !nickname) {
     return null;
   }
 
@@ -146,15 +150,14 @@ const mapBandMemberToCoHostCandidate = (
   }
 
   const isOwner =
-    Boolean(activeProfileId) &&
-    Number(member.bandMemberProfileId) === Number(activeProfileId);
+    Boolean(activeProfileId) && Number(resolvedProfileId) === Number(activeProfileId);
 
   return {
     bandMemberId: member.id,
-    bandMemberProfileId: member.bandMemberProfileId,
+    bandMemberProfileId: resolvedProfileId,
     bandMemberProfileImageUrl: null,
-    nickname: member.profileNickname,
-    part: member.memberType,
+    nickname,
+    part: profile?.part ?? member.memberType,
     status: isOwner ? "OWNER" : null,
     userId: member.userId,
   };
@@ -478,14 +481,29 @@ export function LiveForm({
       getBandMembers(activeBandId),
       getActiveBandMemberProfile().catch(() => null),
     ])
-      .then(([members, activeProfile]) => {
+      .then(async ([members, activeProfile]) => {
         if (!isMounted) return;
 
         const activeProfileId = activeProfile?.id ?? null;
+        const memberProfiles = await Promise.all(
+          members.map((member) =>
+            member.bandMemberProfileId
+              ? getBandMemberProfile(member.bandMemberProfileId).catch(
+                  () => null,
+                )
+              : Promise.resolve(null),
+          ),
+        );
+
+        if (!isMounted) return;
 
         const candidates = members
-          .map((member) =>
-            mapBandMemberToCoHostCandidate(member, activeProfileId),
+          .map((member, index) =>
+            mapBandMemberToCoHostCandidate(
+              member,
+              activeProfileId,
+              memberProfiles[index],
+            ),
           )
           .filter(
             (

@@ -7,9 +7,15 @@ import {
   getLiveMembers,
   subscribeViewerCount,
 } from "@/api/live/live";
-import { useCloseLiveMutation } from "@/hooks/api/live/useLive";
+import {
+  useAcceptCoHostUpgradeMutation,
+  useCloseLiveMutation,
+  useLeaveLiveMutation,
+} from "@/hooks/api/live/useLive";
+import { getApiErrorMessage } from "@/utils/getApiErrorMessage";
 import type { LiveMemberItem } from "@/types/live/live";
 import type { ActiveLive, ChatMessage, GoLiveScreen } from "./types";
+import { getCachedScheduledCoHostUserIds } from "./scheduledLiveCache";
 import {
   ChatComposer,
   LiveActionBar,
@@ -121,7 +127,7 @@ const waitForIceGatheringComplete = (
 
   return new Promise<void>((resolve) => {
     let isResolved = false;
-    let timeoutId: number | undefined;
+    const timeoutId = window.setTimeout(finish, timeoutMs);
 
     function finish() {
       if (isResolved) return;
@@ -147,7 +153,6 @@ const waitForIceGatheringComplete = (
     }
 
     peerConnection.addEventListener("icegatheringstatechange", handleChange);
-    timeoutId = window.setTimeout(finish, timeoutMs);
   });
 };
 
@@ -169,10 +174,15 @@ export function LiveRoom({
   overlay,
 }: LiveRoomProps) {
   const closeLiveMutation = useCloseLiveMutation();
+  const leaveLiveMutation = useLeaveLiveMutation();
+  const acceptCoHostUpgradeMutation = useAcceptCoHostUpgradeMutation();
 
   const playbackRole = live?.playback?.role;
   const playbackProtocol = live?.playback?.protocol;
   const playbackUrl = live?.playback?.playbackUrl;
+  const canBroadcast =
+    playbackRole === "BROADCASTER" || playbackRole === "CO_HOST";
+  const canCloseLive = playbackRole === "BROADCASTER";
 
   const [viewerCount, setViewerCount] = useState(() =>
     getInitialViewerCount(live),
@@ -183,6 +193,7 @@ export function LiveRoom({
   const [audioStatus, setAudioStatus] = useState<LiveAudioStatus>("idle");
   const [audioErrorMessage, setAudioErrorMessage] = useState("");
   const [micInfoMessage, setMicInfoMessage] = useState("");
+  const [coHostApprovalMessage, setCoHostApprovalMessage] = useState("");
   const [micVolume, setMicVolume] = useState(DEFAULT_MIC_VOLUME);
   const [isMicMuted, setIsMicMuted] = useState(false);
   const [listenerAudioMessage, setListenerAudioMessage] = useState("");
@@ -204,6 +215,47 @@ export function LiveRoom({
 
   const isListenerPlayback =
     live?.isLive && playbackRole === "LISTENER" && Boolean(playbackUrl);
+
+  const handleAcceptCoHostUpgrade = async () => {
+    if (!live?.liveId || acceptCoHostUpgradeMutation.isPending) return;
+
+    const requesterUserIds = getCachedScheduledCoHostUserIds(live.liveId);
+
+    if (requesterUserIds.length === 0) {
+      setCoHostApprovalMessage(
+        "승인할 공동 진행자의 사용자 정보를 찾을 수 없어요.",
+      );
+      return;
+    }
+
+    setCoHostApprovalMessage("");
+
+    try {
+      let lastError: unknown = null;
+
+      for (const userId of requesterUserIds) {
+        try {
+          await acceptCoHostUpgradeMutation.mutateAsync({
+            liveId: live.liveId,
+            userId,
+          });
+          setCoHostApprovalMessage("공동 진행 요청을 승인했어요.");
+          return;
+        } catch (error) {
+          lastError = error;
+        }
+      }
+
+      throw lastError;
+    } catch (error) {
+      setCoHostApprovalMessage(
+        getApiErrorMessage(
+          error,
+          "대기 중인 공동 진행 요청을 승인하지 못했어요.",
+        ),
+      );
+    }
+  };
 
   const setAudioStatusSafe = useCallback((nextStatus: LiveAudioStatus) => {
     audioStatusRef.current = nextStatus;
@@ -316,7 +368,7 @@ export function LiveRoom({
   const startWhipBroadcast = useCallback(async () => {
     if (!live?.liveId) return;
 
-    if (playbackRole !== "BROADCASTER") {
+    if (!canBroadcast) {
       setAudioStatusSafe("unsupported");
       return;
     }
@@ -441,9 +493,9 @@ export function LiveRoom({
     }
   }, [
     cleanupWhipBroadcast,
+    canBroadcast,
     live?.liveId,
     playbackProtocol,
-    playbackRole,
     playbackUrl,
     setAudioStatusSafe,
   ]);
@@ -511,6 +563,27 @@ export function LiveRoom({
     }
   };
 
+  const handleHeaderAction = async () => {
+    if (canCloseLive) {
+      go("endConfirm");
+      return;
+    }
+
+    if (!live?.liveId) {
+      go("home");
+      return;
+    }
+
+    try {
+      await stopWhipBroadcast();
+      stopListenerPlayback();
+      await leaveLiveMutation.mutateAsync(live.liveId);
+      go("home");
+    } catch {
+      alert("라이브방에서 나가지 못했어요. 잠시 후 다시 시도해주세요.");
+    }
+  };
+
   useEffect(() => {
     setViewerCount(getInitialViewerCount(live));
   }, [live]);
@@ -531,7 +604,7 @@ export function LiveRoom({
     if (!live?.liveId) return;
 
     const controller = new AbortController();
-    const shouldExcludeMeFromViewerCount = playbackRole === "BROADCASTER";
+    const shouldExcludeMeFromViewerCount = canBroadcast;
 
     subscribeViewerCount({
       liveId: live.liveId,
@@ -545,7 +618,7 @@ export function LiveRoom({
     return () => {
       controller.abort();
     };
-  }, [live?.liveId, playbackRole]);
+  }, [canBroadcast, live?.liveId]);
 
   useEffect(() => {
     if (overlay !== "members" || !live?.liveId) return;
@@ -595,7 +668,8 @@ export function LiveRoom({
   return (
     <main className="relative flex h-dvh min-h-0 flex-col overflow-hidden bg-neutral-0 text-neutral-900">
       <LiveRoomHeader
-        go={go}
+        canCloseLive={canCloseLive}
+        onClose={() => void handleHeaderAction()}
         viewerCount={viewerCount}
         durationSeconds={durationSeconds}
       />
@@ -608,6 +682,26 @@ export function LiveRoom({
         }
         live={live}
       />
+
+      {canCloseLive ? (
+        <div className="absolute top-[58px] right-5 z-30 flex max-w-[calc(100%-40px)] flex-col items-end gap-2">
+          <button
+            type="button"
+            onClick={() => void handleAcceptCoHostUpgrade()}
+            disabled={acceptCoHostUpgradeMutation.isPending}
+            className="rounded-full bg-secondary-500 px-4 py-2 text-caption3 font-semibold text-neutral-0 shadow-[0_2px_10px_rgba(20,20,20,0.15)] disabled:opacity-60"
+          >
+            {acceptCoHostUpgradeMutation.isPending
+              ? "승인 중"
+              : "공동 진행 요청 승인"}
+          </button>
+          {coHostApprovalMessage ? (
+            <p className="rounded-lg bg-neutral-900/85 px-3 py-2 text-right text-caption3 text-neutral-0">
+              {coHostApprovalMessage}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
 
       {audioErrorMessage ? (
         <p className="absolute top-[56px] left-1/2 z-20 w-[calc(100%-40px)] max-w-[353px] -translate-x-1/2 rounded-lg bg-error px-3 py-2 text-center text-caption3 text-neutral-0">

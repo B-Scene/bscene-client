@@ -34,6 +34,7 @@ export type ScheduledLiveCardData = {
   scheduledAt: string;
   isMine: boolean;
   imageUrl?: string | null;
+  coHostUserIds?: number[];
 };
 
 export type ChatMessage = {

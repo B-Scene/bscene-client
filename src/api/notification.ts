@@ -70,6 +70,27 @@ const normalizeServerDateTime = (value: unknown): string => {
 const normalizeBandInvite = (value: unknown): NotificationBandInvite | null =>
   isRecord(value) ? value : null;
 
+const getRequesterUserId = (item: Record<string, unknown>) => {
+  const nestedCandidates = [item.requester, item.actor, item.sender, item.data]
+    .filter(isRecord)
+    .flatMap((value) => [value.userId, value.requesterUserId, value.actorUserId]);
+  const candidates = [
+    item.requesterUserId,
+    item.coHostUserId,
+    item.actorUserId,
+    item.senderUserId,
+    item.fromUserId,
+    ...nestedCandidates,
+  ];
+
+  for (const candidate of candidates) {
+    const userId = toNumberOrNull(candidate);
+    if (userId !== null) return userId;
+  }
+
+  return null;
+};
+
 const normalizeNotification = (
   value: unknown,
   fallbackIndex: number,
@@ -92,6 +113,7 @@ const normalizeNotification = (
       toNotificationMode(item.userMode),
     deepLink: toStringOrNull(item.deepLink),
     referenceId: toNumberOrNull(item.referenceId),
+    requesterUserId: getRequesterUserId(item),
     title: toStringOrNull(item.title) ?? "",
     body: toStringOrNull(item.body) ?? "",
     isRead: toBoolean(item.isRead),

@@ -709,17 +709,23 @@ export const requestCoHostUpgrade = async (
 ): Promise<RequestCoHostUpgradeResponse> => {
   const response = await axiosInstance.post<
     LiveApiResponse<RequestCoHostUpgradeResponse>
-  >(`/lives/${liveId}/co-host`);
+  >(`/lives/${liveId}/co-host`, {});
 
   return unwrapResult(response.data);
 };
 
-export const acceptCoHostUpgrade = async (
-  liveId: number,
-): Promise<AcceptCoHostUpgradeResponse> => {
+export const acceptCoHostUpgrade = async ({
+  liveId,
+  userId,
+}: {
+  liveId: number;
+  userId?: number;
+}): Promise<AcceptCoHostUpgradeResponse> => {
   const response = await axiosInstance.post<
     LiveApiResponse<AcceptCoHostUpgradeResponse>
-  >(`/lives/${liveId}/co-host/acceptance`);
+  >(`/lives/${liveId}/co-host/acceptance`,
+    Number.isFinite(userId) ? { userId } : {},
+  );
 
   return unwrapResult(response.data);
 };

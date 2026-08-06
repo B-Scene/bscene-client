@@ -1,10 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { enterLive, requestCoHostUpgrade } from "@/api/live/live";
+import { getBandMembers } from "@/api/band/bandMember";
 import {
+  useAcceptCoHostUpgradeMutation,
   useEnterLiveMutation,
+  useRequestCoHostUpgradeMutation,
   useRespondCoHostInvitationMutation,
 } from "@/hooks/api/live/useLive";
 import { useLiveChatSocket } from "@/hooks/api/live/useLiveChatSocket";
+import { useActiveBandId } from "@/hooks/api/user/useMyProfiles";
+import { useActiveBandMemberProfileQuery } from "@/hooks/api/band/useBandMemberProfile";
 import type {
   LiveChatMessageData,
   LiveChatMessageFrame,
@@ -19,6 +25,10 @@ import { EndedLive } from "./EndedLive";
 import { CancelConfirm, LiveForm } from "./LiveForm";
 import { LiveRoom } from "./LiveRoom";
 import type { ActiveLive, BandLiveScreen, ChatMessage } from "./types";
+import {
+  cacheScheduledCoHostUserIds,
+  getCachedScheduledCoHostUserIds,
+} from "./scheduledLiveCache";
 
 const toChatTime = (value?: string) => {
   if (!value) return "지금";
@@ -106,6 +116,28 @@ const isAlreadyProcessedCoHostInvitationError = (error: unknown) => {
   return status === 409 || code.startsWith("LIVE409");
 };
 
+const isLiveEnterForbiddenError = (error: unknown) => {
+  const status = getApiErrorStatus(error);
+  const code = getApiErrorCode(error) ?? "";
+
+  return (
+    status === 403 ||
+    status === 404 ||
+    code.startsWith("LIVE403") ||
+    code.startsWith("LIVE404")
+  );
+};
+
+const isNotFoundError = (error: unknown) => {
+  const status = getApiErrorStatus(error);
+  const code = getApiErrorCode(error) ?? "";
+
+  return status === 404 || code.startsWith("LIVE404");
+};
+
+const wait = (milliseconds: number) =>
+  new Promise<void>((resolve) => window.setTimeout(resolve, milliseconds));
+
 const isCoHostInviteType = (value: string | null) => {
   const type = value?.toUpperCase() ?? "";
 
@@ -155,7 +187,30 @@ const getCoHostInviteLiveId = (searchParams: URLSearchParams) => {
   );
 };
 
+const getCoHostUpgradeApprovalLiveId = (searchParams: URLSearchParams) => {
+  const type = searchParams.get("type")?.toUpperCase() ?? "";
+  const action = searchParams.get("action")?.toLowerCase() ?? "";
+  const isUpgradeRequest =
+    (type.includes("CO_HOST") || type.includes("COHOST")) &&
+    (type.includes("UPGRADE") || type.includes("REQUEST"));
+
+  if (!isUpgradeRequest || (action && action !== "approve")) return null;
+
+  return (
+    getValidLiveId(searchParams.get("liveId")) ??
+    getValidLiveId(searchParams.get("referenceId"))
+  );
+};
+
+const isCoHostBroadcastReady = (live: NonNullable<ActiveLive>) =>
+  live.playback.role === "CO_HOST" &&
+  live.playback.protocol === "WHIP" &&
+  Boolean(live.playback.playbackUrl);
+
 export function BandLivePage() {
+  const activeBandId = useActiveBandId();
+  const { data: activeBandMemberProfile } =
+    useActiveBandMemberProfileQuery();
   const [searchParams, setSearchParams] = useSearchParams();
   const [screen, setScreen] = useState<BandLiveScreen>("home");
   const [activeLive, setActiveLive] = useState<ActiveLive>(null);
@@ -166,17 +221,34 @@ export function BandLivePage() {
   const [liveMessages, setLiveMessages] =
     useState<ChatMessage[]>(initialChatMessages);
   const [isHandlingCoHostInvite, setIsHandlingCoHostInvite] = useState(false);
+  const [confirmedCoHostInviteLiveId, setConfirmedCoHostInviteLiveId] = useState<
+    number | null
+  >(null);
+  const [pendingCoHostUpgradeLiveId, setPendingCoHostUpgradeLiveId] = useState<
+    number | null
+  >(null);
 
   const handledCoHostInviteLiveIdRef = useRef<number | null>(null);
   const isCoHostInviteProcessingRef = useRef(false);
+  const handledCoHostUpgradeApprovalLiveIdRef = useRef<number | null>(null);
 
   const respondCoHostInvitationMutation = useRespondCoHostInvitationMutation();
+  const requestCoHostUpgradeMutation = useRequestCoHostUpgradeMutation();
+  const acceptCoHostUpgradeMutation = useAcceptCoHostUpgradeMutation();
   const enterLiveMutation = useEnterLiveMutation();
 
   const coHostInviteLiveId = useMemo(
     () => getCoHostInviteLiveId(searchParams),
     [searchParams],
   );
+  const coHostUpgradeApprovalLiveId = useMemo(
+    () => getCoHostUpgradeApprovalLiveId(searchParams),
+    [searchParams],
+  );
+  const coHostRequesterUserId = getValidLiveId(
+    searchParams.get("coHostRequesterUserId"),
+  );
+  const coHostRequesterNickname = searchParams.get("coHostRequesterNickname");
 
   const isChatEnabled = useMemo(() => {
     return !!activeLive?.liveId && isLiveRoomScreen(screen);
@@ -191,7 +263,10 @@ export function BandLivePage() {
     nextParams.delete("referenceId");
     nextParams.delete("type");
     nextParams.delete("action");
+    nextParams.delete("coHostRequesterUserId");
+    nextParams.delete("coHostRequesterNickname");
 
+    setConfirmedCoHostInviteLiveId(null);
     setSearchParams(nextParams, { replace: true });
   }, [searchParams, setSearchParams]);
 
@@ -215,7 +290,7 @@ export function BandLivePage() {
           copiedMessages[optimisticMessageIndex] = {
             ...copiedMessages[optimisticMessageIndex],
             id: copiedMessages[optimisticMessageIndex].id,
-            sender: message.senderName,
+            sender: copiedMessages[optimisticMessageIndex].sender,
             message: message.content,
             time: toChatTime(message.sentAt),
             highlighted: true,
@@ -268,7 +343,11 @@ export function BandLivePage() {
       ...prevMessages,
       {
         id: Date.now(),
-        sender: activeLive?.bandName ?? "나",
+        sender:
+          activeLive?.myNickname ??
+          activeLive?.nickname ??
+          activeBandMemberProfile?.nickname ??
+          "나",
         message,
         time: "지금",
         highlighted: true,
@@ -305,6 +384,7 @@ export function BandLivePage() {
 
   useEffect(() => {
     if (!coHostInviteLiveId) return;
+    if (confirmedCoHostInviteLiveId !== coHostInviteLiveId) return;
     if (handledCoHostInviteLiveIdRef.current === coHostInviteLiveId) return;
     if (isCoHostInviteProcessingRef.current) return;
 
@@ -314,51 +394,51 @@ export function BandLivePage() {
       setIsHandlingCoHostInvite(true);
 
       try {
-        await respondCoHostInvitationMutation.mutateAsync({
-          liveId: coHostInviteLiveId,
-          request: {
-            isAccepted: true,
-          },
-        });
+        try {
+          await respondCoHostInvitationMutation.mutateAsync({
+            liveId: coHostInviteLiveId,
+            request: { isAccepted: true },
+          });
+        } catch (invitationError) {
+          if (!isAlreadyProcessedCoHostInvitationError(invitationError)) {
+            throw invitationError;
+          }
+        }
 
-        const enteredLive = await enterLiveMutation.mutateAsync(
-          coHostInviteLiveId,
-        );
+        try {
+          const enteredLive = await enterLiveMutation.mutateAsync(
+            coHostInviteLiveId,
+          );
 
-        handleEnterLive(enteredLive);
-        setScreen("room");
-        clearCoHostInviteSearchParams();
-      } catch (error) {
-        if (isAlreadyProcessedCoHostInvitationError(error)) {
-          try {
-            const enteredLive = await enterLiveMutation.mutateAsync(
-              coHostInviteLiveId,
-            );
-
+          if (isCoHostBroadcastReady(enteredLive)) {
             handleEnterLive(enteredLive);
             setScreen("room");
             clearCoHostInviteSearchParams();
             return;
-          } catch (retryError) {
-            alert(
-              getErrorMessage(
-                retryError,
-                "공동 진행 초대 처리 후에도 라이브에 입장하지 못했어요.",
-              ),
-            );
+          }
+        } catch (enterError) {
+          if (!isLiveEnterForbiddenError(enterError)) throw enterError;
+        }
 
-            clearCoHostInviteSearchParams();
-            return;
+        try {
+          await requestCoHostUpgradeMutation.mutateAsync(coHostInviteLiveId);
+        } catch (upgradeError) {
+          if (
+            !isAlreadyProcessedCoHostInvitationError(upgradeError) &&
+            !isLiveEnterForbiddenError(upgradeError)
+          ) {
+            throw upgradeError;
           }
         }
 
+        setPendingCoHostUpgradeLiveId(coHostInviteLiveId);
+      } catch (error) {
         alert(
           getErrorMessage(
             error,
-            "공동 진행 초대를 수락하거나 라이브에 입장하지 못했어요.",
+            "공동 진행 초대를 처리하지 못했어요. 오너가 예약 라이브를 시작했는지 확인해주세요.",
           ),
         );
-
         clearCoHostInviteSearchParams();
       } finally {
         setIsHandlingCoHostInvite(false);
@@ -370,10 +450,234 @@ export function BandLivePage() {
   }, [
     clearCoHostInviteSearchParams,
     coHostInviteLiveId,
+    confirmedCoHostInviteLiveId,
     enterLiveMutation,
     handleEnterLive,
+    requestCoHostUpgradeMutation,
     respondCoHostInvitationMutation,
   ]);
+
+  useEffect(() => {
+    if (!coHostUpgradeApprovalLiveId) return;
+    if (
+      handledCoHostUpgradeApprovalLiveIdRef.current ===
+      coHostUpgradeApprovalLiveId
+    ) {
+      return;
+    }
+
+    handledCoHostUpgradeApprovalLiveIdRef.current =
+      coHostUpgradeApprovalLiveId;
+
+    const approveAndEnterLive = async () => {
+      setIsHandlingCoHostInvite(true);
+
+      try {
+        let requesterUserIds = coHostRequesterUserId
+          ? [coHostRequesterUserId]
+          : getCachedScheduledCoHostUserIds(coHostUpgradeApprovalLiveId);
+
+        if (
+          requesterUserIds.length === 0 &&
+          activeBandId &&
+          coHostRequesterNickname
+        ) {
+          const members = await getBandMembers(activeBandId);
+          const matchedMember = members.find(
+            (member) =>
+              member.profileNickname?.trim() === coHostRequesterNickname.trim(),
+          );
+
+          if (matchedMember) requesterUserIds = [matchedMember.userId];
+        }
+
+        if (requesterUserIds.length === 0) {
+          throw new Error("승인할 공동 진행자 정보를 찾을 수 없어요.");
+        }
+
+        cacheScheduledCoHostUserIds(
+          coHostUpgradeApprovalLiveId,
+          requesterUserIds,
+        );
+
+        const enteredLive = await enterLiveMutation.mutateAsync(
+          coHostUpgradeApprovalLiveId,
+        );
+
+        let isApproved = false;
+
+        for (let attempt = 0; attempt < 10 && !isApproved; attempt += 1) {
+          try {
+            await Promise.all(
+              requesterUserIds.map((userId) =>
+                acceptCoHostUpgradeMutation.mutateAsync({
+                  liveId: coHostUpgradeApprovalLiveId,
+                  userId,
+                }),
+              ),
+            );
+            isApproved = true;
+          } catch (approvalError) {
+            if (isAlreadyProcessedCoHostInvitationError(approvalError)) {
+              isApproved = true;
+              break;
+            }
+
+            if (!isNotFoundError(approvalError) || attempt === 9) {
+              throw approvalError;
+            }
+
+            await wait(1000);
+          }
+        }
+
+        handleEnterLive(enteredLive);
+        setScreen("room");
+      } catch (error) {
+        alert(
+          getErrorMessage(
+            error,
+            "공동 송출자 요청을 수락하거나 라이브에 입장하지 못했어요.",
+          ),
+        );
+      } finally {
+        clearCoHostInviteSearchParams();
+        setIsHandlingCoHostInvite(false);
+      }
+    };
+
+    void approveAndEnterLive();
+  }, [
+    acceptCoHostUpgradeMutation,
+    activeBandId,
+    clearCoHostInviteSearchParams,
+    coHostUpgradeApprovalLiveId,
+    coHostRequesterNickname,
+    coHostRequesterUserId,
+    enterLiveMutation,
+    handleEnterLive,
+  ]);
+
+  useEffect(() => {
+    if (!pendingCoHostUpgradeLiveId) return;
+
+    let isCancelled = false;
+    let timeoutId: number | undefined;
+    let hasRequestedUpgrade = false;
+
+    const retryEnterLive = async () => {
+      if (!hasRequestedUpgrade) {
+        try {
+          await requestCoHostUpgrade(pendingCoHostUpgradeLiveId);
+          hasRequestedUpgrade = true;
+        } catch (upgradeError) {
+          if (isAlreadyProcessedCoHostInvitationError(upgradeError)) {
+            hasRequestedUpgrade = true;
+          } else if (!isLiveEnterForbiddenError(upgradeError)) {
+            return;
+          }
+        }
+      }
+
+      try {
+        const enteredLive = await enterLive(pendingCoHostUpgradeLiveId);
+
+        if (isCancelled) return;
+
+        if (isCoHostBroadcastReady(enteredLive)) {
+          setPendingCoHostUpgradeLiveId(null);
+          handleEnterLive(enteredLive);
+          setScreen("room");
+          clearCoHostInviteSearchParams();
+          return;
+        }
+      } catch {
+        // 오너가 승인하기 전에는 입장 API가 403/409를 반환할 수 있습니다.
+      }
+
+      if (!isCancelled) {
+        timeoutId = window.setTimeout(retryEnterLive, 3000);
+      }
+    };
+
+    timeoutId = window.setTimeout(retryEnterLive, 1500);
+
+    return () => {
+      isCancelled = true;
+      if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+    };
+  }, [
+    clearCoHostInviteSearchParams,
+    handleEnterLive,
+    pendingCoHostUpgradeLiveId,
+  ]);
+
+  if (
+    coHostInviteLiveId &&
+    confirmedCoHostInviteLiveId !== coHostInviteLiveId &&
+    !isHandlingCoHostInvite &&
+    !pendingCoHostUpgradeLiveId
+  ) {
+    return (
+      <main className="flex min-h-dvh items-center justify-center bg-neutral-0 px-6 text-center text-neutral-900">
+        <div className="w-full max-w-sm rounded-2xl bg-neutral-0 px-6 py-8 shadow-[0_4px_20px_rgba(20,20,20,0.12)]">
+          <p className="text-body1 font-semibold">
+            공동 진행자로 초대받았어요
+          </p>
+          <p className="mt-2 text-body3 text-neutral-500">
+            초대를 수락하고 라이브에 참여하시겠어요?
+          </p>
+          <div className="mt-6 grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                clearCoHostInviteSearchParams();
+                setScreen("home");
+              }}
+              className="rounded-lg border border-neutral-300 px-4 py-3 text-body3 text-neutral-700"
+            >
+              나중에
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                setConfirmedCoHostInviteLiveId(coHostInviteLiveId)
+              }
+              className="rounded-lg bg-secondary-500 px-4 py-3 text-body3 font-semibold text-neutral-0"
+            >
+              수락
+            </button>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  if (pendingCoHostUpgradeLiveId) {
+    return (
+      <main className="flex min-h-dvh items-center justify-center bg-neutral-0 px-6 text-center text-neutral-900">
+        <div>
+          <p className="text-body1 font-semibold">
+            오너의 공동 송출 승인을 기다리고 있어요
+          </p>
+          <p className="mt-2 text-body3 text-neutral-500">
+            승인되면 자동으로 라이브방에 입장합니다.
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setPendingCoHostUpgradeLiveId(null);
+              clearCoHostInviteSearchParams();
+              setScreen("home");
+            }}
+            className="mt-5 rounded-lg border border-secondary-500 px-4 py-2 text-caption3 text-secondary-500"
+          >
+            라이브 홈으로 돌아가기
+          </button>
+        </div>
+      </main>
+    );
+  }
 
   if (isHandlingCoHostInvite) {
     return (
