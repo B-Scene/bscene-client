@@ -15,6 +15,7 @@ import {
   sendTestNotification,
   updateNotificationSetting,
 } from "@/api/notification";
+import { fanHomeKeys } from "@/hooks/api/fan/useFanHome";
 import type {
   NotificationSettingsResponse,
   NotificationSettingsMode,
@@ -152,6 +153,9 @@ export const useMarkNotificationAsReadMutation = () => {
       context?.previousNotifications.forEach(([queryKey, previousData]) => {
         queryClient.setQueryData(queryKey, previousData);
       });
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: fanHomeKeys.main() });
     },
   });
 };

@@ -23,6 +23,7 @@ import {
   useFollowExploreBand,
   useUnfollowExploreBand,
 } from "@/hooks/api/fan/useFanExplore";
+import { useNotificationsInfiniteQuery } from "@/hooks/api/useNotifications";
 import { useInterestedPerformancesQuery } from "@/hooks/api/user/useInterestedPerformances";
 import type {
   FanHomeConcert,
@@ -31,6 +32,10 @@ import type {
   FanHomeResponse,
 } from "@/types/fan/home";
 import type { InterestedPerformanceItem } from "@/types/user/interestedPerformance";
+import {
+  isNotificationForMode,
+  isNotificationWithinRetention,
+} from "@/utils/notificationDeepLink";
 
 type HomeVariant = "new" | "recommended" | "main";
 
@@ -875,6 +880,7 @@ const FanHomePage = () => {
   const completeParticipationMutation = useCompletePerformanceParticipation();
   const deleteParticipationMutation = useDeletePerformanceParticipation();
   const { data: fanHome, isError, isLoading, refetch } = useFanHomeQuery();
+  const { data: notificationsData } = useNotificationsInfiniteQuery();
   const interestedPerformancesQuery = useInterestedPerformancesQuery("ALL");
   const upcomingPerformancesQuery = useUpcomingPerformancesInfiniteQuery(
     "IMMINENT",
@@ -918,9 +924,19 @@ const FanHomePage = () => {
   const isParticipationResponding =
     completeParticipationMutation.isPending ||
     deleteParticipationMutation.isPending;
-  const hasNotifications = searchParams.has("notifications")
-    ? searchParams.get("notifications") !== "empty"
-    : (fanHome?.hasUnreadNotification ?? false);
+  const notificationItems = notificationsData?.pages.flatMap(
+    (page) => page.items,
+  );
+  const hasUnreadNotification = notificationItems
+    ? notificationItems.some(
+        (notification) =>
+          !notification.isRead &&
+          isNotificationWithinRetention(notification) &&
+          isNotificationForMode(notification, "FAN"),
+      )
+    : (fanHome?.hasUnreadNotification ??
+      fanHome?.hasUnreadNotifications ??
+      false);
 
   const removeCurrentPendingPerformance = () => {
     if (!currentPendingPerformance) return;
@@ -1081,13 +1097,13 @@ const FanHomePage = () => {
               onClick={() =>
                 navigate(
                   `/fan/home/notifications?status=${
-                    hasNotifications ? "has" : "empty"
+                    hasUnreadNotification ? "has" : "empty"
                   }`,
                 )
               }
               className="flex size-6 items-center justify-center text-neutral-900"
             >
-              <NotificationBellIcon hasUnread={hasNotifications} />
+              <NotificationBellIcon hasUnread={hasUnreadNotification} />
             </button>
 
             <button
