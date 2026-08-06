@@ -1,5 +1,10 @@
 import { useCallback } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import {
   applySessionRecruitment,
   cancelSessionApplicationSubmission,
@@ -46,6 +51,9 @@ export const sessionApplicationKeys = {
   search: (params: SessionApplicationSearchParams) =>
     [...sessionApplicationKeys.searches(), params] as const,
 
+  searchInfinite: (params: SessionApplicationSearchParams) =>
+    [...sessionApplicationKeys.searches(), "infinite", params] as const,
+
   detail: (sessionApplicationId: number) =>
     [...sessionApplicationKeys.all, "detail", sessionApplicationId] as const,
 
@@ -73,6 +81,25 @@ export const useSessionApplicationsSearchQuery = (
   return useQuery({
     queryKey: sessionApplicationKeys.search(params),
     queryFn: () => getSessionApplicationsSearch(params),
+    staleTime: 1000 * 30,
+  });
+};
+
+export const useSessionApplicationsSearchInfiniteQuery = (
+  params: SessionApplicationSearchParams = {},
+  enabled = true,
+) => {
+  return useInfiniteQuery({
+    queryKey: sessionApplicationKeys.searchInfinite(params),
+    queryFn: ({ pageParam }) =>
+      getSessionApplicationsSearch({
+        ...params,
+        cursorId: pageParam,
+      }),
+    initialPageParam: undefined as number | undefined,
+    getNextPageParam: (lastPage) =>
+      lastPage.hasNext ? (lastPage.nextCursor ?? undefined) : undefined,
+    enabled,
     staleTime: 1000 * 30,
   });
 };

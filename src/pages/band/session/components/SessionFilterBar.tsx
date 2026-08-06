@@ -1,4 +1,3 @@
-import ArrowDownIcon from "@/assets/icons/band/arrow-down-gray.svg";
 import FilterIcon from "@/assets/icons/band/filter.svg";
 import LineIcon from "@/assets/icons/band/Line.svg";
 import type { SessionRecruitmentSort } from "@/types/session/sessionRecruitment";
@@ -20,8 +19,6 @@ export const SessionFilterBar = ({
   showSelectedValues = true,
   showBottomBorder = true,
   compactHeight = false,
-  sort,
-  onSortChange,
   onOpenFilter,
 }: SessionFilterBarProps) => {
   const selectedFilters = [
@@ -30,51 +27,50 @@ export const SessionFilterBar = ({
     values.genre,
     values.region,
   ];
+
   const filterLabels = showSelectedValues ? selectedFilters : SESSION_FILTERS;
-  const sortLabel = sort === "LATEST" ? "최신순" : "마감순";
 
   return (
     <section
       className={[
-        "flex w-full items-center gap-2 bg-neutral-0 pl-[22px] pr-[26px]",
+        "sticky top-0 z-10 flex w-full items-center gap-2 bg-neutral-0 px-[22px]",
         compactHeight ? "h-[53px]" : "h-[48px]",
         showBottomBorder ? "border-b border-neutral-400" : "",
       ].join(" ")}
     >
-      <button
-        type="button"
-        aria-label={`정렬 기준: ${sortLabel}`}
-        onClick={() =>
-          onSortChange(sort === "LATEST" ? "IMMINENT" : "LATEST")
-        }
-        className="flex h-[22px] w-[62px] shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-full border border-neutral-400 bg-neutral-0 px-2 py-0.5 text-caption2 text-neutral-600"
-      >
-        {sortLabel}
-        <img src={ArrowDownIcon} alt="" className="h-[7px] w-3 shrink-0" />
-      </button>
+      <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <button
+          type="button"
+          aria-label="정렬 기준: 최신순"
+          aria-pressed={false}
+          className="flex h-[22px] w-[62px] shrink-0 items-center justify-center whitespace-nowrap rounded-full border border-neutral-400 bg-neutral-0 px-2 py-0.5 text-caption3 text-neutral-600"
+        >
+          최신순
+        </button>
 
-      <img src={LineIcon} alt="" className="h-[26px] w-0.5 shrink-0" />
+        <img src={LineIcon} alt="" className="h-[26px] w-0.5 shrink-0" />
 
-      {filterLabels.map((filter, index) => {
-        const isSelected = selectedFilters[index] !== "전체";
+        {filterLabels.map((filter, index) => {
+          const isSelected = selectedFilters[index] !== "전체";
 
-        return (
-          <button
-            key={`${SESSION_FILTERS[index]}-${index}`}
-            type="button"
-            aria-pressed={isSelected}
-            onClick={onOpenFilter}
-            className={[
-              "flex h-[22px] min-w-[49px] shrink-0 items-center justify-center whitespace-nowrap rounded-full border bg-neutral-0 px-2 py-0.5 text-caption2",
-              isSelected
-                ? "border-secondary-500 text-secondary-500"
-                : "border-neutral-400 text-neutral-600",
-            ].join(" ")}
-          >
-            {filter}
-          </button>
-        );
-      })}
+          return (
+            <button
+              key={`${SESSION_FILTERS[index]}-${index}`}
+              type="button"
+              aria-pressed={isSelected}
+              onClick={onOpenFilter}
+              className={[
+                "flex h-[22px] min-w-[49px] shrink-0 items-center justify-center whitespace-nowrap rounded-full border px-[15px] py-0.5 text-caption2",
+                isSelected
+                  ? "border-secondary-400 bg-secondary-0 text-secondary-500"
+                  : "border-neutral-400 bg-neutral-0 text-neutral-600",
+              ].join(" ")}
+            >
+              {filter}
+            </button>
+          );
+        })}
+      </div>
 
       <button
         type="button"
