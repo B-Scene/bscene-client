@@ -43,6 +43,7 @@ export const useLiveRoomPlayback = ({
     );
   const [listenerAudioMessage, setListenerAudioMessage] = useState("");
   const [showListenerPlayButton, setShowListenerPlayButton] = useState(false);
+  const [monitorRetryNonce, setMonitorRetryNonce] = useState(0);
   const listenerAudioRef = useRef<HTMLAudioElement | null>(null);
   const whepSessionUrlRef = useRef<string | null>(null);
   const monitorPeerConnectionRef = useRef<RTCPeerConnection | null>(null);
@@ -50,6 +51,7 @@ export const useLiveRoomPlayback = ({
   const negotiatingMonitorUrlRef = useRef<string | null>(null);
   const whepAbortControllerRef = useRef<AbortController | null>(null);
   const whepGenerationRef = useRef(0);
+  const monitorRetryTimerRef = useRef<number | null>(null);
 
   const isListenerPlayback =
     Boolean(live?.liveId) && playbackRole === "LISTENER" && Boolean(playbackUrl);
@@ -94,6 +96,10 @@ export const useLiveRoomPlayback = ({
 
   const stopBroadcasterMonitorPlayback = useCallback(
     async (resetUi = true) => {
+      if (monitorRetryTimerRef.current !== null) {
+        window.clearTimeout(monitorRetryTimerRef.current);
+        monitorRetryTimerRef.current = null;
+      }
       whepGenerationRef.current += 1;
       whepAbortControllerRef.current?.abort();
       whepAbortControllerRef.current = null;
@@ -233,6 +239,10 @@ export const useLiveRoomPlayback = ({
           : "공동 진행자 오디오 수신에 실패했어요.",
       );
       setShowListenerPlayButton(true);
+      monitorRetryTimerRef.current = window.setTimeout(() => {
+        monitorRetryTimerRef.current = null;
+        setMonitorRetryNonce((current) => current + 1);
+      }, 3000);
     } finally {
       if (whepAbortControllerRef.current?.signal.aborted) {
         whepAbortControllerRef.current = null;
@@ -316,6 +326,7 @@ export const useLiveRoomPlayback = ({
   }, [
     isBroadcasterMonitorPlayback,
     isListenerPlayback,
+    monitorRetryNonce,
     startBroadcasterMonitorPlayback,
     startListenerPlayback,
     stopBroadcasterMonitorPlayback,
@@ -324,6 +335,10 @@ export const useLiveRoomPlayback = ({
 
   useEffect(() => {
     return () => {
+      if (monitorRetryTimerRef.current !== null) {
+        window.clearTimeout(monitorRetryTimerRef.current);
+        monitorRetryTimerRef.current = null;
+      }
       stopListenerPlayback(false);
       void stopBroadcasterMonitorPlayback(false);
     };

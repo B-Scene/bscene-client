@@ -506,21 +506,33 @@ export function LiveRoom({
 
     const controller = new AbortController();
     const shouldExcludeMeFromViewerCount = canBroadcast;
+    let reconnectTimer: number | undefined;
 
-    subscribeViewerCount({
-      liveId: live.liveId,
-      watchOnly: shouldExcludeMeFromViewerCount,
-      onViewerCount: setViewerCount,
-      onCoPublisherJoined: canBroadcast
-        ? handleCoPublisherJoined
-        : undefined,
-      signal: controller.signal,
-    }).catch(() => {
-      // SSE 연결 종료/취소는 조용히 처리
-    });
+    const connectViewerEvents = async () => {
+      try {
+        await subscribeViewerCount({
+          liveId: live.liveId,
+          watchOnly: shouldExcludeMeFromViewerCount,
+          onViewerCount: setViewerCount,
+          onCoPublisherJoined: canBroadcast
+            ? handleCoPublisherJoined
+            : undefined,
+          signal: controller.signal,
+        });
+      } catch {
+        // 일시적인 SSE 연결 오류는 아래 재연결로 복구합니다.
+      }
+
+      if (!controller.signal.aborted) {
+        reconnectTimer = window.setTimeout(connectViewerEvents, 1000);
+      }
+    };
+
+    void connectViewerEvents();
 
     return () => {
       controller.abort();
+      if (reconnectTimer !== undefined) window.clearTimeout(reconnectTimer);
     };
   }, [canBroadcast, handleCoPublisherJoined, live?.liveId]);
 
