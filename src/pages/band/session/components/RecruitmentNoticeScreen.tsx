@@ -48,6 +48,8 @@ import type {
   RecruitmentHistoryItem,
 } from "@/features/session/applicationHistory/applicationHistory.types";
 
+const FIND_FILTER_KEYS = ["genre", "region"] as const;
+
 const toDeadlineLabel = (dDay: number) => {
   if (dDay < 0) return "마감";
   if (dDay === 0) return "오늘 마감";
@@ -137,7 +139,8 @@ export const RecruitmentNoticeScreen = () => {
     useState(false);
 
   const [selectedPostId, setSelectedPostId] = useState<number | null>(
-    () => (location.state as { openPostId?: number } | null)?.openPostId ?? null,
+    () =>
+      (location.state as { openPostId?: number } | null)?.openPostId ?? null,
   );
 
   const [selectedPostOverride, setSelectedPostOverride] =
@@ -175,8 +178,8 @@ export const RecruitmentNoticeScreen = () => {
     hasInitializedFindFilters.current = true;
 
     setFindFilterValues({
-      part: summary.part || INITIAL_SESSION_FILTERS.part,
-      skill: summary.skillLevel || INITIAL_SESSION_FILTERS.skill,
+      part: INITIAL_SESSION_FILTERS.part,
+      skill: INITIAL_SESSION_FILTERS.skill,
       genre: summary.genre || INITIAL_SESSION_FILTERS.genre,
       region: summary.region || INITIAL_SESSION_FILTERS.region,
     });
@@ -305,10 +308,21 @@ export const RecruitmentNoticeScreen = () => {
   const handleMessageApplication = async (
     application: ApplicationHistoryItem,
   ) => {
+    const sessionRecruitmentId = application.sessionRecruitmentId;
+
+    if (!sessionRecruitmentId) {
+      window.alert("모집 공고 정보를 확인할 수 없어 쪽지방을 만들 수 없어요.");
+      return;
+    }
+
+    if (createChatRoomMutation.isPending) {
+      return;
+    }
+
     try {
       const room = await createChatRoomMutation.mutateAsync({
         contextType: "RECRUITMENT",
-        applicationSubmissionId: application.applicationSubmissionId ?? application.id,
+        sessionRecruitmentId,
       });
 
       navigate(`/band/session/messages/${room.chatRoomId}`, {
@@ -432,10 +446,7 @@ export const RecruitmentNoticeScreen = () => {
         onMessages={() => navigate("/band/session/messages")}
       />
 
-      <SessionTabs
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
-      />
+      <SessionTabs activeTab={activeTab} onTabChange={setActiveTab} />
 
       {activeTab !== "applications" ? (
         <SessionFilterBar
@@ -448,6 +459,7 @@ export const RecruitmentNoticeScreen = () => {
           onSortChange={setSort}
           showBottomBorder={activeTab !== "find"}
           compactHeight={activeTab === "find"}
+          filterKeys={activeTab === "find" ? [...FIND_FILTER_KEYS] : undefined}
           onOpenFilter={() => setIsFilterOpen(true)}
         />
       ) : null}
@@ -527,6 +539,7 @@ export const RecruitmentNoticeScreen = () => {
               ? setFindFilterValues
               : setRecruitmentFilterValues
           }
+          filterKeys={activeTab === "find" ? [...FIND_FILTER_KEYS] : undefined}
           onClose={() => setIsFilterOpen(false)}
         />
       ) : null}

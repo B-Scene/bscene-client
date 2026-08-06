@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import type { AxiosError } from "axios";
+import { useNavigate } from "react-router-dom";
 
 import EmptyApplicationHistoryIcon from "@/assets/icons/band/empty-application-history.svg";
 import EmptyScrapHistoryIcon from "@/assets/icons/band/empty-scrap-history.svg";
@@ -29,6 +30,7 @@ import {
   useRecentlyViewedSessionRecruitmentsQuery,
   useRemoveSessionRecruitmentInterest,
 } from "@/hooks/api/session/useSessionRecruitment";
+import { useCreateSessionChatRoomMutation } from "@/hooks/api/session/useSessionChat";
 
 import type {
   ApplicationSubmissionItem,
@@ -65,7 +67,11 @@ const toApplicationStatus = (status: string): ApplicationHistoryStatus => {
     return "rejected";
   }
 
-  if (status === "지원 취소" || status === "CANCELED" || status === "CANCELLED") {
+  if (
+    status === "지원 취소" ||
+    status === "CANCELED" ||
+    status === "CANCELLED"
+  ) {
     return "canceled";
   }
 
@@ -172,6 +178,8 @@ export const SessionApplicationHistoryPage = ({
   onMessage,
   onOpenRecruitment,
 }: SessionApplicationHistoryPageProps) => {
+  const navigate = useNavigate();
+
   const [activeTab, setActiveTab] =
     useState<ApplicationHistoryTab>("application");
 
@@ -195,6 +203,7 @@ export const SessionApplicationHistoryPage = ({
   const cancelApplicationMutation = useCancelApplicationSubmissionMutation();
   const addInterestMutation = useAddSessionRecruitmentInterest();
   const removeInterestMutation = useRemoveSessionRecruitmentInterest();
+  const createChatRoomMutation = useCreateSessionChatRoomMutation();
 
   const applications = useMemo(() => {
     const content = applicationSubmissionsQuery.data?.content ?? [];
@@ -232,6 +241,16 @@ export const SessionApplicationHistoryPage = ({
     return null;
   }
 
+  const handleClose = () => {
+    setActiveTab("application");
+    onClose();
+  };
+
+  const handleBrowseRecruitments = () => {
+    handleClose();
+    onBrowseRecruitments();
+  };
+
   const handleCancelApplication = async (applicationSubmissionId: number) => {
     if (cancelApplicationMutation.isPending) {
       return;
@@ -246,12 +265,56 @@ export const SessionApplicationHistoryPage = ({
         return nextIds;
       });
     } catch (error) {
-      const apiMessage = (
-        error as AxiosError<SessionApiResponse<null>>
-      ).response?.data?.message;
+      const apiMessage = (error as AxiosError<SessionApiResponse<null>>)
+        .response?.data?.message;
 
       window.alert(
         apiMessage ?? "지원 취소에 실패했어요. 잠시 후 다시 시도해주세요.",
+      );
+    }
+  };
+
+  const handleMessageApplication = async (
+    application: ApplicationHistoryItem,
+  ) => {
+    const sessionRecruitmentId = application.sessionRecruitmentId;
+
+    if (!sessionRecruitmentId) {
+      window.alert("모집 공고 정보를 확인할 수 없어 쪽지방을 만들 수 없어요.");
+      return;
+    }
+
+    if (createChatRoomMutation.isPending) {
+      return;
+    }
+
+    if (onMessage) {
+      handleClose();
+      onMessage(application);
+      return;
+    }
+
+    try {
+      const room = await createChatRoomMutation.mutateAsync({
+        contextType: "RECRUITMENT",
+        sessionRecruitmentId,
+      });
+
+      handleClose();
+
+      navigate(`/band/session/messages/${room.chatRoomId}`, {
+        state: {
+          senderName: room.recipientName,
+          chatRoomId: room.chatRoomId,
+          canSend: true,
+        },
+      });
+    } catch (error) {
+      const apiMessage = (error as AxiosError<SessionApiResponse<null>>)
+        .response?.data?.message;
+
+      window.alert(
+        apiMessage ?? "쪽지방 생성에 실패했어요. 잠시 후 다시 시도해주세요.",
       );
     }
   };
@@ -272,9 +335,8 @@ export const SessionApplicationHistoryPage = ({
         await addInterestMutation.mutateAsync(sessionRecruitmentId);
       }
     } catch (error) {
-      const apiMessage = (
-        error as AxiosError<SessionApiResponse<null>>
-      ).response?.data?.message;
+      const apiMessage = (error as AxiosError<SessionApiResponse<null>>)
+        .response?.data?.message;
 
       window.alert(
         apiMessage ?? "스크랩 변경에 실패했어요. 잠시 후 다시 시도해주세요.",
@@ -298,24 +360,13 @@ export const SessionApplicationHistoryPage = ({
         await addInterestMutation.mutateAsync(sessionRecruitmentId);
       }
     } catch (error) {
-      const apiMessage = (
-        error as AxiosError<SessionApiResponse<null>>
-      ).response?.data?.message;
+      const apiMessage = (error as AxiosError<SessionApiResponse<null>>)
+        .response?.data?.message;
 
       window.alert(
         apiMessage ?? "스크랩 변경에 실패했어요. 잠시 후 다시 시도해주세요.",
       );
     }
-  };
-
-  const handleClose = () => {
-    setActiveTab("application");
-    onClose();
-  };
-
-  const handleBrowseRecruitments = () => {
-    handleClose();
-    onBrowseRecruitments();
   };
 
   const renderApplicationTab = () => {
@@ -372,7 +423,7 @@ export const SessionApplicationHistoryPage = ({
               onViewApplication?.(selectedApplication)
             }
             onCancelApplication={handleCancelApplication}
-            onMessage={(selectedApplication) => onMessage?.(selectedApplication)}
+            onMessage={handleMessageApplication}
           />
         ))}
       </div>

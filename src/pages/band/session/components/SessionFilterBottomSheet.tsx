@@ -6,14 +6,27 @@ interface SessionFilterBottomSheetProps {
   values: SessionFilterValues;
   onApply: (values: SessionFilterValues) => void;
   onClose: () => void;
+  filterKeys?: SessionFilterKey[];
 }
+
+const DEFAULT_FILTER_KEYS: SessionFilterKey[] = [
+  "part",
+  "skill",
+  "genre",
+  "region",
+];
 
 export const SessionFilterBottomSheet = ({
   values,
   onApply,
   onClose,
+  filterKeys = DEFAULT_FILTER_KEYS,
 }: SessionFilterBottomSheetProps) => {
   const [draftValues, setDraftValues] = useState(values);
+
+  const visibleGroups = SESSION_FILTER_GROUPS.filter((group) =>
+    filterKeys.includes(group.id),
+  );
 
   const handleOverlayClick = (event: MouseEvent<HTMLDivElement>) => {
     if (event.target === event.currentTarget) {
@@ -28,8 +41,7 @@ export const SessionFilterBottomSheet = ({
     }));
   };
 
-  const hasChanges = Object.keys(draftValues).some((key) => {
-    const filterKey = key as SessionFilterKey;
+  const hasChanges = filterKeys.some((filterKey) => {
     return draftValues[filterKey] !== values[filterKey];
   });
 
@@ -60,15 +72,15 @@ export const SessionFilterBottomSheet = ({
         <div className="flex min-h-0 flex-1 flex-col px-5 pb-5">
           <div className="min-h-0 flex-1 overflow-y-auto px-3">
             <div className="flex flex-col gap-3">
-            {SESSION_FILTER_GROUPS.map((group) => (
-              <FilterGroup
-                key={group.id}
-                title={group.title}
-                options={group.options}
-                selectedValue={draftValues[group.id]}
-                onSelect={(option) => handleSelect(group.id, option)}
-              />
-            ))}
+              {visibleGroups.map((group) => (
+                <FilterGroup
+                  key={group.id}
+                  title={group.title}
+                  options={group.options}
+                  selectedValue={draftValues[group.id]}
+                  onSelect={(option) => handleSelect(group.id, option)}
+                />
+              ))}
             </div>
           </div>
 
@@ -98,10 +110,16 @@ interface FilterGroupProps {
   onSelect: (option: string) => void;
 }
 
-const FilterGroup = ({ title, options, selectedValue, onSelect }: FilterGroupProps) => {
+const FilterGroup = ({
+  title,
+  options,
+  selectedValue,
+  onSelect,
+}: FilterGroupProps) => {
   return (
     <section>
       <h3 className="text-body1 text-neutral-900">{title}</h3>
+
       <div className="mt-2 flex flex-wrap gap-x-1.5 gap-y-1.5">
         {options.map((option) => {
           const isSelected = selectedValue === option;
@@ -113,7 +131,9 @@ const FilterGroup = ({ title, options, selectedValue, onSelect }: FilterGroupPro
               onClick={() => onSelect(option)}
               className={[
                 "flex h-[26px] items-center justify-center rounded-full px-3 text-caption3",
-                isSelected ? "bg-secondary-500 text-neutral-0" : "bg-neutral-300 text-neutral-600",
+                isSelected
+                  ? "bg-secondary-500 text-neutral-0"
+                  : "bg-neutral-300 text-neutral-600",
               ].join(" ")}
             >
               {option}

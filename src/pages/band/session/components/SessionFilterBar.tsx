@@ -1,8 +1,8 @@
 import FilterIcon from "@/assets/icons/band/filter.svg";
 import LineIcon from "@/assets/icons/band/Line.svg";
 import type { SessionRecruitmentSort } from "@/types/session/sessionRecruitment";
-import { SESSION_FILTERS } from "../data/sessionRecruitmentPosts";
-import type { SessionFilterValues } from "../types";
+import { SESSION_FILTER_GROUPS } from "../data/sessionRecruitmentPosts";
+import type { SessionFilterKey, SessionFilterValues } from "../types";
 
 interface SessionFilterBarProps {
   values: SessionFilterValues;
@@ -12,7 +12,15 @@ interface SessionFilterBarProps {
   sort: SessionRecruitmentSort;
   onSortChange: (sort: SessionRecruitmentSort) => void;
   onOpenFilter: () => void;
+  filterKeys?: SessionFilterKey[];
 }
+
+const DEFAULT_FILTER_KEYS: SessionFilterKey[] = [
+  "part",
+  "skill",
+  "genre",
+  "region",
+];
 
 export const SessionFilterBar = ({
   values,
@@ -20,15 +28,11 @@ export const SessionFilterBar = ({
   showBottomBorder = true,
   compactHeight = false,
   onOpenFilter,
+  filterKeys = DEFAULT_FILTER_KEYS,
 }: SessionFilterBarProps) => {
-  const selectedFilters = [
-    values.part,
-    values.skill,
-    values.genre,
-    values.region,
-  ];
-
-  const filterLabels = showSelectedValues ? selectedFilters : SESSION_FILTERS;
+  const visibleGroups = SESSION_FILTER_GROUPS.filter((group) =>
+    filterKeys.includes(group.id),
+  );
 
   return (
     <section
@@ -50,12 +54,14 @@ export const SessionFilterBar = ({
 
         <img src={LineIcon} alt="" className="h-[26px] w-0.5 shrink-0" />
 
-        {filterLabels.map((filter, index) => {
-          const isSelected = selectedFilters[index] !== "전체";
+        {visibleGroups.map((group) => {
+          const selectedValue = values[group.id];
+          const isSelected = selectedValue !== "전체";
+          const label = showSelectedValues ? selectedValue : group.title;
 
           return (
             <button
-              key={`${SESSION_FILTERS[index]}-${index}`}
+              key={group.id}
               type="button"
               aria-pressed={isSelected}
               onClick={onOpenFilter}
@@ -66,7 +72,7 @@ export const SessionFilterBar = ({
                   : "border-neutral-400 bg-neutral-0 text-neutral-600",
               ].join(" ")}
             >
-              {filter}
+              {label}
             </button>
           );
         })}

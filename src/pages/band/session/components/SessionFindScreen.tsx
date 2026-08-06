@@ -43,13 +43,11 @@ export const SessionFindScreen = ({ values }: SessionFindScreenProps) => {
 
   const applicationSearchParams = useMemo(
     () => ({
-      part: getFilterParam(values.part),
-      skillLevel: getFilterParam(values.skill),
       genre: getFilterParam(values.genre),
       region: getFilterParam(values.region),
       size: SESSION_FIND_PAGE_SIZE,
     }),
-    [values.genre, values.part, values.region, values.skill],
+    [values.genre, values.region],
   );
 
   const applicationsQuery =
@@ -62,21 +60,15 @@ export const SessionFindScreen = ({ values }: SessionFindScreenProps) => {
       ) ?? [];
 
     return apiCandidates.filter((candidate) => {
-      const matchesPart =
-        values.part === "전체" || candidate.part === values.part;
-
-      const matchesSkill =
-        values.skill === "전체" || candidate.skill === values.skill;
-
       const matchesGenre =
         values.genre === "전체" || candidate.genre.includes(values.genre);
 
       const matchesRegion =
         values.region === "전체" || candidate.location.includes(values.region);
 
-      return matchesPart && matchesSkill && matchesGenre && matchesRegion;
+      return matchesGenre && matchesRegion;
     });
-  }, [applicationsQuery.data, values]);
+  }, [applicationsQuery.data, values.genre, values.region]);
 
   const loadMore = useCallback(() => {
     if (!applicationsQuery.hasNextPage || applicationsQuery.isFetchingNextPage) {
