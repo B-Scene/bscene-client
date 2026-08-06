@@ -18,7 +18,7 @@ import { useSlideUpSheet } from "@/hooks/useSlideUpSheet";
 import type { FanExploreBand } from "@/types/fan/explore";
 import { getGenreLabel, getRegionLabel } from "@/utils/bandLabels";
 
-type AppliedExploreFilters = {
+export type AppliedExploreFilters = {
   genre: string;
   region: string;
   content: string;
@@ -320,21 +320,26 @@ export const ExploreFilterBar = ({
 const FilterOptionButton = ({
   label,
   selected,
+  disabled = false,
   onClick,
 }: {
   label: string;
   selected: boolean;
+  disabled?: boolean;
   onClick: () => void;
 }) => {
   return (
     <button
       type="button"
       aria-pressed={selected}
+      disabled={disabled}
       onClick={onClick}
       style={{ width: FILTER_OPTION_WIDTHS[label] }}
       className={[
         "box-border flex h-[26px] shrink-0 items-center justify-center whitespace-nowrap rounded-full px-[8px] py-[4px] font-body text-caption3",
-        selected
+        disabled
+          ? "cursor-not-allowed bg-neutral-200 text-neutral-500 opacity-60"
+          : selected
           ? "bg-primary-400 text-neutral-0"
           : "bg-neutral-300 text-neutral-600",
       ].join(" ")}
@@ -348,11 +353,13 @@ const FilterOptionGroup = ({
   title,
   options,
   selected,
+  disabledOptions = [],
   onSelect,
 }: {
   title: string;
   options: string[];
   selected: string;
+  disabledOptions?: string[];
   onSelect: (value: string) => void;
 }) => {
   return (
@@ -364,6 +371,7 @@ const FilterOptionGroup = ({
             key={option}
             label={option}
             selected={selected === option}
+            disabled={disabledOptions.includes(option)}
             onClick={() => onSelect(option)}
           />
         ))}
@@ -372,15 +380,17 @@ const FilterOptionGroup = ({
   );
 };
 
-const ExploreFilterSheet = ({
+export const ExploreFilterSheet = ({
   open,
   onClose,
   appliedFilters,
+  contentSelectable = false,
   onApply,
 }: {
   open: boolean;
   onClose: () => void;
   appliedFilters: AppliedExploreFilters;
+  contentSelectable?: boolean;
   onApply: (filters: AppliedExploreFilters) => void;
 }) => {
   const [selectedGenre, setSelectedGenre] = useState(appliedFilters.genre);
@@ -391,7 +401,7 @@ const ExploreFilterSheet = ({
     () => {
       setSelectedGenre(appliedFilters.genre);
       setSelectedRegion(appliedFilters.region);
-      setSelectedContent(appliedFilters.content);
+      setSelectedContent(contentSelectable ? appliedFilters.content : "전체");
     },
   );
 
@@ -440,7 +450,12 @@ const ExploreFilterSheet = ({
             title="콘텐츠"
             options={FILTER_OPTIONS.content}
             selected={selectedContent}
-            onSelect={setSelectedContent}
+            disabledOptions={
+              contentSelectable
+                ? []
+                : FILTER_OPTIONS.content.filter((option) => option !== "전체")
+            }
+            onSelect={contentSelectable ? setSelectedContent : () => undefined}
           />
         </div>
 
@@ -451,7 +466,7 @@ const ExploreFilterSheet = ({
               onApply({
                 genre: selectedGenre,
                 region: selectedRegion,
-                content: selectedContent,
+                content: contentSelectable ? selectedContent : "전체",
               });
               onClose();
             }}
@@ -662,11 +677,7 @@ const FanExplorePage = () => {
         const matchesRegion =
           appliedFilters.region === "전체" ||
           band.region === appliedFilters.region;
-        const matchesContent =
-          appliedFilters.content === "전체" ||
-          band.contentTypes.includes(appliedFilters.content);
-
-        return matchesGenre && matchesRegion && matchesContent;
+        return matchesGenre && matchesRegion;
       });
 
       return [...nextBands].sort((a, b) => b.score - a.score);
