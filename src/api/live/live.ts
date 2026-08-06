@@ -466,7 +466,7 @@ export const getLiveHome = async (): Promise<LiveHomeResponse> => {
       "/lives/home",
     );
 
-  const result = unwrapResult(response.data);
+  const result = unwrapResult(response.data) ?? {};
 
   return {
     liveNow: result.liveNow ?? [],

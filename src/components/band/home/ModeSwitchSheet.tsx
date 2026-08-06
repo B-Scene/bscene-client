@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useMyProfilesQuery } from "@/hooks/api/user/useMyProfiles";
 import { useChangeUserMode, useToggleUserMode } from "@/hooks/api/user/useMode";
@@ -152,12 +152,27 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
         bandAccounts[0]?.id ??
         (isFanMode ? FAN_START_ID : BAND_START_ID));
   const [selectedId, setSelectedId] = useState(initialSelectedId);
+  const hasUserSelectedRef = useRef(false);
   const [showErrorToast, setShowErrorToast] = useState(false);
   const { rendered, isVisible, handleTransitionEnd } = useSlideUpSheet(
     open,
-    () => setSelectedId(initialSelectedId),
+    () => {
+      hasUserSelectedRef.current = false;
+      setSelectedId(initialSelectedId);
+    },
     () => setShowErrorToast(false),
   );
+
+  useEffect(() => {
+    if (!open || hasUserSelectedRef.current) return;
+
+    setSelectedId(initialSelectedId);
+  }, [initialSelectedId, open]);
+
+  const selectAccount = (accountId: string) => {
+    hasUserSelectedRef.current = true;
+    setSelectedId(accountId);
+  };
   const selectedMode = selectedId.startsWith("fan") ? "fan" : "band";
 
   const bandModeSection = (
@@ -173,7 +188,7 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
               name={band.name}
               subtitle={band.subtitle}
               selected={selectedId === band.id}
-              onSelect={() => setSelectedId(band.id)}
+              onSelect={() => selectAccount(band.id)}
             />
           ))
         ) : (
@@ -185,7 +200,7 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
             }
             name="밴드 모드 시작하기"
             selected={selectedId === BAND_START_ID}
-            onSelect={() => setSelectedId(BAND_START_ID)}
+            onSelect={() => selectAccount(BAND_START_ID)}
           />
         )}
       </div>
@@ -204,7 +219,7 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
             subtitle={fanAccount.email}
             selected={selectedId === fanAccount.id}
             selectedTone="fan"
-            onSelect={() => setSelectedId(fanAccount.id)}
+            onSelect={() => selectAccount(fanAccount.id)}
           />
         ) : (
           <AccountRow
@@ -216,7 +231,7 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
             name="팬 모드 시작하기"
             selected={selectedId === FAN_START_ID}
             selectedTone="fan"
-            onSelect={() => setSelectedId(FAN_START_ID)}
+            onSelect={() => selectAccount(FAN_START_ID)}
           />
         )}
       </div>

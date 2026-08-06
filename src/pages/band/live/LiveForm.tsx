@@ -465,17 +465,26 @@ export function LiveForm({
 
     let isMounted = true;
 
-    setCoHostLoadErrorMessage("");
-    setSelectedCoHostIds([]);
-    setInitialSelectedCoHostIds([]);
-    setCohostCandidates([]);
+    window.setTimeout(() => {
+      if (!isMounted) return;
+      setCoHostLoadErrorMessage("");
+      setSelectedCoHostIds([]);
+      setInitialSelectedCoHostIds([]);
+      setCohostCandidates([]);
+    }, 0);
 
     if (!activeBandId) {
-      setCoHostLoadErrorMessage("현재 선택된 밴드 정보를 찾을 수 없어요.");
+      window.setTimeout(() => {
+        if (isMounted) {
+          setCoHostLoadErrorMessage("현재 선택된 밴드 정보를 찾을 수 없어요.");
+        }
+      }, 0);
       return;
     }
 
-    setIsCoHostLoading(true);
+    window.setTimeout(() => {
+      if (isMounted) setIsCoHostLoading(true);
+    }, 0);
 
     Promise.all([
       getBandMembers(activeBandId),
@@ -536,15 +545,20 @@ export function LiveForm({
     if (!isEdit) return;
 
     if (!reservationLiveId) {
-      setSubmitErrorMessage("수정할 예약 라이브 정보를 찾을 수 없어요.");
+      window.setTimeout(() => {
+        setSubmitErrorMessage("수정할 예약 라이브 정보를 찾을 수 없어요.");
+      }, 0);
       return;
     }
 
     let isMounted = true;
 
-    setIsReservationLoading(true);
-    setSubmitErrorMessage("");
-    setCoHostLoadErrorMessage("");
+    window.setTimeout(() => {
+      if (!isMounted) return;
+      setIsReservationLoading(true);
+      setSubmitErrorMessage("");
+      setCoHostLoadErrorMessage("");
+    }, 0);
 
     getLiveReservation(reservationLiveId)
       .then((reservation) => {

@@ -3,9 +3,7 @@ import Modal from "@/components/Modal/Modal";
 import { ModalOverlay } from "@/components/common/Modal/ModalOverlay";
 import {
   createWhipSession,
-  createWhepSession,
   deleteWhipSession,
-  enterLive,
   getLiveMembers,
   subscribeViewerCount,
 } from "@/api/live/live";
@@ -15,10 +13,15 @@ import {
   useLeaveLiveMutation,
 } from "@/hooks/api/live/useLive";
 import { getApiErrorMessage } from "@/utils/getApiErrorMessage";
-import { getStoredAuthUser } from "@/utils/authUser";
 import type { LiveMemberItem } from "@/types/live/live";
 import type { ActiveLive, ChatMessage, GoLiveScreen } from "./types";
 import { getCachedScheduledCoHostUserIds } from "./scheduledLiveCache";
+import {
+  extractWhipPath,
+  getAudioContextConstructor,
+  waitForIceGatheringComplete,
+} from "./hooks/liveMediaUtils";
+import { useLiveRoomPlayback } from "./hooks/useLiveRoomPlayback";
 import {
   ChatComposer,
   LiveActionBar,
@@ -86,101 +89,6 @@ const getInitialViewerCount = (live: ActiveLive) => {
   return liveWithCounts.viewerCount ?? liveWithCounts.viewCount ?? 0;
 };
 
-const getOtherCoPublisherWhepUrl = (live: ActiveLive) => {
-  const currentUserId = getStoredAuthUser()?.userId;
-
-  return live?.coPublishers?.find(
-    (publisher) =>
-      publisher.whepUrl &&
-      (!Number.isFinite(currentUserId) || publisher.userId !== currentUserId),
-  )?.whepUrl;
-};
-
-const extractWhipPath = (playbackUrl: string) => {
-  const rawValue = playbackUrl.trim();
-
-  try {
-    const url = new URL(rawValue, window.location.origin);
-    const pathname = decodeURIComponent(url.pathname)
-      .replace(/\/+$/, "")
-      .replace(/^\/+/, "");
-
-    const segments = pathname.split("/").filter(Boolean);
-    const rtcIndex = segments.indexOf("rtc");
-    const protocolIndex = segments.findIndex(
-      (segment) => segment === "whip" || segment === "whep",
-    );
-
-    if (rtcIndex >= 0) {
-      const endIndex =
-        protocolIndex > rtcIndex ? protocolIndex : segments.length;
-      return segments.slice(rtcIndex + 1, endIndex).join("/");
-    }
-
-    return pathname
-      .replace(/^api\/rtc\//, "")
-      .replace(/^rtc\//, "")
-      .replace(/\/(?:whip|whep)$/, "")
-      .replace(/^\/+|\/+$/g, "");
-  } catch {
-    return rawValue
-      .replace(/^https?:\/\/[^/]+/i, "")
-      .replace(/^\/+/, "")
-      .replace(/^api\/rtc\//, "")
-      .replace(/^rtc\//, "")
-      .replace(/\/(?:whip|whep)$/, "")
-      .replace(/^\/+|\/+$/g, "");
-  }
-};
-
-const waitForIceGatheringComplete = (
-  peerConnection: RTCPeerConnection,
-  timeoutMs = 3000,
-) => {
-  if (peerConnection.iceGatheringState === "complete") {
-    return Promise.resolve();
-  }
-
-  return new Promise<void>((resolve) => {
-    let isResolved = false;
-    const timeoutId = window.setTimeout(finish, timeoutMs);
-
-    function finish() {
-      if (isResolved) return;
-
-      isResolved = true;
-
-      peerConnection.removeEventListener(
-        "icegatheringstatechange",
-        handleChange,
-      );
-
-      if (timeoutId !== undefined) {
-        window.clearTimeout(timeoutId);
-      }
-
-      resolve();
-    }
-
-    function handleChange() {
-      if (peerConnection.iceGatheringState === "complete") {
-        finish();
-      }
-    }
-
-    peerConnection.addEventListener("icegatheringstatechange", handleChange);
-  });
-};
-
-const getAudioContextConstructor = () => {
-  return (
-    window.AudioContext ??
-    (window as Window & typeof globalThis & {
-      webkitAudioContext?: typeof AudioContext;
-    }).webkitAudioContext
-  );
-};
-
 export function LiveRoom({
   go,
   live,
@@ -212,20 +120,6 @@ export function LiveRoom({
   const [coHostApprovalMessage, setCoHostApprovalMessage] = useState("");
   const [micVolume, setMicVolume] = useState(DEFAULT_MIC_VOLUME);
   const [isMicMuted, setIsMicMuted] = useState(false);
-  const [listenerAudioMessage, setListenerAudioMessage] = useState("");
-  const [showListenerPlayButton, setShowListenerPlayButton] = useState(false);
-  const [monitorPlaybackUrl, setMonitorPlaybackUrl] = useState(
-    () =>
-      getOtherCoPublisherWhepUrl(live) ??
-      live?.monitorPlaybackUrl ??
-      null,
-  );
-  const [monitorPlaybackProtocol, setMonitorPlaybackProtocol] = useState(
-    () =>
-      (getOtherCoPublisherWhepUrl(live)
-        ? "WHEP"
-        : live?.monitorPlaybackProtocol) ?? null,
-  );
   const [liveMembers, setLiveMembers] = useState<LiveMemberItem[]>([]);
   const [isMembersLoading, setIsMembersLoading] = useState(false);
 
@@ -234,24 +128,29 @@ export function LiveRoom({
   const micStreamRef = useRef<MediaStream | null>(null);
   const processedMicStreamRef = useRef<MediaStream | null>(null);
   const whipSessionUrlRef = useRef<string | null>(null);
-  const whepSessionUrlRef = useRef<string | null>(null);
-  const monitorPeerConnectionRef = useRef<RTCPeerConnection | null>(null);
-  const listenerAudioRef = useRef<HTMLAudioElement | null>(null);
 
   const micVolumeRef = useRef(DEFAULT_MIC_VOLUME);
   const audioContextRef = useRef<AudioContext | null>(null);
   const micSourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const micGainNodeRef = useRef<GainNode | null>(null);
 
-  const isListenerPlayback =
-    Boolean(live?.liveId) &&
-    playbackRole === "LISTENER" &&
-    Boolean(playbackUrl);
-  const isBroadcasterMonitorPlayback =
-    Boolean(live?.liveId) &&
-    canBroadcast &&
-    audioStatus === "connected" &&
-    Boolean(monitorPlaybackUrl);
+  const {
+    handleCoPublisherJoined,
+    isBroadcasterMonitorPlayback,
+    isListenerPlayback,
+    listenerAudioMessage,
+    listenerAudioRef,
+    setListenerAudioMessage,
+    setShowListenerPlayButton,
+    showListenerPlayButton,
+    startBroadcasterMonitorPlayback,
+    startListenerPlayback,
+    stopListenerPlayback,
+  } = useLiveRoomPlayback({
+    live,
+    canBroadcast,
+    audioConnected: audioStatus === "connected",
+  });
 
   const handleAcceptCoHostUpgrade = async () => {
     if (!live?.liveId || acceptCoHostUpgradeMutation.isPending) return;
@@ -537,143 +436,6 @@ export function LiveRoom({
     setAudioStatusSafe,
   ]);
 
-  const startListenerPlayback = useCallback(async () => {
-    const audio = listenerAudioRef.current;
-
-    if (!audio || !playbackUrl) return;
-
-    setListenerAudioMessage("");
-    setShowListenerPlayButton(false);
-
-    try {
-      if (audio.src !== playbackUrl) {
-        audio.src = playbackUrl;
-      }
-
-      audio.volume = 1;
-      await audio.play();
-    } catch {
-      setListenerAudioMessage("오디오 재생을 위해 버튼을 눌러주세요.");
-      setShowListenerPlayButton(true);
-    }
-  }, [playbackUrl]);
-
-  const stopListenerPlayback = useCallback(() => {
-    const audio = listenerAudioRef.current;
-
-    if (!audio) return;
-
-    audio.pause();
-    audio.removeAttribute("src");
-    audio.load();
-
-    setListenerAudioMessage("");
-    setShowListenerPlayButton(false);
-  }, []);
-
-  const stopBroadcasterMonitorPlayback = useCallback(async () => {
-    const sessionUrl = whepSessionUrlRef.current;
-
-    whepSessionUrlRef.current = null;
-    monitorPeerConnectionRef.current?.close();
-    monitorPeerConnectionRef.current = null;
-
-    const audio = listenerAudioRef.current;
-
-    if (audio) {
-      audio.pause();
-      audio.srcObject = null;
-    }
-
-    if (sessionUrl) {
-      try {
-        await deleteWhipSession(sessionUrl);
-      } catch {
-        // 이미 종료된 수신 세션이면 무시
-      }
-    }
-  }, []);
-
-  const startBroadcasterMonitorPlayback = useCallback(async () => {
-    const audio = listenerAudioRef.current;
-
-    if (!audio || !monitorPlaybackUrl) return;
-
-    setListenerAudioMessage("");
-    setShowListenerPlayButton(false);
-
-    if (monitorPeerConnectionRef.current) {
-      try {
-        await audio.play();
-      } catch {
-        setListenerAudioMessage("상대 진행자 소리를 들으려면 눌러주세요.");
-        setShowListenerPlayButton(true);
-      }
-      return;
-    }
-
-    try {
-      if (
-        monitorPlaybackProtocol === "HLS" ||
-        monitorPlaybackUrl.toLowerCase().includes(".m3u8")
-      ) {
-        audio.srcObject = null;
-        audio.src = monitorPlaybackUrl;
-        audio.volume = 1;
-        await audio.play();
-        return;
-      }
-
-      const peerConnection = new RTCPeerConnection();
-      monitorPeerConnectionRef.current = peerConnection;
-      peerConnection.addTransceiver("audio", { direction: "recvonly" });
-
-      peerConnection.ontrack = (event) => {
-        const remoteStream =
-          event.streams[0] ?? new MediaStream([event.track]);
-
-        audio.srcObject = remoteStream;
-        audio.volume = 1;
-        void audio.play().catch(() => {
-          setListenerAudioMessage("상대 진행자 소리를 들으려면 눌러주세요.");
-          setShowListenerPlayButton(true);
-        });
-      };
-
-      const offer = await peerConnection.createOffer();
-      await peerConnection.setLocalDescription(offer);
-      await waitForIceGatheringComplete(peerConnection);
-
-      const localDescription = peerConnection.localDescription;
-      if (!localDescription?.sdp) {
-        throw new Error("WHEP SDP Offer 생성에 실패했습니다.");
-      }
-
-      const { sdpAnswer, sessionUrl } = await createWhepSession({
-        whepUrl: monitorPlaybackUrl,
-        sdpOffer: localDescription.sdp,
-      });
-
-      whepSessionUrlRef.current = sessionUrl;
-      await peerConnection.setRemoteDescription({
-        type: "answer",
-        sdp: sdpAnswer,
-      });
-    } catch (error) {
-      await stopBroadcasterMonitorPlayback();
-      setListenerAudioMessage(
-        error instanceof Error
-          ? error.message
-          : "공동 진행자 오디오 수신에 실패했어요.",
-      );
-      setShowListenerPlayButton(true);
-    }
-  }, [
-    monitorPlaybackProtocol,
-    monitorPlaybackUrl,
-    stopBroadcasterMonitorPlayback,
-  ]);
-
   const handleToggleBroadcast = useCallback(() => {
     if (audioStatus === "connecting") {
       return;
@@ -725,25 +487,16 @@ export function LiveRoom({
   };
 
   useEffect(() => {
-    setViewerCount(getInitialViewerCount(live));
-    const coPublisherWhepUrl = getOtherCoPublisherWhepUrl(live);
-
-    setMonitorPlaybackUrl(
-      coPublisherWhepUrl ?? live?.monitorPlaybackUrl ?? null,
-    );
-    setMonitorPlaybackProtocol(
-      coPublisherWhepUrl ? "WHEP" : (live?.monitorPlaybackProtocol ?? null),
-    );
-  }, [live]);
-
-  useEffect(() => {
-    setDurationSeconds(getLiveDurationSeconds(live?.startedAt));
+    const initialTimer = window.setTimeout(() => {
+      setDurationSeconds(getLiveDurationSeconds(live?.startedAt));
+    }, 0);
 
     const timer = window.setInterval(() => {
       setDurationSeconds(getLiveDurationSeconds(live?.startedAt));
     }, 1000);
 
     return () => {
+      window.clearTimeout(initialTimer);
       window.clearInterval(timer);
     };
   }, [live?.startedAt]);
@@ -759,12 +512,7 @@ export function LiveRoom({
       watchOnly: shouldExcludeMeFromViewerCount,
       onViewerCount: setViewerCount,
       onCoPublisherJoined: canBroadcast
-        ? ({ userId, whepUrl }) => {
-            if (userId === getStoredAuthUser()?.userId) return;
-
-            setMonitorPlaybackUrl(whepUrl);
-            setMonitorPlaybackProtocol("WHEP");
-          }
+        ? handleCoPublisherJoined
         : undefined,
       signal: controller.signal,
     }).catch(() => {
@@ -774,56 +522,16 @@ export function LiveRoom({
     return () => {
       controller.abort();
     };
-  }, [canBroadcast, live?.liveId]);
-
-  useEffect(() => {
-    if (
-      !live?.liveId ||
-      !canBroadcast ||
-      audioStatus !== "connected" ||
-      monitorPlaybackUrl
-    ) {
-      return;
-    }
-
-    let isCancelled = false;
-    let timeoutId: number | undefined;
-
-    const refreshCoPublishers = async () => {
-      try {
-        const refreshedLive = await enterLive(live.liveId);
-        const whepUrl = getOtherCoPublisherWhepUrl(refreshedLive);
-
-        if (isCancelled) return;
-
-        if (whepUrl) {
-          setMonitorPlaybackUrl(whepUrl);
-          setMonitorPlaybackProtocol("WHEP");
-          return;
-        }
-      } catch {
-        // SSE 이벤트를 놓친 경우를 위한 보조 조회이므로 다음 주기에 재시도합니다.
-      }
-
-      if (!isCancelled) {
-        timeoutId = window.setTimeout(refreshCoPublishers, 3000);
-      }
-    };
-
-    void refreshCoPublishers();
-
-    return () => {
-      isCancelled = true;
-      if (timeoutId !== undefined) window.clearTimeout(timeoutId);
-    };
-  }, [audioStatus, canBroadcast, live?.liveId, monitorPlaybackUrl]);
+  }, [canBroadcast, handleCoPublisherJoined, live?.liveId]);
 
   useEffect(() => {
     if (overlay !== "members" || !live?.liveId) return;
 
     let isMounted = true;
 
-    setIsMembersLoading(true);
+    const loadingTimer = window.setTimeout(() => {
+      setIsMembersLoading(true);
+    }, 0);
 
     getLiveMembers(live.liveId)
       .then((response) => {
@@ -844,44 +552,15 @@ export function LiveRoom({
 
     return () => {
       isMounted = false;
+      window.clearTimeout(loadingTimer);
     };
   }, [live?.liveId, overlay]);
 
   useEffect(() => {
     return () => {
       void cleanupWhipBroadcast();
-      stopListenerPlayback();
-      void stopBroadcasterMonitorPlayback();
     };
-  }, [
-    cleanupWhipBroadcast,
-    stopBroadcasterMonitorPlayback,
-    stopListenerPlayback,
-  ]);
-
-  useEffect(() => {
-    if (isListenerPlayback) {
-      void stopBroadcasterMonitorPlayback();
-      void startListenerPlayback();
-      return;
-    }
-
-    if (isBroadcasterMonitorPlayback) {
-      stopListenerPlayback();
-      void startBroadcasterMonitorPlayback();
-      return;
-    }
-
-    stopListenerPlayback();
-    void stopBroadcasterMonitorPlayback();
-  }, [
-    isBroadcasterMonitorPlayback,
-    isListenerPlayback,
-    startBroadcasterMonitorPlayback,
-    startListenerPlayback,
-    stopBroadcasterMonitorPlayback,
-    stopListenerPlayback,
-  ]);
+  }, [cleanupWhipBroadcast]);
 
   return (
     <main className="relative flex h-dvh min-h-0 flex-col overflow-hidden bg-neutral-0 text-neutral-900">
@@ -987,9 +666,9 @@ export function LiveRoom({
             title="라이브를 종료할까요?"
             description={
               <>
-                라이브를 종료하면 청취자들이
+                라이브를 종료하면 청취자들도
                 <br />
-                자동으로 퇴장해요
+                자동으로 나가게 돼요.
               </>
             }
             cancelLabel="취소"

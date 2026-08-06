@@ -68,7 +68,7 @@ export interface CheckBandNameResponse {
 
 export interface BandDetailResponse {
   bandId: number;
-  ownerId?: number;
+  ownerId: number;
   name: string;
   genre: BandGenre;
   region: BandRegion;

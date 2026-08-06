@@ -25,6 +25,9 @@ const isLiveReferenceType = (value) => {
 
 const isCoHostUpgradeRequest = (data, notification = {}) => {
   const type = getNotificationType(data).toUpperCase();
+
+  if (isCoHostInviteType(type)) return false;
+
   const content = `${getStringValue(notification.title || data.title)} ${getStringValue(
     notification.body || data.body,
   )}`.toUpperCase();
@@ -61,7 +64,9 @@ const getLiveIdFromData = (data) => {
 };
 
 const createBandLiveDeepLink = (liveId) => {
-  return `/band/live?type=LIVE&liveId=${encodeURIComponent(String(liveId))}`;
+  return `/band/live?type=LIVE&liveId=${encodeURIComponent(
+    String(liveId),
+  )}&action=accept`;
 };
 
 const createCoHostUpgradeApprovalDeepLink = (liveId) => {

@@ -9,7 +9,7 @@ export interface LiveApiResponse<T> {
 }
 
 export interface LiveCoHostItem {
-  userId?: number;
+  userId: number;
   memberId?: number;
   bandMemberId?: number;
   bandMemberProfileId?: number;

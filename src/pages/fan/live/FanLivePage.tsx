@@ -12,7 +12,7 @@ import Modal from "@/components/Modal/Modal";
 import { ModalOverlay } from "@/components/common/Modal/ModalOverlay";
 import {
   useBlockLiveUserMutation,
-  useEnterLiveQuery,
+  useEnterLiveMutation,
   useLeaveLiveMutation,
   useReportLiveUserMutation,
   useUnblockLiveUserMutation,
@@ -96,16 +96,30 @@ export function FanLivePage() {
   const stateLive = (location.state as FanLiveLocationState | null)?.live;
   const liveId = Number(liveIdParam);
   const hasValidLiveId = Number.isInteger(liveId) && liveId > 0;
-  const {
-    data: queriedLive,
-    isLoading,
-    isError,
-    refetch,
-  } = useEnterLiveQuery(
-    hasValidLiveId ? liveId : null,
-    !stateLive,
-  );
-  const live = stateLive ?? queriedLive;
+  const enterLiveMutation = useEnterLiveMutation();
+  const requestedLiveIdRef = useRef<number | null>(null);
+  const requestEnterLive = useCallback(() => {
+    if (!hasValidLiveId) return;
+
+    requestedLiveIdRef.current = liveId;
+    enterLiveMutation.mutate(liveId);
+  }, [enterLiveMutation, hasValidLiveId, liveId]);
+
+  useEffect(() => {
+    if (
+      stateLive ||
+      !hasValidLiveId ||
+      requestedLiveIdRef.current === liveId
+    ) {
+      return;
+    }
+
+    requestEnterLive();
+  }, [hasValidLiveId, liveId, requestEnterLive, stateLive]);
+
+  const live = stateLive ?? enterLiveMutation.data;
+  const isLoading = enterLiveMutation.isPending;
+  const isError = enterLiveMutation.isError;
   const leaveLiveMutation = useLeaveLiveMutation();
   const reportLiveUserMutation = useReportLiveUserMutation();
   const blockLiveUserMutation = useBlockLiveUserMutation();
@@ -266,9 +280,12 @@ export function FanLivePage() {
 
     let isMounted = true;
 
-    setLiveMembers([]);
-    setIsMembersLoading(true);
-    setHasMembersError(false);
+    window.setTimeout(() => {
+      if (!isMounted) return;
+      setLiveMembers([]);
+      setIsMembersLoading(true);
+      setHasMembersError(false);
+    }, 0);
 
     getLiveMembers(live.liveId)
       .then((response) => {
@@ -319,7 +336,9 @@ export function FanLivePage() {
   }
 
   if (playback.role !== "LISTENER") {
-    setAudioMessage("청취자 재생 정보가 올바르지 않아요.");
+    window.setTimeout(() => {
+      setAudioMessage("청취자 재생 정보가 올바르지 않아요.");
+    }, 0);
     return;
   }
 
@@ -537,7 +556,7 @@ export function FanLivePage() {
           {isError ? (
             <button
               type="button"
-              onClick={() => refetch()}
+              onClick={requestEnterLive}
               className="rounded-lg border border-primary-400 px-4 py-2 font-body text-caption2 text-primary-400"
             >
               다시 시도

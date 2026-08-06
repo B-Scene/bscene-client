@@ -91,6 +91,9 @@ export const isCoHostUpgradeRequestNotification = (
   notification: NotificationItem,
 ) => {
   const normalizedType = notification.type.toUpperCase();
+
+  if (isCoHostInviteNotificationType(normalizedType)) return false;
+
   const normalizedContent = `${notification.title} ${notification.body}`
     .trim()
     .toUpperCase();
@@ -169,7 +172,7 @@ const getCoHostUpgradeApprovalPath = (
 };
 
 const getRequesterNickname = (notification: NotificationItem) => {
-  return notification.body.match(/^\s*(.+?)님이(?:\s|['\"])/)?.[1]?.trim() ?? null;
+  return notification.body.match(/^\s*(.+?)님이(?:\s|['"])/)?.[1]?.trim() ?? null;
 };
 
 const getLiveReferencePath = (notification: NotificationItem) => {
@@ -395,6 +398,10 @@ const getDeepLinkMode = (deepLink?: string | null): NotificationMode | null => {
 export const getNotificationMode = (
   notification: NotificationItem,
 ): NotificationMode | null => {
+  if (notification.mode === "FAN" || notification.mode === "BAND") {
+    return notification.mode;
+  }
+
   const type = notification.type.toUpperCase();
   const titleAndBody = `${notification.title} ${notification.body}`;
 
@@ -450,10 +457,6 @@ export const getNotificationMode = (
   const deepLinkMode = getDeepLinkMode(notification.deepLink);
 
   if (deepLinkMode) return deepLinkMode;
-
-  if (notification.mode === "FAN" || notification.mode === "BAND") {
-    return notification.mode;
-  }
 
   if (
     type.includes("FOLLOWED") ||

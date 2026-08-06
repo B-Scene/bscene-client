@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import type { AxiosError } from "axios";
 import LiveHeadIcon from "@/assets/icons/live-head.svg";
 import { Header } from "@/components/common/Header/Header";
@@ -201,49 +201,53 @@ export function BandLiveHome({
   const enterLiveMutation = useEnterLiveMutation();
   const respondCoHostInvitationMutation = useRespondCoHostInvitationMutation();
 
-  const liveNowCards: LiveCard[] =
-    data?.liveNow.map((live) => ({
-      id: live.liveId,
-      title: live.isMine ? "내 라이브 진행 중" : live.bandName,
-      subtitle: live.title,
-      listeners: `${live.viewerCount}명 청취 중`,
-      imageUrl: live.bandProfileImageUrl,
-      isMine: live.isMine,
-    })) ?? [];
+  const { liveNowCards, scheduledCards } = useMemo(() => {
+    const liveNowCards: LiveCard[] =
+      data?.liveNow.map((live) => ({
+        id: live.liveId,
+        title: live.isMine ? "내 라이브 진행 중" : live.bandName,
+        subtitle: live.title,
+        listeners: `${live.viewerCount}명 청취 중`,
+        imageUrl: live.bandProfileImageUrl,
+        isMine: live.isMine,
+      })) ?? [];
 
-  const scheduledFromHome = data?.scheduled ?? [];
-  const scheduledFromList =
-    scheduledListData?.pages.flatMap((page) => page.items ?? []) ?? [];
+    const scheduledFromHome = data?.scheduled ?? [];
+    const scheduledFromList =
+      scheduledListData?.pages.flatMap((page) => page.items ?? []) ?? [];
 
-  const mergedScheduledMap = new Map<
-    number,
-    ScheduledLiveItem | ScheduledLiveListItem
-  >();
+    const mergedScheduledMap = new Map<
+      number,
+      ScheduledLiveItem | ScheduledLiveListItem
+    >();
 
-  scheduledFromList.forEach((live) => {
-    mergedScheduledMap.set(live.liveId, live);
-  });
+    scheduledFromList.forEach((live) => {
+      mergedScheduledMap.set(live.liveId, live);
+    });
 
-  scheduledFromHome.forEach((live) => {
-    mergedScheduledMap.set(live.liveId, live);
-  });
+    scheduledFromHome.forEach((live) => {
+      mergedScheduledMap.set(live.liveId, live);
+    });
 
-  const fetchedScheduledCards = Array.from(mergedScheduledMap.values()).map(
-    mapScheduledToCard,
-  );
-  const retainedScheduledMap = new Map(
-    getCachedOwnedScheduledLives().map((live) => [live.id, live]),
-  );
+    const fetchedScheduledCards = Array.from(mergedScheduledMap.values()).map(
+      mapScheduledToCard,
+    );
+    const retainedScheduledMap = new Map(
+      getCachedOwnedScheduledLives().map((live) => [live.id, live]),
+    );
 
-  fetchedScheduledCards.forEach((live) => {
-    retainedScheduledMap.set(live.id, live);
-  });
+    fetchedScheduledCards.forEach((live) => {
+      retainedScheduledMap.set(live.id, live);
+    });
 
-  liveNowCards.forEach((live) => {
-    retainedScheduledMap.delete(live.id);
-  });
+    liveNowCards.forEach((live) => {
+      retainedScheduledMap.delete(live.id);
+    });
 
-  const scheduledCards = Array.from(retainedScheduledMap.values());
+    const scheduledCards = Array.from(retainedScheduledMap.values());
+
+    return { liveNowCards, scheduledCards };
+  }, [data, scheduledListData]);
 
   useEffect(() => {
     cacheOwnedScheduledLives(scheduledCards);
