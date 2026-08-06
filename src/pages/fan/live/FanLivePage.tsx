@@ -12,7 +12,7 @@ import Modal from "@/components/Modal/Modal";
 import { ModalOverlay } from "@/components/common/Modal/ModalOverlay";
 import {
   useBlockLiveUserMutation,
-  useEnterLiveQuery,
+  useEnterLiveMutation,
   useLeaveLiveMutation,
   useReportLiveUserMutation,
   useUnblockLiveUserMutation,
@@ -96,16 +96,35 @@ export function FanLivePage() {
   const stateLive = (location.state as FanLiveLocationState | null)?.live;
   const liveId = Number(liveIdParam);
   const hasValidLiveId = Number.isInteger(liveId) && liveId > 0;
-  const {
-    data: queriedLive,
-    isLoading,
-    isError,
-    refetch,
-  } = useEnterLiveQuery(
-    hasValidLiveId ? liveId : null,
-    !stateLive,
-  );
-  const live = stateLive ?? queriedLive;
+  const matchingStateLive = stateLive?.liveId === liveId ? stateLive : undefined;
+  const enterLiveMutation = useEnterLiveMutation();
+  const requestedLiveIdRef = useRef<number | null>(null);
+  const requestEnterLive = useCallback(() => {
+    if (!hasValidLiveId) return;
+
+    requestedLiveIdRef.current = liveId;
+    enterLiveMutation.mutate(liveId);
+  }, [enterLiveMutation, hasValidLiveId, liveId]);
+
+  useEffect(() => {
+    if (
+      matchingStateLive ||
+      !hasValidLiveId ||
+      requestedLiveIdRef.current === liveId
+    ) {
+      return;
+    }
+
+    requestEnterLive();
+  }, [hasValidLiveId, liveId, matchingStateLive, requestEnterLive]);
+
+  const matchingMutationLive =
+    enterLiveMutation.variables === liveId
+      ? enterLiveMutation.data
+      : undefined;
+  const live = matchingStateLive ?? matchingMutationLive;
+  const isLoading = enterLiveMutation.isPending;
+  const isError = enterLiveMutation.isError;
   const leaveLiveMutation = useLeaveLiveMutation();
   const reportLiveUserMutation = useReportLiveUserMutation();
   const blockLiveUserMutation = useBlockLiveUserMutation();
@@ -265,13 +284,16 @@ export function FanLivePage() {
     if (!live?.liveId) return;
 
     let isMounted = true;
+    const loadMembers = async () => {
+      await Promise.resolve();
+      if (!isMounted) return;
 
-    setLiveMembers([]);
-    setIsMembersLoading(true);
-    setHasMembersError(false);
+      setLiveMembers([]);
+      setIsMembersLoading(true);
+      setHasMembersError(false);
 
-    getLiveMembers(live.liveId)
-      .then((response) => {
+      try {
+        const response = await getLiveMembers(live.liveId);
         if (!isMounted) return;
 
         const memberNames = new Set(
@@ -286,18 +308,17 @@ export function FanLivePage() {
               chat.sender === live.bandName || memberNames.has(chat.sender),
           })),
         );
-      })
-      .catch(() => {
+      } catch {
         if (!isMounted) return;
 
         setLiveMembers([]);
         setHasMembersError(true);
-      })
-      .finally(() => {
-        if (!isMounted) return;
+      } finally {
+        if (isMounted) setIsMembersLoading(false);
+      }
+    };
 
-        setIsMembersLoading(false);
-      });
+    void loadMembers();
 
     return () => {
       isMounted = false;
@@ -319,7 +340,9 @@ export function FanLivePage() {
   }
 
   if (playback.role !== "LISTENER") {
-    setAudioMessage("청취자 재생 정보가 올바르지 않아요.");
+    window.setTimeout(() => {
+      setAudioMessage("청취자 재생 정보가 올바르지 않아요.");
+    }, 0);
     return;
   }
 
@@ -537,7 +560,7 @@ export function FanLivePage() {
           {isError ? (
             <button
               type="button"
-              onClick={() => refetch()}
+              onClick={requestEnterLive}
               className="rounded-lg border border-primary-400 px-4 py-2 font-body text-caption2 text-primary-400"
             >
               다시 시도

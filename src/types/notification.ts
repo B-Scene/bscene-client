@@ -22,6 +22,7 @@ export interface NotificationItem {
   mode?: NotificationSettingsMode | null;
   deepLink: string | null;
   referenceId: number | null;
+  requesterUserId?: number | null;
   title: string;
   body: string;
   isRead: boolean;

@@ -74,21 +74,6 @@ export const useLiveHomeQuery = () => {
   });
 };
 
-export const useEnterLiveQuery = (
-  liveId?: number | null,
-  enabled = Boolean(liveId),
-) => {
-  return useQuery({
-    queryKey: liveKeys.enter(liveId),
-    queryFn: () => enterLive(liveId as number),
-    enabled: Boolean(liveId) && enabled,
-    staleTime: 0,
-    refetchOnMount: "always",
-    refetchOnWindowFocus: false,
-    retry: 1,
-  });
-};
-
 export const useLiveSummaryQuery = (
   liveId?: number | null,
   enabled = Boolean(liveId),
@@ -451,7 +436,7 @@ export const useAcceptCoHostUpgradeMutation = () => {
 
   return useMutation({
     mutationFn: acceptCoHostUpgrade,
-    onSuccess: (_, liveId) => {
+    onSuccess: (_, { liveId }) => {
       void queryClient.invalidateQueries({ queryKey: liveKeys.home() });
       void queryClient.invalidateQueries({ queryKey: liveKeys.enter(liveId) });
       void queryClient.invalidateQueries({ queryKey: liveKeys.members(liveId) });

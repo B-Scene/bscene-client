@@ -9,7 +9,7 @@ export interface LiveApiResponse<T> {
 }
 
 export interface LiveCoHostItem {
-  userId?: number;
+  userId: number;
   memberId?: number;
   bandMemberId?: number;
   bandMemberProfileId?: number;
@@ -204,6 +204,11 @@ export interface LivePlayback {
   playbackUrl: string;
 }
 
+export interface LiveCoPublisher {
+  userId: number;
+  whepUrl: string;
+}
+
 export interface EnterLiveResponse {
   liveId: number;
   isLive: boolean;
@@ -215,6 +220,8 @@ export interface EnterLiveResponse {
   title: string;
   description: string | null;
   playback: LivePlayback;
+  monitorPlaybackUrl?: string | null;
+  monitorPlaybackProtocol?: PlaybackProtocol | null;
 
   myNickname?: string | null;
   nickname?: string | null;
@@ -224,6 +231,7 @@ export interface EnterLiveResponse {
   isBroadcaster?: boolean;
   coHosts?: LiveCoHostItem[];
   coHostList?: LiveCoHostItem[];
+  coPublishers?: LiveCoPublisher[];
 }
 
 export type LiveReportType =

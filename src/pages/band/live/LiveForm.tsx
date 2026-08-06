@@ -13,9 +13,13 @@ import {
   updateLiveReservation,
 } from "@/api/live/live";
 import { getBandMembers } from "@/api/band/bandMember";
-import { getActiveBandMemberProfile } from "@/api/band/bandMemberProfile";
+import {
+  getActiveBandMemberProfile,
+  getBandMemberProfile,
+} from "@/api/band/bandMemberProfile";
 import { uploadMediaFile } from "@/api/media/media";
 import type { BandMemberListItem } from "@/types/band/bandMember";
+import type { BandMemberProfileResponse } from "@/types/band/bandMemberProfile";
 import type {
   LiveApiResponse,
   LiveReservationCoHostCandidate,
@@ -132,12 +136,12 @@ const isInactiveMemberStatus = (status: string | null | undefined) => {
 const mapBandMemberToCoHostCandidate = (
   member: BandMemberListItem,
   activeProfileId?: number | null,
+  profile?: BandMemberProfileResponse | null,
 ): LiveReservationCoHostCandidate | null => {
-  if (!member.id || !member.bandMemberProfileId || !member.profileNickname) {
-    return null;
-  }
+  const nickname = member.profileNickname ?? profile?.nickname;
+  const resolvedProfileId = member.bandMemberProfileId ?? member.id;
 
-  if (member.memberType === "SESSION") {
+  if (!member.id || !member.userId || !resolvedProfileId || !nickname) {
     return null;
   }
 
@@ -146,15 +150,14 @@ const mapBandMemberToCoHostCandidate = (
   }
 
   const isOwner =
-    Boolean(activeProfileId) &&
-    Number(member.bandMemberProfileId) === Number(activeProfileId);
+    Boolean(activeProfileId) && Number(resolvedProfileId) === Number(activeProfileId);
 
   return {
     bandMemberId: member.id,
-    bandMemberProfileId: member.bandMemberProfileId,
+    bandMemberProfileId: resolvedProfileId,
     bandMemberProfileImageUrl: null,
-    nickname: member.profileNickname,
-    part: member.memberType,
+    nickname,
+    part: profile?.part ?? member.memberType,
     status: isOwner ? "OWNER" : null,
     userId: member.userId,
   };
@@ -462,30 +465,54 @@ export function LiveForm({
 
     let isMounted = true;
 
-    setCoHostLoadErrorMessage("");
-    setSelectedCoHostIds([]);
-    setInitialSelectedCoHostIds([]);
-    setCohostCandidates([]);
+    window.setTimeout(() => {
+      if (!isMounted) return;
+      setCoHostLoadErrorMessage("");
+      setSelectedCoHostIds([]);
+      setInitialSelectedCoHostIds([]);
+      setCohostCandidates([]);
+    }, 0);
 
     if (!activeBandId) {
-      setCoHostLoadErrorMessage("현재 선택된 밴드 정보를 찾을 수 없어요.");
+      window.setTimeout(() => {
+        if (isMounted) {
+          setCoHostLoadErrorMessage("현재 선택된 밴드 정보를 찾을 수 없어요.");
+        }
+      }, 0);
       return;
     }
 
-    setIsCoHostLoading(true);
+    window.setTimeout(() => {
+      if (isMounted) setIsCoHostLoading(true);
+    }, 0);
 
     Promise.all([
       getBandMembers(activeBandId),
       getActiveBandMemberProfile().catch(() => null),
     ])
-      .then(([members, activeProfile]) => {
+      .then(async ([members, activeProfile]) => {
         if (!isMounted) return;
 
         const activeProfileId = activeProfile?.id ?? null;
+        const memberProfiles = await Promise.all(
+          members.map((member) =>
+            member.bandMemberProfileId
+              ? getBandMemberProfile(member.bandMemberProfileId).catch(
+                  () => null,
+                )
+              : Promise.resolve(null),
+          ),
+        );
+
+        if (!isMounted) return;
 
         const candidates = members
-          .map((member) =>
-            mapBandMemberToCoHostCandidate(member, activeProfileId),
+          .map((member, index) =>
+            mapBandMemberToCoHostCandidate(
+              member,
+              activeProfileId,
+              memberProfiles[index],
+            ),
           )
           .filter(
             (
@@ -518,15 +545,20 @@ export function LiveForm({
     if (!isEdit) return;
 
     if (!reservationLiveId) {
-      setSubmitErrorMessage("수정할 예약 라이브 정보를 찾을 수 없어요.");
+      window.setTimeout(() => {
+        setSubmitErrorMessage("수정할 예약 라이브 정보를 찾을 수 없어요.");
+      }, 0);
       return;
     }
 
     let isMounted = true;
 
-    setIsReservationLoading(true);
-    setSubmitErrorMessage("");
-    setCoHostLoadErrorMessage("");
+    window.setTimeout(() => {
+      if (!isMounted) return;
+      setIsReservationLoading(true);
+      setSubmitErrorMessage("");
+      setCoHostLoadErrorMessage("");
+    }, 0);
 
     getLiveReservation(reservationLiveId)
       .then((reservation) => {

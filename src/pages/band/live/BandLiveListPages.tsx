@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import type { AxiosError } from "axios";
 import { Header } from "@/components/common/Header/Header";
 import {
@@ -17,6 +17,17 @@ import type {
   ScheduledLiveCardData,
 } from "./types";
 import { HomeLiveCard, ScheduledLiveCard } from "./BandLiveHome";
+import {
+  cacheOwnedScheduledLives,
+  cacheScheduledCoHostUserIds,
+  getCachedOwnedScheduledLives,
+  removeCachedOwnedScheduledLive,
+  useRetainedScheduledLiveCards,
+} from "./scheduledLiveCache";
+import {
+  isScheduledLiveStartable,
+  useScheduledLiveNow,
+} from "./scheduledLiveTime";
 
 interface BandLiveListPageProps {
   go: GoLiveScreen;
@@ -94,27 +105,6 @@ const isAlreadyProcessedInvitationError = (error: unknown) => {
   const code = getApiErrorBody(error)?.code ?? "";
 
   return status === 409 || code.startsWith("LIVE409");
-};
-
-const parseScheduledAtTime = (scheduledAt: string) => {
-  const value = scheduledAt.trim();
-
-  if (!value) return null;
-
-  const normalizedValue = value.includes("T") ? value : value.replace(" ", "T");
-  const date = new Date(normalizedValue);
-
-  if (Number.isNaN(date.getTime())) return null;
-
-  return date.getTime();
-};
-
-const isScheduledLiveStartable = (scheduledAt: string) => {
-  const scheduledTime = parseScheduledAtTime(scheduledAt);
-
-  if (scheduledTime === null) return false;
-
-  return scheduledTime <= Date.now();
 };
 
 export function BandLiveNowListPage({
@@ -274,6 +264,7 @@ export function BandLiveScheduledListPage({
   onEnterLive,
   onEditReservation,
 }: BandLiveScheduledListPageProps) {
+  const now = useScheduledLiveNow();
   const {
     data,
     fetchNextPage,
@@ -298,8 +289,8 @@ export function BandLiveScheduledListPage({
     [liveHome?.scheduled],
   );
 
-  const scheduledCards = useMemo<ScheduledLiveCardData[]>(
-    () =>
+  const scheduledCards = useMemo<ScheduledLiveCardData[]>(() => {
+    const fetchedCards =
       data?.pages.flatMap((page) =>
         page.items.map((live) => ({
           id: live.liveId,
@@ -309,10 +300,27 @@ export function BandLiveScheduledListPage({
             previewScheduleByLiveId.get(live.liveId) ?? live.scheduledAt,
           isMine: Boolean(live.isMine),
           imageUrl: live.bandProfileImageUrl ?? live.thumbnailImageUrl ?? null,
+          coHostUserIds: (live.coHosts ?? live.coHostList ?? [])
+            .map((coHost) => coHost.userId)
+            .filter((userId): userId is number => Number.isFinite(userId)),
         })),
-      ) ?? [],
-    [data, previewScheduleByLiveId],
-  );
+      ) ?? [];
+    const mergedCards = new Map(
+      getCachedOwnedScheduledLives().map((live) => [live.id, live]),
+    );
+
+    fetchedCards.forEach((live) => mergedCards.set(live.id, live));
+
+    return Array.from(mergedCards.values());
+  }, [data, previewScheduleByLiveId]);
+  const retainedScheduledCards = useRetainedScheduledLiveCards(scheduledCards);
+
+  useEffect(() => {
+    cacheOwnedScheduledLives(retainedScheduledCards);
+    retainedScheduledCards.forEach((live) => {
+      cacheScheduledCoHostUserIds(live.id, live.coHostUserIds ?? []);
+    });
+  }, [retainedScheduledCards]);
 
   const loadMore = useCallback(() => {
     if (!hasNextPage || isFetchingNextPage) return;
@@ -326,6 +334,7 @@ export function BandLiveScheduledListPage({
   });
 
   const enterAndMoveRoom = (enteredLive: EnterLiveResponse) => {
+    removeCachedOwnedScheduledLive(Number(enteredLive.liveId));
     onEnterLive(enteredLive);
     go("room");
   };
@@ -333,7 +342,7 @@ export function BandLiveScheduledListPage({
   const handleScheduledLiveAction = async (live: ScheduledLiveCardData) => {
     if (enterLiveMutation.isPending) return;
 
-    const canStartLive = isScheduledLiveStartable(live.scheduledAt);
+    const canStartLive = isScheduledLiveStartable(live.scheduledAt, now);
 
     if (!canStartLive) {
       if (live.isMine) {
@@ -375,17 +384,22 @@ export function BandLiveScheduledListPage({
           </ListMessage>
         ) : null}
 
-        {!isLoading && !isError && scheduledCards.length === 0 ? (
+        {!isLoading && !isError && retainedScheduledCards.length === 0 ? (
           <ListMessage>예정된 라이브가 없어요.</ListMessage>
         ) : null}
 
-        {!isLoading && !isError && scheduledCards.length > 0 ? (
+        {!isLoading && !isError && retainedScheduledCards.length > 0 ? (
           <div className="grid gap-3 pt-5">
-            {scheduledCards.map((live) => (
-              <ScheduledLiveCard
+            {retainedScheduledCards.map((live) => (
+                <ScheduledLiveCard
                 key={live.id}
                 live={live}
-                onEdit={() => void handleScheduledLiveAction(live)}
+                  actionLabel={
+                  isScheduledLiveStartable(live.scheduledAt, now)
+                    ? "라이브 시작"
+                    : "수정"
+                  }
+                  onEdit={() => void handleScheduledLiveAction(live)}
               />
             ))}
 

@@ -7,9 +7,21 @@ import {
   getLiveMembers,
   subscribeViewerCount,
 } from "@/api/live/live";
-import { useCloseLiveMutation } from "@/hooks/api/live/useLive";
+import {
+  useAcceptCoHostUpgradeMutation,
+  useCloseLiveMutation,
+  useLeaveLiveMutation,
+} from "@/hooks/api/live/useLive";
+import { getApiErrorMessage } from "@/utils/getApiErrorMessage";
 import type { LiveMemberItem } from "@/types/live/live";
 import type { ActiveLive, ChatMessage, GoLiveScreen } from "./types";
+import { getCachedScheduledCoHostUserIds } from "./scheduledLiveCache";
+import {
+  extractWhipPath,
+  getAudioContextConstructor,
+  waitForIceGatheringComplete,
+} from "./hooks/liveMediaUtils";
+import { useLiveRoomPlayback } from "./hooks/useLiveRoomPlayback";
 import {
   ChatComposer,
   LiveActionBar,
@@ -77,89 +89,6 @@ const getInitialViewerCount = (live: ActiveLive) => {
   return liveWithCounts.viewerCount ?? liveWithCounts.viewCount ?? 0;
 };
 
-const extractWhipPath = (playbackUrl: string) => {
-  const rawValue = playbackUrl.trim();
-
-  try {
-    const url = new URL(rawValue, window.location.origin);
-    const pathname = decodeURIComponent(url.pathname)
-      .replace(/\/+$/, "")
-      .replace(/^\/+/, "");
-
-    const segments = pathname.split("/").filter(Boolean);
-    const rtcIndex = segments.indexOf("rtc");
-    const whipIndex = segments.indexOf("whip");
-
-    if (rtcIndex >= 0) {
-      const endIndex = whipIndex > rtcIndex ? whipIndex : segments.length;
-      return segments.slice(rtcIndex + 1, endIndex).join("/");
-    }
-
-    return pathname
-      .replace(/^api\/rtc\//, "")
-      .replace(/^rtc\//, "")
-      .replace(/\/whip$/, "")
-      .replace(/^\/+|\/+$/g, "");
-  } catch {
-    return rawValue
-      .replace(/^https?:\/\/[^/]+/i, "")
-      .replace(/^\/+/, "")
-      .replace(/^api\/rtc\//, "")
-      .replace(/^rtc\//, "")
-      .replace(/\/whip$/, "")
-      .replace(/^\/+|\/+$/g, "");
-  }
-};
-
-const waitForIceGatheringComplete = (
-  peerConnection: RTCPeerConnection,
-  timeoutMs = 3000,
-) => {
-  if (peerConnection.iceGatheringState === "complete") {
-    return Promise.resolve();
-  }
-
-  return new Promise<void>((resolve) => {
-    let isResolved = false;
-    let timeoutId: number | undefined;
-
-    function finish() {
-      if (isResolved) return;
-
-      isResolved = true;
-
-      peerConnection.removeEventListener(
-        "icegatheringstatechange",
-        handleChange,
-      );
-
-      if (timeoutId !== undefined) {
-        window.clearTimeout(timeoutId);
-      }
-
-      resolve();
-    }
-
-    function handleChange() {
-      if (peerConnection.iceGatheringState === "complete") {
-        finish();
-      }
-    }
-
-    peerConnection.addEventListener("icegatheringstatechange", handleChange);
-    timeoutId = window.setTimeout(finish, timeoutMs);
-  });
-};
-
-const getAudioContextConstructor = () => {
-  return (
-    window.AudioContext ??
-    (window as Window & typeof globalThis & {
-      webkitAudioContext?: typeof AudioContext;
-    }).webkitAudioContext
-  );
-};
-
 export function LiveRoom({
   go,
   live,
@@ -169,10 +98,15 @@ export function LiveRoom({
   overlay,
 }: LiveRoomProps) {
   const closeLiveMutation = useCloseLiveMutation();
+  const leaveLiveMutation = useLeaveLiveMutation();
+  const acceptCoHostUpgradeMutation = useAcceptCoHostUpgradeMutation();
 
   const playbackRole = live?.playback?.role;
   const playbackProtocol = live?.playback?.protocol;
   const playbackUrl = live?.playback?.playbackUrl;
+  const canBroadcast =
+    playbackRole === "BROADCASTER" || playbackRole === "CO_HOST";
+  const canCloseLive = playbackRole === "BROADCASTER";
 
   const [viewerCount, setViewerCount] = useState(() =>
     getInitialViewerCount(live),
@@ -183,10 +117,9 @@ export function LiveRoom({
   const [audioStatus, setAudioStatus] = useState<LiveAudioStatus>("idle");
   const [audioErrorMessage, setAudioErrorMessage] = useState("");
   const [micInfoMessage, setMicInfoMessage] = useState("");
+  const [coHostApprovalMessage, setCoHostApprovalMessage] = useState("");
   const [micVolume, setMicVolume] = useState(DEFAULT_MIC_VOLUME);
   const [isMicMuted, setIsMicMuted] = useState(false);
-  const [listenerAudioMessage, setListenerAudioMessage] = useState("");
-  const [showListenerPlayButton, setShowListenerPlayButton] = useState(false);
   const [liveMembers, setLiveMembers] = useState<LiveMemberItem[]>([]);
   const [isMembersLoading, setIsMembersLoading] = useState(false);
 
@@ -195,15 +128,70 @@ export function LiveRoom({
   const micStreamRef = useRef<MediaStream | null>(null);
   const processedMicStreamRef = useRef<MediaStream | null>(null);
   const whipSessionUrlRef = useRef<string | null>(null);
-  const listenerAudioRef = useRef<HTMLAudioElement | null>(null);
 
   const micVolumeRef = useRef(DEFAULT_MIC_VOLUME);
   const audioContextRef = useRef<AudioContext | null>(null);
   const micSourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const micGainNodeRef = useRef<GainNode | null>(null);
 
-  const isListenerPlayback =
-    live?.isLive && playbackRole === "LISTENER" && Boolean(playbackUrl);
+  const {
+    handleCoPublisherJoined,
+    isBroadcasterMonitorPlayback,
+    isListenerPlayback,
+    listenerAudioMessage,
+    listenerAudioRef,
+    setListenerAudioMessage,
+    setShowListenerPlayButton,
+    showListenerPlayButton,
+    startBroadcasterMonitorPlayback,
+    startListenerPlayback,
+    stopListenerPlayback,
+  } = useLiveRoomPlayback({
+    live,
+    canBroadcast,
+    audioConnected: audioStatus === "connected",
+  });
+
+  const handleAcceptCoHostUpgrade = async () => {
+    if (!live?.liveId || acceptCoHostUpgradeMutation.isPending) return;
+
+    const requesterUserIds = getCachedScheduledCoHostUserIds(live.liveId);
+
+    if (requesterUserIds.length === 0) {
+      setCoHostApprovalMessage(
+        "승인할 공동 진행자의 사용자 정보를 찾을 수 없어요.",
+      );
+      return;
+    }
+
+    setCoHostApprovalMessage("");
+
+    try {
+      let lastError: unknown = null;
+
+      for (const userId of requesterUserIds) {
+        try {
+          await acceptCoHostUpgradeMutation.mutateAsync({
+            liveId: live.liveId,
+            userId,
+          });
+          setCoHostApprovalMessage("공동 진행 요청을 승인했어요.");
+          return;
+        } catch (error) {
+          lastError = error;
+        }
+      }
+
+      throw lastError;
+    } catch (error) {
+      setCoHostApprovalMessage(
+        getApiErrorMessage(
+          error,
+          "대기 중인 공동 진행 요청을 승인하지 못했어요.",
+        ),
+      );
+    }
+  };
 
   const setAudioStatusSafe = useCallback((nextStatus: LiveAudioStatus) => {
     audioStatusRef.current = nextStatus;
@@ -316,7 +304,7 @@ export function LiveRoom({
   const startWhipBroadcast = useCallback(async () => {
     if (!live?.liveId) return;
 
-    if (playbackRole !== "BROADCASTER") {
+    if (!canBroadcast) {
       setAudioStatusSafe("unsupported");
       return;
     }
@@ -441,46 +429,12 @@ export function LiveRoom({
     }
   }, [
     cleanupWhipBroadcast,
+    canBroadcast,
     live?.liveId,
     playbackProtocol,
-    playbackRole,
     playbackUrl,
     setAudioStatusSafe,
   ]);
-
-  const startListenerPlayback = useCallback(async () => {
-    const audio = listenerAudioRef.current;
-
-    if (!audio || !playbackUrl) return;
-
-    setListenerAudioMessage("");
-    setShowListenerPlayButton(false);
-
-    try {
-      if (audio.src !== playbackUrl) {
-        audio.src = playbackUrl;
-      }
-
-      audio.volume = 1;
-      await audio.play();
-    } catch {
-      setListenerAudioMessage("오디오 재생을 위해 버튼을 눌러주세요.");
-      setShowListenerPlayButton(true);
-    }
-  }, [playbackUrl]);
-
-  const stopListenerPlayback = useCallback(() => {
-    const audio = listenerAudioRef.current;
-
-    if (!audio) return;
-
-    audio.pause();
-    audio.removeAttribute("src");
-    audio.load();
-
-    setListenerAudioMessage("");
-    setShowListenerPlayButton(false);
-  }, []);
 
   const handleToggleBroadcast = useCallback(() => {
     if (audioStatus === "connecting") {
@@ -511,18 +465,38 @@ export function LiveRoom({
     }
   };
 
-  useEffect(() => {
-    setViewerCount(getInitialViewerCount(live));
-  }, [live]);
+  const handleHeaderAction = async () => {
+    if (canCloseLive) {
+      go("endConfirm");
+      return;
+    }
+
+    if (!live?.liveId) {
+      go("home");
+      return;
+    }
+
+    try {
+      await stopWhipBroadcast();
+      stopListenerPlayback();
+      await leaveLiveMutation.mutateAsync(live.liveId);
+      go("home");
+    } catch {
+      alert("라이브방에서 나가지 못했어요. 잠시 후 다시 시도해주세요.");
+    }
+  };
 
   useEffect(() => {
-    setDurationSeconds(getLiveDurationSeconds(live?.startedAt));
+    const initialTimer = window.setTimeout(() => {
+      setDurationSeconds(getLiveDurationSeconds(live?.startedAt));
+    }, 0);
 
     const timer = window.setInterval(() => {
       setDurationSeconds(getLiveDurationSeconds(live?.startedAt));
     }, 1000);
 
     return () => {
+      window.clearTimeout(initialTimer);
       window.clearInterval(timer);
     };
   }, [live?.startedAt]);
@@ -531,12 +505,15 @@ export function LiveRoom({
     if (!live?.liveId) return;
 
     const controller = new AbortController();
-    const shouldExcludeMeFromViewerCount = playbackRole === "BROADCASTER";
+    const shouldExcludeMeFromViewerCount = canBroadcast;
 
     subscribeViewerCount({
       liveId: live.liveId,
       watchOnly: shouldExcludeMeFromViewerCount,
       onViewerCount: setViewerCount,
+      onCoPublisherJoined: canBroadcast
+        ? handleCoPublisherJoined
+        : undefined,
       signal: controller.signal,
     }).catch(() => {
       // SSE 연결 종료/취소는 조용히 처리
@@ -545,31 +522,32 @@ export function LiveRoom({
     return () => {
       controller.abort();
     };
-  }, [live?.liveId, playbackRole]);
+  }, [canBroadcast, handleCoPublisherJoined, live?.liveId]);
 
   useEffect(() => {
     if (overlay !== "members" || !live?.liveId) return;
 
     let isMounted = true;
+    const loadMembers = async () => {
+      await Promise.resolve();
+      if (!isMounted) return;
 
-    setIsMembersLoading(true);
-
-    getLiveMembers(live.liveId)
-      .then((response) => {
+      setIsMembersLoading(true);
+      try {
+        const response = await getLiveMembers(live.liveId);
         if (!isMounted) return;
 
         setLiveMembers(response.members);
-      })
-      .catch(() => {
+      } catch {
         if (!isMounted) return;
 
         setLiveMembers([]);
-      })
-      .finally(() => {
-        if (!isMounted) return;
+      } finally {
+        if (isMounted) setIsMembersLoading(false);
+      }
+    };
 
-        setIsMembersLoading(false);
-      });
+    void loadMembers();
 
     return () => {
       isMounted = false;
@@ -579,23 +557,14 @@ export function LiveRoom({
   useEffect(() => {
     return () => {
       void cleanupWhipBroadcast();
-      stopListenerPlayback();
     };
-  }, [cleanupWhipBroadcast, stopListenerPlayback]);
-
-  useEffect(() => {
-    if (isListenerPlayback) {
-      void startListenerPlayback();
-      return;
-    }
-
-    stopListenerPlayback();
-  }, [isListenerPlayback, startListenerPlayback, stopListenerPlayback]);
+  }, [cleanupWhipBroadcast]);
 
   return (
     <main className="relative flex h-dvh min-h-0 flex-col overflow-hidden bg-neutral-0 text-neutral-900">
       <LiveRoomHeader
-        go={go}
+        canCloseLive={canCloseLive}
+        onClose={() => void handleHeaderAction()}
         viewerCount={viewerCount}
         durationSeconds={durationSeconds}
       />
@@ -609,6 +578,26 @@ export function LiveRoom({
         live={live}
       />
 
+      {canCloseLive ? (
+        <div className="absolute top-[58px] right-5 z-30 flex max-w-[calc(100%-40px)] flex-col items-end gap-2">
+          <button
+            type="button"
+            onClick={() => void handleAcceptCoHostUpgrade()}
+            disabled={acceptCoHostUpgradeMutation.isPending}
+            className="rounded-full bg-secondary-500 px-4 py-2 text-caption3 font-semibold text-neutral-0 shadow-[0_2px_10px_rgba(20,20,20,0.15)] disabled:opacity-60"
+          >
+            {acceptCoHostUpgradeMutation.isPending
+              ? "승인 중"
+              : "공동 진행 요청 승인"}
+          </button>
+          {coHostApprovalMessage ? (
+            <p className="rounded-lg bg-neutral-900/85 px-3 py-2 text-right text-caption3 text-neutral-0">
+              {coHostApprovalMessage}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
       {audioErrorMessage ? (
         <p className="absolute top-[56px] left-1/2 z-20 w-[calc(100%-40px)] max-w-[353px] -translate-x-1/2 rounded-lg bg-error px-3 py-2 text-center text-caption3 text-neutral-0">
           {audioErrorMessage}
@@ -621,7 +610,7 @@ export function LiveRoom({
         </p>
       ) : null}
 
-      {isListenerPlayback ? (
+      {isListenerPlayback || isBroadcasterMonitorPlayback ? (
         <audio
           ref={listenerAudioRef}
           className="sr-only"
@@ -632,10 +621,15 @@ export function LiveRoom({
         />
       ) : null}
 
-      {isListenerPlayback && showListenerPlayButton ? (
+      {(isListenerPlayback || isBroadcasterMonitorPlayback) &&
+      showListenerPlayButton ? (
         <button
           type="button"
-          onClick={startListenerPlayback}
+          onClick={
+            isBroadcasterMonitorPlayback
+              ? startBroadcasterMonitorPlayback
+              : startListenerPlayback
+          }
           className="absolute top-[56px] left-1/2 z-20 w-[calc(100%-40px)] max-w-[353px] -translate-x-1/2 rounded-lg bg-secondary-500 px-3 py-2 text-center text-caption3 text-neutral-0"
         >
           {listenerAudioMessage || "라이브 오디오 재생"}
@@ -670,9 +664,9 @@ export function LiveRoom({
             title="라이브를 종료할까요?"
             description={
               <>
-                라이브를 종료하면 청취자들이
+                라이브를 종료하면 청취자들도
                 <br />
-                자동으로 퇴장해요
+                자동으로 나가게 돼요.
               </>
             }
             cancelLabel="취소"

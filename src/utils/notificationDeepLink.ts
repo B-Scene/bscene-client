@@ -87,6 +87,39 @@ const isLiveReferenceNotificationType = (type: string) => {
   return type.toUpperCase() === "LIVE";
 };
 
+export const isCoHostUpgradeRequestNotification = (
+  notification: NotificationItem,
+) => {
+  const normalizedType = notification.type.toUpperCase();
+
+  if (isCoHostInviteNotificationType(normalizedType)) return false;
+
+  const normalizedContent = `${notification.title} ${notification.body}`
+    .trim()
+    .toUpperCase();
+  const hasCoHostKeyword =
+    normalizedType.includes("CO_HOST") ||
+    normalizedType.includes("COHOST") ||
+    normalizedContent.includes("CO_HOST") ||
+    normalizedContent.includes("COHOST") ||
+    normalizedContent.includes("공동 송출") ||
+    normalizedContent.includes("공동 진행");
+  const hasUpgradeRequestKeyword =
+    normalizedType.includes("UPGRADE") ||
+    normalizedType.includes("REQUEST") ||
+    normalizedType.includes("ACCEPT") ||
+    normalizedType.includes("APPROVAL") ||
+    normalizedContent.includes("업그레이드 요청") ||
+    normalizedContent.includes("승급 요청") ||
+    normalizedContent.includes("권한 요청") ||
+    normalizedContent.includes("공동 진행 요청") ||
+    normalizedContent.includes("공동 송출 요청") ||
+    normalizedContent.includes("승인") ||
+    normalizedContent.includes("수락");
+
+  return hasCoHostKeyword && hasUpgradeRequestKeyword;
+};
+
 const getLiveIdFromDeepLink = (deepLink?: string | null) => {
   if (!deepLink) return null;
 
@@ -116,8 +149,47 @@ const getCoHostInvitePath = (liveId: string | number) =>
     String(liveId),
   )}&action=accept`;
 
-const getLiveReferencePath = (notification: NotificationItem) => {
+const getCoHostUpgradeApprovalPath = (
+  liveId: string | number,
+  requesterUserId?: number | null,
+  requesterNickname?: string | null,
+) => {
+  const params = new URLSearchParams({
+    type: "LIVE_CO_HOST_UPGRADE_REQUEST",
+    liveId: String(liveId),
+    action: "approve",
+  });
+
+  if (requesterUserId != null) {
+    params.set("coHostRequesterUserId", String(requesterUserId));
+  }
+
+  if (requesterNickname) {
+    params.set("coHostRequesterNickname", requesterNickname);
+  }
+
+  return `/band/live?${params.toString()}`;
+};
+
+const getRequesterNickname = (notification: NotificationItem) => {
+  return notification.body.match(/^\s*(.+?)님이(?:\s|['"])/)?.[1]?.trim() ?? null;
+};
+
+export const getLiveReferencePath = (notification: NotificationItem) => {
   const type = notification.type.toUpperCase();
+
+  if (isCoHostUpgradeRequestNotification(notification)) {
+    const liveId =
+      getLiveIdFromDeepLink(notification.deepLink) ?? notification.referenceId;
+
+    return liveId == null
+      ? null
+      : getCoHostUpgradeApprovalPath(
+          liveId,
+          notification.requesterUserId,
+          getRequesterNickname(notification),
+        );
+  }
 
   if (
     !isCoHostInviteNotificationType(type) &&
@@ -326,6 +398,10 @@ const getDeepLinkMode = (deepLink?: string | null): NotificationMode | null => {
 export const getNotificationMode = (
   notification: NotificationItem,
 ): NotificationMode | null => {
+  if (notification.mode === "FAN" || notification.mode === "BAND") {
+    return notification.mode;
+  }
+
   const type = notification.type.toUpperCase();
   const titleAndBody = `${notification.title} ${notification.body}`;
 
@@ -333,6 +409,7 @@ export const getNotificationMode = (
     type === "BAND_INVITE" ||
     type.startsWith("BAND_") ||
     isCoHostInviteNotificationType(type) ||
+    isCoHostUpgradeRequestNotification(notification) ||
     isLiveReferenceNotificationType(type)
   ) {
     return "BAND";
@@ -380,10 +457,6 @@ export const getNotificationMode = (
   const deepLinkMode = getDeepLinkMode(notification.deepLink);
 
   if (deepLinkMode) return deepLinkMode;
-
-  if (notification.mode === "FAN" || notification.mode === "BAND") {
-    return notification.mode;
-  }
 
   if (
     type.includes("FOLLOWED") ||
