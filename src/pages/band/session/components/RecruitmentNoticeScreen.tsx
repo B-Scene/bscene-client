@@ -4,7 +4,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import type { AxiosError } from "axios";
 
 import {
@@ -115,6 +115,7 @@ const createFallbackPost = (
 
 export const RecruitmentNoticeScreen = () => {
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [activeTab, setActiveTab] =
     useState<SessionTabId>("recruitment");
@@ -157,7 +158,10 @@ export const RecruitmentNoticeScreen = () => {
   const [
     selectedPostId,
     setSelectedPostId,
-  ] = useState<number | null>(null);
+  ] = useState<number | null>(
+    () =>
+      (location.state as { openPostId?: number } | null)?.openPostId ?? null,
+  );
 
   const [
     selectedPostOverride,

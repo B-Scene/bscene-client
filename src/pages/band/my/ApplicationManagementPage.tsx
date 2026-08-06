@@ -39,7 +39,7 @@ const ApplicationManagementPage = () => {
     [data],
   );
   const applicantCount = postings.reduce(
-    (sum, posting) => sum + posting.recruiters.length,
+    (sum, posting) => sum + posting.totalApplicants,
     0,
   );
 
@@ -117,7 +117,23 @@ const ApplicationManagementPage = () => {
                 key={posting.recruitmentPostId}
                 className="flex flex-col gap-7 rounded-lg bg-neutral-0 px-3.75 py-3 shadow-[0_0_8px_0_rgba(0,0,0,0.10)]"
               >
-                <div className="flex flex-col gap-3">
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() =>
+                    navigate("/band/session", {
+                      state: { openPostId: posting.recruitmentPostId },
+                    })
+                  }
+                  onKeyDown={(event) => {
+                    if (event.key !== "Enter" && event.key !== " ") return;
+                    event.preventDefault();
+                    navigate("/band/session", {
+                      state: { openPostId: posting.recruitmentPostId },
+                    });
+                  }}
+                  className="flex cursor-pointer flex-col gap-3"
+                >
                   <span className="self-start rounded-full border border-secondary-500 px-3 py-0.5 text-center text-caption3 text-secondary-400">
                     {formatDDayLabel(getDDay(posting.dueDate.split(" ")[0], today))}
                   </span>
@@ -130,7 +146,7 @@ const ApplicationManagementPage = () => {
                       {`${posting.part} · ${posting.genre} · ${posting.region}`}
                       <span className="mx-1.5 text-neutral-300">|</span>
                       <span className="text-secondary-500">
-                        지원자 {posting.recruiters.length}명
+                        지원자 {posting.totalApplicants}명
                       </span>
                     </p>
                   </div>
@@ -153,7 +169,7 @@ const ApplicationManagementPage = () => {
 
                           <div className="flex min-w-0 flex-col gap-1">
                             <span className="truncate text-label1 text-black">
-                              {applicant.nickname}
+                              {applicant.name}
                             </span>
                             <span className="truncate text-caption2 text-neutral-600">
                               {`${applicant.part} · ${applicant.level} · ${applicant.region}`}{" "}
@@ -182,9 +198,13 @@ const ApplicationManagementPage = () => {
                           <span className="flex py-0.5 px-3.75 shrink-0 items-center justify-center rounded-full bg-neutral-300 text-center text-caption3 text-neutral-600">
                             거절
                           </span>
+                        ) : applicant.status === "BAND_ACCEPTED" ? (
+                          <span className="flex py-0.5 px-3.75 shrink-0 items-center justify-center rounded-full border border-secondary-500 text-center text-caption3 text-secondary-500">
+                            확정 대기
+                          </span>
                         ) : (
                           <span className="flex py-0.5 px-3.75 shrink-0 items-center justify-center rounded-full bg-secondary-400 text-center text-caption3 text-neutral-0">
-                            수락
+                            참여 확정
                           </span>
                         )}
                       </div>

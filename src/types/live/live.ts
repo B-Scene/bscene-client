@@ -8,6 +8,22 @@ export interface LiveApiResponse<T> {
   timeStamp?: string;
 }
 
+export interface LiveCoHostItem {
+  userId?: number;
+  memberId?: number;
+  bandMemberId?: number;
+  bandMemberProfileId?: number;
+  nickname: string;
+  profileImageUrl?: string | null;
+  bandProfileImageUrl?: string | null;
+  bandMemberProfileImageUrl?: string | null;
+  bandName?: string;
+  part?: string | string[];
+  isOwner?: boolean;
+  isMe?: boolean;
+  status?: string | null;
+}
+
 export interface LiveNowItem {
   liveId: number;
   bandProfileImageUrl?: string | null;
@@ -17,6 +33,8 @@ export interface LiveNowItem {
   viewerCount: number;
   viewCount?: number;
   isMine?: boolean;
+  coHosts?: LiveCoHostItem[];
+  coHostList?: LiveCoHostItem[];
 }
 
 export interface LiveReplayItem {
@@ -41,12 +59,20 @@ export interface ScheduledLiveItem {
   isAlarmSet?: boolean;
   alarmSet?: boolean;
   isMine?: boolean;
+  coHosts?: LiveCoHostItem[];
+  coHostList?: LiveCoHostItem[];
 }
 
 export interface LiveHomeResponse {
   liveNow: LiveNowItem[];
   replays: LiveReplayItem[];
   scheduled: ScheduledLiveItem[];
+  myNickname?: string | null;
+  nickname?: string | null;
+  myProfileImageUrl?: string | null;
+  profileImageUrl?: string | null;
+  coHosts?: LiveCoHostItem[];
+  coHostList?: LiveCoHostItem[];
 }
 
 export type LiveNowListFilter = "following" | "all";
@@ -60,6 +86,8 @@ export interface LiveNowListItem {
   viewCount: number;
   viewerCount?: number;
   isMine?: boolean;
+  coHosts?: LiveCoHostItem[];
+  coHostList?: LiveCoHostItem[];
 }
 
 export interface LiveNowPageInfo {
@@ -89,6 +117,8 @@ export interface ScheduledLiveListItem {
   alarmSet?: boolean;
   notificationEnabled?: boolean;
   isMine?: boolean;
+  coHosts?: LiveCoHostItem[];
+  coHostList?: LiveCoHostItem[];
 }
 
 export interface ScheduledLiveListResponse {
@@ -164,9 +194,9 @@ export interface CreateLiveResponse {
   playback?: LivePlayback;
 }
 
-export type PlaybackRole = "BROADCASTER" | "LISTENER";
+export type PlaybackRole = "BROADCASTER" | "LISTENER" | "CO_HOST";
 
-export type PlaybackProtocol = "WHIP" | "HLS";
+export type PlaybackProtocol = "WHIP" | "HLS" | "WHEP";
 
 export interface LivePlayback {
   role: PlaybackRole;
@@ -185,6 +215,15 @@ export interface EnterLiveResponse {
   title: string;
   description: string | null;
   playback: LivePlayback;
+
+  myNickname?: string | null;
+  nickname?: string | null;
+  myProfileImageUrl?: string | null;
+  profileImageUrl?: string | null;
+  isCoHost?: boolean;
+  isBroadcaster?: boolean;
+  coHosts?: LiveCoHostItem[];
+  coHostList?: LiveCoHostItem[];
 }
 
 export type LiveReportType =
@@ -228,6 +267,9 @@ export interface LiveMemberItem {
   bandName: string;
   part: string[];
   isLeader: boolean;
+  profileImageUrl?: string | null;
+  isOwner?: boolean;
+  isCoHost?: boolean;
 }
 
 export interface LiveMembersResponse {
@@ -248,6 +290,7 @@ export interface LiveReservationCoHostCandidate {
   nickname: string;
   part: string;
   status: LiveReservationCoHostStatus;
+  userId?: number;
 }
 
 export interface LiveReservationResponse {
@@ -273,3 +316,13 @@ export interface UpdateLiveReservationRequest {
 export interface UpdateLiveReservationResponse {
   liveId?: number;
 }
+
+export interface RespondCoHostInvitationRequest {
+  isAccepted: boolean;
+}
+
+export type RespondCoHostInvitationResponse = null;
+
+export type RequestCoHostUpgradeResponse = null;
+
+export type AcceptCoHostUpgradeResponse = null;

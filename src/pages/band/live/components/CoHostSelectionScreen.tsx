@@ -11,14 +11,17 @@ interface CoHostSelectionScreenProps {
   candidates: LiveReservationCoHostCandidate[];
   selectedCoHostIds: number[];
   onToggleCoHost: (bandMemberId: number) => void;
+  isLoading?: boolean;
+  errorMessage?: string;
 }
 
-const STATUS_LABELS: Record<Exclude<LiveReservationCoHostStatus, null>, string> = {
-  OWNER: "진행자",
-  APPROVED: "선택됨",
-  INVITED: "초대 중",
-  REJECTED: "재초대",
-};
+const STATUS_LABELS: Record<Exclude<LiveReservationCoHostStatus, null>, string> =
+  {
+    OWNER: "진행자",
+    APPROVED: "선택됨",
+    INVITED: "초대 중",
+    REJECTED: "재초대",
+  };
 
 const PART_LABELS: Record<string, string> = {
   VOCAL: "보컬",
@@ -26,6 +29,9 @@ const PART_LABELS: Record<string, string> = {
   BASS: "베이스",
   DRUM: "드럼",
   KEYBOARD: "키보드",
+  ETC: "기타",
+  MEMBER: "멤버",
+  SESSION: "세션",
 };
 
 const getPartLabel = (part: string) => {
@@ -75,20 +81,31 @@ export function CoHostSelectionScreen({
   candidates,
   selectedCoHostIds,
   onToggleCoHost,
+  isLoading = false,
+  errorMessage = "",
 }: CoHostSelectionScreenProps) {
+  const shouldShowEmptyState =
+    isLoading || Boolean(errorMessage) || candidates.length === 0;
+
   return (
     <main className="min-h-dvh bg-neutral-0 text-neutral-900">
       <TopBar title="공동 진행" onBack={onBack} onClose={onClose} />
 
       <section className="px-9 pt-6 pb-8">
-        {candidates.length === 0 ? (
+        {shouldShowEmptyState ? (
           <div className="rounded-[14px] bg-secondary-0 px-5 py-8 text-center shadow-[0_4px_15px_rgba(20,20,20,0.08)]">
             <p className="text-body3 text-neutral-700">
-              공동 진행자로 초대할 수 있는 멤버가 없어요.
+              {isLoading
+                ? "공동 진행 후보를 불러오는 중이에요."
+                : errorMessage ||
+                  "공동 진행자로 초대할 수 있는 멤버가 없어요."}
             </p>
-            <p className="mt-2 text-caption2 text-neutral-500">
-              예약 수정 화면에서는 기존 후보 목록을 불러올 수 있어요.
-            </p>
+
+            {!isLoading && !errorMessage ? (
+              <p className="mt-2 text-caption2 text-neutral-500">
+                현재 선택된 밴드에 다른 멤버가 있는지 확인해주세요.
+              </p>
+            ) : null}
           </div>
         ) : (
           <div className="grid gap-4">

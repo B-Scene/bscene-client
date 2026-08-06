@@ -1,4 +1,9 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import {
+  useEnterLiveMutation,
+  useRespondCoHostInvitationMutation,
+} from "@/hooks/api/live/useLive";
 import { useLiveChatSocket } from "@/hooks/api/live/useLiveChatSocket";
 import type {
   LiveChatMessageData,
@@ -56,7 +61,102 @@ const isLiveRoomScreen = (screen: BandLiveScreen) => {
   );
 };
 
+const getApiErrorCode = (error: unknown) => {
+  if (typeof error === "object" && error !== null && "response" in error) {
+    return (error as { response?: { data?: { code?: string } } }).response?.data
+      ?.code;
+  }
+
+  return undefined;
+};
+
+const getApiErrorStatus = (error: unknown) => {
+  if (typeof error === "object" && error !== null && "response" in error) {
+    const response = (
+      error as { response?: { status?: number; data?: { status?: number } } }
+    ).response;
+
+    return response?.status ?? response?.data?.status;
+  }
+
+  return undefined;
+};
+
+const getErrorMessage = (error: unknown, fallbackMessage: string) => {
+  if (typeof error === "object" && error !== null && "response" in error) {
+    const response = (error as { response?: { data?: { message?: string } } })
+      .response;
+
+    if (response?.data?.message) {
+      return response.data.message;
+    }
+  }
+
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  return fallbackMessage;
+};
+
+const isAlreadyProcessedCoHostInvitationError = (error: unknown) => {
+  const status = getApiErrorStatus(error);
+  const code = getApiErrorCode(error) ?? "";
+
+  return status === 409 || code.startsWith("LIVE409");
+};
+
+const isCoHostInviteType = (value: string | null) => {
+  const type = value?.toUpperCase() ?? "";
+
+  return (
+    (type.includes("CO_HOST") || type.includes("COHOST")) &&
+    (type.includes("INVITE") || type.includes("INVITATION"))
+  );
+};
+
+const isLiveReferenceType = (value: string | null) => {
+  return value?.toUpperCase() === "LIVE";
+};
+
+const isAcceptAction = (value: string | null) => {
+  return value?.toLowerCase() === "accept";
+};
+
+const getValidLiveId = (value: string | null) => {
+  if (!value) return null;
+
+  const liveId = Number(value);
+
+  return Number.isFinite(liveId) && liveId > 0 ? liveId : null;
+};
+
+const getCoHostInviteLiveId = (searchParams: URLSearchParams) => {
+  const explicitLiveId =
+    getValidLiveId(searchParams.get("coHostInviteLiveId")) ??
+    getValidLiveId(searchParams.get("coHostInvitationLiveId"));
+
+  if (explicitLiveId) return explicitLiveId;
+
+  const type = searchParams.get("type");
+  const action = searchParams.get("action");
+
+  if (!isCoHostInviteType(type) && !isLiveReferenceType(type)) {
+    return null;
+  }
+
+  if (isLiveReferenceType(type) && !isAcceptAction(action)) {
+    return null;
+  }
+
+  return (
+    getValidLiveId(searchParams.get("liveId")) ??
+    getValidLiveId(searchParams.get("referenceId"))
+  );
+};
+
 export function BandLivePage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [screen, setScreen] = useState<BandLiveScreen>("home");
   const [activeLive, setActiveLive] = useState<ActiveLive>(null);
   const [endedLiveId, setEndedLiveId] = useState<number | null>(null);
@@ -65,10 +165,35 @@ export function BandLivePage() {
   >(null);
   const [liveMessages, setLiveMessages] =
     useState<ChatMessage[]>(initialChatMessages);
+  const [isHandlingCoHostInvite, setIsHandlingCoHostInvite] = useState(false);
+
+  const handledCoHostInviteLiveIdRef = useRef<number | null>(null);
+  const isCoHostInviteProcessingRef = useRef(false);
+
+  const respondCoHostInvitationMutation = useRespondCoHostInvitationMutation();
+  const enterLiveMutation = useEnterLiveMutation();
+
+  const coHostInviteLiveId = useMemo(
+    () => getCoHostInviteLiveId(searchParams),
+    [searchParams],
+  );
 
   const isChatEnabled = useMemo(() => {
     return !!activeLive?.liveId && isLiveRoomScreen(screen);
   }, [activeLive?.liveId, screen]);
+
+  const clearCoHostInviteSearchParams = useCallback(() => {
+    const nextParams = new URLSearchParams(searchParams);
+
+    nextParams.delete("coHostInviteLiveId");
+    nextParams.delete("coHostInvitationLiveId");
+    nextParams.delete("liveId");
+    nextParams.delete("referenceId");
+    nextParams.delete("type");
+    nextParams.delete("action");
+
+    setSearchParams(nextParams, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const handleReceiveLiveChatMessage = useCallback(
     (message: LiveChatMessageData, frame: LiveChatMessageFrame) => {
@@ -153,11 +278,13 @@ export function BandLivePage() {
     ]);
   };
 
-  const handleEnterLive = (live: ActiveLive) => {
+  const handleEnterLive = useCallback((live: ActiveLive) => {
+    if (!live) return;
+
     setActiveLive(live);
     setEndedLiveId(null);
     setLiveMessages([]);
-  };
+  }, []);
 
   const handleEditReservation = (liveId: number) => {
     setSelectedReservationLiveId(liveId);
@@ -176,23 +303,106 @@ export function BandLivePage() {
     setScreen(nextScreen);
   };
 
-  if (screen === "liveNowList") {
+  useEffect(() => {
+    if (!coHostInviteLiveId) return;
+    if (handledCoHostInviteLiveIdRef.current === coHostInviteLiveId) return;
+    if (isCoHostInviteProcessingRef.current) return;
+
+    const handleCoHostInvite = async () => {
+      isCoHostInviteProcessingRef.current = true;
+      handledCoHostInviteLiveIdRef.current = coHostInviteLiveId;
+      setIsHandlingCoHostInvite(true);
+
+      try {
+        await respondCoHostInvitationMutation.mutateAsync({
+          liveId: coHostInviteLiveId,
+          request: {
+            isAccepted: true,
+          },
+        });
+
+        const enteredLive = await enterLiveMutation.mutateAsync(
+          coHostInviteLiveId,
+        );
+
+        handleEnterLive(enteredLive);
+        setScreen("room");
+        clearCoHostInviteSearchParams();
+      } catch (error) {
+        if (isAlreadyProcessedCoHostInvitationError(error)) {
+          try {
+            const enteredLive = await enterLiveMutation.mutateAsync(
+              coHostInviteLiveId,
+            );
+
+            handleEnterLive(enteredLive);
+            setScreen("room");
+            clearCoHostInviteSearchParams();
+            return;
+          } catch (retryError) {
+            alert(
+              getErrorMessage(
+                retryError,
+                "공동 진행 초대 처리 후에도 라이브에 입장하지 못했어요.",
+              ),
+            );
+
+            clearCoHostInviteSearchParams();
+            return;
+          }
+        }
+
+        alert(
+          getErrorMessage(
+            error,
+            "공동 진행 초대를 수락하거나 라이브에 입장하지 못했어요.",
+          ),
+        );
+
+        clearCoHostInviteSearchParams();
+      } finally {
+        setIsHandlingCoHostInvite(false);
+        isCoHostInviteProcessingRef.current = false;
+      }
+    };
+
+    void handleCoHostInvite();
+  }, [
+    clearCoHostInviteSearchParams,
+    coHostInviteLiveId,
+    enterLiveMutation,
+    handleEnterLive,
+    respondCoHostInvitationMutation,
+  ]);
+
+  if (isHandlingCoHostInvite) {
     return (
-      <BandLiveNowListPage
-        go={handleGo}
-        onEnterLive={handleEnterLive}
-      />
+      <main className="flex min-h-dvh items-center justify-center bg-neutral-0 px-6 text-center text-neutral-900">
+        <div>
+          <p className="text-body1 font-semibold">
+            공동 진행 초대를 수락하는 중이에요
+          </p>
+          <p className="mt-2 text-body3 text-neutral-500">
+            잠시만 기다려주세요.
+          </p>
+        </div>
+      </main>
     );
   }
 
-  if (screen === "scheduledList") {
-    return (
-      <BandLiveScheduledListPage
-        go={handleGo}
-        onEditReservation={handleEditReservation}
-      />
-    );
+  if (screen === "liveNowList") {
+    return <BandLiveNowListPage go={handleGo} onEnterLive={handleEnterLive} />;
   }
+
+  if (screen === "scheduledList") {
+  return (
+    <BandLiveScheduledListPage
+      go={handleGo}
+      onEnterLive={handleEnterLive}
+      onEditReservation={handleEditReservation}
+    />
+  );
+}
 
   if (screen === "room" || screen === "chat") {
     if (!activeLive) {
@@ -266,21 +476,13 @@ export function BandLivePage() {
 
   if (screen === "instantForm") {
     return (
-      <LiveForm
-        mode="instant"
-        go={handleGo}
-        onCreatedLive={handleEnterLive}
-      />
+      <LiveForm mode="instant" go={handleGo} onCreatedLive={handleEnterLive} />
     );
   }
 
   if (screen === "reserveForm") {
     return (
-      <LiveForm
-        mode="reserve"
-        go={handleGo}
-        onCreatedLive={handleEnterLive}
-      />
+      <LiveForm mode="reserve" go={handleGo} onCreatedLive={handleEnterLive} />
     );
   }
 

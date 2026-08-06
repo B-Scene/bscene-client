@@ -35,7 +35,9 @@ export const formatNotificationTime = (createdAt: string) => {
   const diffDays = Math.floor(diffHours / 24);
   if (diffDays < 7) return `${diffDays}일 전`;
 
-  return `${createdDate.getFullYear()}.${createdDate.getMonth() + 1}.${createdDate.getDate()}.`;
+  return `${createdDate.getFullYear()}.${
+    createdDate.getMonth() + 1
+  }.${createdDate.getDate()}.`;
 };
 
 export const isNotificationWithinRetention = (
@@ -69,6 +71,68 @@ export const normalizeDeepLink = (deepLink: string) => {
 
 export const getRouteSuffix = (path: string) =>
   path.match(/[?#].*$/)?.[0] ?? "";
+
+const isCoHostInviteNotificationType = (type: string) => {
+  const normalizedType = type.toUpperCase();
+
+  return (
+    (normalizedType.includes("CO_HOST") ||
+      normalizedType.includes("COHOST")) &&
+    (normalizedType.includes("INVITE") ||
+      normalizedType.includes("INVITATION"))
+  );
+};
+
+const isLiveReferenceNotificationType = (type: string) => {
+  return type.toUpperCase() === "LIVE";
+};
+
+const getLiveIdFromDeepLink = (deepLink?: string | null) => {
+  if (!deepLink) return null;
+
+  const path = normalizeDeepLink(deepLink.trim());
+
+  try {
+    const url = /^https?:\/\//i.test(path)
+      ? new URL(path)
+      : new URL(path, window.location.origin);
+
+    const queryLiveId =
+      url.searchParams.get("coHostInviteLiveId") ||
+      url.searchParams.get("coHostInvitationLiveId") ||
+      url.searchParams.get("liveId") ||
+      url.searchParams.get("referenceId");
+
+    if (queryLiveId) return queryLiveId;
+  } catch {
+    return null;
+  }
+
+  return path.match(/\/lives?\/(\d+)(?=[/?#]|$)/i)?.[1] ?? null;
+};
+
+const getCoHostInvitePath = (liveId: string | number) =>
+  `/band/live?type=LIVE&liveId=${encodeURIComponent(
+    String(liveId),
+  )}&action=accept`;
+
+const getLiveReferencePath = (notification: NotificationItem) => {
+  const type = notification.type.toUpperCase();
+
+  if (
+    !isCoHostInviteNotificationType(type) &&
+    !isLiveReferenceNotificationType(type)
+  ) {
+    return null;
+  }
+
+  const liveId =
+    getLiveIdFromDeepLink(notification.deepLink) ?? notification.referenceId;
+
+  if (liveId == null) return null;
+
+  return getCoHostInvitePath(liveId);
+};
 
 export const FAN_NOTIFICATION_ROUTES: NotificationRouteMapping = {
   post: (id, suffix) => `/fan/explore/contents/${id}${suffix}`,
@@ -123,8 +187,14 @@ export const BAND_NOTIFICATION_ROUTES: NotificationRouteMapping = {
     "/band/live",
     "/band/profile/",
     "/band/session/messages/",
+    "/band/notifications",
+    "/band/notification",
   ],
   fallback: (notification) => {
+    const liveReferencePath = getLiveReferencePath(notification);
+
+    if (liveReferencePath) return liveReferencePath;
+
     if (notification.referenceId == null) return null;
 
     const type = notification.type.toUpperCase();
@@ -229,6 +299,10 @@ export const getNotificationTargetPath = (
   notification: NotificationItem,
   routes: NotificationRouteMapping,
 ) => {
+  const liveReferencePath = getLiveReferencePath(notification);
+
+  if (liveReferencePath) return liveReferencePath;
+
   const deepLink = notification.deepLink?.trim();
 
   if (deepLink) {
@@ -255,7 +329,15 @@ export const getNotificationMode = (
   const type = notification.type.toUpperCase();
   const titleAndBody = `${notification.title} ${notification.body}`;
 
-  if (type === "BAND_INVITE" || type.startsWith("BAND_")) return "BAND";
+  if (
+    type === "BAND_INVITE" ||
+    type.startsWith("BAND_") ||
+    isCoHostInviteNotificationType(type) ||
+    isLiveReferenceNotificationType(type)
+  ) {
+    return "BAND";
+  }
+
   if (type.startsWith("FAN_")) return "FAN";
 
   if (

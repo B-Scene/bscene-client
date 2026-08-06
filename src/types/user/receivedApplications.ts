@@ -9,7 +9,11 @@ export interface ApiResponse<T> {
 
 export type RecruitmentStatusFilter = "OPEN" | "CLOSE";
 
-export type ApplicantStatus = "PENDING" | "BAND_ACCEPTED" | "REJECTED";
+export type ApplicantStatus =
+  | "PENDING"
+  | "BAND_ACCEPTED"
+  | "ACCEPTED"
+  | "REJECTED";
 
 export interface GetReceivedApplicationsParams {
   status?: RecruitmentStatusFilter;
@@ -18,10 +22,10 @@ export interface GetReceivedApplicationsParams {
 }
 
 export interface ReceivedApplicant {
-  sessionProfileId: number;
   applySubmissionId: number;
+  sessionApplicationId: number;
   profileImageUrl: string | null;
-  nickname: string;
+  name: string;
   part: string;
   level: string;
   region: string;
@@ -35,6 +39,7 @@ export interface ReceivedRecruitmentPost {
   part: string;
   genre: string;
   region: string;
+  totalApplicants: number;
   recruiters: ReceivedApplicant[];
 }
 

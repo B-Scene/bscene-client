@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import SwapIcon from "@/assets/icons/swap.svg";
 import DefaultBandAvatar from "@/assets/icons/band/band-default-profile.svg";
@@ -15,6 +15,12 @@ import {
 } from "@/hooks/api/band/usePerformance";
 import { useDeletePost, usePostsQuery } from "@/hooks/api/band/usePost";
 import { useMusicLinksQuery } from "@/hooks/api/band/useMusicLink";
+import { useNotificationsInfiniteQuery } from "@/hooks/api/useNotifications";
+import {
+  isNotificationForMode,
+  isNotificationWithinRetention,
+  isPostRegistrationNotification,
+} from "@/utils/notificationDeepLink";
 import { BAND_GENRE_LABELS, BAND_REGION_LABELS } from "@/utils/bandLabels";
 import { BandProfileCard } from "@/components/band/home/BandProfileCard";
 import { StatRow } from "@/components/band/home/StatRow";
@@ -77,6 +83,21 @@ const BandHomePage = () => {
   const deletePerformance = useDeletePerformance();
   const deletePost = useDeletePost();
 
+  const { data: notificationsData } = useNotificationsInfiniteQuery();
+  const hasUnreadNotification = useMemo(
+    () =>
+      notificationsData?.pages
+        .flatMap((page) => page.items)
+        .some(
+          (notification) =>
+            !notification.isRead &&
+            isNotificationWithinRetention(notification) &&
+            isNotificationForMode(notification, "BAND") &&
+            !isPostRegistrationNotification(notification),
+        ) ?? false,
+    [notificationsData],
+  );
+
   const performances = performancesData?.performances ?? [];
   const posts = postsData?.posts ?? [];
 
@@ -117,7 +138,10 @@ const BandHomePage = () => {
               onClick={() => navigate("/band/notifications")}
               className="text-neutral-900"
             >
-              <NotificationBellIcon hasUnread={false} />
+              <NotificationBellIcon
+                hasUnread={hasUnreadNotification}
+                dotColor="var(--color-secondary-400)"
+              />
             </button>
 
             <button

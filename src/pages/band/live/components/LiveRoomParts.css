@@ -1,0 +1,30 @@
+.live-audio-wave-bar {
+  transform-origin: center;
+  transform: scaleY(0.45);
+  opacity: 0.55;
+}
+
+.live-audio-wave-bar.is-active {
+  animation-name: live-audio-wave;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+  will-change: transform, opacity;
+}
+
+@keyframes live-audio-wave {
+  0% {
+    transform: scaleY(0.45);
+    opacity: 0.55;
+  }
+
+  50% {
+    transform: scaleY(1.35);
+    opacity: 1;
+  }
+
+  100% {
+    transform: scaleY(0.75);
+    opacity: 0.75;
+  }
+}
