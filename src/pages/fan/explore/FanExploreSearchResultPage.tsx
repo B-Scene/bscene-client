@@ -17,7 +17,11 @@ import {
   useUnfollowExploreBand,
 } from "@/hooks/api/fan/useFanExplore";
 import { useSlideUpSheet } from "@/hooks/useSlideUpSheet";
-import { ExploreFilterBar } from "@/pages/fan/explore/FanExplorePage";
+import {
+  ExploreFilterBar,
+  ExploreFilterSheet,
+  type AppliedExploreFilters,
+} from "@/pages/fan/explore/FanExplorePage";
 import { FanExploreContentNewsList } from "@/pages/fan/explore/components/FanExploreContentNewsList";
 import type {
   FanExploreBand,
@@ -37,6 +41,17 @@ type SearchResultSortState = {
 const SEARCH_SORT_TO_API: Record<SearchResultSortOption, FanExploreSort> = {
   정확도순: "ACCURACY",
   인기순: "POPULAR",
+};
+const SEARCH_CONTENT_TO_API = {
+  전체: "ALL",
+  밴드: "BAND",
+  공연: "PERFORMANCE",
+  영상: "POST",
+} as const;
+const DEFAULT_SEARCH_FILTERS: AppliedExploreFilters = {
+  genre: "전체",
+  region: "전체",
+  content: "전체",
 };
 
 const MONTH_LABELS = [
@@ -279,6 +294,10 @@ const FanExploreSearchResultPage = () => {
   const [searchParams] = useSearchParams();
   const keyword = searchParams.get("q") || "WAVY";
   const [isSortSheetOpen, setIsSortSheetOpen] = useState(false);
+  const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
+  const [appliedFilters, setAppliedFilters] = useState<AppliedExploreFilters>(
+    DEFAULT_SEARCH_FILTERS,
+  );
   const [sortState, setSortState] = useState<SearchResultSortState>(() => ({
     keyword,
     sort: "정확도순",
@@ -295,7 +314,9 @@ const FanExploreSearchResultPage = () => {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const searchQuery = useFanExploreSearchQuery({
     keyword,
-    type: "ALL",
+    type: SEARCH_CONTENT_TO_API[
+      appliedFilters.content as keyof typeof SEARCH_CONTENT_TO_API
+    ],
     sort: SEARCH_SORT_TO_API[appliedSort],
   });
   const followBandMutation = useFollowExploreBand();
@@ -368,10 +389,11 @@ const FanExploreSearchResultPage = () => {
     <main className="min-h-dvh bg-neutral-0 pb-[calc(var(--bottom-nav-height)+24px)]">
       <SearchResultTopBar key={keyword} initialKeyword={keyword} />
       <ExploreFilterBar
-        appliedFilters={{ genre: "전체", region: "전체", content: "전체" }}
+        appliedFilters={appliedFilters}
         appliedSort={appliedSort}
         highlightSort={shouldHighlightSort}
         onSortClick={() => setIsSortSheetOpen(true)}
+        onFilterClick={() => setIsFilterSheetOpen(true)}
       />
 
       <section className="px-[23px] pt-[16px]">
@@ -559,6 +581,15 @@ const FanExploreSearchResultPage = () => {
         onSelect={(nextSort) => {
           setSortState({ keyword, sort: nextSort, selectedByUser: true });
         }}
+      />
+      <ExploreFilterSheet
+        open={isFilterSheetOpen}
+        onClose={() => setIsFilterSheetOpen(false)}
+        appliedFilters={appliedFilters}
+        genreSelectable={false}
+        regionSelectable={false}
+        contentSelectable
+        onApply={setAppliedFilters}
       />
 
       <ModalOverlay
