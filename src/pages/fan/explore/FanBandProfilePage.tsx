@@ -561,7 +561,12 @@ const FanBandProfilePage = () => {
             type="button"
             disabled={!canEnterLive || enterLiveMutation.isPending}
             onClick={() => void handleOpenLive()}
-            className="flex h-[38px] items-center justify-center rounded-[8px] border border-primary-400 bg-primary-400 font-body text-body1 text-neutral-0"
+            className={[
+              "flex h-[38px] items-center justify-center rounded-[8px] border font-body text-body1",
+              canEnterLive
+                ? "border-primary-400 bg-primary-400 text-neutral-0"
+                : "border-neutral-300 bg-neutral-300 text-neutral-500",
+            ].join(" ")}
           >
             라이브 입장
           </button>
