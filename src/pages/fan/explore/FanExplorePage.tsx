@@ -134,7 +134,7 @@ const FILTER_OPTION_WIDTHS: Record<string, number> = {
   포크록: 62,
   펑크록: 62,
   하드록: 62,
-  "etc.": 62,
+  "etc.": 51,
   얼터너티브록: 93,
   사이키델릭록: 93,
   일렉트로닉록: 93,
@@ -384,12 +384,16 @@ export const ExploreFilterSheet = ({
   open,
   onClose,
   appliedFilters,
+  genreSelectable = true,
+  regionSelectable = true,
   contentSelectable = false,
   onApply,
 }: {
   open: boolean;
   onClose: () => void;
   appliedFilters: AppliedExploreFilters;
+  genreSelectable?: boolean;
+  regionSelectable?: boolean;
   contentSelectable?: boolean;
   onApply: (filters: AppliedExploreFilters) => void;
 }) => {
@@ -399,8 +403,8 @@ export const ExploreFilterSheet = ({
   const { rendered, isVisible, handleTransitionEnd } = useSlideUpSheet(
     open,
     () => {
-      setSelectedGenre(appliedFilters.genre);
-      setSelectedRegion(appliedFilters.region);
+      setSelectedGenre(genreSelectable ? appliedFilters.genre : "전체");
+      setSelectedRegion(regionSelectable ? appliedFilters.region : "전체");
       setSelectedContent(contentSelectable ? appliedFilters.content : "전체");
     },
   );
@@ -438,13 +442,23 @@ export const ExploreFilterSheet = ({
             title="장르"
             options={FILTER_OPTIONS.genre}
             selected={selectedGenre}
-            onSelect={setSelectedGenre}
+            disabledOptions={
+              genreSelectable
+                ? []
+                : FILTER_OPTIONS.genre.filter((option) => option !== "전체")
+            }
+            onSelect={genreSelectable ? setSelectedGenre : () => undefined}
           />
           <FilterOptionGroup
             title="지역"
             options={FILTER_OPTIONS.region}
             selected={selectedRegion}
-            onSelect={setSelectedRegion}
+            disabledOptions={
+              regionSelectable
+                ? []
+                : FILTER_OPTIONS.region.filter((option) => option !== "전체")
+            }
+            onSelect={regionSelectable ? setSelectedRegion : () => undefined}
           />
           <FilterOptionGroup
             title="콘텐츠"
@@ -464,8 +478,8 @@ export const ExploreFilterSheet = ({
             type="button"
             onClick={() => {
               onApply({
-                genre: selectedGenre,
-                region: selectedRegion,
+                genre: genreSelectable ? selectedGenre : "전체",
+                region: regionSelectable ? selectedRegion : "전체",
                 content: contentSelectable ? selectedContent : "전체",
               });
               onClose();

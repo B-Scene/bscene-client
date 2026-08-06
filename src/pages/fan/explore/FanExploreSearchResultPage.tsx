@@ -318,8 +318,6 @@ const FanExploreSearchResultPage = () => {
       appliedFilters.content as keyof typeof SEARCH_CONTENT_TO_API
     ],
     sort: SEARCH_SORT_TO_API[appliedSort],
-    genre: appliedFilters.genre === "전체" ? undefined : appliedFilters.genre,
-    region: appliedFilters.region === "전체" ? undefined : appliedFilters.region,
   });
   const followBandMutation = useFollowExploreBand();
   const unfollowBandMutation = useUnfollowExploreBand();
@@ -588,6 +586,8 @@ const FanExploreSearchResultPage = () => {
         open={isFilterSheetOpen}
         onClose={() => setIsFilterSheetOpen(false)}
         appliedFilters={appliedFilters}
+        genreSelectable={false}
+        regionSelectable={false}
         contentSelectable
         onApply={setAppliedFilters}
       />
