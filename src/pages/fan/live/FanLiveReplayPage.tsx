@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import BandImage from "@/assets/Img_Band.png";
+import BandImage from "@/assets/icons/band/band-default-profile.svg";
 import PlayIcon from "@/assets/icons/play.svg";
 import VideoCard from "@/components/common/Card/VideoCard";
 import { BottomNavBar } from "@/components/layout/BottomNavBar";

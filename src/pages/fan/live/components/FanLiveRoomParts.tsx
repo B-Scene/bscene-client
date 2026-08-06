@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import AirplaneIcon from "@/assets/icons/airplane.svg";
-import BandImage from "@/assets/Img_Band.png";
+import BandImage from "@/assets/icons/band/band-default-profile.svg";
 import BadgeIcon from "@/assets/icons/Badge.svg";
 import ChatIcon from "@/assets/icons/chat.svg";
 import HeadsetIcon from "@/assets/Headset.svg";

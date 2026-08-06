@@ -22,6 +22,8 @@ export interface BandMemberResponse {
   userId: number;
   bandMemberProfileId: number | null;
   profileNickname: string | null;
+  part: BandMemberPart | null;
+  owner: boolean;
   memberType: BandMemberType;
   status: string;
   createdAt: string;

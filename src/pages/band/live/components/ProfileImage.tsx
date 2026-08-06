@@ -1,5 +1,4 @@
-import BandImage from "@/assets/Img_Band.png";
-import { getRenderableProfileImageUrl } from "@/utils/profileImageUrl";
+import BandImage from "@/assets/icons/band/band-default-profile.svg";
 import { cx } from "../utils";
 
 interface ProfileImageProps {

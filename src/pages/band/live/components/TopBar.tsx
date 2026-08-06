@@ -29,10 +29,9 @@ export function TopBar({
     <header
       className={cx(
         "relative flex bg-neutral-0",
-        isMain
-          ? "h-16 items-center justify-center px-5"
-          : "h-16 items-center",
-        !isMain && (align === "center" ? "justify-center px-5" : "justify-start px-8"),
+        isMain ? "h-12 items-center justify-center px-5" : "h-12 items-center",
+        !isMain &&
+          (align === "center" ? "justify-center px-5" : "justify-start px-8"),
       )}
     >
       {onBack ? (
@@ -48,9 +47,7 @@ export function TopBar({
 
       <h1
         className={
-          isMain
-            ? "text-label2 text-[#1D1A1A]"
-            : "text-h4 font-bold text-neutral-900"
+          isMain ? "text-label2 text-[#1D1A1A]" : "text-label2 text-neutral-900"
         }
       >
         {title}

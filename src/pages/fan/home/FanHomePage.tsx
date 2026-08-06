@@ -23,6 +23,7 @@ import {
   useFollowExploreBand,
   useUnfollowExploreBand,
 } from "@/hooks/api/fan/useFanExplore";
+import { useNotificationsInfiniteQuery } from "@/hooks/api/useNotifications";
 import { useInterestedPerformancesQuery } from "@/hooks/api/user/useInterestedPerformances";
 import type {
   FanHomeConcert,
@@ -31,6 +32,10 @@ import type {
   FanHomeResponse,
 } from "@/types/fan/home";
 import type { InterestedPerformanceItem } from "@/types/user/interestedPerformance";
+import {
+  isNotificationForMode,
+  isNotificationWithinRetention,
+} from "@/utils/notificationDeepLink";
 
 type HomeVariant = "new" | "recommended" | "main";
 
@@ -594,7 +599,7 @@ const BandRecommendationStrip = ({ bands }: { bands: HomeBandItem[] }) => {
 
   return (
     <>
-      <div className="flex gap-5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="flex gap-[clamp(8px,calc((100vw-312px)/4),20px)] overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {bands.map((band) => {
           const isFollowing = followOverrides[band.id] ?? band.isFollowing;
           const isBandPending = isFollowPending && pendingBandId === band.bandId;
@@ -602,7 +607,7 @@ const BandRecommendationStrip = ({ bands }: { bands: HomeBandItem[] }) => {
           return (
             <article
               key={band.id}
-              className="flex w-[54px] shrink-0 flex-col items-center text-center"
+              className="flex w-[clamp(48px,15vw,54px)] shrink-0 flex-col items-center text-center"
             >
               <button
                 type="button"
@@ -632,7 +637,7 @@ const BandRecommendationStrip = ({ bands }: { bands: HomeBandItem[] }) => {
                 <img
                   src={band.profileImageSrc}
                   alt=""
-                  className="size-[54px] rounded-full object-cover"
+                  className="size-[clamp(48px,15vw,54px)] rounded-full object-cover"
                 />
                 <strong className="mt-2 max-w-full truncate font-body text-body4 text-neutral-900">
                   {band.name}
@@ -670,7 +675,7 @@ const BandRecommendationStrip = ({ bands }: { bands: HomeBandItem[] }) => {
                     onSettled: () => setPendingBandId(null),
                   });
                 }}
-                className="mt-2 h-[16px] w-[54px] rounded-full border-[1px] border-primary-400 font-body text-label4 text-primary-400 disabled:opacity-60"
+                className="mt-2 h-[16px] w-full rounded-full border-[1px] border-primary-400 font-body text-label4 text-primary-400 disabled:opacity-60"
               >
                 {isFollowing ? "팔로잉" : "팔로우"}
               </button>
@@ -875,6 +880,7 @@ const FanHomePage = () => {
   const completeParticipationMutation = useCompletePerformanceParticipation();
   const deleteParticipationMutation = useDeletePerformanceParticipation();
   const { data: fanHome, isError, isLoading, refetch } = useFanHomeQuery();
+  const { data: notificationsData } = useNotificationsInfiniteQuery();
   const interestedPerformancesQuery = useInterestedPerformancesQuery("ALL");
   const {
     data: upcomingPerformancesData,
@@ -918,9 +924,19 @@ const FanHomePage = () => {
   const isParticipationResponding =
     completeParticipationMutation.isPending ||
     deleteParticipationMutation.isPending;
-  const hasNotifications = searchParams.has("notifications")
-    ? searchParams.get("notifications") !== "empty"
-    : (fanHome?.hasUnreadNotification ?? false);
+  const notificationItems = notificationsData?.pages.flatMap(
+    (page) => page.items,
+  );
+  const hasUnreadNotification = notificationItems
+    ? notificationItems.some(
+        (notification) =>
+          !notification.isRead &&
+          isNotificationWithinRetention(notification) &&
+          isNotificationForMode(notification, "FAN"),
+      )
+    : (fanHome?.hasUnreadNotification ??
+      fanHome?.hasUnreadNotifications ??
+      false);
 
   const removeCurrentPendingPerformance = () => {
     if (!currentPendingPerformance) return;
@@ -1092,13 +1108,13 @@ const FanHomePage = () => {
               onClick={() =>
                 navigate(
                   `/fan/home/notifications?status=${
-                    hasNotifications ? "has" : "empty"
+                    hasUnreadNotification ? "has" : "empty"
                   }`,
                 )
               }
               className="flex size-6 items-center justify-center text-neutral-900"
             >
-              <NotificationBellIcon hasUnread={hasNotifications} />
+              <NotificationBellIcon hasUnread={hasUnreadNotification} />
             </button>
 
             <button

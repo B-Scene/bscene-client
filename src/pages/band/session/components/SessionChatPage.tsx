@@ -9,7 +9,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 
-import BandProfileImage from "@/assets/Img_Band.png";
+import BandProfileImage from "@/assets/icons/band/band-default-profile.svg";
 import ChatSendIcon from "@/assets/icons/Btn_send.svg";
 import AirplaneIcon from "@/assets/icons/airplane.svg";
 import Modal from "@/components/Modal/Modal";

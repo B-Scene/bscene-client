@@ -59,14 +59,20 @@ const MyPage = () => {
         <div className="mt-4">
           <StatRow
             stats={[
-              { label: "팔로잉", value: data?.followingCount ?? 0 },
+              {
+                label: "팔로잉",
+                value: data?.followingCount ?? 0,
+                onClick: () => navigate("/fan/my/followed-bands"),
+              },
               {
                 label: "관심 공연",
                 value: data?.interestedPerformanceCount ?? 0,
+                onClick: () => navigate("/fan/my/interested-concerts"),
               },
               {
                 label: "참여 공연",
                 value: data?.participatedPerformanceCount ?? 0,
+                onClick: () => navigate("/fan/my/attended-concerts"),
               },
             ]}
           />

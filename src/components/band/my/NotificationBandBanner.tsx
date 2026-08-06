@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import DefaultAvatar from "@/assets/images/IMG_my.svg";
+import DefaultAvatar from "@/assets/icons/band/band-default-profile.svg";
 
 interface NotificationBandBannerProps {
   bandName: string;
