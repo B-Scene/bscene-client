@@ -369,6 +369,7 @@ export {
   FAN_NOTIFICATION_ROUTES,
   formatNotificationTime,
   getMappedDeepLink,
+  getLiveReferencePath,
   getNotificationMode,
   getNotificationTargetPath,
   getRouteSuffix,

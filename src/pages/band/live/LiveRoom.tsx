@@ -528,31 +528,29 @@ export function LiveRoom({
     if (overlay !== "members" || !live?.liveId) return;
 
     let isMounted = true;
+    const loadMembers = async () => {
+      await Promise.resolve();
+      if (!isMounted) return;
 
-    const loadingTimer = window.setTimeout(() => {
       setIsMembersLoading(true);
-    }, 0);
-
-    getLiveMembers(live.liveId)
-      .then((response) => {
+      try {
+        const response = await getLiveMembers(live.liveId);
         if (!isMounted) return;
 
         setLiveMembers(response.members);
-      })
-      .catch(() => {
+      } catch {
         if (!isMounted) return;
 
         setLiveMembers([]);
-      })
-      .finally(() => {
-        if (!isMounted) return;
+      } finally {
+        if (isMounted) setIsMembersLoading(false);
+      }
+    };
 
-        setIsMembersLoading(false);
-      });
+    void loadMembers();
 
     return () => {
       isMounted = false;
-      window.clearTimeout(loadingTimer);
     };
   }, [live?.liveId, overlay]);
 

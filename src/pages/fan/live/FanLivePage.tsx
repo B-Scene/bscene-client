@@ -96,6 +96,7 @@ export function FanLivePage() {
   const stateLive = (location.state as FanLiveLocationState | null)?.live;
   const liveId = Number(liveIdParam);
   const hasValidLiveId = Number.isInteger(liveId) && liveId > 0;
+  const matchingStateLive = stateLive?.liveId === liveId ? stateLive : undefined;
   const enterLiveMutation = useEnterLiveMutation();
   const requestedLiveIdRef = useRef<number | null>(null);
   const requestEnterLive = useCallback(() => {
@@ -107,7 +108,7 @@ export function FanLivePage() {
 
   useEffect(() => {
     if (
-      stateLive ||
+      matchingStateLive ||
       !hasValidLiveId ||
       requestedLiveIdRef.current === liveId
     ) {
@@ -115,9 +116,13 @@ export function FanLivePage() {
     }
 
     requestEnterLive();
-  }, [hasValidLiveId, liveId, requestEnterLive, stateLive]);
+  }, [hasValidLiveId, liveId, matchingStateLive, requestEnterLive]);
 
-  const live = stateLive ?? enterLiveMutation.data;
+  const matchingMutationLive =
+    enterLiveMutation.variables === liveId
+      ? enterLiveMutation.data
+      : undefined;
+  const live = matchingStateLive ?? matchingMutationLive;
   const isLoading = enterLiveMutation.isPending;
   const isError = enterLiveMutation.isError;
   const leaveLiveMutation = useLeaveLiveMutation();
@@ -279,16 +284,16 @@ export function FanLivePage() {
     if (!live?.liveId) return;
 
     let isMounted = true;
-
-    window.setTimeout(() => {
+    const loadMembers = async () => {
+      await Promise.resolve();
       if (!isMounted) return;
+
       setLiveMembers([]);
       setIsMembersLoading(true);
       setHasMembersError(false);
-    }, 0);
 
-    getLiveMembers(live.liveId)
-      .then((response) => {
+      try {
+        const response = await getLiveMembers(live.liveId);
         if (!isMounted) return;
 
         const memberNames = new Set(
@@ -303,18 +308,17 @@ export function FanLivePage() {
               chat.sender === live.bandName || memberNames.has(chat.sender),
           })),
         );
-      })
-      .catch(() => {
+      } catch {
         if (!isMounted) return;
 
         setLiveMembers([]);
         setHasMembersError(true);
-      })
-      .finally(() => {
-        if (!isMounted) return;
+      } finally {
+        if (isMounted) setIsMembersLoading(false);
+      }
+    };
 
-        setIsMembersLoading(false);
-      });
+    void loadMembers();
 
     return () => {
       isMounted = false;

@@ -175,7 +175,7 @@ const getRequesterNickname = (notification: NotificationItem) => {
   return notification.body.match(/^\s*(.+?)님이(?:\s|['"])/)?.[1]?.trim() ?? null;
 };
 
-const getLiveReferencePath = (notification: NotificationItem) => {
+export const getLiveReferencePath = (notification: NotificationItem) => {
   const type = notification.type.toUpperCase();
 
   if (isCoHostUpgradeRequestNotification(notification)) {

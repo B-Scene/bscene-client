@@ -22,6 +22,7 @@ import {
   cacheScheduledCoHostUserIds,
   getCachedOwnedScheduledLives,
   removeCachedOwnedScheduledLive,
+  useRetainedScheduledLiveCards,
 } from "./scheduledLiveCache";
 import {
   isScheduledLiveStartable,
@@ -312,13 +313,14 @@ export function BandLiveScheduledListPage({
 
     return Array.from(mergedCards.values());
   }, [data, previewScheduleByLiveId]);
+  const retainedScheduledCards = useRetainedScheduledLiveCards(scheduledCards);
 
   useEffect(() => {
-    cacheOwnedScheduledLives(scheduledCards);
-    scheduledCards.forEach((live) => {
+    cacheOwnedScheduledLives(retainedScheduledCards);
+    retainedScheduledCards.forEach((live) => {
       cacheScheduledCoHostUserIds(live.id, live.coHostUserIds ?? []);
     });
-  }, [scheduledCards]);
+  }, [retainedScheduledCards]);
 
   const loadMore = useCallback(() => {
     if (!hasNextPage || isFetchingNextPage) return;
@@ -382,13 +384,13 @@ export function BandLiveScheduledListPage({
           </ListMessage>
         ) : null}
 
-        {!isLoading && !isError && scheduledCards.length === 0 ? (
+        {!isLoading && !isError && retainedScheduledCards.length === 0 ? (
           <ListMessage>예정된 라이브가 없어요.</ListMessage>
         ) : null}
 
-        {!isLoading && !isError && scheduledCards.length > 0 ? (
+        {!isLoading && !isError && retainedScheduledCards.length > 0 ? (
           <div className="grid gap-3 pt-5">
-            {scheduledCards.map((live) => (
+            {retainedScheduledCards.map((live) => (
                 <ScheduledLiveCard
                 key={live.id}
                 live={live}

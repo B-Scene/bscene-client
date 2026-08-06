@@ -4,7 +4,10 @@ import {
   onForegroundPushMessage,
 } from "@/utils/webPushNotifications";
 import { useModeStore } from "@/stores/useModeStore";
-import { getNotificationMode } from "@/utils/notificationDeepLink";
+import {
+  getLiveReferencePath,
+  getNotificationMode,
+} from "@/utils/notificationDeepLink";
 import type {
   NotificationItem,
   NotificationSettingsMode,
@@ -25,43 +28,27 @@ const getPayloadDeepLink = ({
   title: string;
   body: string;
 }) => {
-  if (data?.deepLink || data?.link) {
-    return data.deepLink ?? data.link ?? "/";
-  }
+  const suppliedDeepLink = data?.deepLink ?? data?.link ?? null;
 
-  const type = (
-    data?.type ??
-    data?.notificationType ??
-    data?.eventType ??
-    ""
-  ).toUpperCase();
-  const content = `${title} ${body}`.toUpperCase();
-  const liveId =
+  const referenceIdValue =
     data?.liveId ?? data?.referenceId ?? data?.targetId ?? data?.resourceId;
-  const isCoHostUpgradeRequest =
-    (type.includes("CO_HOST") ||
-      type.includes("COHOST") ||
-      content.includes("공동 송출") ||
-      content.includes("공동 진행")) &&
-    (type.includes("UPGRADE") ||
-      type.includes("REQUEST") ||
-      type.includes("ACCEPT") ||
-      type.includes("APPROVAL") ||
-      content.includes("업그레이드 요청") ||
-      content.includes("승급 요청") ||
-      content.includes("권한 요청") ||
-      content.includes("공동 진행 요청") ||
-      content.includes("공동 송출 요청") ||
-      content.includes("승인") ||
-      content.includes("수락"));
+  const referenceId = Number(referenceIdValue);
+  const notification: NotificationItem = {
+    notificationId: -1,
+    type: data?.type ?? data?.notificationType ?? data?.eventType ?? "UNKNOWN",
+    mode: null,
+    deepLink: suppliedDeepLink,
+    referenceId: Number.isFinite(referenceId) ? referenceId : null,
+    title,
+    body,
+    isRead: false,
+    readAt: null,
+    createdAt: new Date().toISOString(),
+    actionable: false,
+    bandInvite: null,
+  };
 
-  if (isCoHostUpgradeRequest && liveId) {
-    return `/band/live?type=LIVE_CO_HOST_UPGRADE_REQUEST&liveId=${encodeURIComponent(
-      liveId,
-    )}&action=approve`;
-  }
-
-  return "/";
+  return getLiveReferencePath(notification) ?? suppliedDeepLink ?? "/";
 };
 
 const toNotificationMode = (

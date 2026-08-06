@@ -47,6 +47,9 @@ export const useLiveRoomPlayback = ({
   const whepSessionUrlRef = useRef<string | null>(null);
   const monitorPeerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const connectedMonitorUrlRef = useRef<string | null>(null);
+  const negotiatingMonitorUrlRef = useRef<string | null>(null);
+  const whepAbortControllerRef = useRef<AbortController | null>(null);
+  const whepGenerationRef = useRef(0);
 
   const isListenerPlayback =
     Boolean(live?.liveId) && playbackRole === "LISTENER" && Boolean(playbackUrl);
@@ -91,10 +94,14 @@ export const useLiveRoomPlayback = ({
 
   const stopBroadcasterMonitorPlayback = useCallback(
     async (resetUi = true) => {
+      whepGenerationRef.current += 1;
+      whepAbortControllerRef.current?.abort();
+      whepAbortControllerRef.current = null;
       const sessionUrl = whepSessionUrlRef.current;
 
       whepSessionUrlRef.current = null;
       connectedMonitorUrlRef.current = null;
+      negotiatingMonitorUrlRef.current = null;
       monitorPeerConnectionRef.current?.close();
       monitorPeerConnectionRef.current = null;
 
@@ -127,10 +134,10 @@ export const useLiveRoomPlayback = ({
 
     if (!audio || !monitorPlaybackUrl) return;
 
-    if (
-      connectedMonitorUrlRef.current &&
-      connectedMonitorUrlRef.current !== monitorPlaybackUrl
-    ) {
+    const activeMonitorUrl =
+      connectedMonitorUrlRef.current ?? negotiatingMonitorUrlRef.current;
+
+    if (activeMonitorUrl && activeMonitorUrl !== monitorPlaybackUrl) {
       await stopBroadcasterMonitorPlayback(false);
     } else if (monitorPeerConnectionRef.current) {
       try {
@@ -159,6 +166,14 @@ export const useLiveRoomPlayback = ({
         return;
       }
 
+      const targetWhepUrl = monitorPlaybackUrl;
+      const generation = whepGenerationRef.current + 1;
+      whepGenerationRef.current = generation;
+      whepAbortControllerRef.current?.abort();
+      const abortController = new AbortController();
+      whepAbortControllerRef.current = abortController;
+      negotiatingMonitorUrlRef.current = targetWhepUrl;
+
       const peerConnection = new RTCPeerConnection();
       monitorPeerConnectionRef.current = peerConnection;
       peerConnection.addTransceiver("audio", { direction: "recvonly" });
@@ -180,12 +195,23 @@ export const useLiveRoomPlayback = ({
       if (!sdpOffer) throw new Error("WHEP SDP Offer 생성에 실패했습니다.");
 
       const { sdpAnswer, sessionUrl } = await createWhepSession({
-        whepUrl: monitorPlaybackUrl,
+        whepUrl: targetWhepUrl,
         sdpOffer,
+        signal: abortController.signal,
       });
 
+      if (
+        abortController.signal.aborted ||
+        whepGenerationRef.current !== generation
+      ) {
+        peerConnection.close();
+        await deleteWhipSession(sessionUrl).catch(() => undefined);
+        return;
+      }
+
       whepSessionUrlRef.current = sessionUrl;
-      connectedMonitorUrlRef.current = monitorPlaybackUrl;
+      negotiatingMonitorUrlRef.current = null;
+      connectedMonitorUrlRef.current = targetWhepUrl;
       await peerConnection.setRemoteDescription({
         type: "answer",
         sdp: sdpAnswer,
@@ -193,6 +219,13 @@ export const useLiveRoomPlayback = ({
       setListenerAudioMessage("");
       setShowListenerPlayButton(false);
     } catch (error) {
+      if (
+        error instanceof DOMException &&
+        error.name === "AbortError"
+      ) {
+        return;
+      }
+
       await stopBroadcasterMonitorPlayback(false);
       setListenerAudioMessage(
         error instanceof Error
@@ -200,6 +233,10 @@ export const useLiveRoomPlayback = ({
           : "공동 진행자 오디오 수신에 실패했어요.",
       );
       setShowListenerPlayButton(true);
+    } finally {
+      if (whepAbortControllerRef.current?.signal.aborted) {
+        whepAbortControllerRef.current = null;
+      }
     }
   }, [
     monitorPlaybackProtocol,

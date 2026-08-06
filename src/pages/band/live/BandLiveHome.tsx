@@ -29,6 +29,7 @@ import {
   cacheScheduledCoHostUserIds,
   getCachedOwnedScheduledLives,
   removeCachedOwnedScheduledLive,
+  useRetainedScheduledLiveCards,
 } from "./scheduledLiveCache";
 import {
   isScheduledLiveStartable,
@@ -248,13 +249,14 @@ export function BandLiveHome({
 
     return { liveNowCards, scheduledCards };
   }, [data, scheduledListData]);
+  const retainedScheduledCards = useRetainedScheduledLiveCards(scheduledCards);
 
   useEffect(() => {
-    cacheOwnedScheduledLives(scheduledCards);
-    scheduledCards.forEach((live) => {
+    cacheOwnedScheduledLives(retainedScheduledCards);
+    retainedScheduledCards.forEach((live) => {
       cacheScheduledCoHostUserIds(live.id, live.coHostUserIds ?? []);
     });
-  }, [scheduledCards]);
+  }, [retainedScheduledCards]);
 
   const isLoading = isHomeLoading || isScheduledLoading;
   const isError = isHomeError && isScheduledError;
@@ -413,8 +415,8 @@ export function BandLiveHome({
             onClick={() => go("scheduledList")}
           />
           <div className="mt-3 grid gap-3">
-            {scheduledCards.length > 0 ? (
-              scheduledCards.map((live) => (
+            {retainedScheduledCards.length > 0 ? (
+              retainedScheduledCards.map((live) => (
                 <ScheduledLiveCard
                   key={live.id}
                   live={live}

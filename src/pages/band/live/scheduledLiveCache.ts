@@ -1,9 +1,47 @@
+import { useEffect, useMemo, useState } from "react";
 import type { ScheduledLiveCardData } from "./types";
 import { parseScheduledAtTime } from "./scheduledLiveTime";
 
 const STORAGE_KEY = "band-live-owned-scheduled-v1";
 const CO_HOST_STORAGE_KEY = "band-live-co-host-user-ids-v1";
 const LATE_START_RETENTION_MS = 30 * 60 * 1000;
+
+const getScheduledLiveExpiry = (live: ScheduledLiveCardData) => {
+  const scheduledTime = parseScheduledAtTime(live.scheduledAt);
+  return scheduledTime === null ? null : scheduledTime + LATE_START_RETENTION_MS;
+};
+
+export const useRetainedScheduledLiveCards = (
+  lives: ScheduledLiveCardData[],
+) => {
+  const [expiryNow, setExpiryNow] = useState(Date.now);
+
+  const retainedLives = useMemo(() => {
+    return lives.filter((live) => {
+      const expiry = getScheduledLiveExpiry(live);
+      return expiry !== null && expiry > expiryNow;
+    });
+  }, [expiryNow, lives]);
+
+  useEffect(() => {
+    const now = Date.now();
+    const nextExpiry = retainedLives.reduce<number | null>((nearest, live) => {
+      const expiry = getScheduledLiveExpiry(live);
+      if (expiry === null || expiry <= now) return nearest;
+      return nearest === null ? expiry : Math.min(nearest, expiry);
+    }, null);
+
+    if (nextExpiry === null) return;
+
+    const timeoutId = window.setTimeout(
+      () => setExpiryNow(Date.now()),
+      Math.max(0, nextExpiry - now + 50),
+    );
+    return () => window.clearTimeout(timeoutId);
+  }, [expiryNow, retainedLives]);
+
+  return retainedLives;
+};
 
 const isScheduledLiveCard = (value: unknown): value is ScheduledLiveCardData => {
   if (typeof value !== "object" || value === null) return false;
@@ -29,12 +67,8 @@ export const getCachedOwnedScheduledLives = (): ScheduledLiveCardData[] => {
 
     const now = Date.now();
     const retainedLives = parsed.filter(isScheduledLiveCard).filter((live) => {
-      const scheduledTime = parseScheduledAtTime(live.scheduledAt);
-
-      return (
-        scheduledTime !== null &&
-        scheduledTime + LATE_START_RETENTION_MS > now
-      );
+      const expiry = getScheduledLiveExpiry(live);
+      return expiry !== null && expiry > now;
     });
 
     if (retainedLives.length !== parsed.length) {
@@ -54,12 +88,8 @@ export const cacheOwnedScheduledLives = (
   const ownedLives = lives.filter((live) => {
     if (!live.isMine) return false;
 
-    const scheduledTime = parseScheduledAtTime(live.scheduledAt);
-
-    return (
-      scheduledTime !== null &&
-      scheduledTime + LATE_START_RETENTION_MS > now
-    );
+    const expiry = getScheduledLiveExpiry(live);
+    return expiry !== null && expiry > now;
   });
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(ownedLives));
 };

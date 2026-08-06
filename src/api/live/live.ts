@@ -917,9 +917,11 @@ export const subscribeViewerCount = async ({
 export const createWhepSession = async ({
   whepUrl,
   sdpOffer,
+  signal,
 }: {
   whepUrl: string;
   sdpOffer: string;
+  signal?: AbortSignal;
 }): Promise<{ sdpAnswer: string; sessionUrl: string }> => {
   const requestUrl = resolveRtcUrl(whepUrl.trim());
   const maxAttempts = 15;
@@ -927,6 +929,7 @@ export const createWhepSession = async ({
   let responseText = "";
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    signal?.throwIfAborted();
     response = await fetch(requestUrl, {
       method: "POST",
       headers: {
@@ -935,6 +938,7 @@ export const createWhepSession = async ({
         Accept: "application/sdp",
       },
       body: sdpOffer,
+      signal,
     });
     responseText = await response.text();
 
@@ -944,8 +948,17 @@ export const createWhepSession = async ({
       break;
     }
 
-    await new Promise<void>((resolve) => {
-      window.setTimeout(resolve, 1000);
+    await new Promise<void>((resolve, reject) => {
+      const timeoutId = window.setTimeout(() => {
+        signal?.removeEventListener("abort", handleAbort);
+        resolve();
+      }, 1000);
+      const handleAbort = () => {
+        window.clearTimeout(timeoutId);
+        reject(signal?.reason ?? new DOMException("Aborted", "AbortError"));
+      };
+
+      signal?.addEventListener("abort", handleAbort, { once: true });
     });
   }
 
