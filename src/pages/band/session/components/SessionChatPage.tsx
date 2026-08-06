@@ -2,7 +2,6 @@ import {
   type FormEvent,
   useCallback,
   useEffect,
-  useMemo,
   useRef,
   useState,
 } from "react";
@@ -46,6 +45,7 @@ interface LocalChatMessage extends ChatMessage {
   clientMsgId?: string;
   serverMessageId?: number;
   pending?: boolean;
+  createdAt?: string;
 }
 
 const parseChatRoomId = (
@@ -83,13 +83,13 @@ const formatChatTime = (value: string) => {
 
 const formatChatDate = (value?: string) => {
   if (!value) {
-    return "쪽지";
+    return "";
   }
 
   const date = new Date(normalizeDateValue(value));
 
   if (Number.isNaN(date.getTime())) {
-    return "쪽지";
+    return "";
   }
 
   const weekDays = ["일", "월", "화", "수", "목", "금", "토"];
@@ -97,6 +97,22 @@ const formatChatDate = (value?: string) => {
   return `${date.getMonth() + 1}월 ${date.getDate()}일 (${
     weekDays[date.getDay()]
   })`;
+};
+
+const getChatDateKey = (value?: string) => {
+  if (!value) return "";
+
+  const date = new Date(normalizeDateValue(value));
+
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("-");
 };
 
 const getMessageKey = (message: LocalChatMessage) => {
@@ -138,10 +154,6 @@ export default function SessionChatPage() {
   const lastReadMessageIdRef = useRef(0);
   const currentUserIdRef = useRef<number | null>(null);
 
-  const dateDividerText = useMemo(() => {
-    return formatChatDate(detail?.messages?.[0]?.createdAt);
-  }, [detail?.messages]);
-
   const handleSocketMessage = useCallback(
     (
       message: DirectMessageData,
@@ -169,6 +181,7 @@ export default function SessionChatPage() {
         const isMine =
           optimisticMessageIndex >= 0 ||
           message.senderId === currentUserIdRef.current;
+
         const existingMessage =
           previousMessages[
             optimisticMessageIndex >= 0
@@ -184,6 +197,7 @@ export default function SessionChatPage() {
           direction: isMine ? "sent" : "received",
           content: message.content,
           time: formatChatTime(message.createdAt),
+          createdAt: message.createdAt,
           isRead:
             Boolean(existingMessage?.isRead) ||
             (isMine ? Boolean(message.readAt) : true),
@@ -294,6 +308,7 @@ export default function SessionChatPage() {
         direction: message.isMine ? "sent" : "received",
         content: message.content,
         time: formatChatTime(message.createdAt),
+        createdAt: message.createdAt,
         isRead: message.isRead,
         pending: false,
       }),
@@ -326,6 +341,7 @@ export default function SessionChatPage() {
             isRead: Boolean(serverMessage.isRead || previousMessage.isRead),
           };
         });
+
         const localMessages = previousMessages.filter(
           (message) =>
             message.serverMessageId === undefined ||
@@ -358,6 +374,7 @@ export default function SessionChatPage() {
         "filter" in queryParams
           ? queryParams.filter
           : undefined;
+
       const content =
         filter === "UNREAD"
           ? cachedRooms.content.filter(
@@ -495,11 +512,14 @@ export default function SessionChatPage() {
       return;
     }
 
+    const createdAt = new Date().toISOString();
+
     const newMessage: LocalChatMessage = {
       id: Date.now(),
       direction: "sent",
       content: trimmedMessage,
       time: getCurrentChatTime(),
+      createdAt,
       clientMsgId,
       pending: true,
       isRead: false,
@@ -564,32 +584,57 @@ export default function SessionChatPage() {
             </button>
           </section>
         ) : messages.length > 0 ? (
-          <>
-            <SessionChatDateDivider date={dateDividerText} />
+          <section
+            aria-label={`${senderName}님과의 쪽지`}
+            className="flex flex-col"
+          >
+            {messages.map((message, index) => {
+              const previousMessage = messages[index - 1];
+              const nextMessage = messages[index + 1];
 
-            <section
-              aria-label={`${senderName}님과의 쪽지`}
-              className="mt-5 flex flex-col gap-[22px]"
-            >
-              {messages.map((message, index) => {
-                const nextMessage = messages[index + 1];
-                const showTime =
-                  !nextMessage ||
-                  nextMessage.direction !== message.direction ||
-                  nextMessage.time !== message.time;
+              const messageDateKey = getChatDateKey(message.createdAt);
+              const previousMessageDateKey = getChatDateKey(
+                previousMessage?.createdAt,
+              );
+              const nextMessageDateKey = getChatDateKey(
+                nextMessage?.createdAt,
+              );
 
-                return (
-                  <SessionChatMessage
-                    key={getMessageKey(message)}
-                    message={message}
-                    senderName={senderName}
-                    profileImageUrl={profileImageUrl || BandProfileImage}
-                    showTime={showTime}
-                  />
-                );
-              })}
-            </section>
-          </>
+              const shouldShowDateDivider =
+                Boolean(messageDateKey) &&
+                (index === 0 || messageDateKey !== previousMessageDateKey);
+
+              const showTime =
+                !nextMessage ||
+                nextMessage.direction !== message.direction ||
+                nextMessage.time !== message.time ||
+                nextMessageDateKey !== messageDateKey;
+
+              return (
+                <div
+                  key={getMessageKey(message)}
+                  className={index === 0 ? "" : "mt-[22px]"}
+                >
+                  {shouldShowDateDivider ? (
+                    <div className={index === 0 ? "pt-1" : "mb-[22px]"}>
+                      <SessionChatDateDivider
+                        date={formatChatDate(message.createdAt)}
+                      />
+                    </div>
+                  ) : null}
+
+                  <div className={shouldShowDateDivider ? "mt-5" : ""}>
+                    <SessionChatMessage
+                      message={message}
+                      senderName={senderName}
+                      profileImageUrl={profileImageUrl || BandProfileImage}
+                      showTime={showTime}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </section>
         ) : (
           <section className="flex min-h-full items-center justify-center px-6 text-center">
             <p className="text-caption1 text-neutral-500">
