@@ -215,6 +215,8 @@ export interface EnterLiveResponse {
   title: string;
   description: string | null;
   playback: LivePlayback;
+  monitorPlaybackUrl?: string | null;
+  monitorPlaybackProtocol?: PlaybackProtocol | null;
 
   myNickname?: string | null;
   nickname?: string | null;

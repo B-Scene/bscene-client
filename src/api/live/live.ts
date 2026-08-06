@@ -32,6 +32,10 @@ interface SubscribeViewerCountParams {
   liveId: number;
   watchOnly?: boolean;
   onViewerCount: (viewerCount: number) => void;
+  onCoPublisherJoined?: (publisher: {
+    userId: number;
+    whepUrl: string;
+  }) => void;
   signal?: AbortSignal;
 }
 
@@ -811,6 +815,7 @@ export const subscribeViewerCount = async ({
   liveId,
   watchOnly = false,
   onViewerCount,
+  onCoPublisherJoined,
   signal,
 }: SubscribeViewerCountParams): Promise<void> => {
   const requestUrl = resolveLiveApiUrl(
@@ -879,6 +884,28 @@ export const subscribeViewerCount = async ({
           dataLines.length > 0
         ) {
           parseViewerCount(dataLines.join("\n"));
+        }
+
+        if (eventName === "coPublisherJoined" && dataLines.length > 0) {
+          try {
+            const publisher = JSON.parse(dataLines.join("\n")) as {
+              userId?: number;
+              whepUrl?: string;
+            };
+
+            if (
+              Number.isFinite(publisher.userId) &&
+              typeof publisher.whepUrl === "string" &&
+              publisher.whepUrl.trim()
+            ) {
+              onCoPublisherJoined?.({
+                userId: publisher.userId as number,
+                whepUrl: publisher.whepUrl,
+              });
+            }
+          } catch {
+            // 잘못된 공동 송출자 이벤트는 시청자 수 구독을 끊지 않습니다.
+          }
         }
       });
     }

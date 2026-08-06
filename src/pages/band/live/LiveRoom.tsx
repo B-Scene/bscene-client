@@ -199,6 +199,12 @@ export function LiveRoom({
   const [isMicMuted, setIsMicMuted] = useState(false);
   const [listenerAudioMessage, setListenerAudioMessage] = useState("");
   const [showListenerPlayButton, setShowListenerPlayButton] = useState(false);
+  const [monitorPlaybackUrl, setMonitorPlaybackUrl] = useState(
+    () => live?.monitorPlaybackUrl ?? null,
+  );
+  const [monitorPlaybackProtocol, setMonitorPlaybackProtocol] = useState(
+    () => live?.monitorPlaybackProtocol ?? null,
+  );
   const [liveMembers, setLiveMembers] = useState<LiveMemberItem[]>([]);
   const [isMembersLoading, setIsMembersLoading] = useState(false);
 
@@ -219,7 +225,7 @@ export function LiveRoom({
   const isListenerPlayback =
     live?.isLive && playbackRole === "LISTENER" && Boolean(playbackUrl);
   const isBroadcasterMonitorPlayback =
-    live?.isLive && canBroadcast && playbackProtocol === "WHIP" && Boolean(playbackUrl);
+    live?.isLive && canBroadcast && Boolean(monitorPlaybackUrl);
 
   const handleAcceptCoHostUpgrade = async () => {
     if (!live?.liveId || acceptCoHostUpgradeMutation.isPending) return;
@@ -565,7 +571,7 @@ export function LiveRoom({
   const startBroadcasterMonitorPlayback = useCallback(async () => {
     const audio = listenerAudioRef.current;
 
-    if (!audio || !playbackUrl) return;
+    if (!audio || !monitorPlaybackUrl) return;
 
     setListenerAudioMessage("");
     setShowListenerPlayButton(false);
@@ -581,6 +587,17 @@ export function LiveRoom({
     }
 
     try {
+      if (
+        monitorPlaybackProtocol === "HLS" ||
+        monitorPlaybackUrl.toLowerCase().includes(".m3u8")
+      ) {
+        audio.srcObject = null;
+        audio.src = monitorPlaybackUrl;
+        audio.volume = 1;
+        await audio.play();
+        return;
+      }
+
       const peerConnection = new RTCPeerConnection();
       monitorPeerConnectionRef.current = peerConnection;
       peerConnection.addTransceiver("audio", { direction: "recvonly" });
@@ -606,7 +623,7 @@ export function LiveRoom({
         throw new Error("WHEP SDP Offer 생성에 실패했습니다.");
       }
 
-      const path = extractWhipPath(playbackUrl);
+      const path = extractWhipPath(monitorPlaybackUrl);
       const { sdpAnswer, sessionUrl } = await createWhepSession({
         path,
         sdpOffer: localDescription.sdp,
@@ -626,7 +643,11 @@ export function LiveRoom({
       );
       setShowListenerPlayButton(true);
     }
-  }, [playbackUrl, stopBroadcasterMonitorPlayback]);
+  }, [
+    monitorPlaybackProtocol,
+    monitorPlaybackUrl,
+    stopBroadcasterMonitorPlayback,
+  ]);
 
   const handleToggleBroadcast = useCallback(() => {
     if (audioStatus === "connecting") {
@@ -680,6 +701,8 @@ export function LiveRoom({
 
   useEffect(() => {
     setViewerCount(getInitialViewerCount(live));
+    setMonitorPlaybackUrl(live?.monitorPlaybackUrl ?? null);
+    setMonitorPlaybackProtocol(live?.monitorPlaybackProtocol ?? null);
   }, [live]);
 
   useEffect(() => {
@@ -704,6 +727,12 @@ export function LiveRoom({
       liveId: live.liveId,
       watchOnly: shouldExcludeMeFromViewerCount,
       onViewerCount: setViewerCount,
+      onCoPublisherJoined: canBroadcast
+        ? ({ whepUrl }) => {
+            setMonitorPlaybackUrl(whepUrl);
+            setMonitorPlaybackProtocol("WHEP");
+          }
+        : undefined,
       signal: controller.signal,
     }).catch(() => {
       // SSE 연결 종료/취소는 조용히 처리

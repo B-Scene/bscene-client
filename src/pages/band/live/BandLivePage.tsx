@@ -231,6 +231,9 @@ export function BandLivePage() {
   const handledCoHostInviteLiveIdRef = useRef<number | null>(null);
   const isCoHostInviteProcessingRef = useRef(false);
   const handledCoHostUpgradeApprovalLiveIdRef = useRef<number | null>(null);
+  const pendingCoHostMonitorPlaybackRef = useRef<
+    NonNullable<ActiveLive>["playback"] | null
+  >(null);
 
   const respondCoHostInvitationMutation = useRespondCoHostInvitationMutation();
   const requestCoHostUpgradeMutation = useRequestCoHostUpgradeMutation();
@@ -416,6 +419,10 @@ export function BandLivePage() {
             clearCoHostInviteSearchParams();
             return;
           }
+
+          if (enteredLive.playback.role === "LISTENER") {
+            pendingCoHostMonitorPlaybackRef.current = enteredLive.playback;
+          }
         } catch (enterError) {
           if (!isLiveEnterForbiddenError(enterError)) throw enterError;
         }
@@ -585,8 +592,15 @@ export function BandLivePage() {
         if (isCancelled) return;
 
         if (isCoHostBroadcastReady(enteredLive)) {
+          const monitorPlayback = pendingCoHostMonitorPlaybackRef.current;
+
           setPendingCoHostUpgradeLiveId(null);
-          handleEnterLive(enteredLive);
+          handleEnterLive({
+            ...enteredLive,
+            monitorPlaybackUrl: monitorPlayback?.playbackUrl ?? null,
+            monitorPlaybackProtocol: monitorPlayback?.protocol ?? null,
+          });
+          pendingCoHostMonitorPlaybackRef.current = null;
           setScreen("room");
           clearCoHostInviteSearchParams();
           return;
