@@ -3,6 +3,7 @@ import Modal from "@/components/Modal/Modal";
 import { ModalOverlay } from "@/components/common/Modal/ModalOverlay";
 import {
   createWhipSession,
+  createWhepSession,
   deleteWhipSession,
   getLiveMembers,
   subscribeViewerCount,
@@ -206,6 +207,8 @@ export function LiveRoom({
   const micStreamRef = useRef<MediaStream | null>(null);
   const processedMicStreamRef = useRef<MediaStream | null>(null);
   const whipSessionUrlRef = useRef<string | null>(null);
+  const whepSessionUrlRef = useRef<string | null>(null);
+  const monitorPeerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const listenerAudioRef = useRef<HTMLAudioElement | null>(null);
 
   const micVolumeRef = useRef(DEFAULT_MIC_VOLUME);
@@ -215,6 +218,8 @@ export function LiveRoom({
 
   const isListenerPlayback =
     live?.isLive && playbackRole === "LISTENER" && Boolean(playbackUrl);
+  const isBroadcasterMonitorPlayback =
+    live?.isLive && canBroadcast && playbackProtocol === "WHIP" && Boolean(playbackUrl);
 
   const handleAcceptCoHostUpgrade = async () => {
     if (!live?.liveId || acceptCoHostUpgradeMutation.isPending) return;
@@ -534,6 +539,95 @@ export function LiveRoom({
     setShowListenerPlayButton(false);
   }, []);
 
+  const stopBroadcasterMonitorPlayback = useCallback(async () => {
+    const sessionUrl = whepSessionUrlRef.current;
+
+    whepSessionUrlRef.current = null;
+    monitorPeerConnectionRef.current?.close();
+    monitorPeerConnectionRef.current = null;
+
+    const audio = listenerAudioRef.current;
+
+    if (audio) {
+      audio.pause();
+      audio.srcObject = null;
+    }
+
+    if (sessionUrl) {
+      try {
+        await deleteWhipSession(sessionUrl);
+      } catch {
+        // 이미 종료된 수신 세션이면 무시
+      }
+    }
+  }, []);
+
+  const startBroadcasterMonitorPlayback = useCallback(async () => {
+    const audio = listenerAudioRef.current;
+
+    if (!audio || !playbackUrl) return;
+
+    setListenerAudioMessage("");
+    setShowListenerPlayButton(false);
+
+    if (monitorPeerConnectionRef.current) {
+      try {
+        await audio.play();
+      } catch {
+        setListenerAudioMessage("상대 진행자 소리를 들으려면 눌러주세요.");
+        setShowListenerPlayButton(true);
+      }
+      return;
+    }
+
+    try {
+      const peerConnection = new RTCPeerConnection();
+      monitorPeerConnectionRef.current = peerConnection;
+      peerConnection.addTransceiver("audio", { direction: "recvonly" });
+
+      peerConnection.ontrack = (event) => {
+        const remoteStream =
+          event.streams[0] ?? new MediaStream([event.track]);
+
+        audio.srcObject = remoteStream;
+        audio.volume = 1;
+        void audio.play().catch(() => {
+          setListenerAudioMessage("상대 진행자 소리를 들으려면 눌러주세요.");
+          setShowListenerPlayButton(true);
+        });
+      };
+
+      const offer = await peerConnection.createOffer();
+      await peerConnection.setLocalDescription(offer);
+      await waitForIceGatheringComplete(peerConnection);
+
+      const localDescription = peerConnection.localDescription;
+      if (!localDescription?.sdp) {
+        throw new Error("WHEP SDP Offer 생성에 실패했습니다.");
+      }
+
+      const path = extractWhipPath(playbackUrl);
+      const { sdpAnswer, sessionUrl } = await createWhepSession({
+        path,
+        sdpOffer: localDescription.sdp,
+      });
+
+      whepSessionUrlRef.current = sessionUrl;
+      await peerConnection.setRemoteDescription({
+        type: "answer",
+        sdp: sdpAnswer,
+      });
+    } catch (error) {
+      await stopBroadcasterMonitorPlayback();
+      setListenerAudioMessage(
+        error instanceof Error
+          ? error.message
+          : "공동 진행자 오디오 수신에 실패했어요.",
+      );
+      setShowListenerPlayButton(true);
+    }
+  }, [playbackUrl, stopBroadcasterMonitorPlayback]);
+
   const handleToggleBroadcast = useCallback(() => {
     if (audioStatus === "connecting") {
       return;
@@ -653,17 +747,37 @@ export function LiveRoom({
     return () => {
       void cleanupWhipBroadcast();
       stopListenerPlayback();
+      void stopBroadcasterMonitorPlayback();
     };
-  }, [cleanupWhipBroadcast, stopListenerPlayback]);
+  }, [
+    cleanupWhipBroadcast,
+    stopBroadcasterMonitorPlayback,
+    stopListenerPlayback,
+  ]);
 
   useEffect(() => {
     if (isListenerPlayback) {
+      void stopBroadcasterMonitorPlayback();
       void startListenerPlayback();
       return;
     }
 
+    if (isBroadcasterMonitorPlayback) {
+      stopListenerPlayback();
+      void startBroadcasterMonitorPlayback();
+      return;
+    }
+
     stopListenerPlayback();
-  }, [isListenerPlayback, startListenerPlayback, stopListenerPlayback]);
+    void stopBroadcasterMonitorPlayback();
+  }, [
+    isBroadcasterMonitorPlayback,
+    isListenerPlayback,
+    startBroadcasterMonitorPlayback,
+    startListenerPlayback,
+    stopBroadcasterMonitorPlayback,
+    stopListenerPlayback,
+  ]);
 
   return (
     <main className="relative flex h-dvh min-h-0 flex-col overflow-hidden bg-neutral-0 text-neutral-900">
@@ -715,7 +829,7 @@ export function LiveRoom({
         </p>
       ) : null}
 
-      {isListenerPlayback ? (
+      {isListenerPlayback || isBroadcasterMonitorPlayback ? (
         <audio
           ref={listenerAudioRef}
           className="sr-only"
@@ -726,10 +840,15 @@ export function LiveRoom({
         />
       ) : null}
 
-      {isListenerPlayback && showListenerPlayButton ? (
+      {(isListenerPlayback || isBroadcasterMonitorPlayback) &&
+      showListenerPlayButton ? (
         <button
           type="button"
-          onClick={startListenerPlayback}
+          onClick={
+            isBroadcasterMonitorPlayback
+              ? startBroadcasterMonitorPlayback
+              : startListenerPlayback
+          }
           className="absolute top-[56px] left-1/2 z-20 w-[calc(100%-40px)] max-w-[353px] -translate-x-1/2 rounded-lg bg-secondary-500 px-3 py-2 text-center text-caption3 text-neutral-0"
         >
           {listenerAudioMessage || "라이브 오디오 재생"}

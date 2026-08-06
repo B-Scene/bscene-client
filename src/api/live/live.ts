@@ -886,3 +886,43 @@ export const subscribeViewerCount = async ({
     reader.releaseLock();
   }
 };
+
+export const createWhepSession = async ({
+  path,
+  sdpOffer,
+}: {
+  path: string;
+  sdpOffer: string;
+}): Promise<{ sdpAnswer: string; sessionUrl: string }> => {
+  const normalizedPath = path.replace(/^\/+|\/+$/g, "");
+  const requestUrl = resolveRtcUrl(`/rtc/${normalizedPath}/whep`);
+
+  const response = await fetch(requestUrl, {
+    method: "POST",
+    headers: {
+      Authorization: getWhipAuthorization(),
+      "Content-Type": "application/sdp",
+      Accept: "application/sdp",
+    },
+    body: sdpOffer,
+  });
+  const responseText = await response.text();
+
+  if (!response.ok) {
+    throw new Error(
+      parseErrorMessage(
+        responseText,
+        `WHEP 세션 생성 실패: ${response.status}`,
+      ),
+    );
+  }
+
+  const sessionUrl =
+    response.headers.get("Location") ?? response.headers.get("location");
+
+  if (!sessionUrl) {
+    throw new Error("WHEP 세션 Location 헤더가 없습니다.");
+  }
+
+  return { sdpAnswer: responseText, sessionUrl };
+};
