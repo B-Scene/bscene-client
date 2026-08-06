@@ -204,6 +204,11 @@ export interface LivePlayback {
   playbackUrl: string;
 }
 
+export interface LiveCoPublisher {
+  userId: number;
+  whepUrl: string;
+}
+
 export interface EnterLiveResponse {
   liveId: number;
   isLive: boolean;
@@ -226,6 +231,7 @@ export interface EnterLiveResponse {
   isBroadcaster?: boolean;
   coHosts?: LiveCoHostItem[];
   coHostList?: LiveCoHostItem[];
+  coPublishers?: LiveCoPublisher[];
 }
 
 export type LiveReportType =

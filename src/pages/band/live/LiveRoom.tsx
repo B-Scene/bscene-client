@@ -95,17 +95,20 @@ const extractWhipPath = (playbackUrl: string) => {
 
     const segments = pathname.split("/").filter(Boolean);
     const rtcIndex = segments.indexOf("rtc");
-    const whipIndex = segments.indexOf("whip");
+    const protocolIndex = segments.findIndex(
+      (segment) => segment === "whip" || segment === "whep",
+    );
 
     if (rtcIndex >= 0) {
-      const endIndex = whipIndex > rtcIndex ? whipIndex : segments.length;
+      const endIndex =
+        protocolIndex > rtcIndex ? protocolIndex : segments.length;
       return segments.slice(rtcIndex + 1, endIndex).join("/");
     }
 
     return pathname
       .replace(/^api\/rtc\//, "")
       .replace(/^rtc\//, "")
-      .replace(/\/whip$/, "")
+      .replace(/\/(?:whip|whep)$/, "")
       .replace(/^\/+|\/+$/g, "");
   } catch {
     return rawValue
@@ -113,7 +116,7 @@ const extractWhipPath = (playbackUrl: string) => {
       .replace(/^\/+/, "")
       .replace(/^api\/rtc\//, "")
       .replace(/^rtc\//, "")
-      .replace(/\/whip$/, "")
+      .replace(/\/(?:whip|whep)$/, "")
       .replace(/^\/+|\/+$/g, "");
   }
 };
@@ -200,10 +203,16 @@ export function LiveRoom({
   const [listenerAudioMessage, setListenerAudioMessage] = useState("");
   const [showListenerPlayButton, setShowListenerPlayButton] = useState(false);
   const [monitorPlaybackUrl, setMonitorPlaybackUrl] = useState(
-    () => live?.monitorPlaybackUrl ?? null,
+    () =>
+      live?.coPublishers?.find((publisher) => publisher.whepUrl)?.whepUrl ??
+      live?.monitorPlaybackUrl ??
+      null,
   );
   const [monitorPlaybackProtocol, setMonitorPlaybackProtocol] = useState(
-    () => live?.monitorPlaybackProtocol ?? null,
+    () =>
+      (live?.coPublishers?.some((publisher) => publisher.whepUrl)
+        ? "WHEP"
+        : live?.monitorPlaybackProtocol) ?? null,
   );
   const [liveMembers, setLiveMembers] = useState<LiveMemberItem[]>([]);
   const [isMembersLoading, setIsMembersLoading] = useState(false);
@@ -701,8 +710,16 @@ export function LiveRoom({
 
   useEffect(() => {
     setViewerCount(getInitialViewerCount(live));
-    setMonitorPlaybackUrl(live?.monitorPlaybackUrl ?? null);
-    setMonitorPlaybackProtocol(live?.monitorPlaybackProtocol ?? null);
+    const coPublisherWhepUrl = live?.coPublishers?.find(
+      (publisher) => publisher.whepUrl,
+    )?.whepUrl;
+
+    setMonitorPlaybackUrl(
+      coPublisherWhepUrl ?? live?.monitorPlaybackUrl ?? null,
+    );
+    setMonitorPlaybackProtocol(
+      coPublisherWhepUrl ? "WHEP" : (live?.monitorPlaybackProtocol ?? null),
+    );
   }, [live]);
 
   useEffect(() => {
