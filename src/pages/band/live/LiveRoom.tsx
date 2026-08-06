@@ -236,7 +236,10 @@ export function LiveRoom({
     playbackRole === "LISTENER" &&
     Boolean(playbackUrl);
   const isBroadcasterMonitorPlayback =
-    Boolean(live?.liveId) && canBroadcast && Boolean(monitorPlaybackUrl);
+    Boolean(live?.liveId) &&
+    canBroadcast &&
+    audioStatus === "connected" &&
+    Boolean(monitorPlaybackUrl);
 
   const handleAcceptCoHostUpgrade = async () => {
     if (!live?.liveId || acceptCoHostUpgradeMutation.isPending) return;
@@ -634,9 +637,8 @@ export function LiveRoom({
         throw new Error("WHEP SDP Offer 생성에 실패했습니다.");
       }
 
-      const path = extractWhipPath(monitorPlaybackUrl);
       const { sdpAnswer, sessionUrl } = await createWhepSession({
-        path,
+        whepUrl: monitorPlaybackUrl,
         sdpOffer: localDescription.sdp,
       });
 

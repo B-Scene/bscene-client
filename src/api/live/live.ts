@@ -915,25 +915,43 @@ export const subscribeViewerCount = async ({
 };
 
 export const createWhepSession = async ({
-  path,
+  whepUrl,
   sdpOffer,
 }: {
-  path: string;
+  whepUrl: string;
   sdpOffer: string;
 }): Promise<{ sdpAnswer: string; sessionUrl: string }> => {
-  const normalizedPath = path.replace(/^\/+|\/+$/g, "");
-  const requestUrl = resolveRtcUrl(`/rtc/${normalizedPath}/whep`);
+  const requestUrl = resolveRtcUrl(whepUrl.trim());
+  const maxAttempts = 15;
+  let response: Response | null = null;
+  let responseText = "";
 
-  const response = await fetch(requestUrl, {
-    method: "POST",
-    headers: {
-      Authorization: getWhipAuthorization(),
-      "Content-Type": "application/sdp",
-      Accept: "application/sdp",
-    },
-    body: sdpOffer,
-  });
-  const responseText = await response.text();
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    response = await fetch(requestUrl, {
+      method: "POST",
+      headers: {
+        Authorization: getWhipAuthorization(),
+        "Content-Type": "application/sdp",
+        Accept: "application/sdp",
+      },
+      body: sdpOffer,
+    });
+    responseText = await response.text();
+
+    // coPublisherJoined can arrive just before the media server exposes WHEP.
+    // Keep the exact URL supplied by the backend and wait briefly for it.
+    if (response.status !== 404 || attempt === maxAttempts) {
+      break;
+    }
+
+    await new Promise<void>((resolve) => {
+      window.setTimeout(resolve, 1000);
+    });
+  }
+
+  if (!response) {
+    throw new Error("WHEP 세션 요청을 시작하지 못했습니다.");
+  }
 
   if (!response.ok) {
     throw new Error(
