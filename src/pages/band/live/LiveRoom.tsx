@@ -5,6 +5,7 @@ import {
   createWhipSession,
   createWhepSession,
   deleteWhipSession,
+  enterLive,
   getLiveMembers,
   subscribeViewerCount,
 } from "@/api/live/live";
@@ -14,6 +15,7 @@ import {
   useLeaveLiveMutation,
 } from "@/hooks/api/live/useLive";
 import { getApiErrorMessage } from "@/utils/getApiErrorMessage";
+import { getStoredAuthUser } from "@/utils/authUser";
 import type { LiveMemberItem } from "@/types/live/live";
 import type { ActiveLive, ChatMessage, GoLiveScreen } from "./types";
 import { getCachedScheduledCoHostUserIds } from "./scheduledLiveCache";
@@ -82,6 +84,16 @@ const getInitialViewerCount = (live: ActiveLive) => {
   };
 
   return liveWithCounts.viewerCount ?? liveWithCounts.viewCount ?? 0;
+};
+
+const getOtherCoPublisherWhepUrl = (live: ActiveLive) => {
+  const currentUserId = getStoredAuthUser()?.userId;
+
+  return live?.coPublishers?.find(
+    (publisher) =>
+      publisher.whepUrl &&
+      (!Number.isFinite(currentUserId) || publisher.userId !== currentUserId),
+  )?.whepUrl;
 };
 
 const extractWhipPath = (playbackUrl: string) => {
@@ -204,13 +216,13 @@ export function LiveRoom({
   const [showListenerPlayButton, setShowListenerPlayButton] = useState(false);
   const [monitorPlaybackUrl, setMonitorPlaybackUrl] = useState(
     () =>
-      live?.coPublishers?.find((publisher) => publisher.whepUrl)?.whepUrl ??
+      getOtherCoPublisherWhepUrl(live) ??
       live?.monitorPlaybackUrl ??
       null,
   );
   const [monitorPlaybackProtocol, setMonitorPlaybackProtocol] = useState(
     () =>
-      (live?.coPublishers?.some((publisher) => publisher.whepUrl)
+      (getOtherCoPublisherWhepUrl(live)
         ? "WHEP"
         : live?.monitorPlaybackProtocol) ?? null,
   );
@@ -714,9 +726,7 @@ export function LiveRoom({
 
   useEffect(() => {
     setViewerCount(getInitialViewerCount(live));
-    const coPublisherWhepUrl = live?.coPublishers?.find(
-      (publisher) => publisher.whepUrl,
-    )?.whepUrl;
+    const coPublisherWhepUrl = getOtherCoPublisherWhepUrl(live);
 
     setMonitorPlaybackUrl(
       coPublisherWhepUrl ?? live?.monitorPlaybackUrl ?? null,
@@ -749,7 +759,9 @@ export function LiveRoom({
       watchOnly: shouldExcludeMeFromViewerCount,
       onViewerCount: setViewerCount,
       onCoPublisherJoined: canBroadcast
-        ? ({ whepUrl }) => {
+        ? ({ userId, whepUrl }) => {
+            if (userId === getStoredAuthUser()?.userId) return;
+
             setMonitorPlaybackUrl(whepUrl);
             setMonitorPlaybackProtocol("WHEP");
           }
@@ -763,6 +775,48 @@ export function LiveRoom({
       controller.abort();
     };
   }, [canBroadcast, live?.liveId]);
+
+  useEffect(() => {
+    if (
+      !live?.liveId ||
+      !canBroadcast ||
+      audioStatus !== "connected" ||
+      monitorPlaybackUrl
+    ) {
+      return;
+    }
+
+    let isCancelled = false;
+    let timeoutId: number | undefined;
+
+    const refreshCoPublishers = async () => {
+      try {
+        const refreshedLive = await enterLive(live.liveId);
+        const whepUrl = getOtherCoPublisherWhepUrl(refreshedLive);
+
+        if (isCancelled) return;
+
+        if (whepUrl) {
+          setMonitorPlaybackUrl(whepUrl);
+          setMonitorPlaybackProtocol("WHEP");
+          return;
+        }
+      } catch {
+        // SSE 이벤트를 놓친 경우를 위한 보조 조회이므로 다음 주기에 재시도합니다.
+      }
+
+      if (!isCancelled) {
+        timeoutId = window.setTimeout(refreshCoPublishers, 3000);
+      }
+    };
+
+    void refreshCoPublishers();
+
+    return () => {
+      isCancelled = true;
+      if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+    };
+  }, [audioStatus, canBroadcast, live?.liveId, monitorPlaybackUrl]);
 
   useEffect(() => {
     if (overlay !== "members" || !live?.liveId) return;
