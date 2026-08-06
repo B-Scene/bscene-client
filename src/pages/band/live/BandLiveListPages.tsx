@@ -1,13 +1,15 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import type { AxiosError } from "axios";
+import { Header } from "@/components/common/Header/Header";
 import {
   useEnterLiveMutation,
   useLiveHomeQuery,
   useLiveNowQuery,
+  useRespondCoHostInvitationMutation,
   useScheduledLiveQuery,
 } from "@/hooks/api/live/useLive";
 import { useInfiniteScrollObserver } from "@/hooks/useInfiniteScrollObserver";
-import type { LiveApiResponse } from "@/types/live/live";
+import type { EnterLiveResponse, LiveApiResponse } from "@/types/live/live";
 import type {
   ActiveLive,
   GoLiveScreen,
@@ -15,7 +17,17 @@ import type {
   ScheduledLiveCardData,
 } from "./types";
 import { HomeLiveCard, ScheduledLiveCard } from "./BandLiveHome";
-import { TopBar } from "./components/TopBar";
+import {
+  cacheOwnedScheduledLives,
+  cacheScheduledCoHostUserIds,
+  getCachedOwnedScheduledLives,
+  removeCachedOwnedScheduledLive,
+  useRetainedScheduledLiveCards,
+} from "./scheduledLiveCache";
+import {
+  isScheduledLiveStartable,
+  useScheduledLiveNow,
+} from "./scheduledLiveTime";
 
 interface BandLiveListPageProps {
   go: GoLiveScreen;
@@ -26,7 +38,21 @@ interface BandLiveNowListPageProps extends BandLiveListPageProps {
 }
 
 interface BandLiveScheduledListPageProps extends BandLiveListPageProps {
+  onEnterLive: (live: ActiveLive) => void;
   onEditReservation: (liveId: number) => void;
+}
+
+function HeaderBackButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="뒤로가기"
+      className="absolute top-0 left-5 z-20 flex h-[52px] w-10 items-center justify-center"
+    >
+      <span className="block h-[18px] w-[18px] rotate-45 border-b-[2.5px] border-l-[2.5px] border-[#1D1A1A]" />
+    </button>
+  );
 }
 
 function ListMessage({
@@ -39,6 +65,7 @@ function ListMessage({
   return (
     <div className="py-12 text-center">
       <p className="text-caption2 text-neutral-500">{children}</p>
+
       {onRetry ? (
         <button
           type="button"
@@ -51,6 +78,34 @@ function ListMessage({
     </div>
   );
 }
+
+const getApiErrorBody = (error: unknown) => {
+  return (error as AxiosError<LiveApiResponse<null>>).response?.data;
+};
+
+const getApiStatus = (error: unknown) => {
+  const axiosError = error as AxiosError<LiveApiResponse<null>>;
+
+  return axiosError.response?.status ?? axiosError.response?.data?.status;
+};
+
+const getApiMessage = (error: unknown, fallbackMessage: string) => {
+  return getApiErrorBody(error)?.message ?? fallbackMessage;
+};
+
+const isLiveEnterForbiddenError = (error: unknown) => {
+  const status = getApiStatus(error);
+  const code = getApiErrorBody(error)?.code ?? "";
+
+  return status === 403 || code.startsWith("LIVE403");
+};
+
+const isAlreadyProcessedInvitationError = (error: unknown) => {
+  const status = getApiStatus(error);
+  const code = getApiErrorBody(error)?.code ?? "";
+
+  return status === 409 || code.startsWith("LIVE409");
+};
 
 export function BandLiveNowListPage({
   go,
@@ -65,7 +120,9 @@ export function BandLiveNowListPage({
     isLoading,
     refetch,
   } = useLiveNowQuery("all");
+
   const enterLiveMutation = useEnterLiveMutation();
+  const respondCoHostInvitationMutation = useRespondCoHostInvitationMutation();
 
   const liveCards = useMemo<LiveCard[]>(
     () =>
@@ -79,16 +136,19 @@ export function BandLiveNowListPage({
             live.viewCount ??
             0
           ).toLocaleString()}명 청취 중`,
-          imageUrl:
-            live.bandProfileImageUrl ?? live.thumbnailImageUrl ?? null,
+          imageUrl: live.bandProfileImageUrl ?? live.thumbnailImageUrl ?? null,
           isMine: live.isMine,
         })),
       ) ?? [],
     [data],
   );
 
+  const isEnterPending =
+    enterLiveMutation.isPending || respondCoHostInvitationMutation.isPending;
+
   const loadMore = useCallback(() => {
     if (!hasNextPage || isFetchingNextPage) return;
+
     void fetchNextPage();
   }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
@@ -97,28 +157,72 @@ export function BandLiveNowListPage({
     onIntersect: loadMore,
   });
 
+  const enterAndMoveRoom = (enteredLive: EnterLiveResponse) => {
+    onEnterLive(enteredLive);
+    go("room");
+  };
+
   const handleEnterLive = async (liveId: number) => {
-    if (enterLiveMutation.isPending) return;
+    if (isEnterPending) return;
 
     try {
       const enteredLive = await enterLiveMutation.mutateAsync(liveId);
 
-      onEnterLive(enteredLive);
-      go("room");
+      enterAndMoveRoom(enteredLive);
     } catch (error) {
-      const apiMessage = (error as AxiosError<LiveApiResponse<null>>).response
-        ?.data?.message;
+      if (!isLiveEnterForbiddenError(error)) {
+        alert(getApiMessage(error, "라이브방에 입장하지 못했어요."));
+        return;
+      }
 
-      alert(apiMessage ?? "라이브방에 입장하지 못했어요.");
+      try {
+        await respondCoHostInvitationMutation.mutateAsync({
+          liveId,
+          request: {
+            isAccepted: true,
+          },
+        });
+
+        const enteredLive = await enterLiveMutation.mutateAsync(liveId);
+
+        enterAndMoveRoom(enteredLive);
+      } catch (coHostError) {
+        if (isAlreadyProcessedInvitationError(coHostError)) {
+          try {
+            const enteredLive = await enterLiveMutation.mutateAsync(liveId);
+
+            enterAndMoveRoom(enteredLive);
+            return;
+          } catch (retryError) {
+            alert(
+              getApiMessage(
+                retryError,
+                "공동 진행자 수락 후에도 라이브방에 입장하지 못했어요.",
+              ),
+            );
+            return;
+          }
+        }
+
+        alert(
+          getApiMessage(
+            coHostError,
+            "공동 진행자 초대 수락에 실패했어요. 알림 또는 초대 상태를 확인해주세요.",
+          ),
+        );
+      }
     }
   };
 
   return (
     <main className="relative h-dvh overflow-hidden bg-neutral-0 text-neutral-900">
-      <TopBar title="진행 중인 라이브" onBack={() => go("home")} />
+      <Header title="진행 중인 라이브" showBack={false} variant="main" />
+      <HeaderBackButton onClick={() => go("home")} />
 
-      <section className="h-[calc(100%_-_64px)] overflow-y-auto px-5 pb-8">
-        {isLoading ? <ListMessage>라이브 목록을 불러오는 중이에요.</ListMessage> : null}
+      <section className="h-[calc(100%_-_52px)] overflow-y-auto px-5 pb-8">
+        {isLoading ? (
+          <ListMessage>라이브 목록을 불러오는 중이에요.</ListMessage>
+        ) : null}
 
         {isError ? (
           <ListMessage onRetry={() => void refetch()}>
@@ -135,7 +239,7 @@ export function BandLiveNowListPage({
             {liveCards.map((live) => (
               <HomeLiveCard
                 key={live.id}
-                disabled={enterLiveMutation.isPending}
+                disabled={isEnterPending}
                 live={live}
                 onEnter={() => void handleEnterLive(live.id)}
               />
@@ -157,8 +261,10 @@ export function BandLiveNowListPage({
 
 export function BandLiveScheduledListPage({
   go,
+  onEnterLive,
   onEditReservation,
 }: BandLiveScheduledListPageProps) {
+  const now = useScheduledLiveNow();
   const {
     data,
     fetchNextPage,
@@ -168,7 +274,9 @@ export function BandLiveScheduledListPage({
     isLoading,
     refetch,
   } = useScheduledLiveQuery(false);
+
   const { data: liveHome } = useLiveHomeQuery();
+  const enterLiveMutation = useEnterLiveMutation();
 
   const previewScheduleByLiveId = useMemo(
     () =>
@@ -181,8 +289,8 @@ export function BandLiveScheduledListPage({
     [liveHome?.scheduled],
   );
 
-  const scheduledCards = useMemo<ScheduledLiveCardData[]>(
-    () =>
+  const scheduledCards = useMemo<ScheduledLiveCardData[]>(() => {
+    const fetchedCards =
       data?.pages.flatMap((page) =>
         page.items.map((live) => ({
           id: live.liveId,
@@ -191,15 +299,32 @@ export function BandLiveScheduledListPage({
           scheduledAt:
             previewScheduleByLiveId.get(live.liveId) ?? live.scheduledAt,
           isMine: Boolean(live.isMine),
-          imageUrl:
-            live.bandProfileImageUrl ?? live.thumbnailImageUrl ?? null,
+          imageUrl: live.bandProfileImageUrl ?? live.thumbnailImageUrl ?? null,
+          coHostUserIds: (live.coHosts ?? live.coHostList ?? [])
+            .map((coHost) => coHost.userId)
+            .filter((userId): userId is number => Number.isFinite(userId)),
         })),
-      ) ?? [],
-    [data, previewScheduleByLiveId],
-  );
+      ) ?? [];
+    const mergedCards = new Map(
+      getCachedOwnedScheduledLives().map((live) => [live.id, live]),
+    );
+
+    fetchedCards.forEach((live) => mergedCards.set(live.id, live));
+
+    return Array.from(mergedCards.values());
+  }, [data, previewScheduleByLiveId]);
+  const retainedScheduledCards = useRetainedScheduledLiveCards(scheduledCards);
+
+  useEffect(() => {
+    cacheOwnedScheduledLives(retainedScheduledCards);
+    retainedScheduledCards.forEach((live) => {
+      cacheScheduledCoHostUserIds(live.id, live.coHostUserIds ?? []);
+    });
+  }, [retainedScheduledCards]);
 
   const loadMore = useCallback(() => {
     if (!hasNextPage || isFetchingNextPage) return;
+
     void fetchNextPage();
   }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
@@ -208,11 +333,47 @@ export function BandLiveScheduledListPage({
     onIntersect: loadMore,
   });
 
+  const enterAndMoveRoom = (enteredLive: EnterLiveResponse) => {
+    removeCachedOwnedScheduledLive(Number(enteredLive.liveId));
+    onEnterLive(enteredLive);
+    go("room");
+  };
+
+  const handleScheduledLiveAction = async (live: ScheduledLiveCardData) => {
+    if (enterLiveMutation.isPending) return;
+
+    const canStartLive = isScheduledLiveStartable(live.scheduledAt, now);
+
+    if (!canStartLive) {
+      if (live.isMine) {
+        onEditReservation(live.id);
+        return;
+      }
+
+      alert("아직 예약 시간이 되지 않은 라이브예요.");
+      return;
+    }
+
+    try {
+      const enteredLive = await enterLiveMutation.mutateAsync(live.id);
+
+      enterAndMoveRoom(enteredLive);
+    } catch (error) {
+      alert(
+        getApiMessage(
+          error,
+          "예약 라이브를 시작하거나 입장하지 못했어요. 예약 시간과 권한을 확인해주세요.",
+        ),
+      );
+    }
+  };
+
   return (
     <main className="relative h-dvh overflow-hidden bg-neutral-0 text-neutral-900">
-      <TopBar title="예정된 라이브" onBack={() => go("home")} />
+      <Header title="예정된 라이브" showBack={false} variant="main" />
+      <HeaderBackButton onClick={() => go("home")} />
 
-      <section className="h-[calc(100%_-_64px)] overflow-y-auto px-5 pb-8">
+      <section className="h-[calc(100%_-_52px)] overflow-y-auto px-5 pb-8">
         {isLoading ? (
           <ListMessage>예정된 라이브를 불러오는 중이에요.</ListMessage>
         ) : null}
@@ -223,17 +384,22 @@ export function BandLiveScheduledListPage({
           </ListMessage>
         ) : null}
 
-        {!isLoading && !isError && scheduledCards.length === 0 ? (
+        {!isLoading && !isError && retainedScheduledCards.length === 0 ? (
           <ListMessage>예정된 라이브가 없어요.</ListMessage>
         ) : null}
 
-        {!isLoading && !isError && scheduledCards.length > 0 ? (
+        {!isLoading && !isError && retainedScheduledCards.length > 0 ? (
           <div className="grid gap-3 pt-5">
-            {scheduledCards.map((live) => (
-              <ScheduledLiveCard
+            {retainedScheduledCards.map((live) => (
+                <ScheduledLiveCard
                 key={live.id}
                 live={live}
-                onEdit={() => onEditReservation(live.id)}
+                  actionLabel={
+                  isScheduledLiveStartable(live.scheduledAt, now)
+                    ? "라이브 시작"
+                    : "수정"
+                  }
+                  onEdit={() => void handleScheduledLiveAction(live)}
               />
             ))}
 

@@ -280,8 +280,8 @@ const ContentRegisterForm = ({
             { label: "콘텐츠", value: contentType ?? "" },
             { label: "콘텐츠 제목", value: title },
           ],
-          primaryLabel: "콘텐츠 보기",
-          primaryTo: isEditMode ? `/band/contents/${postId}` : "/band/home",
+          primaryLabel: "홈으로 이동",
+          primaryTo: "/band/home",
         },
       });
     };

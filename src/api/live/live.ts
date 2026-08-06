@@ -1,5 +1,6 @@
 import { axiosInstance } from "@/api/axiosInstance";
 import type {
+  AcceptCoHostUpgradeResponse,
   BlockLiveUserRequest,
   CloseLiveResponse,
   CreateLiveRequest,
@@ -18,6 +19,9 @@ import type {
   ReportLiveUserResponse,
   ReplayListResponse,
   ReplayPlaybackResponse,
+  RequestCoHostUpgradeResponse,
+  RespondCoHostInvitationRequest,
+  RespondCoHostInvitationResponse,
   ScheduledLiveListResponse,
   ToggleLiveAlarmResponse,
   UpdateLiveReservationRequest,
@@ -28,6 +32,10 @@ interface SubscribeViewerCountParams {
   liveId: number;
   watchOnly?: boolean;
   onViewerCount: (viewerCount: number) => void;
+  onCoPublisherJoined?: (publisher: {
+    userId: number;
+    whepUrl: string;
+  }) => void;
   signal?: AbortSignal;
 }
 
@@ -458,12 +466,18 @@ export const getLiveHome = async (): Promise<LiveHomeResponse> => {
       "/lives/home",
     );
 
-  const result = unwrapResult(response.data);
+  const result = unwrapResult(response.data) ?? {};
 
   return {
     liveNow: result.liveNow ?? [],
     replays: (result.replays ?? []).map(normalizeReplayLiveId),
     scheduled: result.scheduled ?? [],
+    myNickname: result.myNickname ?? result.nickname ?? null,
+    nickname: result.nickname ?? result.myNickname ?? null,
+    myProfileImageUrl: result.myProfileImageUrl ?? result.profileImageUrl ?? null,
+    profileImageUrl: result.profileImageUrl ?? result.myProfileImageUrl ?? null,
+    coHosts: result.coHosts ?? result.coHostList ?? [],
+    coHostList: result.coHostList ?? result.coHosts ?? [],
   };
 };
 
@@ -666,7 +680,10 @@ export const updateLiveReservation = async ({
 }): Promise<UpdateLiveReservationResponse | null> => {
   const response = await axiosInstance.patch<
     LiveApiResponse<UpdateLiveReservationResponse | null>
-  >(`/lives/${liveId}/reservation`, normalizeUpdateLiveReservationRequest(request));
+  >(
+    `/lives/${liveId}/reservation`,
+    normalizeUpdateLiveReservationRequest(request),
+  );
 
   return unwrapResult(response.data);
 };
@@ -675,6 +692,46 @@ export const cancelLiveReservation = async (
   liveId: number,
 ): Promise<void> => {
   await axiosInstance.delete(`/lives/${liveId}/reservation`);
+};
+
+export const respondCoHostInvitation = async ({
+  liveId,
+  request,
+}: {
+  liveId: number;
+  request: RespondCoHostInvitationRequest;
+}): Promise<RespondCoHostInvitationResponse> => {
+  const response = await axiosInstance.patch<
+    LiveApiResponse<RespondCoHostInvitationResponse>
+  >(`/lives/${liveId}/co-host-invitation`, request);
+
+  return unwrapResult(response.data);
+};
+
+export const requestCoHostUpgrade = async (
+  liveId: number,
+): Promise<RequestCoHostUpgradeResponse> => {
+  const response = await axiosInstance.post<
+    LiveApiResponse<RequestCoHostUpgradeResponse>
+  >(`/lives/${liveId}/co-host`, {});
+
+  return unwrapResult(response.data);
+};
+
+export const acceptCoHostUpgrade = async ({
+  liveId,
+  userId,
+}: {
+  liveId: number;
+  userId?: number;
+}): Promise<AcceptCoHostUpgradeResponse> => {
+  const response = await axiosInstance.post<
+    LiveApiResponse<AcceptCoHostUpgradeResponse>
+  >(`/lives/${liveId}/co-host/acceptance`,
+    Number.isFinite(userId) ? { userId } : {},
+  );
+
+  return unwrapResult(response.data);
 };
 
 export const createWhipSession = async ({
@@ -758,6 +815,7 @@ export const subscribeViewerCount = async ({
   liveId,
   watchOnly = false,
   onViewerCount,
+  onCoPublisherJoined,
   signal,
 }: SubscribeViewerCountParams): Promise<void> => {
   const requestUrl = resolveLiveApiUrl(
@@ -827,9 +885,102 @@ export const subscribeViewerCount = async ({
         ) {
           parseViewerCount(dataLines.join("\n"));
         }
+
+        if (eventName === "coPublisherJoined" && dataLines.length > 0) {
+          try {
+            const publisher = JSON.parse(dataLines.join("\n")) as {
+              userId?: number;
+              whepUrl?: string;
+            };
+
+            if (
+              Number.isFinite(publisher.userId) &&
+              typeof publisher.whepUrl === "string" &&
+              publisher.whepUrl.trim()
+            ) {
+              onCoPublisherJoined?.({
+                userId: publisher.userId as number,
+                whepUrl: publisher.whepUrl,
+              });
+            }
+          } catch {
+            // 잘못된 공동 송출자 이벤트는 시청자 수 구독을 끊지 않습니다.
+          }
+        }
       });
     }
   } finally {
     reader.releaseLock();
   }
+};
+
+export const createWhepSession = async ({
+  whepUrl,
+  sdpOffer,
+  signal,
+}: {
+  whepUrl: string;
+  sdpOffer: string;
+  signal?: AbortSignal;
+}): Promise<{ sdpAnswer: string; sessionUrl: string }> => {
+  const requestUrl = resolveRtcUrl(whepUrl.trim());
+  const maxAttempts = 15;
+  let response: Response | null = null;
+  let responseText = "";
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    signal?.throwIfAborted();
+    response = await fetch(requestUrl, {
+      method: "POST",
+      headers: {
+        Authorization: getWhipAuthorization(),
+        "Content-Type": "application/sdp",
+        Accept: "application/sdp",
+      },
+      body: sdpOffer,
+      signal,
+    });
+    responseText = await response.text();
+
+    // coPublisherJoined can arrive just before the media server exposes WHEP.
+    // Keep the exact URL supplied by the backend and wait briefly for it.
+    if (response.status !== 404 || attempt === maxAttempts) {
+      break;
+    }
+
+    await new Promise<void>((resolve, reject) => {
+      const timeoutId = window.setTimeout(() => {
+        signal?.removeEventListener("abort", handleAbort);
+        resolve();
+      }, 1000);
+      const handleAbort = () => {
+        window.clearTimeout(timeoutId);
+        reject(signal?.reason ?? new DOMException("Aborted", "AbortError"));
+      };
+
+      signal?.addEventListener("abort", handleAbort, { once: true });
+    });
+  }
+
+  if (!response) {
+    throw new Error("WHEP 세션 요청을 시작하지 못했습니다.");
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      parseErrorMessage(
+        responseText,
+        `WHEP 세션 생성 실패: ${response.status}`,
+      ),
+    );
+  }
+
+  const sessionUrl =
+    response.headers.get("Location") ?? response.headers.get("location");
+
+  if (!sessionUrl) {
+    throw new Error("WHEP 세션 Location 헤더가 없습니다.");
+  }
+
+  return { sdpAnswer: responseText, sessionUrl };
 };

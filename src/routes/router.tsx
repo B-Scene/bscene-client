@@ -8,6 +8,7 @@ import ModeSelecPage from "@/pages/onboarding/ModeSelectPage";
 import FanNicknamePage from "@/pages/onboarding/FanNicknamePage";
 import GenreSelectPage from "@/pages/onboarding/GenreSelectPage";
 import RegionSelectPage from "@/pages/onboarding/RegionSelectPage";
+import NotificationPermissionPage from "@/pages/onboarding/NotificationPermissionPage";
 import OnboardingCompletePage from "@/pages/onboarding/OnboardingCompletePage";
 import OAuthCallbackPage from "@/pages/auth/OAuthCallbackPage";
 import BandHomePage from "@/pages/band/home/BandHomePage";
@@ -47,7 +48,7 @@ import {
   FanLiveReplayPage,
   FanLiveScheduledPage,
 } from "@/pages/fan/live";
-import { BandLivePage } from "@/pages/band/live/BandLivePage";
+import BandLivePage from "@/pages/band/live/BandLivePage";
 import BandSessionPage from "@/pages/band/session/BandSessionPage";
 import MemberInviteSearchPage from "@/pages/band/home/MemberInviteSearchPage";
 import ApplicationManagementPage from "@/pages/band/my/ApplicationManagementPage";
@@ -112,6 +113,10 @@ export const router = createBrowserRouter([
       {
         path: "/onboarding/region",
         element: <RegionSelectPage />,
+      },
+      {
+        path: "/onboarding/notification-permission",
+        element: <NotificationPermissionPage />,
       },
       {
         path: "/onboarding/complete",

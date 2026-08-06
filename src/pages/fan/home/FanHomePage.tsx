@@ -882,10 +882,12 @@ const FanHomePage = () => {
   const { data: fanHome, isError, isLoading, refetch } = useFanHomeQuery();
   const { data: notificationsData } = useNotificationsInfiniteQuery();
   const interestedPerformancesQuery = useInterestedPerformancesQuery("ALL");
-  const upcomingPerformancesQuery = useUpcomingPerformancesInfiniteQuery(
-    "IMMINENT",
-    4,
-  );
+  const {
+    data: upcomingPerformancesData,
+    isError: isUpcomingPerformancesError,
+    isLoading: isUpcomingPerformancesLoading,
+    refetch: refetchUpcomingPerformances,
+  } = useUpcomingPerformancesInfiniteQuery("IMMINENT", 4);
   const variant = getVariant(searchParams.get("variant"));
   const homeData = useMemo(() => mapHomeResponse(fanHome), [fanHome]);
   const interestedConcerts = useMemo(() => {
@@ -898,12 +900,12 @@ const FanHomePage = () => {
   }, [interestedPerformancesQuery.data]);
   const upcomingApiConcerts = useMemo(() => {
     return (
-      upcomingPerformancesQuery.data?.pages
+      upcomingPerformancesData?.pages
         .flatMap((page) => page.items ?? [])
         .map(mapConcertItem)
         .filter(isUpcomingConcert) ?? []
     );
-  }, [upcomingPerformancesQuery.data]);
+  }, [upcomingPerformancesData]);
   const shouldUseRecommendedPerformances =
     variant === "recommended" ||
     homeData.performanceType === "RECOMMENDED" ||
@@ -912,9 +914,7 @@ const FanHomePage = () => {
     ? interestedConcerts.length > 0
       ? interestedConcerts
       : homeData.performances
-    : upcomingApiConcerts.length > 0
-      ? upcomingApiConcerts
-      : homeData.performances;
+    : upcomingApiConcerts;
   const pendingPerformances = useMemo(() => {
     return (pendingParticipationQuery.data?.items ?? []).filter(
       (item) => !answeredPendingPerformanceIds.has(item.performanceId),
@@ -1070,7 +1070,15 @@ const FanHomePage = () => {
             title="다가오는 공연"
             onMoreClick={() => navigate("/fan/home/concerts")}
           />
-          <ConcertList concerts={upcomingConcerts} />
+          {isUpcomingPerformancesLoading ? (
+            <LoadingBlock />
+          ) : isUpcomingPerformancesError ? (
+            <ErrorBlock
+              onRetry={() => void refetchUpcomingPerformances()}
+            />
+          ) : (
+            <ConcertList concerts={upcomingConcerts} />
+          )}
         </section>
       </>
     );
@@ -1083,6 +1091,9 @@ const FanHomePage = () => {
     refetch,
     shouldUseRecommendedPerformances,
     upcomingConcerts,
+    isUpcomingPerformancesError,
+    isUpcomingPerformancesLoading,
+    refetchUpcomingPerformances,
     variant,
   ]);
 

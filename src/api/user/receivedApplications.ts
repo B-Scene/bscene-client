@@ -25,5 +25,9 @@ export const acceptApplicationSubmission = async (
     body,
   );
 
+  if (!data.isSuccess) {
+    throw new Error(data.message || "지원서 처리에 실패했어요.");
+  }
+
   return data.result;
 };

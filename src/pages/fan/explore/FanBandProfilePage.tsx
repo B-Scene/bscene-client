@@ -88,6 +88,12 @@ const getBandFollowerCount = (band?: FanExploreBandDetail | null) => {
   );
 };
 
+const getBandFollowingState = (band?: FanExploreBandDetail | null) =>
+  band?.isFollowing ??
+  band?.isFollowed ??
+  band?.following ??
+  band?.followed;
+
 const getFollowedBandFollowerCount = (band?: FollowedBandItem | null) => {
   const bandInfo = band?.band;
 
@@ -326,7 +332,17 @@ const FanBandProfilePage = () => {
   const musicLinksQuery = useMusicLinksQuery(
     canToggleFollow ? numericBandId : Number.NaN,
   );
-  const followedBandsQuery = useFollowedBandsQuery(100);
+  const detailFollowState =
+    getBandFollowingState(bandDetailQuery.data) ??
+    getBandFollowingState(bandPreview);
+  const shouldCheckFollowedBands =
+    canToggleFollow &&
+    !bandDetailQuery.isLoading &&
+    detailFollowState === undefined;
+  const followedBandsQuery = useFollowedBandsQuery(
+    100,
+    shouldCheckFollowedBands,
+  );
   const followBandMutation = useFollowExploreBand();
   const unfollowBandMutation = useUnfollowExploreBand();
   const enterLiveMutation = useEnterLiveMutation();
@@ -369,15 +385,8 @@ const FanBandProfilePage = () => {
     : undefined;
   const isFollowing =
     followOverride ??
+    detailFollowState ??
     (isFollowedFromList ? true : undefined) ??
-    bandDetailQuery.data?.isFollowing ??
-    bandDetailQuery.data?.isFollowed ??
-    bandDetailQuery.data?.following ??
-    bandDetailQuery.data?.followed ??
-    bandPreview?.isFollowing ??
-    bandPreview?.isFollowed ??
-    bandPreview?.following ??
-    bandPreview?.followed ??
     false;
   const rawFollowerCount =
     getBandFollowerCount(bandDetailQuery.data) ??
@@ -421,6 +430,7 @@ const FanBandProfilePage = () => {
   useEffect(() => {
     if (
       !canToggleFollow ||
+      !shouldCheckFollowedBands ||
       isFollowedFromList ||
       !followedBandsQuery.hasNextPage ||
       followedBandsQuery.isFetchingNextPage
@@ -433,6 +443,7 @@ const FanBandProfilePage = () => {
     canToggleFollow,
     followedBandsQuery,
     isFollowedFromList,
+    shouldCheckFollowedBands,
   ]);
 
   const handleOpenLive = async () => {

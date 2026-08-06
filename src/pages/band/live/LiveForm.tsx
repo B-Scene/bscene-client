@@ -1,16 +1,25 @@
 import { useEffect, useMemo, useState } from "react";
 import type { AxiosError } from "axios";
+import { Header } from "@/components/common/Header/Header";
 import { BottomNavBar } from "@/components/layout/BottomNavBar";
 import {
   useCreateLiveMutation,
   useEnterLiveMutation,
 } from "@/hooks/api/live/useLive";
+import { useActiveBandId } from "@/hooks/api/user/useMyProfiles";
 import {
   cancelLiveReservation,
   getLiveReservation,
   updateLiveReservation,
 } from "@/api/live/live";
+import { getBandMembers } from "@/api/band/bandMember";
+import {
+  getActiveBandMemberProfile,
+  getBandMemberProfile,
+} from "@/api/band/bandMemberProfile";
 import { uploadMediaFile } from "@/api/media/media";
+import type { BandMemberListItem } from "@/types/band/bandMember";
+import type { BandMemberProfileResponse } from "@/types/band/bandMemberProfile";
 import type {
   LiveApiResponse,
   LiveReservationCoHostCandidate,
@@ -19,7 +28,6 @@ import type { ActiveLive, GoLiveScreen, LiveFormMode } from "./types";
 import { ConfirmDialog } from "./components/ConfirmDialog";
 import { CoHostSelectionScreen } from "./components/CoHostSelectionScreen";
 import { MicTestScreen } from "./components/MicTestScreen";
-import { TopBar } from "./components/TopBar";
 import {
   ChoiceCard,
   CoHostCard,
@@ -35,6 +43,18 @@ interface LiveFormProps {
   onCreatedLive?: (live: ActiveLive) => void;
   reservationLiveId?: number | null;
 }
+
+const INACTIVE_MEMBER_STATUS_VALUES = new Set([
+  "PENDING",
+  "INVITED",
+  "WAITING",
+  "REJECTED",
+  "REMOVED",
+  "DELETED",
+  "WITHDRAWN",
+  "CANCELED",
+  "CANCELLED",
+]);
 
 const toCreateScheduledAt = (date: string, time: string) => {
   return `${date}T${time}:00`;
@@ -89,9 +109,7 @@ const getInitialSelectedCoHostIds = (
 ) => {
   return candidates
     .filter((candidate) => {
-      return (
-        candidate.status === "APPROVED" || candidate.status === "INVITED"
-      );
+      return candidate.status === "APPROVED" || candidate.status === "INVITED";
     })
     .map((candidate) => candidate.bandMemberId);
 };
@@ -109,12 +127,76 @@ const isSameNumberArray = (leftValues: number[], rightValues: number[]) => {
   return left.every((value, index) => value === right[index]);
 };
 
+const isInactiveMemberStatus = (status: string | null | undefined) => {
+  if (!status) return false;
+
+  return INACTIVE_MEMBER_STATUS_VALUES.has(status.toUpperCase());
+};
+
+const mapBandMemberToCoHostCandidate = (
+  member: BandMemberListItem,
+  activeProfileId?: number | null,
+  profile?: BandMemberProfileResponse | null,
+): LiveReservationCoHostCandidate | null => {
+  const nickname = member.profileNickname ?? profile?.nickname;
+  const resolvedProfileId = member.bandMemberProfileId ?? member.id;
+
+  if (!member.id || !member.userId || !resolvedProfileId || !nickname) {
+    return null;
+  }
+
+  if (isInactiveMemberStatus(member.status)) {
+    return null;
+  }
+
+  const isOwner =
+    Boolean(activeProfileId) && Number(resolvedProfileId) === Number(activeProfileId);
+
+  return {
+    bandMemberId: member.id,
+    bandMemberProfileId: resolvedProfileId,
+    bandMemberProfileImageUrl: null,
+    nickname,
+    part: profile?.part ?? member.memberType,
+    status: isOwner ? "OWNER" : null,
+    userId: member.userId,
+  };
+};
+
+function HeaderBackButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="뒤로가기"
+      className="absolute top-0 left-5 z-20 flex h-[52px] w-10 items-center justify-center"
+    >
+      <span className="block h-[18px] w-[18px] rotate-45 border-b-[2.5px] border-l-[2.5px] border-[#1D1A1A]" />
+    </button>
+  );
+}
+
+function HeaderCloseButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="닫기"
+      className="absolute top-0 right-5 z-20 flex h-[52px] w-10 items-center justify-center"
+    >
+      <span className="absolute h-[28px] w-[2.5px] rotate-45 rounded-full bg-neutral-500" />
+      <span className="absolute h-[28px] w-[2.5px] -rotate-45 rounded-full bg-neutral-500" />
+    </button>
+  );
+}
+
 export function LiveForm({
   mode,
   go,
   onCreatedLive,
   reservationLiveId,
 }: LiveFormProps) {
+  const activeBandId = useActiveBandId();
   const createLiveMutation = useCreateLiveMutation();
   const enterLiveMutation = useEnterLiveMutation();
 
@@ -135,10 +217,13 @@ export function LiveForm({
   const [reservedDate, setReservedDate] = useState(getTomorrowDateString);
   const [reservedTime, setReservedTime] = useState("20:00");
   const [submitErrorMessage, setSubmitErrorMessage] = useState("");
+  const [coHostLoadErrorMessage, setCoHostLoadErrorMessage] = useState("");
+
   const [isUploadingThumbnail, setIsUploadingThumbnail] = useState(false);
   const [isReservationLoading, setIsReservationLoading] = useState(false);
   const [isReservationSaving, setIsReservationSaving] = useState(false);
   const [isReservationCanceling, setIsReservationCanceling] = useState(false);
+  const [isCoHostLoading, setIsCoHostLoading] = useState(false);
 
   const [cohostCandidates, setCohostCandidates] = useState<
     LiveReservationCoHostCandidate[]
@@ -158,6 +243,28 @@ export function LiveForm({
   const hasCoHostSelectionChanged = useMemo(() => {
     return !isSameNumberArray(selectedCoHostIds, initialSelectedCoHostIds);
   }, [initialSelectedCoHostIds, selectedCoHostIds]);
+
+  const getSubmitCoHostIds = () => {
+    return selectedCoHostIds
+      .map((coHostId) =>
+        cohostCandidates.find(
+          (candidate) => candidate.bandMemberId === coHostId,
+        ),
+      )
+      .filter(
+        (
+          candidate,
+        ): candidate is LiveReservationCoHostCandidate => {
+          if (!candidate) return false;
+          if (candidate.status === "OWNER") return false;
+
+          const submitId = candidate.userId ?? candidate.bandMemberProfileId;
+
+          return Number.isFinite(submitId);
+        },
+      )
+      .map((candidate) => candidate.userId ?? candidate.bandMemberProfileId);
+  };
 
   const handleBack = () => {
     if (isReservationMode) {
@@ -189,7 +296,18 @@ export function LiveForm({
     });
   };
 
+  const handleOpenCoHostScreen = () => {
+    setSubmitErrorMessage("");
+    setIsCoHostScreenOpen(true);
+  };
+
   const handleToggleCoHost = (bandMemberId: number) => {
+    const candidate = cohostCandidates.find(
+      (cohostCandidate) => cohostCandidate.bandMemberId === bandMemberId,
+    );
+
+    if (candidate?.status === "OWNER") return;
+
     setSelectedCoHostIds((prevIds) => {
       if (prevIds.includes(bandMemberId)) {
         return prevIds.filter((id) => id !== bandMemberId);
@@ -227,6 +345,7 @@ export function LiveForm({
 
     try {
       const thumbnailImageUrl = await uploadThumbnailIfNeeded();
+      const submitCoHostIds = getSubmitCoHostIds();
 
       const createdLive = await createLiveMutation.mutateAsync({
         title: trimmedTitle,
@@ -235,7 +354,7 @@ export function LiveForm({
         scheduledAt: isReserve
           ? toCreateScheduledAt(reservedDate, reservedTime)
           : null,
-        coHost: selectedCoHostIds,
+        coHost: submitCoHostIds,
       });
 
       if (isReserve) {
@@ -281,6 +400,7 @@ export function LiveForm({
 
     try {
       const thumbnailImageUrl = await uploadThumbnailIfNeeded();
+      const submitCoHostIds = getSubmitCoHostIds();
 
       await updateLiveReservation({
         liveId: reservationLiveId,
@@ -289,7 +409,7 @@ export function LiveForm({
           description: trimmedDescription,
           thumbnailImageUrl,
           scheduledAt: toUpdateScheduledAt(reservedDate, reservedTime),
-          cohosts: hasCoHostSelectionChanged ? selectedCoHostIds : null,
+          cohosts: hasCoHostSelectionChanged ? submitCoHostIds : null,
         },
       });
 
@@ -341,17 +461,104 @@ export function LiveForm({
   };
 
   useEffect(() => {
+    if (isEdit) return;
+
+    let isMounted = true;
+
+    window.setTimeout(() => {
+      if (!isMounted) return;
+      setCoHostLoadErrorMessage("");
+      setSelectedCoHostIds([]);
+      setInitialSelectedCoHostIds([]);
+      setCohostCandidates([]);
+    }, 0);
+
+    if (!activeBandId) {
+      window.setTimeout(() => {
+        if (isMounted) {
+          setCoHostLoadErrorMessage("현재 선택된 밴드 정보를 찾을 수 없어요.");
+        }
+      }, 0);
+      return;
+    }
+
+    window.setTimeout(() => {
+      if (isMounted) setIsCoHostLoading(true);
+    }, 0);
+
+    Promise.all([
+      getBandMembers(activeBandId),
+      getActiveBandMemberProfile().catch(() => null),
+    ])
+      .then(async ([members, activeProfile]) => {
+        if (!isMounted) return;
+
+        const activeProfileId = activeProfile?.id ?? null;
+        const memberProfiles = await Promise.all(
+          members.map((member) =>
+            member.bandMemberProfileId
+              ? getBandMemberProfile(member.bandMemberProfileId).catch(
+                  () => null,
+                )
+              : Promise.resolve(null),
+          ),
+        );
+
+        if (!isMounted) return;
+
+        const candidates = members
+          .map((member, index) =>
+            mapBandMemberToCoHostCandidate(
+              member,
+              activeProfileId,
+              memberProfiles[index],
+            ),
+          )
+          .filter(
+            (
+              candidate,
+            ): candidate is LiveReservationCoHostCandidate =>
+              Boolean(candidate),
+          );
+
+        setCohostCandidates(candidates);
+      })
+      .catch((error) => {
+        if (!isMounted) return;
+
+        setCoHostLoadErrorMessage(
+          getErrorMessage(error, "공동 진행 후보를 불러오지 못했어요."),
+        );
+      })
+      .finally(() => {
+        if (!isMounted) return;
+
+        setIsCoHostLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activeBandId, isEdit]);
+
+  useEffect(() => {
     if (!isEdit) return;
 
     if (!reservationLiveId) {
-      setSubmitErrorMessage("수정할 예약 라이브 정보를 찾을 수 없어요.");
+      window.setTimeout(() => {
+        setSubmitErrorMessage("수정할 예약 라이브 정보를 찾을 수 없어요.");
+      }, 0);
       return;
     }
 
     let isMounted = true;
 
-    setIsReservationLoading(true);
-    setSubmitErrorMessage("");
+    window.setTimeout(() => {
+      if (!isMounted) return;
+      setIsReservationLoading(true);
+      setSubmitErrorMessage("");
+      setCoHostLoadErrorMessage("");
+    }, 0);
 
     getLiveReservation(reservationLiveId)
       .then((reservation) => {
@@ -406,6 +613,8 @@ export function LiveForm({
         candidates={cohostCandidates}
         selectedCoHostIds={selectedCoHostIds}
         onToggleCoHost={handleToggleCoHost}
+        isLoading={isCoHostLoading}
+        errorMessage={coHostLoadErrorMessage}
       />
     );
   }
@@ -442,11 +651,13 @@ export function LiveForm({
 
   return (
     <main className="relative min-h-dvh bg-secondary-0 pb-[calc(var(--bottom-nav-height)+32px)] text-neutral-900">
-      <TopBar
+      <Header
         title={isReservationMode ? "라이브 예약 수정" : "라이브 시작"}
-        onBack={handleBack}
-        onClose={handleClose}
+        showBack={false}
+        variant="main"
       />
+      <HeaderBackButton onClick={handleBack} />
+      <HeaderCloseButton onClick={handleClose} />
 
       <div className="grid gap-3 px-5 pt-3 pb-6">
         {!isEdit ? (
@@ -491,9 +702,13 @@ export function LiveForm({
           </FormCard>
         ) : null}
 
-        <CoHostCard onClick={() => setIsCoHostScreenOpen(true)} />
+        <CoHostCard onClick={handleOpenCoHostScreen} />
 
-        {selectedCoHostCount > 0 ? (
+        {isCoHostLoading ? (
+          <p className="-mt-1 text-right text-caption2 text-neutral-500">
+            공동 진행 후보 불러오는 중
+          </p>
+        ) : selectedCoHostCount > 0 ? (
           <p className="-mt-1 text-right text-caption2 text-secondary-500">
             공동 진행자 {selectedCoHostCount}명 선택됨
           </p>

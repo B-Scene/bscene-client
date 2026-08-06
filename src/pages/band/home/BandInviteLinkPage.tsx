@@ -5,7 +5,7 @@ import { Header } from "@/components/common/Header/Header";
 import { useEnterBandInviteLink } from "@/hooks/api/band/useBandMember";
 import { notificationKeys } from "@/hooks/api/useNotifications";
 import { getApiErrorMessage } from "@/utils/getApiErrorMessage";
-import { getStoredAuthUser } from "@/utils/authUser";
+import { getStoredAuthUser, savePostLoginRedirect } from "@/utils/authUser";
 
 const BandInviteLinkPage = () => {
   const navigate = useNavigate();
@@ -18,6 +18,7 @@ const BandInviteLinkPage = () => {
     if (!token || hasRequestedRef.current) return;
 
     if (!getStoredAuthUser()) {
+      savePostLoginRedirect(`/band/invite-links/${encodeURIComponent(token)}`);
       navigate("/login", { replace: true });
       return;
     }

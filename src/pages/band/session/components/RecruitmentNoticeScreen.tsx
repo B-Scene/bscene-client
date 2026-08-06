@@ -155,13 +155,29 @@ export const RecruitmentNoticeScreen = () => {
     setIsBasicProfileEditOpen,
   ] = useState(false);
 
+  const openPostId =
+    (location.state as { openPostId?: number } | null)?.openPostId ?? null;
+
   const [
     selectedPostId,
     setSelectedPostId,
   ] = useState<number | null>(
-    () =>
-      (location.state as { openPostId?: number } | null)?.openPostId ?? null,
+    () => openPostId,
   );
+
+  useEffect(() => {
+    if (!Number.isFinite(openPostId)) return;
+
+    const timeoutId = window.setTimeout(() => {
+      setSelectedPostId(openPostId);
+      navigate(`${location.pathname}${location.search}${location.hash}`, {
+        replace: true,
+        state: null,
+      });
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [location.hash, location.pathname, location.search, navigate, openPostId]);
 
   const [
     selectedPostOverride,

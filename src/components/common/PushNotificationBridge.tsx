@@ -4,7 +4,10 @@ import {
   onForegroundPushMessage,
 } from "@/utils/webPushNotifications";
 import { useModeStore } from "@/stores/useModeStore";
-import { getNotificationMode } from "@/utils/notificationDeepLink";
+import {
+  getLiveReferencePath,
+  getNotificationMode,
+} from "@/utils/notificationDeepLink";
 import type {
   NotificationItem,
   NotificationSettingsMode,
@@ -16,8 +19,37 @@ declare global {
   }
 }
 
-const getPayloadDeepLink = (data?: Record<string, string>) =>
-  data?.deepLink ?? data?.link ?? "/";
+const getPayloadDeepLink = ({
+  data,
+  title,
+  body,
+}: {
+  data?: Record<string, string>;
+  title: string;
+  body: string;
+}) => {
+  const suppliedDeepLink = data?.deepLink ?? data?.link ?? null;
+
+  const referenceIdValue =
+    data?.liveId ?? data?.referenceId ?? data?.targetId ?? data?.resourceId;
+  const referenceId = Number(referenceIdValue);
+  const notification: NotificationItem = {
+    notificationId: -1,
+    type: data?.type ?? data?.notificationType ?? data?.eventType ?? "UNKNOWN",
+    mode: null,
+    deepLink: suppliedDeepLink,
+    referenceId: Number.isFinite(referenceId) ? referenceId : null,
+    title,
+    body,
+    isRead: false,
+    readAt: null,
+    createdAt: new Date().toISOString(),
+    actionable: false,
+    bandInvite: null,
+  };
+
+  return getLiveReferencePath(notification) ?? suppliedDeepLink ?? "/";
+};
 
 const toNotificationMode = (
   value?: string,
@@ -85,7 +117,11 @@ export const PushNotificationBridge = () => {
       const title =
         payload.notification?.title ?? payload.data?.title ?? "B:Scene";
       const body = payload.notification?.body ?? payload.data?.body;
-      const deepLink = getPayloadDeepLink(payload.data);
+      const deepLink = getPayloadDeepLink({
+        data: payload.data,
+        title,
+        body: body ?? "",
+      });
       const payloadMode = getPayloadMode({
         data: payload.data,
         title,

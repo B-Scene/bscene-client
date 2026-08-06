@@ -45,11 +45,13 @@ const formatMemberParts = (parts: string[]) => {
 };
 
 export function LiveRoomHeader({
-  go,
+  canCloseLive,
+  onClose,
   viewerCount,
   durationSeconds,
 }: {
-  go: GoLiveScreen;
+  canCloseLive: boolean;
+  onClose: () => void;
   viewerCount: number;
   durationSeconds: number;
 }) {
@@ -74,10 +76,10 @@ export function LiveRoomHeader({
 
       <button
         type="button"
-        onClick={() => go("endConfirm")}
+        onClick={onClose}
         className="flex h-[28px] w-[74px] items-center justify-center rounded-full bg-neutral-0 text-caption3 text-error shadow-[0_2px_8px_rgba(198,40,40,0.18)]"
       >
-        라이브 종료
+        {canCloseLive ? "라이브 종료" : "나가기"}
       </button>
     </header>
   );

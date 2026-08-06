@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { KeyboardEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import BandDefaultProfileImage from "@/assets/icons/band/band-default-profile.svg";
@@ -112,23 +112,54 @@ const NotificationPage = () => {
     isLoading,
     refetch,
   } = useNotificationsInfiniteQuery(NOTIFICATION_PAGE_SIZE);
+  const [retentionNow, setRetentionNow] = useState(() => Date.now());
   const notifications = useMemo(
     () =>
       data?.pages
         .flatMap((page) => page.items)
         .filter(
           (notification) =>
-            isNotificationWithinRetention(notification) &&
+            isNotificationWithinRetention(notification, retentionNow) &&
             isNotificationForMode(notification, "FAN"),
         ) ??
       [],
-    [data],
+    [data, retentionNow],
   );
   const hasNotifications = notifications.length > 0;
   const sentinelRef = useInfiniteScrollObserver({
     enabled: Boolean(hasNextPage) && !isFetchingNextPage,
     onIntersect: fetchNextPage,
   });
+
+  useEffect(() => {
+    const intervalId = window.setInterval(
+      () => setRetentionNow(Date.now()),
+      60_000,
+    );
+
+    return () => window.clearInterval(intervalId);
+  }, []);
+
+  useEffect(() => {
+    if (
+      isLoading ||
+      isError ||
+      hasNotifications ||
+      !hasNextPage ||
+      isFetchingNextPage
+    ) {
+      return;
+    }
+
+    void fetchNextPage();
+  }, [
+    fetchNextPage,
+    hasNextPage,
+    hasNotifications,
+    isError,
+    isFetchingNextPage,
+    isLoading,
+  ]);
 
   return (
     <main className="mx-auto min-h-dvh w-full max-w-[393px] bg-primary-0">
