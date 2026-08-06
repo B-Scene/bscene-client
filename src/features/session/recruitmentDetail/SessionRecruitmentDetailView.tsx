@@ -7,12 +7,10 @@ export interface RecruitmentDetailInfoRow {
 
 export const SessionRecruitmentDetailHeader = ({
   onBack,
-  onDelete,
 }: {
   onBack: () => void;
-  onDelete?: () => void;
 }) => (
-  <header className="sticky top-0 z-30 flex h-12 w-full shrink-0 items-center justify-center bg-neutral-0">
+  <header className="relative z-30 flex h-12 w-full shrink-0 items-center justify-center bg-neutral-0">
     <button
       type="button"
       aria-label="뒤로가기"
@@ -23,16 +21,6 @@ export const SessionRecruitmentDetailHeader = ({
     </button>
 
     <h1 className="text-body1 text-neutral-900">모집 공고</h1>
-
-    {onDelete ? (
-      <button
-        type="button"
-        onClick={onDelete}
-        className="absolute top-1/2 right-5 -translate-y-1/2 text-caption3 text-error"
-      >
-        삭제
-      </button>
-    ) : null}
   </header>
 );
 
@@ -47,7 +35,7 @@ interface SessionRecruitmentDetailContentProps {
   bandName: string;
   bandGenre: string;
   shortLocation: string;
-  deleteErrorMessage?: string;
+  errorMessage?: string;
 }
 
 export const SessionRecruitmentDetailContent = ({
@@ -61,21 +49,25 @@ export const SessionRecruitmentDetailContent = ({
   bandName,
   bandGenre,
   shortLocation,
-  deleteErrorMessage,
+  errorMessage,
 }: SessionRecruitmentDetailContentProps) => (
   <>
     <section className="px-8 pt-4 pb-5">
-      <div className="inline-flex flex-col items-start gap-2">
+      <div className="inline-flex max-w-full flex-col items-start gap-2">
         {isNew ? (
           <span className="inline-flex h-[13px] items-center justify-center rounded-[2px] bg-secondary-500 px-[3px] text-label4 text-neutral-0">
             NEW
           </span>
         ) : null}
 
-        <div className="flex flex-col items-start gap-[2px]">
-          <h1 className="text-label1 text-neutral-900">{title}</h1>
-          <div className="flex items-center text-caption2 text-neutral-600">
+        <div className="flex max-w-full flex-col items-start gap-[2px]">
+          <h1 className="max-w-full break-words text-label1 text-neutral-900">
+            {title}
+          </h1>
+
+          <div className="flex max-w-full flex-wrap items-center text-caption2 text-neutral-600">
             <span>{deadlineText || "마감일 정보 없음"}</span>
+
             {dDayText ? (
               <>
                 <span
@@ -95,7 +87,8 @@ export const SessionRecruitmentDetailContent = ({
     <div className="px-8">
       <section className="pt-6 pb-6">
         <h2 className="text-body6 text-neutral-900">상세 요강</h2>
-        <p className="mt-4 whitespace-pre-line text-caption2 text-neutral-800">
+
+        <p className="mt-4 whitespace-pre-line break-words text-caption2 text-neutral-800">
           {content || "상세 요강이 없습니다."}
         </p>
       </section>
@@ -104,13 +97,18 @@ export const SessionRecruitmentDetailContent = ({
 
       <section className="py-6">
         <h2 className="text-body6 text-neutral-900">모집 조건</h2>
+
         <dl className="mt-4 flex flex-col gap-3">
           {infoRows.map((row) => (
-            <div key={row.label} className="flex min-h-[18px] items-center gap-8">
+            <div
+              key={row.label}
+              className="flex min-h-[18px] items-start gap-8"
+            >
               <dt className="w-[52px] shrink-0 text-caption2 text-neutral-700">
                 {row.label}
               </dt>
-              <dd className="min-w-0 flex-1 text-caption2 text-neutral-800">
+
+              <dd className="min-w-0 flex-1 break-words text-caption2 text-neutral-800">
                 {row.value}
               </dd>
             </div>
@@ -122,16 +120,19 @@ export const SessionRecruitmentDetailContent = ({
 
       <section className="pt-6 pb-8">
         <h2 className="text-body6 text-neutral-900">밴드 정보</h2>
-        <div className="mt-3 flex h-[60px] w-full items-center rounded-[8px] bg-neutral-0 py-3 pr-[15px] pl-3 text-left shadow-[0_0_8px_rgba(0,0,0,0.1)]">
+
+        <div className="mt-3 flex min-h-[60px] w-full items-center rounded-[8px] bg-neutral-0 py-3 pr-[15px] pl-3 text-left shadow-[0_0_8px_rgba(0,0,0,0.1)]">
           <img
             src={bandProfileImageUrl}
             alt=""
             className="size-[35px] shrink-0 rounded-full object-cover"
           />
+
           <div className="ml-5 min-w-0 flex-1">
             <strong className="block truncate text-caption3 text-neutral-900">
               {bandName}
             </strong>
+
             <span className="mt-[1px] block truncate text-caption2 text-neutral-600">
               {bandGenre} · {shortLocation}
             </span>
@@ -139,9 +140,9 @@ export const SessionRecruitmentDetailContent = ({
         </div>
       </section>
 
-      {deleteErrorMessage ? (
+      {errorMessage ? (
         <p className="pb-5 text-center text-caption2 text-error">
-          {deleteErrorMessage}
+          {errorMessage}
         </p>
       ) : null}
     </div>
@@ -149,31 +150,67 @@ export const SessionRecruitmentDetailContent = ({
 );
 
 export const SessionRecruitmentDetailActions = ({
+  canManage,
+  isCanceling = false,
   onSendMessage,
   onApply,
+  onEdit,
+  onCancelRecruitment,
 }: {
+  canManage: boolean;
+  isCanceling?: boolean;
   onSendMessage: () => void;
   onApply: () => void;
-}) => (
-  <div className="absolute inset-x-0 bottom-[var(--bottom-nav-height)] z-20 bg-neutral-0 px-8 pt-4 pb-5">
-    <div className="flex gap-[10px]">
-      <button
-        type="button"
-        onClick={onSendMessage}
-        className="flex h-12 min-w-0 flex-1 items-center justify-center rounded-[10px] border-[1.5px] border-secondary-500 bg-neutral-0 text-body6 text-secondary-500"
-      >
-        쪽지 보내기
-      </button>
-      <button
-        type="button"
-        onClick={onApply}
-        className="flex h-12 min-w-0 flex-1 items-center justify-center rounded-[10px] bg-secondary-500 text-body6 text-neutral-0"
-      >
-        지원하기
-      </button>
-    </div>
-  </div>
-);
+  onEdit: () => void;
+  onCancelRecruitment: () => void;
+}) => {
+  if (canManage) {
+    return (
+      <footer className="shrink-0 bg-neutral-0 px-8 pt-4 pb-[calc(env(safe-area-inset-bottom)+20px)] shadow-[0_-4px_16px_rgba(0,0,0,0.04)]">
+        <div className="flex gap-[10px]">
+          <button
+            type="button"
+            onClick={onEdit}
+            className="flex h-12 min-w-0 flex-1 items-center justify-center rounded-[10px] border-[1.5px] border-secondary-500 bg-neutral-0 text-body6 text-secondary-500"
+          >
+            수정하기
+          </button>
+
+          <button
+            type="button"
+            onClick={onCancelRecruitment}
+            disabled={isCanceling}
+            className="flex h-12 min-w-0 flex-1 items-center justify-center rounded-[10px] bg-secondary-500 text-body6 text-neutral-0 disabled:opacity-60"
+          >
+            {isCanceling ? "취소 중" : "취소하기"}
+          </button>
+        </div>
+      </footer>
+    );
+  }
+
+  return (
+    <footer className="shrink-0 bg-neutral-0 px-8 pt-4 pb-[calc(env(safe-area-inset-bottom)+20px)] shadow-[0_-4px_16px_rgba(0,0,0,0.04)]">
+      <div className="flex gap-[10px]">
+        <button
+          type="button"
+          onClick={onSendMessage}
+          className="flex h-12 min-w-0 flex-1 items-center justify-center rounded-[10px] border-[1.5px] border-secondary-500 bg-neutral-0 text-body6 text-secondary-500"
+        >
+          쪽지 보내기
+        </button>
+
+        <button
+          type="button"
+          onClick={onApply}
+          className="flex h-12 min-w-0 flex-1 items-center justify-center rounded-[10px] bg-secondary-500 text-body6 text-neutral-0"
+        >
+          지원하기
+        </button>
+      </div>
+    </footer>
+  );
+};
 
 const SectionDivider = () => (
   <div
