@@ -9,7 +9,6 @@ import type {
 } from "@/features/session/applicationForm/applicationForm.types";
 
 import {
-  isDefaultSessionApplication,
   mapApplicationToDetail,
   mapServerApplications,
 } from "@/features/session/applicationList/sessionApplicationList.mapper";
