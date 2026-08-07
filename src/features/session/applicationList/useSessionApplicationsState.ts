@@ -1,5 +1,3 @@
-// src/features/session/applicationList/useSessionApplicationsState.ts
-
 import { useMemo, useState } from "react";
 
 import { createInitialApplicationForm } from "@/features/session/applicationForm/applicationForm.constants";
@@ -7,6 +5,7 @@ import type {
   SessionApplicationDraft,
   SessionApplicationFormMode,
 } from "@/features/session/applicationForm/applicationForm.types";
+import type { SessionApplicationPortfolioLink } from "@/types/session/sessionApplication";
 
 import {
   mapApplicationToDetail,
@@ -116,11 +115,8 @@ export const useSessionApplicationsState = ({
     detailDraft?: SessionApplicationDraft,
   ) => {
     setApplicationFormMode("edit");
-
     setEditingApplicationId(application.sessionApplicationId);
-
     setEditingInitialValue(detailDraft ?? application.draft);
-
     setIsApplicationFormOpen(true);
   };
 
@@ -133,12 +129,14 @@ export const useSessionApplicationsState = ({
   const handleOpenApplicationDetail = (
     application: ApplicationCardItem,
     detailDraft?: SessionApplicationDraft,
+    portfolioLinkDetails?: readonly SessionApplicationPortfolioLink[] | null,
   ) => {
     setSelectedApplication(
       detailDraft
         ? {
             ...application,
             draft: detailDraft,
+            portfolioLinkDetails,
           }
         : application,
     );
@@ -188,8 +186,7 @@ export const useSessionApplicationsState = ({
     if (application.isLocal) {
       setLocalApplications((previousApplications) =>
         previousApplications.filter(
-          (item) =>
-            item.sessionApplicationId !== application.sessionApplicationId,
+          (item) => item.sessionApplicationId !== application.sessionApplicationId,
         ),
       );
 

@@ -1,6 +1,8 @@
 import ArrowLeftIcon from "@/assets/icons/arrow-left.svg";
 import UserDefaultProfileIcon from "@/assets/icons/band/user-default-profile.svg";
+import PlayButtonIcon from "@/assets/icons/band/play-button.svg";
 import type { SessionApplicationDraft } from "@/features/session/applicationForm/applicationForm.types";
+import type { SessionApplicationPortfolioLink } from "@/types/session/sessionApplication";
 import { getRenderableProfileImageUrl } from "@/utils/profileImageUrl";
 
 import {
@@ -14,7 +16,11 @@ import {
   type SectionRefCallback,
 } from "./applicationDetail.types";
 
-export const MyApplicationDetailHeader = ({ onBack }: { onBack: () => void }) => (
+export const MyApplicationDetailHeader = ({
+  onBack,
+}: {
+  onBack: () => void;
+}) => (
   <header className="relative flex h-[88px] w-full shrink-0 items-end justify-center border-b border-neutral-300 bg-neutral-0 pb-[23px]">
     <button
       type="button"
@@ -231,47 +237,84 @@ export const MyApplicationCareerSection = ({
         ))}
       </div>
     ) : (
-      <p className="mt-4 text-caption2 text-neutral-500">등록된 경력이 없어요</p>
+      <p className="mt-4 text-caption2 text-neutral-500">
+        등록된 경력이 없어요
+      </p>
     )}
   </section>
 );
 
 interface PortfolioSectionProps {
   sectionRef: SectionRefCallback;
-  portfolioLinks: string[];
+  portfolioLinks?: readonly SessionApplicationPortfolioLink[] | null;
+  fallbackPortfolioLinks: string[];
+}
+
+interface VisiblePortfolioLink {
+  id: string;
+  url: string;
+  title: string;
+  thumbnailUrl?: string | null;
 }
 
 export const MyApplicationPortfolioSection = ({
   sectionRef,
   portfolioLinks,
+  fallbackPortfolioLinks,
 }: PortfolioSectionProps) => {
-  const visibleLinks = portfolioLinks.filter(
-    (link) => typeof link === "string" && link.trim().length > 0,
-  );
+  const visibleLinks: VisiblePortfolioLink[] =
+    portfolioLinks && portfolioLinks.length > 0
+      ? portfolioLinks
+          .filter((link) => link.url.trim().length > 0)
+          .map((link, index) => ({
+            id: String(link.sessionApplicationLinkId ?? index),
+            url: link.url,
+            title:
+              link.title?.trim() ||
+              getApplicationPortfolioTitle(link.url, index),
+            thumbnailUrl: link.thumbnailUrl,
+          }))
+      : fallbackPortfolioLinks
+          .filter((link) => typeof link === "string" && link.trim().length > 0)
+          .map((link, index) => ({
+            id: `${link}-${index}`,
+            url: link,
+            title: getApplicationPortfolioTitle(link, index),
+            thumbnailUrl: null,
+          }));
 
   return (
     <section ref={sectionRef} className="scroll-mt-12 pt-6 pb-12">
       <h2 className="text-label1 text-neutral-900">포트폴리오</h2>
+
       {visibleLinks.length > 0 ? (
         <div className="mt-4 flex flex-col gap-6">
-          {visibleLinks.map((link, index) => (
+          {visibleLinks.map((link) => (
             <a
-              key={`${link}-${index}`}
-              href={normalizeApplicationPortfolioUrl(link)}
+              key={link.id}
+              href={normalizeApplicationPortfolioUrl(link.url)}
               target="_blank"
               rel="noreferrer"
               className="block"
             >
-              <div className="flex h-[172px] w-full items-center justify-center overflow-hidden rounded-[6px] bg-neutral-500">
-                <span className="flex size-6 items-center justify-center rounded-full border border-neutral-800">
-                  <span className="ml-[2px] h-0 w-0 border-y-[4px] border-y-transparent border-l-[6px] border-l-neutral-800" />
-                </span>
+              <div className="relative flex h-[172px] w-full items-center justify-center overflow-hidden rounded-[6px] bg-neutral-500">
+                {link.thumbnailUrl ? (
+                  <img
+                    src={link.thumbnailUrl}
+                    alt=""
+                    className="size-full object-cover"
+                  />
+                ) : null}
+
+                <img src={PlayButtonIcon} alt="" className="absolute size-6" />
               </div>
+
               <h3 className="mt-4 text-body1 text-neutral-800">
-                {getApplicationPortfolioTitle(link, index)}
+                {link.title}
               </h3>
+
               <p className="mt-1 truncate text-caption2 text-neutral-500">
-                {link}
+                {link.url}
               </p>
             </a>
           ))}

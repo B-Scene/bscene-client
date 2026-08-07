@@ -1,5 +1,3 @@
-// src/pages/band/session/components/SessionApplicationsScreen.tsx
-
 import { useState } from "react";
 import type { AxiosError } from "axios";
 
@@ -238,6 +236,7 @@ export const SessionApplicationsScreen = ({
       handleOpenApplicationDetail(
         application,
         mapMyApplicationDetailToDraft(detail),
+        detail.portfolioLinks,
       );
     } catch (error) {
       const apiMessage = (error as AxiosError<SessionApiResponse<null>>)
