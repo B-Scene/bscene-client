@@ -24,14 +24,12 @@ import {
   useUnfollowExploreBand,
 } from "@/hooks/api/fan/useFanExplore";
 import { useNotificationsInfiniteQuery } from "@/hooks/api/useNotifications";
-import { useInterestedPerformancesQuery } from "@/hooks/api/user/useInterestedPerformances";
 import type {
   FanHomeConcert,
   FanHomeNewsItem,
   FanHomeRecommendedBand,
   FanHomeResponse,
 } from "@/types/fan/home";
-import type { InterestedPerformanceItem } from "@/types/user/interestedPerformance";
 import {
   isNotificationForMode,
   isNotificationWithinRetention,
@@ -423,33 +421,6 @@ const mapConcertItem = (
   };
 };
 
-const getInterestedConcertDate = (concert: InterestedPerformanceItem) => {
-  if (concert.performanceDate && concert.startTime) {
-    return toDate(`${concert.performanceDate}T${concert.startTime}`);
-  }
-
-  return toDate(concert.performanceDate);
-};
-
-const mapInterestedConcertItem = (
-  item: InterestedPerformanceItem,
-): HomeConcertItem => {
-  const date = getInterestedConcertDate(item);
-
-  return {
-    id: String(item.performanceId),
-    date,
-    month: date ? MONTH_LABELS[date.getMonth()] : "TBD",
-    day: date ? String(date.getDate()).padStart(2, "0") : "--",
-    title: item.title,
-    location: item.venue,
-    dateTime: formatDateTime(date),
-    status: formatDday({ performanceDate: item.performanceDate }, date),
-    thumbnailSrc: item.posterImageUrl ?? undefined,
-    showThumbnail: Boolean(item.posterImageUrl),
-  };
-};
-
 const isUpcomingConcert = (concert: HomeConcertItem) => {
   if (["종료", "COMPLETED", "ENDED", "FINISHED"].includes(concert.status)) {
     return false;
@@ -615,7 +586,7 @@ const BandRecommendationStrip = ({ bands }: { bands: HomeBandItem[] }) => {
 
   return (
     <>
-      <div className="flex gap-[clamp(8px,calc((100vw-312px)/4),20px)] overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="flex gap-3 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {bands.map((band) => {
           const isFollowing = followOverrides[band.id] ?? band.isFollowing;
           const isBandPending = isFollowPending && pendingBandId === band.bandId;
@@ -623,7 +594,7 @@ const BandRecommendationStrip = ({ bands }: { bands: HomeBandItem[] }) => {
           return (
             <article
               key={band.id}
-              className="flex w-[clamp(48px,15vw,54px)] shrink-0 flex-col items-center text-center"
+              className="flex w-[calc((100%-36px)/4)] shrink-0 flex-col items-center text-center"
             >
               <button
                 type="button"
@@ -653,12 +624,12 @@ const BandRecommendationStrip = ({ bands }: { bands: HomeBandItem[] }) => {
                 <img
                   src={band.profileImageSrc}
                   alt=""
-                  className="size-[clamp(48px,15vw,54px)] rounded-full object-cover"
+                  className="size-[clamp(56px,16vw,64px)] rounded-full object-cover"
                 />
-                <strong className="mt-2 max-w-full truncate font-body text-body4 text-neutral-900">
+                <strong className="mt-2 max-w-full truncate font-body text-body1 text-neutral-900">
                   {band.name}
                 </strong>
-                <span className="mt-[5px] max-w-full truncate font-body text-caption4 text-neutral-600">
+                <span className="mt-[5px] max-w-full truncate font-body text-body5 text-neutral-600">
                   {band.meta}
                 </span>
               </button>
@@ -691,7 +662,7 @@ const BandRecommendationStrip = ({ bands }: { bands: HomeBandItem[] }) => {
                     onSettled: () => setPendingBandId(null),
                   });
                 }}
-                className="mt-2 h-[16px] w-full rounded-full border-[1px] border-primary-400 font-body text-label4 text-primary-400 disabled:opacity-60"
+                className="mt-2 h-[20px] w-full rounded-full border-[1px] border-primary-400 font-body text-caption3 text-primary-400 disabled:opacity-60"
               >
                 {isFollowing ? "팔로잉" : "팔로우"}
               </button>
@@ -897,7 +868,6 @@ const FanHomePage = () => {
   const deleteParticipationMutation = useDeletePerformanceParticipation();
   const { data: fanHome, isError, isLoading, refetch } = useFanHomeQuery();
   const { data: notificationsData } = useNotificationsInfiniteQuery();
-  const interestedPerformancesQuery = useInterestedPerformancesQuery("ALL");
   const {
     data: upcomingPerformancesData,
     isError: isUpcomingPerformancesError,
@@ -906,14 +876,6 @@ const FanHomePage = () => {
   } = useUpcomingPerformancesInfiniteQuery("IMMINENT", 4);
   const variant = getVariant(searchParams.get("variant"));
   const homeData = useMemo(() => mapHomeResponse(fanHome), [fanHome]);
-  const interestedConcerts = useMemo(() => {
-    return (
-      interestedPerformancesQuery.data?.pages
-        .flatMap((page) => page.items)
-        .filter((item) => item.participationStatus !== "COMPLETED")
-        .map(mapInterestedConcertItem) ?? []
-    ).filter(isUpcomingConcert);
-  }, [interestedPerformancesQuery.data]);
   const upcomingApiConcerts = useMemo(() => {
     return (
       upcomingPerformancesData?.pages
@@ -922,14 +884,19 @@ const FanHomePage = () => {
         .filter(isUpcomingConcert) ?? []
     );
   }, [upcomingPerformancesData]);
+  const hasNoFollowedBandPerformances =
+    homeData.hasFollowingBands &&
+    !isUpcomingPerformancesLoading &&
+    !isUpcomingPerformancesError &&
+    Boolean(upcomingPerformancesData) &&
+    upcomingApiConcerts.length === 0;
   const shouldUseRecommendedPerformances =
     variant === "recommended" ||
     homeData.performanceType === "RECOMMENDED" ||
-    !homeData.hasFollowingBands;
+    !homeData.hasFollowingBands ||
+    hasNoFollowedBandPerformances;
   const upcomingConcerts = shouldUseRecommendedPerformances
-    ? interestedConcerts.length > 0
-      ? interestedConcerts
-      : homeData.performances
+    ? homeData.performances
     : upcomingApiConcerts;
   const pendingPerformances = useMemo(() => {
     return (pendingParticipationQuery.data?.items ?? []).filter(
@@ -1001,8 +968,17 @@ const FanHomePage = () => {
     }
 
     const isNewHome = variant === "new" || !homeData.hasFollowingBands;
-    const hasInterestedConcerts = interestedConcerts.length > 0;
     const hasUpcomingConcerts = upcomingConcerts.length > 0;
+    const recommendedBandSection =
+      homeData.recommendedBands.length > 0 ? (
+        <section className="mt-8">
+          <SectionHeader
+            title="이런 밴드는 어때요?"
+            description="관심사 장르 · 지역 기반 추천"
+          />
+          <BandRecommendationStrip bands={homeData.recommendedBands} />
+        </section>
+      ) : null;
 
     if (isNewHome) {
       return (
@@ -1012,25 +988,16 @@ const FanHomePage = () => {
             <EmptyFollowCard onExploreClick={() => navigate("/fan/explore")} />
           </section>
 
-          {homeData.recommendedBands.length > 0 ? (
-            <section className="mt-8">
-              <SectionHeader
-                title="이런 밴드는 어때요?"
-                description="관심사 장르 · 지역 기반 추천"
-              />
-              <BandRecommendationStrip bands={homeData.recommendedBands} />
-            </section>
-          ) : null}
+          {recommendedBandSection}
 
           <section className="mt-8">
             <SectionHeader
-              title={hasInterestedConcerts ? "다가오는 공연" : "이런 공연은 어때요?"}
+              title="이런 공연은 어때요?"
               description={
-                hasInterestedConcerts
-                  ? undefined
-                  : "지금 인기 있는 공연을 추천해드릴게요!"
+                hasUpcomingConcerts
+                  ? "지금 인기 있는 공연을 추천해드릴게요!"
+                  : undefined
               }
-              onMoreClick={() => navigate("/fan/home/concerts")}
             />
             <ConcertList concerts={upcomingConcerts} />
           </section>
@@ -1049,21 +1016,20 @@ const FanHomePage = () => {
             <NewsCarousel items={homeData.news} />
           </section>
 
+          {recommendedBandSection}
+
           <section className="mt-8">
             <SectionHeader
               title={
                 hasUpcomingConcerts
-                  ? hasInterestedConcerts
-                    ? "다가오는 공연"
-                    : "이런 공연은 어때요?"
-                  : "다가오는 공연이 없어요"
+                  ? "이런 공연은 어때요?"
+                  : "추천 공연이 없어요"
               }
               description={
-                !hasInterestedConcerts && hasUpcomingConcerts
+                hasUpcomingConcerts
                   ? "지금 인기 있는 공연을 추천해드릴게요!"
                   : undefined
               }
-              onMoreClick={() => navigate("/fan/home/concerts")}
             />
             <ConcertList concerts={upcomingConcerts} />
           </section>
@@ -1080,6 +1046,8 @@ const FanHomePage = () => {
           />
           <NewsCarousel items={homeData.news} />
         </section>
+
+        {recommendedBandSection}
 
         <section className="mt-8">
           <SectionHeader
@@ -1100,7 +1068,6 @@ const FanHomePage = () => {
     );
   }, [
     homeData,
-    interestedConcerts.length,
     isError,
     isLoading,
     navigate,

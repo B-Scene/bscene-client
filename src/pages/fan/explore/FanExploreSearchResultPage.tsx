@@ -28,7 +28,12 @@ import type {
   FanExplorePerformance,
   FanExploreSort,
 } from "@/types/fan/explore";
-import { getGenreLabel, getRegionLabel } from "@/utils/bandLabels";
+import {
+  BAND_GENRE_BY_LABEL,
+  BAND_REGION_BY_LABEL,
+  getGenreLabel,
+  getRegionLabel,
+} from "@/utils/bandLabels";
 import { addRecentSearch } from "./recentSearches";
 
 const SEARCH_RESULT_SORT_OPTIONS = ["정확도순", "인기순"] as const;
@@ -52,6 +57,41 @@ const DEFAULT_SEARCH_FILTERS: AppliedExploreFilters = {
   genre: "전체",
   region: "전체",
   content: "전체",
+};
+
+const getGenreFilterParam = (genre: string) => {
+  if (genre === "전체") return undefined;
+  return BAND_GENRE_BY_LABEL[genre] ?? genre;
+};
+
+const getRegionFilterParam = (region: string) => {
+  if (region === "전체") return undefined;
+  return BAND_REGION_BY_LABEL[region] ?? region;
+};
+
+const createMoreResultPath = ({
+  keyword,
+  path,
+  sort,
+  shouldHighlightSort,
+  filters,
+}: {
+  keyword: string;
+  path: "concerts" | "contents";
+  sort: FanExploreSort;
+  shouldHighlightSort: boolean;
+  filters: AppliedExploreFilters;
+}) => {
+  const params = new URLSearchParams({
+    q: keyword,
+    sort,
+  });
+
+  if (shouldHighlightSort) params.set("sortSelected", "1");
+  if (filters.genre !== "전체") params.set("genre", filters.genre);
+  if (filters.region !== "전체") params.set("region", filters.region);
+
+  return `/fan/explore/search/results/${path}?${params.toString()}`;
 };
 
 const MONTH_LABELS = [
@@ -307,17 +347,21 @@ const FanExploreSearchResultPage = () => {
     sortState.keyword === keyword ? sortState.sort : "정확도순";
   const shouldHighlightSort =
     sortState.keyword === keyword && sortState.selectedByUser;
-  const selectedSortQuery = shouldHighlightSort ? "&sortSelected=1" : "";
   const [unfollowTargetBandId, setUnfollowTargetBandId] = useState<number | null>(
     null,
   );
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const selectedContentType =
+    SEARCH_CONTENT_TO_API[
+      appliedFilters.content as keyof typeof SEARCH_CONTENT_TO_API
+    ];
+  const selectedSort = SEARCH_SORT_TO_API[appliedSort];
   const searchQuery = useFanExploreSearchQuery({
     keyword,
-    type: SEARCH_CONTENT_TO_API[
-      appliedFilters.content as keyof typeof SEARCH_CONTENT_TO_API
-    ],
-    sort: SEARCH_SORT_TO_API[appliedSort],
+    type: selectedContentType,
+    sort: selectedSort,
+    genre: getGenreFilterParam(appliedFilters.genre),
+    region: getRegionFilterParam(appliedFilters.region),
   });
   const followBandMutation = useFollowExploreBand();
   const unfollowBandMutation = useUnfollowExploreBand();
@@ -493,9 +537,13 @@ const FanExploreSearchResultPage = () => {
           showMore
           onMoreClick={() =>
             navigate(
-              `/fan/explore/search/results/concerts?q=${encodeURIComponent(
+              createMoreResultPath({
                 keyword,
-              )}&sort=${SEARCH_SORT_TO_API[appliedSort]}${selectedSortQuery}`,
+                path: "concerts",
+                sort: selectedSort,
+                shouldHighlightSort,
+                filters: appliedFilters,
+              }),
             )
           }
         />
@@ -561,9 +609,13 @@ const FanExploreSearchResultPage = () => {
           showMore
           onMoreClick={() =>
             navigate(
-              `/fan/explore/search/results/contents?q=${encodeURIComponent(
+              createMoreResultPath({
                 keyword,
-              )}&sort=${SEARCH_SORT_TO_API[appliedSort]}${selectedSortQuery}`,
+                path: "contents",
+                sort: selectedSort,
+                shouldHighlightSort,
+                filters: appliedFilters,
+              }),
             )
           }
         />
@@ -586,8 +638,6 @@ const FanExploreSearchResultPage = () => {
         open={isFilterSheetOpen}
         onClose={() => setIsFilterSheetOpen(false)}
         appliedFilters={appliedFilters}
-        genreSelectable={false}
-        regionSelectable={false}
         contentSelectable
         onApply={setAppliedFilters}
       />

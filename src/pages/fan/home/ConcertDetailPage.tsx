@@ -742,7 +742,7 @@ const ConcertDetailPage = () => {
             onClick={handleTicketClick}
             className="mt-4 flex h-[44px] w-full items-center justify-center rounded-[12px] border-[1.2px] border-primary-400 font-body text-label2 text-primary-400 disabled:border-neutral-400 disabled:text-neutral-500"
           >
-            예매하기
+            {detail?.ticketLink ? "예매하기" : "지금은 예매할 수 없어요"}
           </button>
         </section>
       </section>

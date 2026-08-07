@@ -8,9 +8,16 @@ import {
   useFanExploreSearchQuery,
 } from "@/hooks/api/fan/useFanExplore";
 import { useInfiniteScrollObserver } from "@/hooks/useInfiniteScrollObserver";
-import { ExploreFilterBar } from "@/pages/fan/explore/FanExplorePage";
+import {
+  ExploreFilterBar,
+  type AppliedExploreFilters,
+} from "@/pages/fan/explore/FanExplorePage";
 import { FanExploreContentNewsList } from "@/pages/fan/explore/components/FanExploreContentNewsList";
 import type { FanExploreContent, FanExploreSort } from "@/types/fan/explore";
+import {
+  BAND_GENRE_BY_LABEL,
+  BAND_REGION_BY_LABEL,
+} from "@/utils/bandLabels";
 import { addRecentSearch } from "./recentSearches";
 
 const SORT_LABELS: Record<FanExploreSort, "정확도순" | "인기순"> = {
@@ -22,6 +29,18 @@ const SORT_LABELS: Record<FanExploreSort, "정확도순" | "인기순"> = {
 const getSortParam = (value: string | null): FanExploreSort => {
   if (value === "POPULAR") return "POPULAR";
   return "ACCURACY";
+};
+
+const getFilterLabelParam = (value: string | null) => value || "전체";
+
+const getGenreFilterParam = (genre: string) => {
+  if (genre === "전체") return undefined;
+  return BAND_GENRE_BY_LABEL[genre] ?? genre;
+};
+
+const getRegionFilterParam = (region: string) => {
+  if (region === "전체") return undefined;
+  return BAND_REGION_BY_LABEL[region] ?? region;
 };
 
 const getContentId = (content: FanExploreContent) =>
@@ -99,15 +118,24 @@ const FanExploreContentMorePage = () => {
   const sort = getSortParam(searchParams.get("sort"));
   const shouldHighlightSort =
     sort === "POPULAR" || searchParams.get("sortSelected") === "1";
+  const appliedFilters: AppliedExploreFilters = {
+    genre: getFilterLabelParam(searchParams.get("genre")),
+    region: getFilterLabelParam(searchParams.get("region")),
+    content: "콘텐츠",
+  };
   const contentsQuery = useFanExploreContentSearchQuery({
     keyword,
     sort,
+    genre: getGenreFilterParam(appliedFilters.genre),
+    region: getRegionFilterParam(appliedFilters.region),
     size: 30,
   });
   const allSearchQuery = useFanExploreSearchQuery({
     keyword,
     type: "ALL",
     sort,
+    genre: getGenreFilterParam(appliedFilters.genre),
+    region: getRegionFilterParam(appliedFilters.region),
   });
   const {
     data,
@@ -138,7 +166,7 @@ const FanExploreContentMorePage = () => {
     <main className="min-h-dvh bg-neutral-0 pb-[calc(var(--bottom-nav-height)+24px)]">
       <ContentMoreTopBar initialKeyword={keyword} />
       <ExploreFilterBar
-        appliedFilters={{ genre: "전체", region: "전체", content: "콘텐츠" }}
+        appliedFilters={appliedFilters}
         appliedSort={SORT_LABELS[sort]}
         highlightSort={shouldHighlightSort}
       />

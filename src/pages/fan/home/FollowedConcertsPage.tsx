@@ -32,6 +32,7 @@ const MONTH_LABELS = [
 type SortOption = (typeof SORT_OPTIONS)[number];
 type ConcertListItem = {
   id: string;
+  date: Date | null;
   month: string;
   day: string;
   title: string;
@@ -196,6 +197,7 @@ const mapPerformanceToConcert = (
     id: String(
       concert.performanceId ?? concert.concertId ?? concert.id ?? `concert-${index}`,
     ),
+    date,
     month: date ? MONTH_LABELS[date.getMonth()] : "TBD",
     day: date ? String(date.getDate()).padStart(2, "0") : "--",
     title: getConcertTitle(concert),
@@ -206,6 +208,16 @@ const mapPerformanceToConcert = (
     showThumbnail: Boolean(thumbnailSrc),
     isInterested: concert.isInterested ?? false,
   };
+};
+
+const isUpcomingConcert = (concert: ConcertListItem) => {
+  if (["종료", "COMPLETED", "ENDED", "FINISHED"].includes(concert.status)) {
+    return false;
+  }
+
+  if (!concert.date) return true;
+
+  return concert.date.getTime() >= Date.now();
 };
 
 const SortArrowIcon = () => (
@@ -266,7 +278,23 @@ const FollowedConcertsPage = () => {
     isLoading,
     refetch,
   } = upcomingPerformancesQuery;
+  const upcomingConcerts = useMemo(() => {
+    return (
+      data?.pages
+        .flatMap((page) => page.items ?? [])
+        .map(mapPerformanceToConcert)
+        .filter(isUpcomingConcert) ?? []
+    );
+  }, [data]);
   const isRecommendedFallback = fanHomeQuery.data?.hasFollowingBands !== true;
+  const hasNoFollowedBandPerformances =
+    fanHomeQuery.data?.hasFollowingBands === true &&
+    !isLoading &&
+    !isError &&
+    Boolean(data) &&
+    upcomingConcerts.length === 0;
+  const shouldUseRecommendedFallback =
+    isRecommendedFallback || hasNoFollowedBandPerformances;
   const sortButtonClassName = `flex shrink-0 flex-col items-center gap-2.5 rounded-full border px-[10px] py-1 font-body text-caption3 ${
     hasSelectedSort
       ? "border-primary-400 bg-primary-0 text-primary-400"
@@ -277,21 +305,23 @@ const FollowedConcertsPage = () => {
     setHasSelectedSort(true);
   };
   const concerts = useMemo(() => {
-    if (isRecommendedFallback) {
+    if (shouldUseRecommendedFallback) {
       return sortPerformances(
         getHomeRecommendedPerformances(fanHomeQuery.data),
         selectedSort,
       ).map(mapPerformanceToConcert);
     }
 
-    return (
-      data?.pages.flatMap((page) => page.items ?? []).map(mapPerformanceToConcert) ??
-      []
-    );
-  }, [data, fanHomeQuery.data, isRecommendedFallback, selectedSort]);
+    return upcomingConcerts;
+  }, [
+    fanHomeQuery.data,
+    selectedSort,
+    shouldUseRecommendedFallback,
+    upcomingConcerts,
+  ]);
 
   useEffect(() => {
-    if (isRecommendedFallback) return;
+    if (shouldUseRecommendedFallback) return;
 
     const target = loadMoreRef.current;
     if (!target) return;
@@ -299,7 +329,11 @@ const FollowedConcertsPage = () => {
     const observer = new IntersectionObserver((entries) => {
       const [entry] = entries;
 
-      if (entry?.isIntersecting && hasNextPage && !isFetchingNextPage) {
+      if (
+        entry?.isIntersecting &&
+        hasNextPage &&
+        !isFetchingNextPage
+      ) {
         void fetchNextPage();
       }
     });
@@ -307,13 +341,19 @@ const FollowedConcertsPage = () => {
     observer.observe(target);
 
     return () => observer.disconnect();
-  }, [fetchNextPage, hasNextPage, isFetchingNextPage, isRecommendedFallback]);
+  }, [
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    shouldUseRecommendedFallback,
+  ]);
 
   const isPageLoading =
-    isRecommendedFallback
+    shouldUseRecommendedFallback
       ? fanHomeQuery.isLoading
-      : isLoading || (fanHomeQuery.isLoading && concerts.length === 0);
-  const isPageError = isRecommendedFallback ? fanHomeQuery.isError : isError;
+      : isLoading ||
+        (fanHomeQuery.isLoading && concerts.length === 0);
+  const isPageError = shouldUseRecommendedFallback ? fanHomeQuery.isError : isError;
 
   return (
     <main className="min-h-dvh bg-neutral-0 px-[15px] pb-[calc(var(--bottom-nav-height)+24px)]">
@@ -382,11 +422,11 @@ const FollowedConcertsPage = () => {
           />
         ))}
 
-        {!isRecommendedFallback ? (
+        {!shouldUseRecommendedFallback ? (
           <div ref={loadMoreRef} className="h-4 w-full" />
         ) : null}
 
-        {isFetchingNextPage && !isRecommendedFallback ? (
+        {isFetchingNextPage && !shouldUseRecommendedFallback ? (
           <p className="m-0 text-center font-body text-caption2 text-neutral-600">
             더 불러오는 중이에요
           </p>
