@@ -95,7 +95,7 @@ export const RecruitmentDeadlinePickerButton = ({
     )}
   >
     <span>{value || placeholder}</span>
-    <img src={icon} alt="" className="size-[18px]" />
+    <img src={icon} alt="" className="size-[18px] brightness-0" />
   </button>
 );
 
@@ -148,6 +148,10 @@ export const RecruitmentBottomActionButton = ({
   </div>
 );
 
-export const RecruitmentErrorMessage = ({ children }: { children: ReactNode }) => (
+export const RecruitmentErrorMessage = ({
+  children,
+}: {
+  children: ReactNode;
+}) => (
   <p className="mt-1 text-[10px] leading-3 font-bold text-error">{children}</p>
 );

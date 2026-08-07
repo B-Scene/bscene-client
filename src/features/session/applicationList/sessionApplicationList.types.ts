@@ -27,6 +27,8 @@ export interface SessionApplicationSummaryItem
 }
 
 export interface SessionApplicationSummary {
+  hasDefaultApplication?: boolean | null;
+  sessionApplicationId?: number | null;
   nickname?: string | null;
   profileImageUrl?: string | null;
   part?: string | null;
@@ -45,6 +47,7 @@ export interface ApplicationCardItem {
   title: string;
   purpose: string;
   isPublic: boolean;
+  isDefault: boolean;
   isLocal: boolean;
   draft: SessionApplicationDraft;
 }
@@ -55,9 +58,6 @@ export interface MyApplicationDetailData {
   applicationType: string;
   title: string;
   nickname: string;
-
-  // API에서 null이 올 수 있으므로 null도 허용
   profileImageUrl?: string | null;
-
   draft: SessionApplicationDraft;
 }
