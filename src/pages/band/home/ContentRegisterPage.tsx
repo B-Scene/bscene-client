@@ -217,7 +217,7 @@ const ContentRegisterForm = ({
   };
 
   const handleTagInputKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key !== "Enter") return;
+    if (event.nativeEvent.isComposing || event.key !== "Enter") return;
     event.preventDefault();
 
     const trimmed = tagInput.trim();
