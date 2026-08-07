@@ -1,5 +1,4 @@
 export type FormStep = 1 | 2;
-export type SelectBottomSheetType = "genre" | "region" | null;
 export type FormMode = "create" | "edit";
 
 export interface BasicFormValues {

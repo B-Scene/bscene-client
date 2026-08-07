@@ -1,7 +1,5 @@
 import type { ChangeEvent, ReactNode } from "react";
 
-import ArrowDownGrayIcon from "@/assets/icons/band/arrow-down-gray.svg";
-
 import { joinClassNames } from "./sessionRecruitmentForm.utils";
 
 export const RecruitmentFieldLabel = ({
@@ -47,31 +45,6 @@ export const RecruitmentTextInput = ({
   />
 );
 
-export const RecruitmentSelectButton = ({
-  value,
-  placeholder,
-  error = false,
-  onClick,
-}: {
-  value: string;
-  placeholder: string;
-  error?: boolean;
-  onClick: () => void;
-}) => (
-  <button
-    type="button"
-    onClick={onClick}
-    className={joinClassNames(
-      "flex h-[30px] w-full items-center justify-between rounded-[5px] border bg-neutral-0 px-4 text-caption2",
-      error ? "border-error" : "border-neutral-400",
-      value ? "text-neutral-900" : "text-neutral-500",
-    )}
-  >
-    <span>{value || placeholder}</span>
-    <img src={ArrowDownGrayIcon} alt="" className="h-[7px] w-3" />
-  </button>
-);
-
 export const RecruitmentDeadlinePickerButton = ({
   value,
   placeholder,
@@ -95,7 +68,7 @@ export const RecruitmentDeadlinePickerButton = ({
     )}
   >
     <span>{value || placeholder}</span>
-    <img src={icon} alt="" className="size-[18px] brightness-0" />
+    <img src={icon} alt="" className="size-4 shrink-0" />
   </button>
 );
 
@@ -125,22 +98,28 @@ export const RecruitmentOptionChip = ({
 export const RecruitmentBottomActionButton = ({
   active,
   label,
+  errorMessage,
   onClick,
 }: {
   active: boolean;
   label: string;
+  errorMessage?: string;
   onClick: () => void | Promise<void>;
 }) => (
-  <div className="fixed inset-x-0 bottom-[var(--bottom-nav-height)] z-20 bg-secondary-0 px-5 py-5">
+  <div className="mt-4.5 flex flex-col gap-2 px-5">
+    {errorMessage ? (
+      <span className="text-center text-body5 text-error">{errorMessage}</span>
+    ) : null}
+
     <button
       type="button"
       onClick={onClick}
       disabled={!active}
       className={joinClassNames(
-        "flex h-[52px] w-full items-center justify-center rounded-[12px] text-label2",
+        "flex h-13 w-full items-center justify-center rounded-xl text-label1",
         active
           ? "bg-secondary-500 text-neutral-0"
-          : "bg-neutral-300 text-neutral-700",
+          : "bg-neutral-300 text-neutral-600",
       )}
     >
       {label}

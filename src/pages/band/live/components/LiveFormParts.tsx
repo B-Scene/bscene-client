@@ -1,9 +1,11 @@
-import { useRef, type ChangeEvent, type ReactNode } from "react";
+import { useState, type ChangeEvent, type ReactNode } from "react";
 import AddImageIcon from "@/assets/icons/band/add-image.svg";
 import ArrowDownGrayIcon from "@/assets/icons/band/arrow-down-gray.svg";
 import CalendarIcon from "@/assets/icons/band/data-range.svg";
 import ClockIcon from "@/assets/icons/band/clock-band.svg";
 import CoHostBackgroundIcon from "@/assets/icons/Background.svg";
+import { DatePickerSheet } from "@/components/band/home/DatePickerSheet";
+import { TimePickerSheet } from "@/components/band/home/TimePickerSheet";
 import { cx } from "../utils";
 
 export function ChoiceCard({
@@ -235,107 +237,72 @@ export function DateTimeSelector({
   onDateChange,
   onTimeChange,
 }: DateTimeSelectorProps) {
-  const dateInputRef = useRef<HTMLInputElement>(null);
-  const timeInputRef = useRef<HTMLInputElement>(null);
-
-  const hasSelectedDate = Boolean(date);
-  const hasSelectedTime = Boolean(time);
-
-  const openNativePicker = (input: HTMLInputElement | null) => {
-    if (!input) return;
-
-    const pickerInput = input as HTMLInputElement & {
-      showPicker?: () => void;
-    };
-
-    if (pickerInput.showPicker) {
-      pickerInput.showPicker();
-      return;
-    }
-
-    input.focus();
-    input.click();
-  };
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const [isTimePickerOpen, setIsTimePickerOpen] = useState(false);
 
   return (
     <div className="rounded-lg border border-neutral-300 px-4 py-3">
-      <div className="relative">
-        <button
-          type="button"
-          onClick={() => openNativePicker(dateInputRef.current)}
-          className="flex h-9 w-full items-center gap-4 text-left"
-        >
-          <img
-            src={CalendarIcon}
-            alt=""
-            className={cx(
-              "size-6 shrink-0",
-              hasSelectedDate ? "brightness-0" : "",
-            )}
-          />
+      <button
+        type="button"
+        onClick={() => setIsDatePickerOpen(true)}
+        className="flex h-9 w-full items-center gap-4 text-left"
+      >
+        <img src={CalendarIcon} alt="" className="size-6 shrink-0" />
 
-          <span className="flex-1">
-            <span className="block text-caption2 text-neutral-500">
-              날짜 선택
-            </span>
-            <strong className="block text-body2 text-neutral-900">
-              {formatDateLabel(date)}
-            </strong>
+        <span className="flex-1">
+          <span className="block text-caption2 text-neutral-500">
+            날짜 선택
           </span>
+          <strong className="block text-body2 text-neutral-900">
+            {formatDateLabel(date)}
+          </strong>
+        </span>
 
-          <img src={ArrowDownGrayIcon} alt="" className="size-4 shrink-0" />
-        </button>
-
-        <input
-          ref={dateInputRef}
-          type="date"
-          value={date}
-          tabIndex={-1}
-          aria-hidden="true"
-          onChange={(event) => onDateChange(event.target.value)}
-          className="pointer-events-none absolute top-0 right-0 h-px w-px opacity-0"
-        />
-      </div>
+        <img src={ArrowDownGrayIcon} alt="" className="size-4 shrink-0" />
+      </button>
 
       <div className="my-2 h-px bg-neutral-300" />
 
-      <div className="relative">
-        <button
-          type="button"
-          onClick={() => openNativePicker(timeInputRef.current)}
-          className="flex h-9 w-full items-center gap-4 text-left"
-        >
-          <img
-            src={ClockIcon}
-            alt=""
-            className={cx(
-              "size-6 shrink-0",
-              hasSelectedTime ? "brightness-0" : "",
-            )}
-          />
+      <button
+        type="button"
+        onClick={() => setIsTimePickerOpen(true)}
+        className="flex h-9 w-full items-center gap-4 text-left"
+      >
+        <img src={ClockIcon} alt="" className="size-6 shrink-0" />
 
-          <span className="flex-1">
-            <span className="block text-caption2 text-neutral-500">
-              시작 시간
-            </span>
-            <strong className="block text-body2 text-neutral-900">
-              {time || "시간 선택"}
-            </strong>
+        <span className="flex-1">
+          <span className="block text-caption2 text-neutral-500">
+            시작 시간
           </span>
+          <strong className="block text-body2 text-neutral-900">
+            {time || "시간 선택"}
+          </strong>
+        </span>
 
-          <img src={ArrowDownGrayIcon} alt="" className="size-4 shrink-0" />
-        </button>
+        <img src={ArrowDownGrayIcon} alt="" className="size-4 shrink-0" />
+      </button>
 
-        <input
-          ref={timeInputRef}
-          type="time"
-          value={time}
-          tabIndex={-1}
-          aria-hidden="true"
-          onChange={(event) => onTimeChange(event.target.value)}
-          className="pointer-events-none absolute top-0 right-0 h-px w-px opacity-0"
-        />
-      </div>
+      <DatePickerSheet
+        open={isDatePickerOpen}
+        startDate={date}
+        endDate={date}
+        onClose={() => setIsDatePickerOpen(false)}
+        onSelect={(range) => {
+          onDateChange(range.start);
+          setIsDatePickerOpen(false);
+        }}
+      />
+
+      <TimePickerSheet
+        open={isTimePickerOpen}
+        value={time}
+        title="라이브 시작 시간"
+        onClose={() => setIsTimePickerOpen(false)}
+        onConfirm={(nextTime) => {
+          onTimeChange(nextTime);
+          setIsTimePickerOpen(false);
+        }}
+      />
     </div>
   );
 }

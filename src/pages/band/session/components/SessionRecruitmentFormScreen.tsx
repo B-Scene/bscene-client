@@ -5,8 +5,6 @@ import { ModalOverlay } from "@/components/common/Modal/ModalOverlay";
 import {
   DEFAULT_RECRUITMENT_BASIC_VALUES,
   DEFAULT_RECRUITMENT_DETAIL_VALUES,
-  RECRUITMENT_GENRE_OPTIONS,
-  RECRUITMENT_REGION_OPTIONS,
 } from "@/features/session/recruitmentForm/sessionRecruitmentForm.constants";
 import type {
   BasicFormValues,
@@ -14,7 +12,6 @@ import type {
   FormErrors,
   FormMode,
   FormStep,
-  SelectBottomSheetType,
 } from "@/features/session/recruitmentForm/sessionRecruitmentForm.types";
 import {
   isFutureRecruitmentDeadline,
@@ -23,7 +20,6 @@ import {
 } from "@/features/session/recruitmentForm/sessionRecruitmentForm.utils";
 import {
   RecruitmentFormTopBar,
-  RecruitmentSelectBottomSheet,
   RecruitmentStepIndicator,
 } from "@/features/session/recruitmentForm/RecruitmentFormChrome";
 import { RecruitmentBasicInfoStep } from "@/features/session/recruitmentForm/RecruitmentBasicInfoStep";
@@ -177,8 +173,6 @@ const SessionRecruitmentFormBody = ({
   const [currentStep, setCurrentStep] = useState<FormStep>(1);
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [isCompleteScreenOpen, setIsCompleteScreenOpen] = useState(false);
-  const [selectBottomSheetType, setSelectBottomSheetType] =
-    useState<SelectBottomSheetType>(null);
   const [createdRecruitment, setCreatedRecruitment] =
     useState<CreateSessionRecruitmentResponse | null>(null);
   const [submitErrorMessage, setSubmitErrorMessage] = useState("");
@@ -261,7 +255,6 @@ const SessionRecruitmentFormBody = ({
     }));
     setErrors((currentErrors) => ({ ...currentErrors, genre: undefined }));
     setSubmitErrorMessage("");
-    setSelectBottomSheetType(null);
   };
 
   const handleRegionSelect = (region: string) => {
@@ -271,13 +264,12 @@ const SessionRecruitmentFormBody = ({
     }));
     setErrors((currentErrors) => ({ ...currentErrors, region: undefined }));
     setSubmitErrorMessage("");
-    setSelectBottomSheetType(null);
   };
 
-  const handleDeadlineDateChange = (event: ChangeEvent<HTMLInputElement>) => {
+  const handleDeadlineDateChange = (date: string) => {
     setDetailValues((currentValues) => ({
       ...currentValues,
-      deadlineDate: event.target.value,
+      deadlineDate: date,
     }));
     setErrors((currentErrors) => ({
       ...currentErrors,
@@ -287,10 +279,10 @@ const SessionRecruitmentFormBody = ({
     setSubmitErrorMessage("");
   };
 
-  const handleDeadlineTimeChange = (event: ChangeEvent<HTMLInputElement>) => {
+  const handleDeadlineTimeChange = (time: string) => {
     setDetailValues((currentValues) => ({
       ...currentValues,
-      deadlineTime: event.target.value,
+      deadlineTime: time,
     }));
     setErrors((currentErrors) => ({
       ...currentErrors,
@@ -521,7 +513,7 @@ const SessionRecruitmentFormBody = ({
       : createRecruitmentMutation.isPending;
 
   return (
-    <main className="min-h-dvh bg-secondary-0 pb-[calc(var(--bottom-nav-height)+92px)]">
+    <main className="min-h-dvh bg-secondary-0 pb-[calc(var(--bottom-nav-height)+24px)]">
       <RecruitmentFormTopBar
         title={mode === "edit" ? "세션 모집 공고 수정" : "세션 모집 공고 등록"}
         onBack={handleBack}
@@ -537,7 +529,7 @@ const SessionRecruitmentFormBody = ({
           onFieldChange={handleBasicFieldChange}
           onPartClick={handlePartClick}
           onSkillClick={handleSkillClick}
-          onOpenGenreSelect={() => setSelectBottomSheetType("genre")}
+          onGenreChange={handleGenreSelect}
           onNext={handleNext}
         />
       ) : (
@@ -550,7 +542,7 @@ const SessionRecruitmentFormBody = ({
           submitLabel={mode === "edit" ? "수정하기" : "모집 공고 등록"}
           submittingLabel={mode === "edit" ? "수정 중" : "등록 중"}
           onFieldChange={handleDetailFieldChange}
-          onOpenRegionSelect={() => setSelectBottomSheetType("region")}
+          onRegionChange={handleRegionSelect}
           onDeadlineDateChange={handleDeadlineDateChange}
           onDeadlineTimeChange={handleDeadlineTimeChange}
           onSubmit={handleSubmit}
@@ -578,26 +570,6 @@ const SessionRecruitmentFormBody = ({
           onConfirm={handleCancelConfirm}
         />
       </ModalOverlay>
-
-      {selectBottomSheetType === "genre" ? (
-        <RecruitmentSelectBottomSheet
-          title="장르"
-          options={RECRUITMENT_GENRE_OPTIONS}
-          selectedValue={basicValues.genre}
-          onSelect={handleGenreSelect}
-          onClose={() => setSelectBottomSheetType(null)}
-        />
-      ) : null}
-
-      {selectBottomSheetType === "region" ? (
-        <RecruitmentSelectBottomSheet
-          title="지역"
-          options={RECRUITMENT_REGION_OPTIONS}
-          selectedValue={detailValues.region}
-          onSelect={handleRegionSelect}
-          onClose={() => setSelectBottomSheetType(null)}
-        />
-      ) : null}
     </main>
   );
 };
