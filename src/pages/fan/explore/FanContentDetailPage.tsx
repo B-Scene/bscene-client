@@ -26,6 +26,7 @@ import { getApiErrorMessage } from "@/utils/getApiErrorMessage";
 import { useInfiniteScrollObserver } from "@/hooks/useInfiniteScrollObserver";
 import type { NormalizedFanExplorePostComment } from "@/types/fan/explore";
 import type { FanExplorePostMediaType } from "@/types/fan/explore";
+import { PhotoLightbox } from "./components/PhotoLightbox";
 
 const TAGS = ["합주", "인디밴드", "홍대", "공연준비"];
 const BASE_LIKE_COUNT = 412;
@@ -302,6 +303,7 @@ const FanContentDetailPage = () => {
   const deleteCommentMutation = useDeleteFanExplorePostComment();
   const postDetail = postDetailQuery.data;
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [likeOverride, setLikeOverride] = useState<{
     isLiked: boolean;
     likeCount: number;
@@ -602,7 +604,8 @@ const FanContentDetailPage = () => {
                     key={`${url}-${index}`}
                     src={url}
                     alt={`콘텐츠 이미지 ${index + 1}`}
-                    className="h-full w-full shrink-0 snap-center object-cover"
+                    onClick={() => setLightboxIndex(index)}
+                    className="h-full w-full shrink-0 snap-center cursor-zoom-in object-cover"
                   />
                 ))
               )
@@ -873,6 +876,14 @@ const FanContentDetailPage = () => {
           밴드 프로필 보기
         </button>
       </div>
+
+      {lightboxIndex !== null && mediaType !== "VIDEO" ? (
+        <PhotoLightbox
+          images={imageUrls}
+          initialIndex={lightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+        />
+      ) : null}
     </main>
   );
 };
