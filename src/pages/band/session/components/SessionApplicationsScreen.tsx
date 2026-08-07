@@ -113,6 +113,20 @@ const mapMyApplicationDetailToDraft = (
   };
 };
 
+const isDefaultApplicationDraft = (
+  draft: SessionApplicationDraft,
+  isFirstApplication: boolean,
+) => {
+  const applicationType = draft.applicationType.trim();
+
+  return (
+    isFirstApplication ||
+    applicationType === "기본" ||
+    applicationType.toUpperCase() === "DEFAULT" ||
+    applicationType.toUpperCase() === "BASIC"
+  );
+};
+
 export const SessionApplicationsScreen = ({
   onEditBasicInfo,
   onViewApplicationHistory,
@@ -124,6 +138,7 @@ export const SessionApplicationsScreen = ({
 }: SessionApplicationsScreenProps) => {
   const [isApplicationHistoryOpen, setIsApplicationHistoryOpen] =
     useState(false);
+  const [visibilityGuardMessage, setVisibilityGuardMessage] = useState("");
 
   const summaryQuery = useMySessionApplicationSummaryQuery();
   const sessionProfileQuery = useSessionProfileQuery();
@@ -164,7 +179,13 @@ export const SessionApplicationsScreen = ({
   } = useSessionApplicationsState({
     summary,
 
+    onVisibilityBlocked: () => {
+      setVisibilityGuardMessage("기본지원서만 공개 여부를 변경할 수 있어요.");
+    },
+
     onServerVisibilityChange: (sessionApplicationId, isPublic) => {
+      setVisibilityGuardMessage("");
+
       visibilityMutation.mutate({
         sessionApplicationId,
 
@@ -215,6 +236,7 @@ export const SessionApplicationsScreen = ({
       handleOpenApplicationDetail(
         application,
         mapMyApplicationDetailToDraft(detail),
+        detail.portfolioLinks,
       );
     } catch (error) {
       const apiMessage = (error as AxiosError<SessionApiResponse<null>>)
@@ -246,11 +268,30 @@ export const SessionApplicationsScreen = ({
   };
 
   const handleCreateApplication = async (draft: SessionApplicationDraft) => {
+    const isFirstApplication =
+      !hasApplications &&
+      (summary?.applicationCount ?? 0) + localApplicationCount === 0;
+
+    const isDefaultApplication = isDefaultApplicationDraft(
+      draft,
+      isFirstApplication,
+    );
+
     try {
-      await createApplicationMutation.mutateAsync(
+      const createdApplication = await createApplicationMutation.mutateAsync(
         createApplicationRequestFromDraft(draft),
       );
 
+      if (isDefaultApplication) {
+        await visibilityMutation.mutateAsync({
+          sessionApplicationId: createdApplication.sessionApplicationId,
+          body: {
+            isPublic: false,
+          },
+        });
+      }
+
+      setVisibilityGuardMessage("");
       handleCloseApplicationForm();
     } catch (error) {
       const apiMessage = (error as AxiosError<SessionApiResponse<null>>)
@@ -278,6 +319,7 @@ export const SessionApplicationsScreen = ({
         body: createApplicationRequestFromDraft(draft, purposeOverride),
       });
 
+      setVisibilityGuardMessage("");
       handleCloseApplicationForm();
     } catch (error) {
       const apiMessage = (error as AxiosError<SessionApiResponse<null>>)
@@ -300,6 +342,8 @@ export const SessionApplicationsScreen = ({
   const visibilityErrorMessage = (
     visibilityMutation.error as AxiosError<SessionApiResponse<null>> | null
   )?.response?.data?.message;
+
+  const visibilityMessage = visibilityGuardMessage || visibilityErrorMessage;
 
   if (summaryQuery.isLoading) {
     return (
@@ -328,8 +372,9 @@ export const SessionApplicationsScreen = ({
   }
 
   const profileDescription =
-    [summary?.part, summary?.genre, summary?.region].filter(Boolean).join(" · ") ||
-    "기본 정보를 등록해주세요";
+    [summary?.part, summary?.genre, summary?.region]
+      .filter(Boolean)
+      .join(" · ") || "기본 정보를 등록해주세요";
 
   const stats = [
     {
@@ -352,7 +397,8 @@ export const SessionApplicationsScreen = ({
   const isApplicationActionPending =
     createApplicationMutation.isPending ||
     updateApplicationMutation.isPending ||
-    deleteApplicationMutation.isPending;
+    deleteApplicationMutation.isPending ||
+    visibilityMutation.isPending;
 
   return (
     <>
@@ -414,9 +460,9 @@ export const SessionApplicationsScreen = ({
             지원 내역
           </button>
 
-          {visibilityErrorMessage ? (
+          {visibilityMessage ? (
             <p className="text-center text-caption2 text-error">
-              {visibilityErrorMessage}
+              {visibilityMessage}
             </p>
           ) : null}
         </section>

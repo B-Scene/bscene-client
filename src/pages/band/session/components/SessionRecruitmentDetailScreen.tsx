@@ -16,6 +16,7 @@ interface SessionRecruitmentDetailScreenProps {
   onBack: () => void;
   onToggleBookmark: (postId: number) => void;
   onDeletePost?: (postId: number) => void;
+  onEditPost?: (postId: number) => void;
   onPreviewApplication?: (sessionApplicationId: number) => void;
   onEditApplication?: (sessionApplicationId: number) => void;
   onApplyApplication?: (
@@ -28,6 +29,7 @@ export const SessionRecruitmentDetailScreen = ({
   post,
   onBack,
   onDeletePost,
+  onEditPost,
   onPreviewApplication,
   onEditApplication,
   onApplyApplication,
@@ -36,6 +38,7 @@ export const SessionRecruitmentDetailScreen = ({
     post,
     onBack,
     onDeletePost,
+    onEditPost,
     onPreviewApplication,
     onEditApplication,
     onApplyApplication,
@@ -55,22 +58,20 @@ export const SessionRecruitmentDetailScreen = ({
   }
 
   return (
-    <main className="relative mx-auto h-dvh w-full max-w-[393px] overflow-hidden bg-neutral-0">
-      <div className="h-full overflow-y-auto overscroll-y-contain pb-[calc(var(--bottom-nav-height)+112px)]">
-        <SessionRecruitmentDetailHeader
-          onBack={onBack}
-          onDelete={screen.canDelete ? screen.openDeleteModal : undefined}
-        />
+    <main className="mx-auto flex h-[calc(100dvh-var(--bottom-nav-height))] w-full max-w-[393px] flex-col overflow-hidden bg-neutral-0">
+      <SessionRecruitmentDetailHeader onBack={onBack} />
 
-        {screen.detailQuery.isLoading ? (
-          <section className="flex min-h-[360px] items-center justify-center px-6 text-caption1 text-neutral-500">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
+        {screen.detailQuery.isLoading || screen.myBandProfilesQuery.isLoading ? (
+          <section className="flex min-h-full items-center justify-center px-6 text-center text-caption1 text-neutral-500">
             모집 공고 상세 정보를 불러오고 있어요
           </section>
         ) : screen.detailQuery.isError ? (
-          <section className="flex min-h-[360px] flex-col items-center justify-center px-6 text-center">
+          <section className="flex min-h-full flex-col items-center justify-center px-6 text-center">
             <p className="text-caption1 text-neutral-500">
               모집 공고 상세 정보를 불러오지 못했어요
             </p>
+
             <button
               type="button"
               onClick={() => screen.detailQuery.refetch()}
@@ -91,52 +92,64 @@ export const SessionRecruitmentDetailScreen = ({
             bandName={screen.bandName}
             bandGenre={screen.bandGenre}
             shortLocation={screen.shortLocation}
-            deleteErrorMessage={screen.deleteErrorMessage}
+            errorMessage={screen.cancelErrorMessage}
           />
         )}
       </div>
 
       {screen.isDetailLoaded ? (
         <SessionRecruitmentDetailActions
+          canManage={screen.canManage}
+          isCanceling={screen.deleteRecruitmentMutation.isPending}
           onSendMessage={screen.sendMessage}
           onApply={screen.openApplicationModal}
+          onEdit={screen.openEditForm}
+          onCancelRecruitment={screen.openCancelModal}
         />
       ) : null}
 
-      {screen.canDelete ? (
+      {screen.canManage ? (
         <ModalOverlay
-          open={screen.isDeleteModalOpen}
-          onClose={screen.closeDeleteModal}
+          open={screen.isCancelModalOpen}
+          onClose={
+            screen.deleteRecruitmentMutation.isPending
+              ? undefined
+              : screen.closeCancelModal
+          }
         >
           <Modal
             tone="orange"
-            title="세션 모집 공고를 삭제할까요?"
+            title="세션 모집 공고를 취소할까요?"
             description={
               <>
-                삭제한 모집 공고는
+                취소한 모집 공고는
                 <br />
                 다시 복구할 수 없어요.
-                {screen.deleteErrorMessage ? (
+                {screen.cancelErrorMessage ? (
                   <>
                     <br />
                     <span className="text-error">
-                      {screen.deleteErrorMessage}
+                      {screen.cancelErrorMessage}
                     </span>
                   </>
                 ) : null}
               </>
             }
-            cancelLabel="취소"
+            cancelLabel="닫기"
             confirmLabel={
-              screen.deleteRecruitmentMutation.isPending ? "삭제 중" : "삭제"
+              screen.deleteRecruitmentMutation.isPending
+                ? "취소 중"
+                : "취소하기"
             }
-            onCancel={screen.closeDeleteModal}
-            onConfirm={screen.confirmDelete}
+            cancelDisabled={screen.deleteRecruitmentMutation.isPending}
+            confirmDisabled={screen.deleteRecruitmentMutation.isPending}
+            onCancel={screen.closeCancelModal}
+            onConfirm={screen.confirmCancel}
           />
         </ModalOverlay>
       ) : null}
 
-      {!screen.canDelete ? (
+      {!screen.canManage ? (
         <SessionApplicationSelectModal
           open={screen.isApplicationModalOpen}
           onClose={screen.closeApplicationModal}
