@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import SwapIcon from "@/assets/icons/swap.svg";
 import DefaultBandAvatar from "@/assets/icons/band/band-default-profile.svg";
 import { HomeHeader } from "@/components/common/Header/HomeHeader";
@@ -68,6 +68,7 @@ const getPerformanceCardProps = (performance: PerformanceListItem) => {
 
 const BandHomePage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const activeBandId = useActiveBandId();
   const bandProfilesQuery = useMyProfilesQuery({ type: "band" });
   const isBandStatusLoading = bandProfilesQuery.isLoading;
@@ -115,7 +116,10 @@ const BandHomePage = () => {
       otherUrl,
   );
 
-  const [activeTab, setActiveTab] = useState("content");
+  const requestedTab = (location.state as { tab?: string } | null)?.tab;
+  const [activeTab, setActiveTab] = useState(
+    HOME_TABS.some((tab) => tab.id === requestedTab) ? requestedTab! : "content",
+  );
   const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
   const [deletePostTargetId, setDeletePostTargetId] = useState<number | null>(
     null,
