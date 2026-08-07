@@ -53,7 +53,11 @@ const MyPage = () => {
         <div className="mt-4">
           <StatRow
             stats={[
-              { label: "팔로워", value: data?.follower ?? 0 },
+              {
+                label: "팔로워",
+                value: data?.follower ?? 0,
+                onClick: () => navigate("/band/my/followers"),
+              },
               { label: "지원자", value: data?.applicant ?? 0 },
               { label: "공연", value: data?.performance ?? 0 },
             ]}

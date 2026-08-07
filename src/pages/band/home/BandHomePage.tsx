@@ -195,7 +195,11 @@ const BandHomePage = () => {
         <div className="mt-4">
           <StatRow
             stats={[
-              { label: "팔로워", value: band?.followerCount ?? 0 },
+              {
+                label: "팔로워",
+                value: band?.followerCount ?? 0,
+                onClick: () => navigate("/band/my/followers"),
+              },
               { label: "공연", value: band?.performanceCount ?? 0 },
               { label: "콘텐츠", value: posts.length },
             ]}

@@ -55,6 +55,7 @@ import MemberInviteSearchPage from "@/pages/band/home/MemberInviteSearchPage";
 import ApplicationManagementPage from "@/pages/band/my/ApplicationManagementPage";
 import PostingManagementPage from "@/pages/band/my/PostingManagementPage";
 import MyPage from "@/pages/band/my/MyPage";
+import BandFollowersPage from "@/pages/band/my/BandFollowersPage";
 import RecruitAlertSettingsPage from "@/pages/band/my/RecruitAlertSettingsPage";
 import LiveAlertSettingsPage from "@/pages/band/my/LiveAlertSettingsPage";
 import SessionMailboxPage from "@/pages/band/session/components/SessionMailboxPage";
@@ -344,6 +345,10 @@ export const router = createBrowserRouter([
       {
         path: "/band/my",
         element: <MyPage />,
+      },
+      {
+        path: "/band/my/followers",
+        element: <BandFollowersPage />,
       },
     ],
   },

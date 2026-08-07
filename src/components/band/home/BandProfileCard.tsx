@@ -22,7 +22,7 @@ export const BandProfileCard = ({
         <img
           src={avatarUrl || DefaultAvatar}
           alt={name}
-          className="size-14 shrink-0 rounded-full object-cover"
+          className="size-18 shrink-0 rounded-full object-cover"
         />
 
         <div className="flex min-w-0 flex-1 flex-col gap-1.25">
