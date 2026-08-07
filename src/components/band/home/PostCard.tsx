@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import DefaultBandAvatar from "@/assets/icons/band/band-default-profile.svg";
 import PlayButtonIcon from "@/assets/icons/band/play-button.svg";
 
@@ -14,6 +14,7 @@ interface PostCardProps {
   mediaItems?: PostMediaItem[];
   caption: string;
   onClick?: () => void;
+  actions?: ReactNode;
 }
 
 const MEDIA_ITEM_WIDTH = 156;
@@ -28,6 +29,7 @@ export const PostCard = ({
   mediaItems = [],
   caption,
   onClick,
+  actions,
 }: PostCardProps) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [activeSlide, setActiveSlide] = useState(0);
@@ -57,20 +59,26 @@ export const PostCard = ({
         onClick ? " cursor-pointer" : ""
       }`}
     >
-      <div className="flex items-center gap-3">
-        <img
-          src={avatarUrl || DefaultBandAvatar}
-          alt=""
-          className="size-9 shrink-0 rounded-full object-cover"
-        />
-        <div className="flex min-w-0 flex-col">
-          <span className="truncate text-caption3 text-neutral-900">
-            {bandName}
-          </span>
-          <span className="truncate text-caption2 text-neutral-700">
-            {metaLabel}
-          </span>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <img
+            src={avatarUrl || DefaultBandAvatar}
+            alt=""
+            className="size-9 shrink-0 rounded-full object-cover"
+          />
+          <div className="flex min-w-0 flex-col">
+            <span className="truncate text-caption3 text-neutral-900">
+              {bandName}
+            </span>
+            <span className="truncate text-caption2 text-neutral-700">
+              {metaLabel}
+            </span>
+          </div>
         </div>
+
+        {actions ? (
+          <div className="flex shrink-0 items-center gap-2">{actions}</div>
+        ) : null}
       </div>
 
       <div className="flex flex-col gap-2">

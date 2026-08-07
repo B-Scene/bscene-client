@@ -18,6 +18,8 @@ export interface UpdateFanInformationRequest {
   nickname: string;
   genres: string[];
   regions: string[];
+  profileImageUrl?: string;
+  deleteProfileImage?: boolean;
 }
 
 export type UpdateFanInformationResponse = FanInformationResponse;

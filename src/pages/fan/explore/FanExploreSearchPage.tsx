@@ -1,10 +1,10 @@
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import ArrowLeftIcon from "@/assets/icons/arrow-left.svg";
 import CloseIcon from "@/assets/icons/close.svg";
 import TimesCircleIcon from "@/assets/icons/ic_Times Circle.svg";
 import SearchIcon from "@/assets/icons/band/search.svg";
+import { Header } from "@/components/common/Header/Header";
 import { Toast } from "@/components/common/Toast/Toast";
 import {
   useDeleteAllFanExploreRecentSearches,
@@ -136,16 +136,7 @@ const FanExploreSearchPage = () => {
 
   return (
     <main className="min-h-dvh bg-neutral-0 pb-[calc(var(--bottom-nav-height)+24px)]">
-      <header className="flex h-[48px] w-full max-w-[393px] items-center gap-[118px] bg-neutral-0 px-[15px] py-[5px]">
-        <button
-          type="button"
-          aria-label="뒤로가기"
-          onClick={() => navigate(-1)}
-          className="flex size-6 shrink-0 items-center justify-center"
-        >
-          <img src={ArrowLeftIcon} alt="" className="size-6" />
-        </button>
-      </header>
+      <Header title="" />
 
       <div className="pl-[23px] pr-[22px]">
         <form

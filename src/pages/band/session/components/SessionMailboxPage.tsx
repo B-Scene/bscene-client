@@ -3,7 +3,10 @@ import { useNavigate } from "react-router-dom";
 
 import ArrowLeftIcon from "@/assets/icons/arrow-left.svg";
 import UserDefaultProfileIcon from "@/assets/icons/band/user-default-profile.svg";
-import { useSessionChatRoomsQuery } from "@/hooks/api/session/useSessionChat";
+import {
+  useSessionChatRoomListSocket,
+  useSessionChatRoomsQuery,
+} from "@/hooks/api/session/useSessionChat";
 import type {
   SessionChatRoomFilter,
   SessionChatRoomListItem,
@@ -108,11 +111,17 @@ export default function SessionMailboxPage() {
       size: 20,
     });
 
+  useSessionChatRoomListSocket();
+
   const messages = useMemo(
     () =>
-      chatRoomsQuery.data?.content.map(
-        mapChatRoomToMessageItem,
-      ) ?? [],
+      chatRoomsQuery.data?.content
+        .filter(
+          (room) =>
+            Boolean(room.lastMessage?.trim()) &&
+            Boolean(room.lastMessageAt),
+        )
+        .map(mapChatRoomToMessageItem) ?? [],
     [chatRoomsQuery.data],
   );
 

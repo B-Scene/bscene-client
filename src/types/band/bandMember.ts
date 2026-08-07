@@ -1,3 +1,5 @@
+import type { BandGenre, BandRegion } from "@/types/band/band";
+
 export interface BandApiResponse<T> {
   isSuccess: boolean;
   status: number;
@@ -55,3 +57,31 @@ export interface BandMemberSearchItem {
 }
 
 export type BandMemberListItem = BandMemberResponse;
+
+export interface CreateBandInviteLinkRequest {
+  memberType: BandMemberType;
+}
+
+export interface BandInviteLinkResponse {
+  bandId: number;
+  memberType: BandMemberType;
+  token: string;
+  expiresAt: string;
+}
+
+export interface BandInviteLinkInfoResponse {
+  bandId: number;
+  bandName: string;
+  bandProfileImageUrl: string | null;
+  genre: BandGenre;
+  region: BandRegion;
+  memberType: BandMemberType;
+  expiresAt: string;
+}
+
+export interface EnterBandInviteLinkResponse {
+  bandMemberId: number;
+  bandId: number;
+  memberType: BandMemberType;
+  status: string;
+}

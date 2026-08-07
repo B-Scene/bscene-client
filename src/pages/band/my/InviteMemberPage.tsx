@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import DefaultAvatar from "@/assets/icons/band/user-default-profile.svg";
-import { Header } from "@/components/band/home/Header";
+import { Header } from "@/components/common/Header/Header";
 import { NotificationBandBanner } from "@/components/band/my/NotificationBandBanner";
 import { ModalOverlay } from "@/components/common/Modal/ModalOverlay";
 import Modal from "@/components/Modal/Modal";
@@ -29,10 +29,11 @@ const MEMBER_TYPE_LABELS: Record<BandMemberType, string> = {
 interface MemberRowProps {
   member: BandMemberListItem;
   isSelf: boolean;
+  isOwner: boolean;
   onRemoveClick: (userId: number) => void;
 }
 
-const MemberRow = ({ member, isSelf, onRemoveClick }: MemberRowProps) => {
+const MemberRow = ({ member, isSelf, isOwner, onRemoveClick }: MemberRowProps) => {
   const profileQuery = useBandMemberProfileQuery(
     member.bandMemberProfileId ?? NaN,
   );
@@ -63,7 +64,7 @@ const MemberRow = ({ member, isSelf, onRemoveClick }: MemberRowProps) => {
         </div>
       </div>
 
-      {isSelf ? (
+      {isOwner ? (
         <span className="shrink-0 rounded-full border border-secondary-500 px-3 py-1 text-caption3 text-secondary-500">
           운영자
         </span>
@@ -118,6 +119,7 @@ const InviteMemberPage = () => {
           <NotificationBandBanner
             bandName={bandName}
             description={`현재 선택된 밴드 · 멤버 ${band?.memberCount ?? 0}명`}
+            profileImageUrl={band?.profileImageUrl}
             action={
               <button
                 type="button"
@@ -135,6 +137,7 @@ const InviteMemberPage = () => {
                 key={member.id}
                 member={member}
                 isSelf={member.userId === myUserId}
+                isOwner={member.userId === band?.ownerId}
                 onRemoveClick={setRemoveTargetId}
               />
             ))}

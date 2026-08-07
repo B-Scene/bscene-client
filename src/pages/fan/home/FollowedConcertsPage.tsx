@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import ArrowLeftIcon from "@/assets/icons/arrow-left.svg";
 import ConcertCard from "@/components/common/Card/ConcertCard";
+import { Header } from "@/components/common/Header/Header";
 import ConcertLikeButton from "@/components/fan/home/ConcertLikeButton";
 import {
   useFanHomeQuery,
@@ -333,29 +333,21 @@ const FollowedConcertsPage = () => {
 
   return (
     <main className="min-h-dvh bg-neutral-0 px-[15px] pb-[calc(var(--bottom-nav-height)+24px)]">
-      <header className="-mx-[15px] flex h-[60px] items-center justify-between px-[15px]">
-        <button
-          type="button"
-          aria-label="뒤로가기"
-          onClick={() => navigate(-1)}
-          className="flex size-6 items-center justify-center"
-        >
-          <img src={ArrowLeftIcon} alt="" className="size-6" />
-        </button>
-
-        <h1 className="m-0 font-body text-label2 text-neutral-900">
-          공연 일정
-        </h1>
-
-        <button
-          type="button"
-          aria-label="공연 일정"
-          onClick={() => navigate("/fan/home/concerts/calendar")}
-          className="flex size-6 items-center justify-center text-neutral-900"
-        >
-          <CalendarIcon />
-        </button>
-      </header>
+      <Header
+        title="공연 일정"
+        align="betweenCompact"
+        className="-mx-3.75"
+        rightContent={
+          <button
+            type="button"
+            aria-label="공연 일정"
+            onClick={() => navigate("/fan/home/concerts/calendar")}
+            className="flex size-6 items-center justify-center text-neutral-900"
+          >
+            <CalendarIcon />
+          </button>
+        }
+      />
 
       <div className="mt-[11px] flex h-10 items-center justify-between pl-0.5 pr-[3px]">
         <button

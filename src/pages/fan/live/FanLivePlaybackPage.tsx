@@ -2,8 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
 import { useNavigate, useParams } from "react-router-dom";
 import {
-  getLiveBearerAuthorization,
   resolveLiveApiUrl,
+  setupLiveReplayXhr,
 } from "@/api/live/live";
 import HeadsetIcon from "@/assets/Headset.svg";
 import FallbackSeekIcon from "@/assets/icons/band/menu-reload.svg";
@@ -160,7 +160,7 @@ export function FanLivePlaybackPage() {
     isError,
     isLoading,
     refetch,
-  } = useReplayPlaybackQuery(hasValidLiveId ? liveId : null);
+  } = useReplayPlaybackQuery(hasValidLiveId ? liveId : undefined);
   const audioRef = useRef<HTMLAudioElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const [playing, setPlaying] = useState(false);
@@ -219,15 +219,7 @@ export function FanLivePlaybackPage() {
     const hls = new Hls({
       lowLatencyMode: false,
       backBufferLength: 60,
-      xhrSetup: (xhr, url) => {
-        if (url.includes("/api/")) {
-          xhr.withCredentials = true;
-          xhr.setRequestHeader(
-            "Authorization",
-            getLiveBearerAuthorization(),
-          );
-        }
-      },
+      xhrSetup: setupLiveReplayXhr,
     });
 
     hlsRef.current = hls;

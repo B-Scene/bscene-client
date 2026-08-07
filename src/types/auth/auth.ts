@@ -61,7 +61,7 @@ export type LoginResponse = {
   user: {
     userId: number;
     name: string;
-    currentMode: string | null;
+    currentMode: "FAN" | "BAND" | null;
     onboardingCompleted: boolean;
   };
 };

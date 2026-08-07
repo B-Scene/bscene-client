@@ -10,6 +10,7 @@ import {
   cancelSessionApplicationSubmission,
   createSessionApplication,
   deleteSessionApplication,
+  finalizeApplicationSubmission,
   getApplicationSubmissionDetail,
   getApplicationSubmissions,
   getMySessionApplicationDetail,
@@ -23,10 +24,14 @@ import type {
   ApplicationSubmissionsParams,
   ApplySessionRecruitmentRequest,
   CreateSessionApplicationRequest,
+  FinalizeApplicationSubmissionRequest,
   SessionApplicationSearchParams,
   UpdateSessionApplicationRequest,
   UpdateSessionApplicationVisibilityRequest,
 } from "@/types/session/sessionApplication";
+import { notificationKeys } from "@/hooks/api/useNotifications";
+import { myProfilesKeys } from "@/hooks/api/user/useMyProfiles";
+import { bandMemberProfileKeys } from "@/hooks/api/band/useBandMemberProfile";
 
 interface UpdateVisibilityVariables {
   sessionApplicationId: number;
@@ -41,6 +46,11 @@ interface UpdateSessionApplicationVariables {
 interface ApplySessionRecruitmentVariables {
   sessionRecruitmentId: number;
   body: ApplySessionRecruitmentRequest;
+}
+
+interface FinalizeApplicationSubmissionVariables {
+  applySubmissionId: number;
+  body: FinalizeApplicationSubmissionRequest;
 }
 
 export const sessionApplicationKeys = {
@@ -305,3 +315,28 @@ export const useCancelApplicationSubmissionMutation = () => {
 
 export const useCancelSessionApplicationSubmissionMutation =
   useCancelApplicationSubmissionMutation;
+
+export const useFinalizeApplicationSubmissionMutation = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      applySubmissionId,
+      body,
+    }: FinalizeApplicationSubmissionVariables) =>
+      finalizeApplicationSubmission(applySubmissionId, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: sessionApplicationKeys.submissions(),
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: sessionApplicationKeys.summary(),
+      });
+
+      queryClient.invalidateQueries({ queryKey: notificationKeys.all });
+      queryClient.invalidateQueries({ queryKey: myProfilesKeys.all });
+      queryClient.invalidateQueries({ queryKey: bandMemberProfileKeys.all });
+    },
+  });
+};

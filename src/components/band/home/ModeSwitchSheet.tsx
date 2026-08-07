@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useMyProfilesQuery } from "@/hooks/api/user/useMyProfiles";
-import { useChangeUserMode } from "@/hooks/api/user/useMode";
+import { useChangeUserMode, useToggleUserMode } from "@/hooks/api/user/useMode";
 import { useSlideUpSheet } from "@/hooks/useSlideUpSheet";
 import { Toast } from "@/components/common/Toast/Toast";
 import { useModeStore } from "@/stores/useModeStore";
@@ -11,6 +11,7 @@ import BandAvatar from "@/assets/images/IMG_my.svg";
 import FanAvatar from "@/assets/icons/band/user-default-profile.svg";
 import CheckCircleYellowIcon from "@/assets/icons/band/check-circle-yellow.svg";
 import CheckApproveIcon from "@/assets/icons/band/check-approve.svg";
+import PlusIcon from "@/assets/icons/Plus.svg";
 
 interface ModeSwitchSheetProps {
   open: boolean;
@@ -18,11 +19,14 @@ interface ModeSwitchSheetProps {
 }
 
 const LAST_FAN_PATH_KEY = "bscene:last-fan-path";
+const FAN_START_ID = "fan-start";
+const BAND_START_ID = "band-start";
 
 interface AccountRowProps {
-  avatar: string;
+  avatar?: string;
+  avatarNode?: ReactNode;
   name: string;
-  subtitle: string;
+  subtitle?: string;
   selected: boolean;
   selectedTone?: "fan" | "band";
   onSelect: () => void;
@@ -44,6 +48,7 @@ const getLastFanPath = () => {
 
 const AccountRow = ({
   avatar,
+  avatarNode,
   name,
   subtitle,
   selected,
@@ -56,17 +61,27 @@ const AccountRow = ({
     className="flex w-full items-center gap-3 rounded-lg bg-neutral-0 py-3 pr-3.75 pl-3 shadow-[0_0_8px_0_rgba(0,0,0,0.10)]"
   >
     <div className="flex min-w-0 flex-1 items-center gap-6.25">
-      <img
-        src={avatar}
-        alt=""
-        className="size-10 shrink-0 rounded-full object-cover"
-      />
+      {avatarNode ?? (
+        <img
+          src={avatar}
+          alt=""
+          className="size-10 shrink-0 rounded-full object-cover"
+        />
+      )}
 
-      <div className="flex min-w-0 flex-1 flex-col items-start gap-0">
-        <span className="truncate text-body1 text-neutral-900">{name}</span>
-        <span className="truncate text-caption2 text-neutral-600">
-          {subtitle}
+      <div className="flex min-w-0 flex-1 flex-col items-start justify-center gap-0">
+        <span
+          className={`truncate text-body1 ${
+            subtitle ? "text-neutral-900" : "text-neutral-700"
+          }`}
+        >
+          {name}
         </span>
+        {subtitle ? (
+          <span className="truncate text-caption2 text-neutral-600">
+            {subtitle}
+          </span>
+        ) : null}
       </div>
     </div>
 
@@ -99,6 +114,7 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
   const location = useLocation();
   const setMode = useModeStore((state) => state.setMode);
   const changeUserMode = useChangeUserMode();
+  const toggleUserMode = useToggleUserMode();
   const { data: myProfiles } = useMyProfilesQuery({ type: "all" });
   const { data: bandProfiles } = useMyProfilesQuery({ type: "band" });
 
@@ -113,8 +129,9 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
     email: fanProfile?.email || storedFanAccount.email,
   };
 
-  const resolvedBandProfiles =
-    bandProfiles?.bandProfiles.length ? bandProfiles.bandProfiles : myProfiles?.bandProfiles;
+  const resolvedBandProfiles = bandProfiles?.bandProfiles.length
+    ? bandProfiles.bandProfiles
+    : myProfiles?.bandProfiles;
 
   const bandAccounts = (resolvedBandProfiles ?? []).map((band) => ({
     id: `band-${band.bandId}`,
@@ -126,18 +143,36 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
   }));
 
   const isFanMode = location.pathname.startsWith("/fan");
+  const hasBandAccount = bandAccounts.length > 0;
   const activeBand = bandAccounts.find((band) => band.isActive);
   const initialSelectedId =
     isFanMode && hasFanProfile
       ? fanAccount.id
-      : (activeBand?.id ?? bandAccounts[0]?.id ?? fanAccount.id);
+      : (activeBand?.id ??
+        bandAccounts[0]?.id ??
+        (isFanMode ? FAN_START_ID : BAND_START_ID));
   const [selectedId, setSelectedId] = useState(initialSelectedId);
+  const hasUserSelectedRef = useRef(false);
   const [showErrorToast, setShowErrorToast] = useState(false);
   const { rendered, isVisible, handleTransitionEnd } = useSlideUpSheet(
     open,
-    () => setSelectedId(initialSelectedId),
+    () => {
+      hasUserSelectedRef.current = false;
+      setSelectedId(initialSelectedId);
+    },
     () => setShowErrorToast(false),
   );
+
+  useEffect(() => {
+    if (!open || hasUserSelectedRef.current) return;
+
+    setSelectedId(initialSelectedId);
+  }, [initialSelectedId, open]);
+
+  const selectAccount = (accountId: string) => {
+    hasUserSelectedRef.current = true;
+    setSelectedId(accountId);
+  };
   const selectedMode = selectedId.startsWith("fan") ? "fan" : "band";
 
   const bandModeSection = (
@@ -145,16 +180,29 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
       <span className="text-label2 text-secondary-500">밴드 모드</span>
 
       <div className="flex w-full flex-col gap-3">
-        {bandAccounts.map((band) => (
+        {hasBandAccount ? (
+          bandAccounts.map((band) => (
+            <AccountRow
+              key={band.id}
+              avatar={band.avatar}
+              name={band.name}
+              subtitle={band.subtitle}
+              selected={selectedId === band.id}
+              onSelect={() => selectAccount(band.id)}
+            />
+          ))
+        ) : (
           <AccountRow
-            key={band.id}
-            avatar={band.avatar}
-            name={band.name}
-            subtitle={band.subtitle}
-            selected={selectedId === band.id}
-            onSelect={() => setSelectedId(band.id)}
+            avatarNode={
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-neutral-300">
+                <img src={PlusIcon} alt="" />
+              </div>
+            }
+            name="밴드 모드 시작하기"
+            selected={selectedId === BAND_START_ID}
+            onSelect={() => selectAccount(BAND_START_ID)}
           />
-        ))}
+        )}
       </div>
     </div>
   );
@@ -171,12 +219,20 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
             subtitle={fanAccount.email}
             selected={selectedId === fanAccount.id}
             selectedTone="fan"
-            onSelect={() => setSelectedId(fanAccount.id)}
+            onSelect={() => selectAccount(fanAccount.id)}
           />
         ) : (
-          <div className="flex w-full items-center justify-center rounded-lg bg-neutral-100 py-3 pr-3.75 pl-3 text-caption2 text-neutral-500">
-            아직 팬 프로필이 없어요
-          </div>
+          <AccountRow
+            avatarNode={
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-neutral-300">
+                <img src={PlusIcon} alt="" />
+              </div>
+            }
+            name="팬 모드 시작하기"
+            selected={selectedId === FAN_START_ID}
+            selectedTone="fan"
+            onSelect={() => selectAccount(FAN_START_ID)}
+          />
         )}
       </div>
     </div>
@@ -211,8 +267,6 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
           <div className="flex w-full flex-col items-center gap-6">
             {isFanMode ? fanModeSection : bandModeSection}
 
-            <div className="h-px w-90.75 shrink-0 bg-neutral-400" />
-
             {isFanMode ? bandModeSection : fanModeSection}
 
             {!isFanMode ? (
@@ -235,6 +289,29 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
             <button
               type="button"
               onClick={() => {
+                if (selectedMode === "fan" && !hasFanProfile) {
+                  sessionStorage.setItem(
+                    "onboardingSelectedModes",
+                    JSON.stringify(["FAN", "BAND"]),
+                  );
+                  sessionStorage.setItem("onboardingInitialMode", "FAN");
+                  onClose();
+                  navigate("/onboarding/fan-nickname");
+                  return;
+                }
+
+                if (selectedMode === "band" && !hasBandAccount) {
+                  toggleUserMode.mutate(undefined, {
+                    onSuccess: () => {
+                      setMode("band");
+                      onClose();
+                      navigate("/band/home");
+                    },
+                    onError: () => setShowErrorToast(true),
+                  });
+                  return;
+                }
+
                 const proceed = () => {
                   setShowErrorToast(false);
                   setMode(selectedMode);
@@ -256,7 +333,10 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
                 if (selectedMode === "fan" && fanAccount.profileId) {
                   changeUserMode.mutate(
                     { profileId: fanAccount.profileId, type: "FAN" },
-                    { onSuccess: proceed, onError: () => setShowErrorToast(true) },
+                    {
+                      onSuccess: proceed,
+                      onError: () => setShowErrorToast(true),
+                    },
                   );
                   return;
                 }
@@ -271,14 +351,17 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
                       profileId: selectedBand.bandMemberProfileId,
                       type: "BAND",
                     },
-                    { onSuccess: proceed, onError: () => setShowErrorToast(true) },
+                    {
+                      onSuccess: proceed,
+                      onError: () => setShowErrorToast(true),
+                    },
                   );
                   return;
                 }
 
                 proceed();
               }}
-              disabled={changeUserMode.isPending}
+              disabled={changeUserMode.isPending || toggleUserMode.isPending}
               className={`flex h-[52px] w-[353px] items-center justify-center rounded-[12px] text-label1 text-neutral-0 ${
                 selectedMode === "fan" ? "bg-primary-400" : "bg-secondary-500"
               }`}

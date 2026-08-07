@@ -1,16 +1,17 @@
 import BandImage from "@/assets/Img_Band.png";
+import { getRenderableProfileImageUrl } from "@/utils/profileImageUrl";
 import { cx } from "../utils";
 
 interface ProfileImageProps {
   size?: "sm" | "md" | "lg";
   glow?: boolean;
-  src?: string;
+  src?: string | null;
 }
 
 export function ProfileImage({
   size = "md",
   glow = false,
-  src = BandImage,
+  src,
 }: ProfileImageProps) {
   const sizeClass = {
     sm: "size-9",
@@ -18,9 +19,11 @@ export function ProfileImage({
     lg: "size-[150px]",
   }[size];
 
+  const imageSrc = getRenderableProfileImageUrl(src) ?? BandImage;
+
   return (
     <img
-      src={src}
+      src={imageSrc}
       alt=""
       className={cx(
         sizeClass,

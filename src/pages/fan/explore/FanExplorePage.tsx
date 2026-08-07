@@ -5,6 +5,7 @@ import ArrowDownIcon from "@/assets/icons/band/arrow-down-gray.svg";
 import BandImage from "@/assets/Img_Band.png";
 import Modal from "@/components/Modal/Modal";
 import BandCard from "@/components/common/Card/BandCard";
+import { Header } from "@/components/common/Header/Header";
 import { ModalOverlay } from "@/components/common/Modal/ModalOverlay";
 import { Toast } from "@/components/common/Toast/Toast";
 import {
@@ -46,7 +47,22 @@ const DEFAULT_APPLIED_FILTERS: AppliedExploreFilters = {
 };
 
 const FILTER_OPTIONS = {
-  genre: ["전체", "록", "인디팝", "펑크", "메탈", "재즈", "블루스", "R&B", "어쿠스틱", "포크"],
+  genre: [
+    "전체",
+    "인디",
+    "팝",
+    "팝록",
+    "재즈",
+    "블루스",
+    "얼터너티브록",
+    "사이키델릭록",
+    "일렉트로닉록",
+    "포크록",
+    "펑크록",
+    "하드록",
+    "메탈",
+    "etc.",
+  ],
   region: [
     "전체",
     "서울",
@@ -70,6 +86,60 @@ const FILTER_OPTIONS = {
   content: ["전체", "밴드", "공연", "영상"],
 };
 
+const EXPLORE_GENRE_LABELS: Record<string, string> = {
+  "팝 록": "팝록",
+  "얼터너티브 록": "얼터너티브록",
+  "사이키델릭 록": "사이키델릭록",
+  "일렉트로닉 록": "일렉트로닉록",
+  "포크 록": "포크록",
+  "펑크 록": "펑크록",
+  "하드 록": "하드록",
+  기타: "etc.",
+};
+
+const getExploreGenreLabel = (genre: string) => {
+  const genreLabel = getGenreLabel(genre);
+
+  return EXPLORE_GENRE_LABELS[genreLabel] ?? genreLabel;
+};
+
+const FILTER_OPTION_WIDTHS: Record<string, number> = {
+  팝: 41,
+  전체: 51,
+  인디: 51,
+  팝록: 51,
+  재즈: 51,
+  메탈: 51,
+  서울: 51,
+  경기: 51,
+  인천: 51,
+  부산: 51,
+  대구: 51,
+  광주: 51,
+  대전: 51,
+  울산: 51,
+  세종: 51,
+  충남: 51,
+  충북: 51,
+  전남: 51,
+  전북: 51,
+  경남: 51,
+  경북: 51,
+  강원: 51,
+  제주: 51,
+  밴드: 51,
+  공연: 51,
+  영상: 51,
+  블루스: 62,
+  포크록: 62,
+  펑크록: 62,
+  하드록: 62,
+  "etc.": 62,
+  얼터너티브록: 93,
+  사이키델릭록: 93,
+  일렉트로닉록: 93,
+};
+
 const mapBandToItem = (band: FanExploreBand): RecommendedBandItem => {
   const bandInfo = band.band ?? band;
   const bandId =
@@ -86,7 +156,7 @@ const mapBandToItem = (band: FanExploreBand): RecommendedBandItem => {
     id,
     bandId,
     name: bandInfo.name ?? bandInfo.bandName ?? "밴드명",
-    genre: bandInfo.genre ? getGenreLabel(bandInfo.genre) : "장르",
+    genre: bandInfo.genre ? getExploreGenreLabel(bandInfo.genre) : "장르",
     region: bandInfo.region ? getRegionLabel(bandInfo.region) : "지역",
     contentTypes: bandInfo.contentTypes ?? band.contentTypes ?? ["밴드"],
     followers:
@@ -119,22 +189,25 @@ const ExploreTopBar = () => {
   const navigate = useNavigate();
 
   return (
-    <header className="relative flex h-12 w-full max-w-[393px] items-center justify-center bg-neutral-0 px-6">
-      <h1 className="m-0 font-body text-label2 text-[#1D1A1A]">탐색</h1>
-
-      <button
-        type="button"
-        aria-label="검색"
-        onClick={() => navigate("/fan/explore/search")}
-        className="absolute right-6 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center"
-      >
-        <img
-          src={SearchIcon}
-          alt=""
-          className="h-[19.997px] w-[20.012px] brightness-0"
-        />
-      </button>
-    </header>
+    <Header
+      title="탐색"
+      align="mainWithAction"
+      showBack={false}
+      rightContent={
+        <button
+          type="button"
+          aria-label="검색"
+          onClick={() => navigate("/fan/explore/search")}
+          className="flex items-center justify-center"
+        >
+          <img
+            src={SearchIcon}
+            alt=""
+            className="h-[19.997px] w-[20.012px] brightness-0"
+          />
+        </button>
+      }
+    />
   );
 };
 
@@ -184,7 +257,7 @@ export const ExploreFilterBar = ({
   const sortChipWidthClass = appliedSort === "정확도순" ? "w-[73px]" : "w-[62px]";
 
   return (
-    <div className="flex h-[48px] w-full max-w-[393px] items-center justify-between border-b border-neutral-400 bg-neutral-0 py-[11px] pl-[22px] pr-[26px]">
+    <div className="sticky top-0 z-10 flex h-[48px] w-full max-w-[393px] items-center justify-between border-b border-neutral-400 bg-neutral-0 py-[11px] pl-[22px] pr-[26px]">
       <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto pr-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <button
           type="button"
@@ -258,8 +331,9 @@ const FilterOptionButton = ({
       type="button"
       aria-pressed={selected}
       onClick={onClick}
+      style={{ width: FILTER_OPTION_WIDTHS[label] }}
       className={[
-        "box-border flex h-[26px] min-w-[51px] items-center justify-center rounded-full px-[15px] py-[4px] font-body text-caption3",
+        "box-border flex h-[26px] shrink-0 items-center justify-center whitespace-nowrap rounded-full px-[8px] py-[4px] font-body text-caption3",
         selected
           ? "bg-primary-400 text-neutral-0"
           : "bg-neutral-300 text-neutral-600",
@@ -284,7 +358,7 @@ const FilterOptionGroup = ({
   return (
     <section>
       <h3 className="m-0 font-body text-body1 text-neutral-900">{title}</h3>
-      <div className="mt-[8px] flex flex-wrap gap-x-[8px] gap-y-[8px]">
+      <div className="mt-[8px] flex flex-wrap items-center gap-x-[4px] gap-y-[8px]">
         {options.map((option) => (
           <FilterOptionButton
             key={option}
@@ -349,7 +423,7 @@ const ExploreFilterSheet = ({
           필터
         </h2>
 
-        <div className="mt-[16px] ml-[41px] mr-[11px] flex min-h-0 flex-1 flex-col gap-[16px] overflow-y-auto pb-[8px] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="mt-[16px] ml-[32px] mr-[31px] flex min-h-0 flex-1 flex-col gap-[16px] overflow-y-auto pb-[8px] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <FilterOptionGroup
             title="장르"
             options={FILTER_OPTIONS.genre}
@@ -428,8 +502,8 @@ const RecommendationSection = ({
     if (band.bandId == null || band.isFollowing || isFollowPending) return;
 
     try {
-      await followBandMutation.mutateAsync(band.bandId);
       setToastMessage(`${band.name}를 팔로우했어요`);
+      await followBandMutation.mutateAsync(band.bandId);
     } catch {
       setToastMessage("밴드 팔로우에 실패했어요");
     }
@@ -438,9 +512,10 @@ const RecommendationSection = ({
   const confirmUnfollow = async () => {
     if (!unfollowTarget?.bandId || isFollowPending) return;
 
+    setUnfollowTargetId(null);
+
     try {
       await unfollowBandMutation.mutateAsync(unfollowTarget.bandId);
-      setUnfollowTargetId(null);
       setToastMessage(`${unfollowTarget.name} 팔로우를 취소했어요`);
     } catch {
       setToastMessage("팔로우 취소에 실패했어요");

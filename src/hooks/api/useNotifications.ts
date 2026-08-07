@@ -16,8 +16,8 @@ import {
   updateNotificationSetting,
 } from "@/api/notification";
 import type {
-  NotificationSettingsResponse,
   NotificationSettingsMode,
+  NotificationSettingsResponse,
   NotificationsPageResponse,
   UpdateNotificationSettingParams,
 } from "@/types/notification";
@@ -76,8 +76,9 @@ export const useUpdateNotificationSettingMutation = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ settingType, enabled }: UpdateNotificationSettingParams) =>
-      updateNotificationSetting({ settingType, enabled }),
+    mutationFn: (params: UpdateNotificationSettingParams) =>
+      updateNotificationSetting(params),
+
     onMutate: async ({ mode, settingType, enabled }) => {
       const queryKey = notificationKeys.settings(mode);
 
@@ -100,10 +101,17 @@ export const useUpdateNotificationSettingMutation = () => {
 
       return { previousSettings, queryKey };
     },
+
     onError: (_error, _variables, context) => {
       if (context?.previousSettings) {
         queryClient.setQueryData(context.queryKey, context.previousSettings);
       }
+    },
+
+    onSettled: (_data, _error, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: notificationKeys.settings(variables.mode),
+      });
     },
   });
 };
@@ -112,9 +120,15 @@ export const useMarkNotificationAsReadMutation = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: markNotificationAsRead,
-    onMutate: async (notificationId) => {
+    mutationFn: (notificationId: number) =>
+      markNotificationAsRead(notificationId),
+    onMutate: async (notificationId: number) => {
       await queryClient.cancelQueries({ queryKey: notificationKeys.all });
+
+      const previousNotifications =
+        queryClient.getQueriesData<InfiniteData<NotificationsPageResponse>>({
+          queryKey: notificationKeys.all,
+        });
 
       queryClient.setQueriesData<InfiniteData<NotificationsPageResponse>>(
         { queryKey: notificationKeys.all },
@@ -140,8 +154,16 @@ export const useMarkNotificationAsReadMutation = () => {
           };
         },
       );
+
+      return { previousNotifications };
     },
-    onSettled: () =>
-      queryClient.invalidateQueries({ queryKey: notificationKeys.all }),
+    onError: (_error, _notificationId, context) => {
+      context?.previousNotifications.forEach(([queryKey, previousData]) => {
+        queryClient.setQueryData(queryKey, previousData);
+      });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: notificationKeys.all });
+    },
   });
 };

@@ -17,6 +17,7 @@ import {
   useDeletePerformanceParticipation,
   useFanHomeQuery,
   usePendingPerformanceParticipationQuery,
+  useUpcomingPerformancesInfiniteQuery,
 } from "@/hooks/api/fan/useFanHome";
 import {
   useFollowExploreBand,
@@ -51,12 +52,14 @@ const MONTH_LABELS = [
 
 type HomeNewsCardItem = {
   id: string;
+  detailId: number | null;
   profileImageSrc: string;
   contentImageSrc?: string;
   bandName: string;
   meta: string;
   title: string;
   tags: string[];
+  createdAt?: string | null;
 };
 
 type HomeBandItem = {
@@ -74,6 +77,7 @@ type HomeBandItem = {
 
 type HomeConcertItem = {
   id: string;
+  date: Date | null;
   month: string;
   day: string;
   title: string;
@@ -287,9 +291,21 @@ const mapNewsItem = (
   index: number,
 ): HomeNewsCardItem => {
   const postedAgo = formatPostedAgo(item);
+  const detailId =
+    toNumericId(item.postId) ??
+    toNumericId(item.contentId) ??
+    toNumericId(item.id) ??
+    toNumericId(item.newsId);
 
   return {
-    id: String(item.newsId ?? item.contentId ?? item.id ?? `news-${index}`),
+    id: String(
+      item.newsId ??
+        item.postId ??
+        item.contentId ??
+        item.id ??
+        `news-${index}`,
+    ),
+    detailId,
     profileImageSrc: getBandProfileImageUrl(item) ?? BandProfileImage,
     contentImageSrc: getNewsContentImageUrl(item),
     bandName: item.bandName ?? "밴드명",
@@ -298,6 +314,7 @@ const mapNewsItem = (
       "장르 · 지역",
     title: item.title ?? item.content ?? "새로운 소식이 도착했어요",
     tags: item.tags ?? [],
+    createdAt: item.createdAt,
   };
 };
 
@@ -364,6 +381,7 @@ const mapConcertItem = (
     id: String(
       item.performanceId ?? item.concertId ?? item.id ?? `concert-${index}`,
     ),
+    date,
     month: date ? MONTH_LABELS[date.getMonth()] : "TBD",
     day: date ? String(date.getDate()).padStart(2, "0") : "--",
     title:
@@ -399,6 +417,7 @@ const mapInterestedConcertItem = (
 
   return {
     id: String(item.performanceId),
+    date,
     month: date ? MONTH_LABELS[date.getMonth()] : "TBD",
     day: date ? String(date.getDate()).padStart(2, "0") : "--",
     title: item.title,
@@ -408,6 +427,16 @@ const mapInterestedConcertItem = (
     thumbnailSrc: item.posterImageUrl ?? undefined,
     showThumbnail: Boolean(item.posterImageUrl),
   };
+};
+
+const isUpcomingConcert = (concert: HomeConcertItem) => {
+  if (["종료", "COMPLETED", "ENDED", "FINISHED"].includes(concert.status)) {
+    return false;
+  }
+
+  if (!concert.date) return true;
+
+  return concert.date.getTime() >= Date.now();
 };
 
 const mapHomeResponse = (data?: FanHomeResponse) => {
@@ -428,7 +457,7 @@ const mapHomeResponse = (data?: FanHomeResponse) => {
     data?.recommendedConcerts,
     data?.recommendConcerts,
     data?.popularConcerts,
-  ).map(mapConcertItem);
+  ).map(mapConcertItem).filter(isUpcomingConcert);
 
   return {
     hasFollowingBands: data?.hasFollowingBands === true,
@@ -540,6 +569,7 @@ const BandRecommendationStrip = ({ bands }: { bands: HomeBandItem[] }) => {
     const previousIsFollowing =
       followOverrides[unfollowTarget.id] ?? unfollowTarget.isFollowing;
 
+    setUnfollowTargetId(null);
     setPendingBandId(unfollowTarget.bandId);
     setFollowOverrides((currentOverrides) => ({
       ...currentOverrides,
@@ -548,7 +578,6 @@ const BandRecommendationStrip = ({ bands }: { bands: HomeBandItem[] }) => {
 
     try {
       await unfollowBandMutation.mutateAsync(unfollowTarget.bandId);
-      setUnfollowTargetId(null);
       setToastMessage(`${unfollowTarget.name} 팔로우를 취소했어요`);
     } catch {
       setFollowOverrides((currentOverrides) => ({
@@ -628,9 +657,9 @@ const BandRecommendationStrip = ({ bands }: { bands: HomeBandItem[] }) => {
                     ...currentOverrides,
                     [band.id]: true,
                   }));
+                  setToastMessage(`${band.name}를 팔로우했어요`);
 
                   followBandMutation.mutate(band.bandId, {
-                    onSuccess: () => setToastMessage(`${band.name}를 팔로우했어요`),
                     onError: () => {
                       setFollowOverrides((currentOverrides) => ({
                         ...currentOverrides,
@@ -681,23 +710,29 @@ const BandRecommendationStrip = ({ bands }: { bands: HomeBandItem[] }) => {
 };
 
 const NewsCarousel = ({ items }: { items: HomeNewsCardItem[] }) => {
+  const navigate = useNavigate();
   const [activeIndex, setActiveIndex] = useState(0);
 
   if (items.length === 0) {
     return <EmptySectionMessage>새로운 밴드 소식이 없어요</EmptySectionMessage>;
   }
 
+  const displayedActiveIndex = Math.min(activeIndex, items.length - 1);
+
   const handleScroll = (event: UIEvent<HTMLDivElement>) => {
     const scrollContainer = event.currentTarget;
-    const firstCard = scrollContainer.firstElementChild as HTMLElement | null;
+    const maxScrollLeft =
+      scrollContainer.scrollWidth - scrollContainer.clientWidth;
 
-    if (!firstCard) return;
+    if (maxScrollLeft <= 0) {
+      setActiveIndex(0);
+      return;
+    }
 
-    const gap = 12;
-    const cardStep = firstCard.offsetWidth + gap;
+    const scrollProgress = scrollContainer.scrollLeft / maxScrollLeft;
     const nextIndex = Math.min(
       items.length - 1,
-      Math.max(0, Math.round(scrollContainer.scrollLeft / cardStep)),
+      Math.max(0, Math.round(scrollProgress * (items.length - 1))),
     );
 
     setActiveIndex(nextIndex);
@@ -718,6 +753,19 @@ const NewsCarousel = ({ items }: { items: HomeNewsCardItem[] }) => {
             meta={item.meta}
             title={item.title}
             tags={item.tags}
+            onClick={
+              item.detailId == null
+                ? undefined
+                : () =>
+                    navigate(
+                      `/fan/explore/contents/${item.detailId}${
+                        item.createdAt
+                          ? `?createdAt=${encodeURIComponent(item.createdAt)}`
+                          : ""
+                      }`,
+                    )
+            }
+            ariaLabel={`${item.title} 상세보기`}
           />
         ))}
       </div>
@@ -727,7 +775,7 @@ const NewsCarousel = ({ items }: { items: HomeNewsCardItem[] }) => {
           <span
             key={item.id}
             className={
-              index === activeIndex
+              index === displayedActiveIndex
                 ? "size-1 rounded-full bg-primary-300"
                 : "size-1 rounded-full bg-neutral-400"
             }
@@ -828,6 +876,12 @@ const FanHomePage = () => {
   const deleteParticipationMutation = useDeletePerformanceParticipation();
   const { data: fanHome, isError, isLoading, refetch } = useFanHomeQuery();
   const interestedPerformancesQuery = useInterestedPerformancesQuery("ALL");
+  const {
+    data: upcomingPerformancesData,
+    isError: isUpcomingPerformancesError,
+    isLoading: isUpcomingPerformancesLoading,
+    refetch: refetchUpcomingPerformances,
+  } = useUpcomingPerformancesInfiniteQuery("IMMINENT", 4);
   const variant = getVariant(searchParams.get("variant"));
   const homeData = useMemo(() => mapHomeResponse(fanHome), [fanHome]);
   const interestedConcerts = useMemo(() => {
@@ -836,10 +890,25 @@ const FanHomePage = () => {
         .flatMap((page) => page.items)
         .filter((item) => item.participationStatus !== "COMPLETED")
         .map(mapInterestedConcertItem) ?? []
-    );
+    ).filter(isUpcomingConcert);
   }, [interestedPerformancesQuery.data]);
-  const upcomingConcerts =
-    interestedConcerts.length > 0 ? interestedConcerts : homeData.performances;
+  const upcomingApiConcerts = useMemo(() => {
+    return (
+      upcomingPerformancesData?.pages
+        .flatMap((page) => page.items ?? [])
+        .map(mapConcertItem)
+        .filter(isUpcomingConcert) ?? []
+    );
+  }, [upcomingPerformancesData]);
+  const shouldUseRecommendedPerformances =
+    variant === "recommended" ||
+    homeData.performanceType === "RECOMMENDED" ||
+    !homeData.hasFollowingBands;
+  const upcomingConcerts = shouldUseRecommendedPerformances
+    ? interestedConcerts.length > 0
+      ? interestedConcerts
+      : homeData.performances
+    : upcomingApiConcerts;
   const pendingPerformances = useMemo(() => {
     return (pendingParticipationQuery.data?.items ?? []).filter(
       (item) => !answeredPendingPerformanceIds.has(item.performanceId),
@@ -900,8 +969,6 @@ const FanHomePage = () => {
     }
 
     const isNewHome = variant === "new" || !homeData.hasFollowingBands;
-    const isRecommendedPerformances =
-      variant === "recommended" || homeData.performanceType === "RECOMMENDED";
     const hasInterestedConcerts = interestedConcerts.length > 0;
     const hasUpcomingConcerts = upcomingConcerts.length > 0;
 
@@ -939,7 +1006,7 @@ const FanHomePage = () => {
       );
     }
 
-    if (isRecommendedPerformances) {
+    if (shouldUseRecommendedPerformances) {
       return (
         <>
           <section>
@@ -987,7 +1054,15 @@ const FanHomePage = () => {
             title="다가오는 공연"
             onMoreClick={() => navigate("/fan/home/concerts")}
           />
-          <ConcertList concerts={upcomingConcerts} />
+          {isUpcomingPerformancesLoading ? (
+            <LoadingBlock />
+          ) : isUpcomingPerformancesError ? (
+            <ErrorBlock
+              onRetry={() => void refetchUpcomingPerformances()}
+            />
+          ) : (
+            <ConcertList concerts={upcomingConcerts} />
+          )}
         </section>
       </>
     );
@@ -998,7 +1073,11 @@ const FanHomePage = () => {
     isLoading,
     navigate,
     refetch,
+    shouldUseRecommendedPerformances,
     upcomingConcerts,
+    isUpcomingPerformancesError,
+    isUpcomingPerformancesLoading,
+    refetchUpcomingPerformances,
     variant,
   ]);
 

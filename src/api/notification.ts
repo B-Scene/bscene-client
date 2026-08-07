@@ -70,6 +70,27 @@ const normalizeServerDateTime = (value: unknown): string => {
 const normalizeBandInvite = (value: unknown): NotificationBandInvite | null =>
   isRecord(value) ? value : null;
 
+const getRequesterUserId = (item: Record<string, unknown>) => {
+  const nestedCandidates = [item.requester, item.actor, item.sender, item.data]
+    .filter(isRecord)
+    .flatMap((value) => [value.userId, value.requesterUserId, value.actorUserId]);
+  const candidates = [
+    item.requesterUserId,
+    item.coHostUserId,
+    item.actorUserId,
+    item.senderUserId,
+    item.fromUserId,
+    ...nestedCandidates,
+  ];
+
+  for (const candidate of candidates) {
+    const userId = toNumberOrNull(candidate);
+    if (userId !== null) return userId;
+  }
+
+  return null;
+};
+
 const normalizeNotification = (
   value: unknown,
   fallbackIndex: number,
@@ -92,12 +113,15 @@ const normalizeNotification = (
       toNotificationMode(item.userMode),
     deepLink: toStringOrNull(item.deepLink),
     referenceId: toNumberOrNull(item.referenceId),
+    requesterUserId: getRequesterUserId(item),
     title: toStringOrNull(item.title) ?? "",
     body: toStringOrNull(item.body) ?? "",
     isRead: toBoolean(item.isRead),
     readAt: toStringOrNull(item.readAt),
     createdAt: normalizeServerDateTime(item.createdAt),
-    actionable: toBoolean(item.actionable),
+    actionable:
+      toBoolean(item.actionable) ||
+      toBoolean(isRecord(item.bandInvite) ? item.bandInvite.actionable : null),
     bandInvite: normalizeBandInvite(item.bandInvite),
   };
 };
@@ -338,3 +362,24 @@ export const markNotificationAsRead = async (notificationId: number) => {
 
   return data.result;
 };
+
+// 딥링크 판정은 utils의 단일 구현을 사용하고 기존 API import 경로도 유지합니다.
+export {
+  BAND_NOTIFICATION_ROUTES,
+  FAN_NOTIFICATION_ROUTES,
+  formatNotificationTime,
+  getMappedDeepLink,
+  getLiveReferencePath,
+  getNotificationMode,
+  getNotificationTargetPath,
+  getRouteSuffix,
+  isCoHostUpgradeRequestNotification,
+  isNotificationForMode,
+  isNotificationWithinRetention,
+  isPostRegistrationNotification,
+  normalizeDeepLink,
+} from "@/utils/notificationDeepLink";
+export type {
+  NotificationMode,
+  NotificationRouteMapping,
+} from "@/utils/notificationDeepLink";

@@ -68,6 +68,7 @@ export interface CheckBandNameResponse {
 
 export interface BandDetailResponse {
   bandId: number;
+  ownerId: number;
   name: string;
   genre: BandGenre;
   region: BandRegion;
@@ -82,7 +83,8 @@ export interface UpdateBandRequest {
   name?: string;
   genre?: BandGenre;
   region?: BandRegion;
-  profileImageUrl?: string | null;
+  profileImageUrl?: string;
+  deleteProfileImage?: boolean;
   description?: string;
 }
 

@@ -3,10 +3,11 @@ import { useNavigate } from "react-router-dom";
 import ApplyMemberIcon from "@/assets/icons/band/apply-member.svg";
 import ArrowRightIcon from "@/assets/icons/band/arrow-right-my.svg";
 import DefaultAvatar from "@/assets/icons/band/user-default-profile.svg";
-import { Header } from "@/components/band/home/Header";
+import { Header } from "@/components/common/Header/Header";
 import { NotificationBandBanner } from "@/components/band/my/NotificationBandBanner";
 import { EmptyState } from "@/components/common/EmptyState/EmptyState";
 import { useBandMyPageQuery } from "@/hooks/api/user/useBandMyPage";
+import { useMyProfilesQuery } from "@/hooks/api/user/useMyProfiles";
 import { useReceivedApplicationsQuery } from "@/hooks/api/user/useReceivedApplications";
 import { useInfiniteScrollObserver } from "@/hooks/useInfiniteScrollObserver";
 import { useTodayTick } from "@/hooks/useTodayTick";
@@ -22,6 +23,10 @@ const ApplicationManagementPage = () => {
   const navigate = useNavigate();
   const { data: bandMyPage } = useBandMyPageQuery();
   const bandName = bandMyPage?.bandName ?? "";
+  const { data: bandProfiles } = useMyProfilesQuery({ type: "band" });
+  const activeBandProfileImageUrl = bandProfiles?.bandProfiles.find(
+    (band) => band.isActive,
+  )?.profileImageUrl;
   const today = useTodayTick();
 
   const [activeTab, setActiveTab] = useState<RecruitmentStatusFilter>("OPEN");
@@ -34,7 +39,7 @@ const ApplicationManagementPage = () => {
     [data],
   );
   const applicantCount = postings.reduce(
-    (sum, posting) => sum + posting.recruiters.length,
+    (sum, posting) => sum + posting.totalApplicants,
     0,
   );
 
@@ -51,6 +56,7 @@ const ApplicationManagementPage = () => {
         <NotificationBandBanner
           bandName={bandName}
           description="현재 선택된 밴드의 모집 공고 지원자"
+          profileImageUrl={activeBandProfileImageUrl}
         />
 
         <div className="flex items-center justify-between gap-3 rounded-lg bg-neutral-0 p-3 shadow-[0_0_8px_0_rgba(0,0,0,0.10)]">
@@ -111,7 +117,23 @@ const ApplicationManagementPage = () => {
                 key={posting.recruitmentPostId}
                 className="flex flex-col gap-7 rounded-lg bg-neutral-0 px-3.75 py-3 shadow-[0_0_8px_0_rgba(0,0,0,0.10)]"
               >
-                <div className="flex flex-col gap-3">
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() =>
+                    navigate("/band/session", {
+                      state: { openPostId: posting.recruitmentPostId },
+                    })
+                  }
+                  onKeyDown={(event) => {
+                    if (event.key !== "Enter" && event.key !== " ") return;
+                    event.preventDefault();
+                    navigate("/band/session", {
+                      state: { openPostId: posting.recruitmentPostId },
+                    });
+                  }}
+                  className="flex cursor-pointer flex-col gap-3"
+                >
                   <span className="self-start rounded-full border border-secondary-500 px-3 py-0.5 text-center text-caption3 text-secondary-400">
                     {formatDDayLabel(getDDay(posting.dueDate.split(" ")[0], today))}
                   </span>
@@ -124,7 +146,7 @@ const ApplicationManagementPage = () => {
                       {`${posting.part} · ${posting.genre} · ${posting.region}`}
                       <span className="mx-1.5 text-neutral-300">|</span>
                       <span className="text-secondary-500">
-                        지원자 {posting.recruiters.length}명
+                        지원자 {posting.totalApplicants}명
                       </span>
                     </p>
                   </div>
@@ -147,7 +169,7 @@ const ApplicationManagementPage = () => {
 
                           <div className="flex min-w-0 flex-col gap-1">
                             <span className="truncate text-label1 text-black">
-                              {applicant.nickname}
+                              {applicant.name}
                             </span>
                             <span className="truncate text-caption2 text-neutral-600">
                               {`${applicant.part} · ${applicant.level} · ${applicant.region}`}{" "}
@@ -157,6 +179,7 @@ const ApplicationManagementPage = () => {
                                 onClick={() =>
                                   navigate(
                                     `/band/my/applications/${applicant.applySubmissionId}`,
+                                    { state: { status: applicant.status } },
                                   )
                                 }
                                 className="text-caption3 text-secondary-500"
@@ -171,13 +194,17 @@ const ApplicationManagementPage = () => {
                           <button type="button" className="shrink-0">
                             <img src={ArrowRightIcon} alt="" />
                           </button>
-                        ) : applicant.status === "ACCEPTED" ? (
-                          <span className="flex py-0.5 px-3.75 shrink-0 items-center justify-center rounded-full bg-secondary-400 text-center text-caption3 text-neutral-0">
-                            수락
-                          </span>
-                        ) : (
+                        ) : applicant.status === "REJECTED" ? (
                           <span className="flex py-0.5 px-3.75 shrink-0 items-center justify-center rounded-full bg-neutral-300 text-center text-caption3 text-neutral-600">
                             거절
+                          </span>
+                        ) : applicant.status === "BAND_ACCEPTED" ? (
+                          <span className="flex py-0.5 px-3.75 shrink-0 items-center justify-center rounded-full border border-secondary-500 text-center text-caption3 text-secondary-500">
+                            확정 대기
+                          </span>
+                        ) : (
+                          <span className="flex py-0.5 px-3.75 shrink-0 items-center justify-center rounded-full bg-secondary-400 text-center text-caption3 text-neutral-0">
+                            참여 확정
                           </span>
                         )}
                       </div>
