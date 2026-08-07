@@ -1,9 +1,4 @@
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { AxiosError } from "axios";
 
@@ -17,6 +12,7 @@ import {
   useMySessionApplicationSummaryQuery,
 } from "@/hooks/api/session/useSessionApplication";
 import { useCreateSessionChatRoomMutation } from "@/hooks/api/session/useSessionChat";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import type {
   SessionRecruitmentListItem,
   SessionRecruitmentSort,
@@ -107,12 +103,44 @@ const createFallbackPost = (
   };
 };
 
+const PullToRefreshIndicator = ({
+  pullDistance,
+  isRefreshing,
+  isReadyToRefresh,
+}: {
+  pullDistance: number;
+  isRefreshing: boolean;
+  isReadyToRefresh: boolean;
+}) => {
+  const isVisible = pullDistance > 0 || isRefreshing;
+
+  if (!isVisible) {
+    return null;
+  }
+
+  return (
+    <div
+      className="pointer-events-none fixed left-1/2 z-[60] flex h-8 -translate-x-1/2 items-center justify-center rounded-full bg-neutral-900/80 px-4 text-caption3 text-neutral-0 shadow-[0_4px_12px_rgba(0,0,0,0.18)]"
+      style={{
+        top: 158,
+        opacity: Math.min(1, Math.max(0.35, pullDistance / 72)),
+        transform: `translate(-50%, ${Math.min(pullDistance, 48)}px)`,
+      }}
+    >
+      {isRefreshing
+        ? "새로고침 중..."
+        : isReadyToRefresh
+          ? "놓으면 새로고침"
+          : "아래로 당겨 새로고침"}
+    </div>
+  );
+};
+
 export const RecruitmentNoticeScreen = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [activeTab, setActiveTab] =
-    useState<SessionTabId>("recruitment");
+  const [activeTab, setActiveTab] = useState<SessionTabId>("recruitment");
 
   const [isFilterOpen, setIsFilterOpen] = useState(false);
 
@@ -124,8 +152,7 @@ export const RecruitmentNoticeScreen = () => {
 
   const hasInitializedFindFilters = useRef(false);
 
-  const [sort, setSort] =
-    useState<SessionRecruitmentSort>("LATEST");
+  const [sort, setSort] = useState<SessionRecruitmentSort>("LATEST");
 
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
@@ -135,19 +162,21 @@ export const RecruitmentNoticeScreen = () => {
     number | null
   >(null);
 
-  const [isBasicProfileEditOpen, setIsBasicProfileEditOpen] =
-    useState(false);
+  const [isBasicProfileEditOpen, setIsBasicProfileEditOpen] = useState(false);
+
+  const openPostId =
+    (location.state as { openPostId?: number } | null)?.openPostId ?? null;
 
   const [selectedPostId, setSelectedPostId] = useState<number | null>(
-    () =>
-      (location.state as { openPostId?: number } | null)?.openPostId ?? null,
+    () => openPostId,
   );
 
   const [selectedPostOverride, setSelectedPostOverride] =
     useState<SessionRecruitmentPost | null>(null);
 
-  const [selectedApplicationId, setSelectedApplicationId] =
-    useState<number | null>(null);
+  const [selectedApplicationId, setSelectedApplicationId] = useState<
+    number | null
+  >(null);
 
   const [deletedPostIds, setDeletedPostIds] = useState<number[]>([]);
 
@@ -167,6 +196,40 @@ export const RecruitmentNoticeScreen = () => {
     size: 20,
     sort,
   });
+
+  const handleRefreshRecruitments = useCallback(async () => {
+    await sessionRecruitmentsQuery.refetch();
+  }, [sessionRecruitmentsQuery]);
+
+  const recruitmentPullToRefresh = usePullToRefresh<HTMLElement>({
+    enabled:
+      activeTab === "recruitment" &&
+      !isFilterOpen &&
+      !isSearchOpen &&
+      !isCreateOpen &&
+      editingRecruitmentId === null &&
+      !isBasicProfileEditOpen &&
+      selectedPostId === null &&
+      selectedApplicationId === null &&
+      !sessionRecruitmentsQuery.isLoading &&
+      !sessionRecruitmentsQuery.isFetching,
+    onRefresh: handleRefreshRecruitments,
+  });
+
+  useEffect(() => {
+    if (!Number.isFinite(openPostId)) return;
+
+    const timeoutId = window.setTimeout(() => {
+      setSelectedPostId(openPostId);
+
+      navigate(`${location.pathname}${location.search}${location.hash}`, {
+        replace: true,
+        state: null,
+      });
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [location.hash, location.pathname, location.search, navigate, openPostId]);
 
   useEffect(() => {
     const summary = myApplicationSummaryQuery.data;
@@ -440,7 +503,18 @@ export const RecruitmentNoticeScreen = () => {
   }
 
   return (
-    <main className="relative min-h-dvh bg-neutral-0 pb-[calc(var(--bottom-nav-height)+24px)]">
+    <main
+      ref={recruitmentPullToRefresh.containerRef}
+      className="relative min-h-dvh overscroll-y-contain bg-neutral-0 pb-[calc(var(--bottom-nav-height)+24px)]"
+    >
+      {activeTab === "recruitment" ? (
+        <PullToRefreshIndicator
+          pullDistance={recruitmentPullToRefresh.pullDistance}
+          isRefreshing={recruitmentPullToRefresh.isRefreshing}
+          isReadyToRefresh={recruitmentPullToRefresh.isReadyToRefresh}
+        />
+      ) : null}
+
       <SessionPageHeader
         onSearch={() => setIsSearchOpen(true)}
         onMessages={() => navigate("/band/session/messages")}
