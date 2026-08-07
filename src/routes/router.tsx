@@ -19,6 +19,7 @@ import ConcertRegisterPage from "@/pages/band/home/ConcertRegisterPage";
 import CompletePage from "@/pages/band/home/CompletePage";
 import MusicRegisterPage from "@/pages/band/home/MusicRegisterPage";
 import ContentRegisterPage from "@/pages/band/home/ContentRegisterPage";
+import ContentDetailPage from "@/pages/band/home/ContentDetailPage";
 import BandScheduleDetailPage from "@/pages/band/home/BandScheduleDetailPage";
 import FanHomePage from "@/pages/fan/home/FanHomePage";
 import FanMyPage from "@/pages/fan/my/MyPage";
@@ -315,6 +316,10 @@ export const router = createBrowserRouter([
       {
         path: "/band/concerts/:performanceId",
         element: <BandScheduleDetailPage />,
+      },
+      {
+        path: "/band/contents/:postId",
+        element: <ContentDetailPage />,
       },
       {
         path: "/band/contents/:postId/edit",
