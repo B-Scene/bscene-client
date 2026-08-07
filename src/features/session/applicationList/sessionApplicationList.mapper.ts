@@ -1,5 +1,3 @@
-// src/features/session/applicationList/sessionApplicationList.mapper.ts
-
 import { createInitialApplicationForm } from "@/features/session/applicationForm/applicationForm.constants";
 import type { SessionApplicationDraft } from "@/features/session/applicationForm/applicationForm.types";
 
@@ -48,44 +46,25 @@ export const createApplicationDraftFromSummary = ({
     title: application.purpose ?? "",
 
     shortIntroduction:
-      application.shortIntroduction ??
-      application.purpose ??
-      "",
+      application.shortIntroduction ?? application.purpose ?? "",
 
     introduction: application.introduction ?? "",
 
-    part:
-      application.part ??
-      summary?.part ??
-      "",
+    part: application.part ?? summary?.part ?? "",
 
-    skillLevel:
-      application.skillLevel ??
-      summary?.skillLevel ??
-      "",
+    skillLevel: application.skillLevel ?? summary?.skillLevel ?? "",
 
-    genre:
-      application.genre ??
-      summary?.genre ??
-      "",
+    genre: application.genre ?? summary?.genre ?? "",
 
-    region:
-      application.region ??
-      summary?.region ??
-      "",
+    region: application.region ?? summary?.region ?? "",
 
-    activities: application.activities
-      ? [...application.activities]
-      : [],
+    activities: application.activities ? [...application.activities] : [],
 
-    experiences: application.experiences
-      ? [...application.experiences]
-      : [],
+    experiences: application.experiences ? [...application.experiences] : [],
 
-    portfolioLinks:
-      application.portfolioLinks?.length
-        ? [...application.portfolioLinks]
-        : [""],
+    portfolioLinks: application.portfolioLinks?.length
+      ? [...application.portfolioLinks]
+      : [""],
   };
 };
 
@@ -93,15 +72,12 @@ export const mapServerApplications = (
   summary: SessionApplicationSummary | undefined,
   overrides: Record<number, ApplicationCardItem>,
 ): ApplicationCardItem[] => {
-  const serverApplications =
-    summary?.applications ?? [];
+  const serverApplications = summary?.applications ?? [];
 
   return serverApplications.map((application) => {
-    const applicationId =
-      application.sessionApplicationId;
+    const applicationId = application.sessionApplicationId;
 
-    const override =
-      overrides[applicationId];
+    const override = overrides[applicationId];
 
     if (override) {
       return override;
@@ -114,14 +90,11 @@ export const mapServerApplications = (
 
     return {
       sessionApplicationId: applicationId,
-      displayDate:
-        application.displayDate ?? "",
+      displayDate: application.displayDate ?? "",
 
       title: application.title ?? "",
       purpose: application.purpose ?? "",
 
-      // 기본지원서가 아닌 지원서는 공개 토글 대상이 아니므로
-      // 프론트 표시상 항상 비공개로 고정합니다.
       isPublic: isDefault ? (application.isPublic ?? false) : false,
 
       isDefault,
@@ -131,6 +104,8 @@ export const mapServerApplications = (
         application,
         summary,
       }),
+
+      portfolioLinkDetails: null,
     };
   });
 };
@@ -140,20 +115,19 @@ export const mapApplicationToDetail = (
   summary?: SessionApplicationSummary,
 ): MyApplicationDetailData => {
   return {
-    sessionApplicationId:
-      application.sessionApplicationId,
+    sessionApplicationId: application.sessionApplicationId,
 
     displayDate: application.displayDate,
 
     applicationType: application.title,
     title: application.purpose,
 
-    nickname:
-      summary?.nickname ?? "닉네임 없음",
+    nickname: summary?.nickname ?? "닉네임 없음",
 
-    profileImageUrl:
-      summary?.profileImageUrl ?? null,
+    profileImageUrl: summary?.profileImageUrl ?? null,
 
     draft: application.draft,
+
+    portfolioLinks: application.portfolioLinkDetails ?? null,
   };
 };

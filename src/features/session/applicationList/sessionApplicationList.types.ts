@@ -1,9 +1,8 @@
-// src/features/session/applicationList/sessionApplicationList.types.ts
-
 import type {
   SessionApplicationDraft,
   SessionApplicationExperience,
 } from "@/features/session/applicationForm/applicationForm.types";
+import type { SessionApplicationPortfolioLink } from "@/types/session/sessionApplication";
 
 export interface ApplicationDetailFields {
   shortIntroduction?: string | null;
@@ -17,8 +16,7 @@ export interface ApplicationDetailFields {
   portfolioLinks?: readonly string[] | null;
 }
 
-export interface SessionApplicationSummaryItem
-  extends ApplicationDetailFields {
+export interface SessionApplicationSummaryItem extends ApplicationDetailFields {
   sessionApplicationId: number;
   displayDate?: string | null;
   title?: string | null;
@@ -50,6 +48,7 @@ export interface ApplicationCardItem {
   isDefault: boolean;
   isLocal: boolean;
   draft: SessionApplicationDraft;
+  portfolioLinkDetails?: readonly SessionApplicationPortfolioLink[] | null;
 }
 
 export interface MyApplicationDetailData {
@@ -60,4 +59,5 @@ export interface MyApplicationDetailData {
   nickname: string;
   profileImageUrl?: string | null;
   draft: SessionApplicationDraft;
+  portfolioLinks?: readonly SessionApplicationPortfolioLink[] | null;
 }

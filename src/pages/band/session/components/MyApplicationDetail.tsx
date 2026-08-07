@@ -1,10 +1,4 @@
-// src/pages/band/session/components/MyApplicationDetail.tsx
-
-import {
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import {
@@ -16,9 +10,7 @@ import {
   MyApplicationPortfolioSection,
   MyApplicationSummary,
 } from "@/features/session/applicationDetail/MyApplicationDetailView";
-import {
-  type DetailSectionId,
-} from "@/features/session/applicationDetail/applicationDetail.types";
+import { type DetailSectionId } from "@/features/session/applicationDetail/applicationDetail.types";
 import type { MyApplicationDetailData } from "@/features/session/applicationList/sessionApplicationList.types";
 
 interface MyApplicationDetailProps {
@@ -26,7 +18,6 @@ interface MyApplicationDetailProps {
   application: MyApplicationDetailData | null;
   onClose: () => void;
 }
-
 
 export const MyApplicationDetail = ({
   open,
@@ -36,12 +27,9 @@ export const MyApplicationDetail = ({
   const [activeSection, setActiveSection] =
     useState<DetailSectionId>("introduction");
 
-  const scrollContainerRef =
-    useRef<HTMLElement>(null);
+  const scrollContainerRef = useRef<HTMLElement>(null);
 
-  const sectionRefs = useRef<
-    Record<DetailSectionId, HTMLElement | null>
-  >({
+  const sectionRefs = useRef<Record<DetailSectionId, HTMLElement | null>>({
     introduction: null,
     information: null,
     career: null,
@@ -53,33 +41,23 @@ export const MyApplicationDetail = ({
       return;
     }
 
-    const previousOverflow =
-      document.body.style.overflow;
+    const previousOverflow = document.body.style.overflow;
 
     document.body.style.overflow = "hidden";
 
-    const handleKeyDown = (
-      event: KeyboardEvent,
-    ) => {
+    const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setActiveSection("introduction");
         onClose();
       }
     };
 
-    window.addEventListener(
-      "keydown",
-      handleKeyDown,
-    );
+    window.addEventListener("keydown", handleKeyDown);
 
     return () => {
-      document.body.style.overflow =
-        previousOverflow;
+      document.body.style.overflow = previousOverflow;
 
-      window.removeEventListener(
-        "keydown",
-        handleKeyDown,
-      );
+      window.removeEventListener("keydown", handleKeyDown);
     };
   }, [onClose, open]);
 
@@ -94,13 +72,10 @@ export const MyApplicationDetail = ({
     nickname,
     profileImageUrl,
     draft,
+    portfolioLinks,
   } = application;
 
-  const profileDescription = [
-    draft.part,
-    draft.skillLevel,
-    draft.region,
-  ]
+  const profileDescription = [draft.part, draft.skillLevel, draft.region]
     .filter(Boolean)
     .join(" · ");
 
@@ -109,14 +84,10 @@ export const MyApplicationDetail = ({
     onClose();
   };
 
-  const handleSelectSection = (
-    sectionId: DetailSectionId,
-  ) => {
-    const scrollContainer =
-      scrollContainerRef.current;
+  const handleSelectSection = (sectionId: DetailSectionId) => {
+    const scrollContainer = scrollContainerRef.current;
 
-    const section =
-      sectionRefs.current[sectionId];
+    const section = sectionRefs.current[sectionId];
 
     if (!scrollContainer || !section) {
       return;
@@ -124,17 +95,12 @@ export const MyApplicationDetail = ({
 
     setActiveSection(sectionId);
 
-    const containerTop =
-      scrollContainer.getBoundingClientRect().top;
+    const containerTop = scrollContainer.getBoundingClientRect().top;
 
-    const sectionTop =
-      section.getBoundingClientRect().top;
+    const sectionTop = section.getBoundingClientRect().top;
 
     const nextScrollTop =
-      scrollContainer.scrollTop +
-      sectionTop -
-      containerTop -
-      47;
+      scrollContainer.scrollTop + sectionTop - containerTop - 47;
 
     scrollContainer.scrollTo({
       top: nextScrollTop,
@@ -144,9 +110,7 @@ export const MyApplicationDetail = ({
 
   return createPortal(
     <main className="fixed inset-0 z-[99999] mx-auto flex h-dvh w-full max-w-[393px] flex-col overflow-hidden bg-neutral-0">
-      <MyApplicationDetailHeader
-        onBack={handleClose}
-      />
+      <MyApplicationDetailHeader onBack={handleClose} />
 
       <section
         ref={scrollContainerRef}
@@ -158,9 +122,7 @@ export const MyApplicationDetail = ({
           title={title}
           nickname={nickname}
           profileImageUrl={profileImageUrl}
-          profileDescription={
-            profileDescription
-          }
+          profileDescription={profileDescription}
         />
 
         <MyApplicationDetailTabs
@@ -171,43 +133,32 @@ export const MyApplicationDetail = ({
         <div className="px-6">
           <MyApplicationIntroductionSection
             sectionRef={(element) => {
-              sectionRefs.current.introduction =
-                element;
+              sectionRefs.current.introduction = element;
             }}
-            shortIntroduction={
-              draft.shortIntroduction
-            }
-            introduction={
-              draft.introduction
-            }
+            shortIntroduction={draft.shortIntroduction}
+            introduction={draft.introduction}
           />
 
           <MyApplicationInformationSection
             sectionRef={(element) => {
-              sectionRefs.current.information =
-                element;
+              sectionRefs.current.information = element;
             }}
             draft={draft}
           />
 
           <MyApplicationCareerSection
             sectionRef={(element) => {
-              sectionRefs.current.career =
-                element;
+              sectionRefs.current.career = element;
             }}
-            experiences={
-              draft.experiences
-            }
+            experiences={draft.experiences}
           />
 
           <MyApplicationPortfolioSection
             sectionRef={(element) => {
-              sectionRefs.current.portfolio =
-                element;
+              sectionRefs.current.portfolio = element;
             }}
-            portfolioLinks={
-              draft.portfolioLinks
-            }
+            portfolioLinks={portfolioLinks}
+            fallbackPortfolioLinks={draft.portfolioLinks}
           />
         </div>
       </section>
