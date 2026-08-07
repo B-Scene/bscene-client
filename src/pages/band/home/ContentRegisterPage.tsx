@@ -269,7 +269,7 @@ const ContentRegisterForm = ({
 
     setIsUploading(false);
 
-    const onSuccess = () => {
+    const onSuccess = (result: { postId: number }) => {
       navigate("/band/register/complete", {
         state: {
           title: isEditMode ? "콘텐츠가 수정됐어요" : "콘텐츠가 업로드됐어요",
@@ -280,8 +280,8 @@ const ContentRegisterForm = ({
             { label: "콘텐츠", value: contentType ?? "" },
             { label: "콘텐츠 제목", value: title },
           ],
-          primaryLabel: "홈으로 이동",
-          primaryTo: "/band/home",
+          primaryLabel: "콘텐츠 보기",
+          primaryTo: `/band/contents/${result.postId}`,
         },
       });
     };
