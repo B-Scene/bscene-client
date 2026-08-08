@@ -10,6 +10,7 @@ interface DatePickerSheetProps {
   open: boolean;
   startDate: string;
   endDate: string;
+  selectionMode?: "single" | "range";
   onClose: () => void;
   onSelect: (range: DateRange) => void;
 }
@@ -82,6 +83,7 @@ export const DatePickerSheet = ({
   open,
   startDate,
   endDate,
+  selectionMode = "range",
   onClose,
   onSelect,
 }: DatePickerSheetProps) => {
@@ -121,6 +123,13 @@ export const DatePickerSheet = ({
   };
 
   const handleDayClick = (dateKey: string) => {
+    if (selectionMode === "single") {
+      setRangeStart(dateKey);
+      setRangeEnd(dateKey);
+      onSelect({ start: dateKey, end: dateKey });
+      return;
+    }
+
     const hasCompleteRange = Boolean(rangeStart) && Boolean(rangeEnd);
 
     if (!rangeStart || hasCompleteRange) {
