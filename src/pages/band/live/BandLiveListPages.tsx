@@ -9,6 +9,7 @@ import {
   useScheduledLiveQuery,
 } from "@/hooks/api/live/useLive";
 import { useInfiniteScrollObserver } from "@/hooks/useInfiniteScrollObserver";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import type { EnterLiveResponse, LiveApiResponse } from "@/types/live/live";
 import type {
   ActiveLive,
@@ -16,7 +17,11 @@ import type {
   LiveCard,
   ScheduledLiveCardData,
 } from "./types";
-import { HomeLiveCard, ScheduledLiveCard } from "./BandLiveHome";
+import {
+  HomeLiveCard,
+  PullToRefreshIndicator,
+  ScheduledLiveCard,
+} from "./BandLiveHome";
 import {
   cacheOwnedScheduledLives,
   cacheScheduledCoHostUserIds,
@@ -131,11 +136,9 @@ export function BandLiveNowListPage({
           id: live.liveId,
           title: live.isMine ? "내 라이브 진행 중" : live.bandName,
           subtitle: live.title,
-          listeners: `${(
-            live.viewerCount ??
-            live.viewCount ??
-            0
-          ).toLocaleString()}명 청취 중`,
+          listeners: `${
+            live.viewerCount ?? live.viewCount ?? 0
+          }명 청취 중`,
           imageUrl: live.bandProfileImageUrl ?? live.thumbnailImageUrl ?? null,
           isMine: live.isMine,
         })),
@@ -155,6 +158,15 @@ export function BandLiveNowListPage({
   const loadMoreRef = useInfiniteScrollObserver({
     enabled: Boolean(hasNextPage) && !isFetchingNextPage,
     onIntersect: loadMore,
+  });
+
+  const handleRefreshLiveNowList = useCallback(async () => {
+    await refetch();
+  }, [refetch]);
+
+  const liveNowPullToRefresh = usePullToRefresh<HTMLElement>({
+    enabled: !isLoading && !isFetchingNextPage && !isEnterPending,
+    onRefresh: handleRefreshLiveNowList,
   });
 
   const enterAndMoveRoom = (enteredLive: EnterLiveResponse) => {
@@ -219,7 +231,15 @@ export function BandLiveNowListPage({
       <Header title="진행 중인 라이브" showBack={false} variant="main" />
       <HeaderBackButton onClick={() => go("home")} />
 
-      <section className="h-[calc(100%_-_52px)] overflow-y-auto px-5 pb-8">
+      <PullToRefreshIndicator
+        pullDistance={liveNowPullToRefresh.pullDistance}
+        isRefreshing={liveNowPullToRefresh.isRefreshing}
+      />
+
+      <section
+        ref={liveNowPullToRefresh.containerRef}
+        className="h-[calc(100%_-_52px)] overflow-y-auto overscroll-y-contain px-5 pb-8"
+      >
         {isLoading ? (
           <ListMessage>라이브 목록을 불러오는 중이에요.</ListMessage>
         ) : null}
@@ -275,7 +295,7 @@ export function BandLiveScheduledListPage({
     refetch,
   } = useScheduledLiveQuery(false);
 
-  const { data: liveHome } = useLiveHomeQuery();
+  const { data: liveHome, refetch: refetchLiveHome } = useLiveHomeQuery();
   const enterLiveMutation = useEnterLiveMutation();
 
   const previewScheduleByLiveId = useMemo(
@@ -333,6 +353,15 @@ export function BandLiveScheduledListPage({
     onIntersect: loadMore,
   });
 
+  const handleRefreshScheduledList = useCallback(async () => {
+    await Promise.all([refetch(), refetchLiveHome()]);
+  }, [refetch, refetchLiveHome]);
+
+  const scheduledPullToRefresh = usePullToRefresh<HTMLElement>({
+    enabled: !isLoading && !isFetchingNextPage && !enterLiveMutation.isPending,
+    onRefresh: handleRefreshScheduledList,
+  });
+
   const enterAndMoveRoom = (enteredLive: EnterLiveResponse) => {
     removeCachedOwnedScheduledLive(Number(enteredLive.liveId));
     onEnterLive(enteredLive);
@@ -373,7 +402,15 @@ export function BandLiveScheduledListPage({
       <Header title="예정된 라이브" showBack={false} variant="main" />
       <HeaderBackButton onClick={() => go("home")} />
 
-      <section className="h-[calc(100%_-_52px)] overflow-y-auto px-5 pb-8">
+      <PullToRefreshIndicator
+        pullDistance={scheduledPullToRefresh.pullDistance}
+        isRefreshing={scheduledPullToRefresh.isRefreshing}
+      />
+
+      <section
+        ref={scheduledPullToRefresh.containerRef}
+        className="h-[calc(100%_-_52px)] overflow-y-auto overscroll-y-contain px-5 pb-8"
+      >
         {isLoading ? (
           <ListMessage>예정된 라이브를 불러오는 중이에요.</ListMessage>
         ) : null}
@@ -391,15 +428,15 @@ export function BandLiveScheduledListPage({
         {!isLoading && !isError && retainedScheduledCards.length > 0 ? (
           <div className="grid gap-3 pt-5">
             {retainedScheduledCards.map((live) => (
-                <ScheduledLiveCard
+              <ScheduledLiveCard
                 key={live.id}
                 live={live}
-                  actionLabel={
+                actionLabel={
                   isScheduledLiveStartable(live.scheduledAt, now)
                     ? "라이브 시작"
                     : "수정"
-                  }
-                  onEdit={() => void handleScheduledLiveAction(live)}
+                }
+                onEdit={() => void handleScheduledLiveAction(live)}
               />
             ))}
 

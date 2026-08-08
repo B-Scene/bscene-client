@@ -46,6 +46,75 @@ import type {
 
 const FIND_FILTER_KEYS = ["genre", "region"] as const;
 
+const SESSION_ACTIVE_TAB_STORAGE_KEY = "bscene:session:active-tab";
+const SESSION_RECRUITMENT_FILTER_STORAGE_KEY =
+  "bscene:session:recruitment-filter";
+const SESSION_FIND_FILTER_STORAGE_KEY = "bscene:session:find-filter";
+
+const SESSION_TAB_IDS: SessionTabId[] = [
+  "recruitment",
+  "find",
+  "applications",
+];
+
+const isSessionTabId = (value: string | null): value is SessionTabId => {
+  return SESSION_TAB_IDS.includes(value as SessionTabId);
+};
+
+const readStoredActiveTab = (): SessionTabId => {
+  try {
+    const storedValue = window.sessionStorage.getItem(
+      SESSION_ACTIVE_TAB_STORAGE_KEY,
+    );
+
+    return isSessionTabId(storedValue) ? storedValue : "recruitment";
+  } catch {
+    return "recruitment";
+  }
+};
+
+const readStoredFilterValues = (
+  storageKey: string,
+): SessionFilterValues | null => {
+  try {
+    const storedValue = window.sessionStorage.getItem(storageKey);
+
+    if (!storedValue) {
+      return null;
+    }
+
+    const parsedValue = JSON.parse(storedValue) as Partial<SessionFilterValues>;
+
+    return {
+      part: parsedValue.part ?? INITIAL_SESSION_FILTERS.part,
+      skill: parsedValue.skill ?? INITIAL_SESSION_FILTERS.skill,
+      genre: parsedValue.genre ?? INITIAL_SESSION_FILTERS.genre,
+      region: parsedValue.region ?? INITIAL_SESSION_FILTERS.region,
+    };
+  } catch {
+    return null;
+  }
+};
+
+const writeStoredFilterValues = (
+  storageKey: string,
+  values: SessionFilterValues,
+) => {
+  try {
+    window.sessionStorage.setItem(storageKey, JSON.stringify(values));
+  } catch {
+    // sessionStorage 접근이 제한된 환경에서는 저장하지 않음
+  }
+};
+
+const writeStoredActiveTab = (tabId: SessionTabId) => {
+  try {
+    window.sessionStorage.setItem(SESSION_ACTIVE_TAB_STORAGE_KEY, tabId);
+  } catch {
+    // sessionStorage 접근이 제한된 환경에서는 저장하지 않음
+  }
+};
+
 const toDeadlineLabel = (dDay: number) => {
   if (dDay < 0) return "마감";
   if (dDay === 0) return "오늘 마감";
@@ -110,14 +179,14 @@ const PullToRefreshIndicator = ({
   pullDistance: number;
   isRefreshing: boolean;
 }) => {
-  const shouldShow = pullDistance > 0 || isRefreshing;
+  const shouldShow = pullDistance >= 24 || isRefreshing;
 
   if (!shouldShow) {
     return null;
   }
 
   const visibleDistance = Math.min(pullDistance, 52);
-  const opacity = Math.min(1, Math.max(0.35, pullDistance / 76));
+  const opacity = Math.min(1, Math.max(0.35, pullDistance / 80));
 
   return (
     <div
@@ -137,17 +206,31 @@ export const RecruitmentNoticeScreen = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [activeTab, setActiveTab] = useState<SessionTabId>("recruitment");
+  const [activeTab, setActiveTab] = useState<SessionTabId>(
+    () => readStoredActiveTab(),
+  );
 
   const [isFilterOpen, setIsFilterOpen] = useState(false);
 
   const [recruitmentFilterValues, setRecruitmentFilterValues] =
-    useState<SessionFilterValues>(INITIAL_SESSION_FILTERS);
+    useState<SessionFilterValues>(
+      () =>
+        readStoredFilterValues(SESSION_RECRUITMENT_FILTER_STORAGE_KEY) ??
+        INITIAL_SESSION_FILTERS,
+    );
 
   const [findFilterValues, setFindFilterValues] =
-    useState<SessionFilterValues>(INITIAL_SESSION_FILTERS);
+    useState<SessionFilterValues>(
+      () =>
+        readStoredFilterValues(SESSION_FIND_FILTER_STORAGE_KEY) ??
+        INITIAL_SESSION_FILTERS,
+    );
 
   const hasInitializedFindFilters = useRef(false);
+
+  const hasStoredFindFilters = useRef(
+    Boolean(readStoredFilterValues(SESSION_FIND_FILTER_STORAGE_KEY)),
+  );
 
   const [sort, setSort] = useState<SessionRecruitmentSort>("LATEST");
 
@@ -194,17 +277,50 @@ export const RecruitmentNoticeScreen = () => {
     sort,
   });
 
+  const handleTabChange = useCallback((nextTab: SessionTabId) => {
+    setActiveTab(nextTab);
+    writeStoredActiveTab(nextTab);
+  }, []);
+
+  const handleApplyRecruitmentFilters = useCallback(
+    (nextValues: SessionFilterValues) => {
+      setRecruitmentFilterValues(nextValues);
+      writeStoredFilterValues(
+        SESSION_RECRUITMENT_FILTER_STORAGE_KEY,
+        nextValues,
+      );
+    },
+    [],
+  );
+
+  const handleApplyFindFilters = useCallback(
+    (nextValues: SessionFilterValues) => {
+      setFindFilterValues(nextValues);
+      writeStoredFilterValues(SESSION_FIND_FILTER_STORAGE_KEY, nextValues);
+    },
+    [],
+  );
+
   const handleRefreshPage = useCallback(async () => {
+    writeStoredActiveTab(activeTab);
+    writeStoredFilterValues(
+      SESSION_RECRUITMENT_FILTER_STORAGE_KEY,
+      recruitmentFilterValues,
+    );
+    writeStoredFilterValues(SESSION_FIND_FILTER_STORAGE_KEY, findFilterValues);
+
     await new Promise<void>((resolve) => {
       window.setTimeout(resolve, 250);
     });
 
     window.location.reload();
-  }, []);
+  }, [activeTab, findFilterValues, recruitmentFilterValues]);
 
   const recruitmentPullToRefresh = usePullToRefresh<HTMLElement>({
     enabled:
-      (activeTab === "recruitment" || activeTab === "find") &&
+      (activeTab === "recruitment" ||
+        activeTab === "find" ||
+        activeTab === "applications") &&
       !isFilterOpen &&
       !isSearchOpen &&
       !isCreateOpen &&
@@ -233,19 +349,23 @@ export const RecruitmentNoticeScreen = () => {
   useEffect(() => {
     const summary = myApplicationSummaryQuery.data;
 
-    if (!summary || hasInitializedFindFilters.current) {
+    if (
+      !summary ||
+      hasInitializedFindFilters.current ||
+      hasStoredFindFilters.current
+    ) {
       return;
     }
 
     hasInitializedFindFilters.current = true;
 
-    setFindFilterValues({
+    handleApplyFindFilters({
       part: INITIAL_SESSION_FILTERS.part,
       skill: INITIAL_SESSION_FILTERS.skill,
       genre: summary.genre || INITIAL_SESSION_FILTERS.genre,
       region: summary.region || INITIAL_SESSION_FILTERS.region,
     });
-  }, [myApplicationSummaryQuery.data]);
+  }, [handleApplyFindFilters, myApplicationSummaryQuery.data]);
 
   const posts = useMemo(() => {
     const apiPosts =
@@ -407,7 +527,7 @@ export const RecruitmentNoticeScreen = () => {
   const handleOpenHistoryRecruitment = (
     recruitment: RecruitmentHistoryItem,
   ) => {
-    setActiveTab("recruitment");
+    handleTabChange("recruitment");
     setSelectedPostOverride(mapHistoryRecruitmentToPost(recruitment));
     setSelectedPostId(recruitment.id);
   };
@@ -467,7 +587,7 @@ export const RecruitmentNoticeScreen = () => {
       <SessionSearchScreen
         values={recruitmentFilterValues}
         onBack={() => setIsSearchOpen(false)}
-        onApplyFilters={setRecruitmentFilterValues}
+        onApplyFilters={handleApplyRecruitmentFilters}
       />
     );
   }
@@ -506,7 +626,9 @@ export const RecruitmentNoticeScreen = () => {
       ref={recruitmentPullToRefresh.containerRef}
       className="relative min-h-dvh overscroll-y-contain bg-neutral-0 pb-[calc(var(--bottom-nav-height)+24px)]"
     >
-      {activeTab === "recruitment" || activeTab === "find" ? (
+      {activeTab === "recruitment" ||
+      activeTab === "find" ||
+      activeTab === "applications" ? (
         <PullToRefreshIndicator
           pullDistance={recruitmentPullToRefresh.pullDistance}
           isRefreshing={recruitmentPullToRefresh.isRefreshing}
@@ -518,7 +640,7 @@ export const RecruitmentNoticeScreen = () => {
         onMessages={() => navigate("/band/session/messages")}
       />
 
-      <SessionTabs activeTab={activeTab} onTabChange={setActiveTab} />
+      <SessionTabs activeTab={activeTab} onTabChange={handleTabChange} />
 
       {activeTab !== "applications" ? (
         <SessionFilterBar
@@ -579,7 +701,7 @@ export const RecruitmentNoticeScreen = () => {
       ) : activeTab === "applications" ? (
         <SessionApplicationsScreen
           onEditBasicInfo={() => setIsBasicProfileEditOpen(true)}
-          onBrowseRecruitments={() => setActiveTab("recruitment")}
+          onBrowseRecruitments={() => handleTabChange("recruitment")}
           onViewHistoryApplication={(application) => {
             if (!application.sessionApplicationId) {
               window.alert(
@@ -608,10 +730,9 @@ export const RecruitmentNoticeScreen = () => {
           }
           onApply={
             activeTab === "find"
-              ? setFindFilterValues
-              : setRecruitmentFilterValues
+              ? handleApplyFindFilters
+              : handleApplyRecruitmentFilters
           }
-          filterKeys={activeTab === "find" ? [...FIND_FILTER_KEYS] : undefined}
           onClose={() => setIsFilterOpen(false)}
         />
       ) : null}

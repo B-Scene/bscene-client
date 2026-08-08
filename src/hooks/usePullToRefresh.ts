@@ -17,14 +17,46 @@ const getDocumentScrollTop = () => {
   );
 };
 
+const isScrollable = (element: HTMLElement) => {
+  return element.scrollHeight > element.clientHeight + 2;
+};
+
+const getPrimaryScrollElement = (container: HTMLElement) => {
+  let element: HTMLElement | null = container;
+
+  while (element && element !== document.body) {
+    if (isScrollable(element)) {
+      return element;
+    }
+
+    element = element.parentElement;
+  }
+
+  return document.scrollingElement || document.documentElement;
+};
+
+const getScrollTop = (element: Element | null) => {
+  if (
+    !element ||
+    element === document.scrollingElement ||
+    element === document.documentElement ||
+    element === document.body
+  ) {
+    return getDocumentScrollTop();
+  }
+
+  return (element as HTMLElement).scrollTop;
+};
+
 export const usePullToRefresh = <T extends HTMLElement>({
   enabled = true,
-  threshold = 76,
-  activationDistance = 20,
-  maxPullDistance = 96,
+  threshold = 80,
+  activationDistance = 48,
+  maxPullDistance = 104,
   onRefresh,
 }: UsePullToRefreshParams) => {
   const containerRef = useRef<T | null>(null);
+  const scrollElementRef = useRef<Element | null>(null);
 
   const onRefreshRef = useRef(onRefresh);
   const startYRef = useRef(0);
@@ -52,10 +84,6 @@ export const usePullToRefresh = <T extends HTMLElement>({
       return;
     }
 
-    const isAtPageTop = () => {
-      return getDocumentScrollTop() <= 2;
-    };
-
     const isEventInsideContainer = (event: TouchEvent) => {
       const target = event.target;
 
@@ -66,19 +94,35 @@ export const usePullToRefresh = <T extends HTMLElement>({
       return container.contains(target);
     };
 
+    const isAtTop = () => {
+      const scrollElement =
+        scrollElementRef.current ?? getPrimaryScrollElement(container);
+
+      const scrollTop = getScrollTop(scrollElement);
+      const documentScrollTop = getDocumentScrollTop();
+
+      return scrollTop <= 2 && documentScrollTop <= 2;
+    };
+
     const resetPull = () => {
       isPullingRef.current = false;
       startYRef.current = 0;
-      setPullDistance(0);
+      pullDistanceRef.current = 0;
+      setPullDistanceState(0);
     };
 
     const handleTouchStart = (event: TouchEvent) => {
       if (
         !enabled ||
         isRefreshingRef.current ||
-        !isEventInsideContainer(event) ||
-        !isAtPageTop()
+        !isEventInsideContainer(event)
       ) {
+        return;
+      }
+
+      scrollElementRef.current = getPrimaryScrollElement(container);
+
+      if (!isAtTop()) {
         return;
       }
 
@@ -91,7 +135,7 @@ export const usePullToRefresh = <T extends HTMLElement>({
         return;
       }
 
-      if (!isAtPageTop()) {
+      if (!isAtTop()) {
         resetPull();
         return;
       }
