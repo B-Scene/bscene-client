@@ -3,6 +3,8 @@ import type { AxiosError } from "axios";
 import CloseIcon from "@/assets/icons/close-header.svg";
 import { Header } from "@/components/common/Header/Header";
 import { BottomNavBar } from "@/components/layout/BottomNavBar";
+import { DatePickerSheet } from "@/components/band/home/DatePickerSheet";
+import { TimePickerSheet } from "@/components/band/home/TimePickerSheet";
 import {
   useCreateLiveMutation,
   useEnterLiveMutation,
@@ -216,6 +218,8 @@ export function LiveForm({
 
   const [reservedDate, setReservedDate] = useState(getTomorrowDateString);
   const [reservedTime, setReservedTime] = useState("20:00");
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const [isTimePickerOpen, setIsTimePickerOpen] = useState(false);
   const [submitErrorMessage, setSubmitErrorMessage] = useState("");
   const [coHostLoadErrorMessage, setCoHostLoadErrorMessage] = useState("");
 
@@ -696,8 +700,8 @@ export function LiveForm({
             <DateTimeSelector
               date={reservedDate}
               time={reservedTime}
-              onDateChange={setReservedDate}
-              onTimeChange={setReservedTime}
+              onDateClick={() => setIsDatePickerOpen(true)}
+              onTimeClick={() => setIsTimePickerOpen(true)}
             />
           </FormCard>
         ) : null}
@@ -757,6 +761,29 @@ export function LiveForm({
       </div>
 
       <BottomNavBar modeOverride="band" />
+
+      <DatePickerSheet
+        open={isDatePickerOpen}
+        startDate={reservedDate}
+        endDate={reservedDate}
+        selectionMode="single"
+        onClose={() => setIsDatePickerOpen(false)}
+        onSelect={({ start }) => {
+          setReservedDate(start);
+          setIsDatePickerOpen(false);
+        }}
+      />
+
+      <TimePickerSheet
+        open={isTimePickerOpen}
+        value={reservedTime}
+        title="라이브 시작 시간"
+        onClose={() => setIsTimePickerOpen(false)}
+        onConfirm={(time) => {
+          setReservedTime(time);
+          setIsTimePickerOpen(false);
+        }}
+      />
 
       {isReservationCancelDialogOpen ? (
         <ConfirmDialog

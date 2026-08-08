@@ -1,4 +1,4 @@
-import { useRef, type ChangeEvent, type ReactNode } from "react";
+import type { ChangeEvent, ReactNode } from "react";
 import AddImageIcon from "@/assets/icons/band/add-image.svg";
 import ArrowDownGrayIcon from "@/assets/icons/band/arrow-down-gray.svg";
 import CalendarIcon from "@/assets/icons/band/data-range.svg";
@@ -225,44 +225,25 @@ const formatDateLabel = (dateValue: string) => {
 interface DateTimeSelectorProps {
   date: string;
   time: string;
-  onDateChange: (date: string) => void;
-  onTimeChange: (time: string) => void;
+  onDateClick: () => void;
+  onTimeClick: () => void;
 }
 
 export function DateTimeSelector({
   date,
   time,
-  onDateChange,
-  onTimeChange,
+  onDateClick,
+  onTimeClick,
 }: DateTimeSelectorProps) {
-  const dateInputRef = useRef<HTMLInputElement>(null);
-  const timeInputRef = useRef<HTMLInputElement>(null);
-
   const hasSelectedDate = Boolean(date);
   const hasSelectedTime = Boolean(time);
 
-  const openNativePicker = (input: HTMLInputElement | null) => {
-    if (!input) return;
-
-    const pickerInput = input as HTMLInputElement & {
-      showPicker?: () => void;
-    };
-
-    if (pickerInput.showPicker) {
-      pickerInput.showPicker();
-      return;
-    }
-
-    input.focus();
-    input.click();
-  };
-
   return (
     <div className="rounded-lg border border-neutral-300 px-4 py-3">
-      <div className="relative">
+      <div>
         <button
           type="button"
-          onClick={() => openNativePicker(dateInputRef.current)}
+          onClick={onDateClick}
           className="flex h-9 w-full items-center gap-4 text-left"
         >
           <img
@@ -285,24 +266,14 @@ export function DateTimeSelector({
 
           <img src={ArrowDownGrayIcon} alt="" className="size-4 shrink-0" />
         </button>
-
-        <input
-          ref={dateInputRef}
-          type="date"
-          value={date}
-          tabIndex={-1}
-          aria-hidden="true"
-          onChange={(event) => onDateChange(event.target.value)}
-          className="pointer-events-none absolute top-0 right-0 h-px w-px opacity-0"
-        />
       </div>
 
       <div className="my-2 h-px bg-neutral-300" />
 
-      <div className="relative">
+      <div>
         <button
           type="button"
-          onClick={() => openNativePicker(timeInputRef.current)}
+          onClick={onTimeClick}
           className="flex h-9 w-full items-center gap-4 text-left"
         >
           <img
@@ -325,16 +296,6 @@ export function DateTimeSelector({
 
           <img src={ArrowDownGrayIcon} alt="" className="size-4 shrink-0" />
         </button>
-
-        <input
-          ref={timeInputRef}
-          type="time"
-          value={time}
-          tabIndex={-1}
-          aria-hidden="true"
-          onChange={(event) => onTimeChange(event.target.value)}
-          className="pointer-events-none absolute top-0 right-0 h-px w-px opacity-0"
-        />
       </div>
     </div>
   );
