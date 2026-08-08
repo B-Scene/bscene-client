@@ -975,6 +975,7 @@ const FanHomePage = () => {
           <SectionHeader
             title="이런 밴드는 어때요?"
             description="관심사 장르 · 지역 기반 추천"
+            onMoreClick={() => navigate("/fan/explore")}
           />
           <BandRecommendationStrip bands={homeData.recommendedBands} />
         </section>

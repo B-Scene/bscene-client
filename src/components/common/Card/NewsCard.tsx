@@ -83,10 +83,10 @@ const NewsCard = ({
         {title}
       </p>
 
-      <div className={`flex gap-[4px]${hasContentImage ? '' : ' mt-auto'}`}>
+      <div className={`flex max-w-full flex-wrap gap-[4px]${hasContentImage ? '' : ' mt-auto'}`}>
         {tags.map((tag, index) => (
           <span
-            className="font-body text-caption5 inline-flex h-[12px] w-[30px] items-center justify-center rounded-full bg-primary-50 text-primary-400"
+            className="font-body text-caption5 inline-flex h-[12px] min-w-[30px] max-w-full items-center justify-center truncate whitespace-nowrap rounded-full bg-primary-50 px-[5px] text-primary-400"
             key={index}
           >
             {tag}
