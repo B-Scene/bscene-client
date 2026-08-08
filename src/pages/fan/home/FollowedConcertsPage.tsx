@@ -1,19 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import ConcertCard from "@/components/common/Card/ConcertCard";
 import { Header } from "@/components/common/Header/Header";
 import ConcertLikeButton from "@/components/fan/home/ConcertLikeButton";
 import {
   useFanHomeQuery,
+  useRecommendedPerformancesInfiniteQuery,
   useUpcomingPerformancesInfiniteQuery,
 } from "@/hooks/api/fan/useFanHome";
 import type {
   FanHomeConcert,
-  FanHomeResponse,
+  RecommendedPerformanceSort,
   UpcomingPerformanceSort,
 } from "@/types/fan/home";
 
-const SORT_OPTIONS = ["공연임박순", "최신순", "인기순"] as const;
+const UPCOMING_SORT_OPTIONS = ["공연임박순", "최신순", "인기순"] as const;
+const RECOMMENDED_SORT_OPTIONS = ["인기순", "공연임박순"] as const;
 const MONTH_LABELS = [
   "JAN",
   "FEB",
@@ -29,7 +31,9 @@ const MONTH_LABELS = [
   "DEC",
 ];
 
-type SortOption = (typeof SORT_OPTIONS)[number];
+type UpcomingSortOption = (typeof UPCOMING_SORT_OPTIONS)[number];
+type RecommendedSortOption = (typeof RECOMMENDED_SORT_OPTIONS)[number];
+type SortOption = UpcomingSortOption | RecommendedSortOption;
 type ConcertListItem = {
   id: string;
   date: Date | null;
@@ -44,14 +48,15 @@ type ConcertListItem = {
   isInterested: boolean;
 };
 
-const SORT_TO_API: Record<SortOption, UpcomingPerformanceSort> = {
+const UPCOMING_SORT_TO_API: Record<UpcomingSortOption, UpcomingPerformanceSort> = {
   공연임박순: "IMMINENT",
   최신순: "LATEST",
   인기순: "POPULAR",
 };
 
-const firstList = <T,>(...lists: Array<T[] | undefined>) => {
-  return lists.find((list) => Array.isArray(list) && list.length > 0) ?? [];
+const RECOMMENDED_SORT_TO_API: Record<RecommendedSortOption, RecommendedPerformanceSort> = {
+  인기순: "POPULAR",
+  공연임박순: "IMMINENT",
 };
 
 const firstImageUrl = (...values: Array<string | null | undefined>) => {
@@ -157,32 +162,23 @@ const getConcertTitle = (concert: FanHomeConcert) => {
   );
 };
 
-const getHomeRecommendedPerformances = (data?: FanHomeResponse) => {
-  return firstList(
-    data?.performances,
-    data?.recommendedConcerts,
-    data?.recommendConcerts,
-    data?.popularConcerts,
-  );
+const getPerformanceKey = (concert: FanHomeConcert) => {
+  const id = concert.performanceId ?? concert.concertId ?? concert.id;
+
+  return id == null ? null : String(id);
 };
 
-const sortPerformances = (
-  performances: FanHomeConcert[],
-  selectedSort: SortOption,
-) => {
-  return [...performances].sort((a, b) => {
-    if (selectedSort === "최신순") {
-      return (b.createdAt ?? "").localeCompare(a.createdAt ?? "");
-    }
+const dedupePerformancesById = (performances: FanHomeConcert[]) => {
+  const seenIds = new Set<string>();
 
-    if (selectedSort === "인기순") {
-      return (b.popularity ?? 0) - (a.popularity ?? 0);
-    }
+  return performances.filter((performance) => {
+    const id = getPerformanceKey(performance);
 
-    const aDate = getConcertDate(a)?.getTime() ?? Number.MAX_SAFE_INTEGER;
-    const bDate = getConcertDate(b)?.getTime() ?? Number.MAX_SAFE_INTEGER;
+    if (id == null) return true;
+    if (seenIds.has(id)) return false;
 
-    return aDate - bDate;
+    seenIds.add(id);
+    return true;
   });
 };
 
@@ -260,15 +256,44 @@ const CheckIcon = () => (
 
 const FollowedConcertsPage = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const [selectedSort, setSelectedSort] = useState<SortOption>("공연임박순");
   const [hasSelectedSort, setHasSelectedSort] = useState(false);
   const [isSortSheetOpen, setIsSortSheetOpen] = useState(false);
   const fanHomeQuery = useFanHomeQuery();
+  const isRecommendedRequested = searchParams.get("type") === "recommended";
+  const shouldUseRecommendedApi =
+    isRecommendedRequested ||
+    fanHomeQuery.data?.performanceType === "RECOMMENDED" ||
+    fanHomeQuery.data?.hasFollowingBands === false;
+  const canResolvePerformanceSource =
+    isRecommendedRequested || fanHomeQuery.isSuccess || fanHomeQuery.isError;
+  const availableSortOptions = shouldUseRecommendedApi
+    ? RECOMMENDED_SORT_OPTIONS
+    : UPCOMING_SORT_OPTIONS;
+  const defaultSort = shouldUseRecommendedApi ? "인기순" : "공연임박순";
+  const requestedSort = hasSelectedSort ? selectedSort : defaultSort;
+  const effectiveSort = availableSortOptions.some((option) => option === requestedSort)
+    ? requestedSort
+    : defaultSort;
+  const upcomingSort =
+    UPCOMING_SORT_TO_API[effectiveSort as UpcomingSortOption] ?? "IMMINENT";
+  const recommendedSort =
+    RECOMMENDED_SORT_TO_API[effectiveSort as RecommendedSortOption] ?? "POPULAR";
   const upcomingPerformancesQuery = useUpcomingPerformancesInfiniteQuery(
-    SORT_TO_API[selectedSort],
+    upcomingSort,
     10,
+    canResolvePerformanceSource && !shouldUseRecommendedApi,
   );
+  const recommendedPerformancesQuery = useRecommendedPerformancesInfiniteQuery(
+    recommendedSort,
+    10,
+    canResolvePerformanceSource && shouldUseRecommendedApi,
+  );
+  const activePerformancesQuery = shouldUseRecommendedApi
+    ? recommendedPerformancesQuery
+    : upcomingPerformancesQuery;
   const {
     data,
     fetchNextPage,
@@ -277,24 +302,7 @@ const FollowedConcertsPage = () => {
     isFetchingNextPage,
     isLoading,
     refetch,
-  } = upcomingPerformancesQuery;
-  const upcomingConcerts = useMemo(() => {
-    return (
-      data?.pages
-        .flatMap((page) => page.items ?? [])
-        .map(mapPerformanceToConcert)
-        .filter(isUpcomingConcert) ?? []
-    );
-  }, [data]);
-  const isRecommendedFallback = fanHomeQuery.data?.hasFollowingBands !== true;
-  const hasNoFollowedBandPerformances =
-    fanHomeQuery.data?.hasFollowingBands === true &&
-    !isLoading &&
-    !isError &&
-    Boolean(data) &&
-    upcomingConcerts.length === 0;
-  const shouldUseRecommendedFallback =
-    isRecommendedFallback || hasNoFollowedBandPerformances;
+  } = activePerformancesQuery;
   const sortButtonClassName = `flex shrink-0 flex-col items-center gap-2.5 rounded-full border px-[10px] py-1 font-body text-caption3 ${
     hasSelectedSort
       ? "border-primary-400 bg-primary-0 text-primary-400"
@@ -305,24 +313,17 @@ const FollowedConcertsPage = () => {
     setHasSelectedSort(true);
   };
   const concerts = useMemo(() => {
-    if (shouldUseRecommendedFallback) {
-      return sortPerformances(
-        getHomeRecommendedPerformances(fanHomeQuery.data),
-        selectedSort,
-      ).map(mapPerformanceToConcert);
-    }
+    const performances = data?.pages.flatMap((page) => page.items ?? []) ?? [];
+    const normalizedPerformances = shouldUseRecommendedApi
+      ? dedupePerformancesById(performances)
+      : performances;
 
-    return upcomingConcerts;
-  }, [
-    fanHomeQuery.data,
-    selectedSort,
-    shouldUseRecommendedFallback,
-    upcomingConcerts,
-  ]);
+    return normalizedPerformances
+      .map(mapPerformanceToConcert)
+      .filter(isUpcomingConcert);
+  }, [data, shouldUseRecommendedApi]);
 
   useEffect(() => {
-    if (shouldUseRecommendedFallback) return;
-
     const target = loadMoreRef.current;
     if (!target) return;
 
@@ -345,19 +346,18 @@ const FollowedConcertsPage = () => {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-    shouldUseRecommendedFallback,
   ]);
 
-  const isPageLoading =
-    shouldUseRecommendedFallback
-      ? fanHomeQuery.isLoading
-      : isLoading ||
-        (fanHomeQuery.isLoading && concerts.length === 0);
-  const isPageError = shouldUseRecommendedFallback ? fanHomeQuery.isError : isError;
+  const isPageLoading = !canResolvePerformanceSource || isLoading;
+  const isPageError = isError;
 
   return (
     <main className="min-h-dvh bg-neutral-0 px-[15px] pb-[calc(var(--bottom-nav-height)+24px)]">
-      <Header title="공연 일정" align="betweenCompact" className="-mx-3.75" />
+      <Header
+        title={shouldUseRecommendedApi ? "추천 공연" : "공연 일정"}
+        align="betweenCompact"
+        className="-mx-3.75"
+      />
 
       <div className="mt-[11px] flex h-10 items-center justify-between pl-0.5 pr-[3px]">
         <button
@@ -366,7 +366,7 @@ const FollowedConcertsPage = () => {
           className={sortButtonClassName}
         >
           <span className="flex items-center gap-1">
-            {selectedSort}
+            {effectiveSort}
             <SortArrowIcon />
           </span>
         </button>
@@ -422,11 +422,9 @@ const FollowedConcertsPage = () => {
           />
         ))}
 
-        {!shouldUseRecommendedFallback ? (
-          <div ref={loadMoreRef} className="h-4 w-full" />
-        ) : null}
+        <div ref={loadMoreRef} className="h-4 w-full" />
 
-        {isFetchingNextPage && !shouldUseRecommendedFallback ? (
+        {isFetchingNextPage ? (
           <p className="m-0 text-center font-body text-caption2 text-neutral-600">
             더 불러오는 중이에요
           </p>
@@ -447,8 +445,8 @@ const FollowedConcertsPage = () => {
             className="relative z-10 flex w-full max-w-[393px] flex-col items-start gap-2.5 rounded-t-[24px] bg-neutral-0 px-[15px] pb-12 pt-8"
           >
             <div className="flex w-full flex-col items-start gap-6 px-[15px]">
-              {SORT_OPTIONS.map((option) => {
-                const isSelected = option === selectedSort;
+              {availableSortOptions.map((option) => {
+                const isSelected = option === effectiveSort;
 
                 return (
                   <button

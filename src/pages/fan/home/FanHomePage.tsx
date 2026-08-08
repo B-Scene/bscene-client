@@ -993,6 +993,7 @@ const FanHomePage = () => {
           <section className="mt-8">
             <SectionHeader
               title="이런 공연은 어때요?"
+              onMoreClick={() => navigate("/fan/home/concerts?type=recommended")}
               description={
                 hasUpcomingConcerts
                   ? "지금 인기 있는 공연을 추천해드릴게요!"
@@ -1025,6 +1026,7 @@ const FanHomePage = () => {
                   ? "이런 공연은 어때요?"
                   : "추천 공연이 없어요"
               }
+              onMoreClick={() => navigate("/fan/home/concerts?type=recommended")}
               description={
                 hasUpcomingConcerts
                   ? "지금 인기 있는 공연을 추천해드릴게요!"

@@ -374,9 +374,9 @@ const FanExploreSearchResultPage = () => {
   const visiblePerformances = performances.slice(0, 4);
   const visibleContents = contents.slice(0, 4);
   const resultCounts = {
-    bands: bands.length,
-    concerts: performances.length,
-    contents: contents.length,
+    bands: searchQuery.data?.bandCount ?? bands.length,
+    concerts: searchQuery.data?.performanceCount ?? performances.length,
+    contents: searchQuery.data?.contentCount ?? contents.length,
   };
 
   useEffect(() => {
@@ -455,76 +455,78 @@ const FanExploreSearchResultPage = () => {
             검색 결과 다시 불러오기
           </button>
         ) : (
-          bands.map((band) => {
-            const bandInfo = getBandInfo(band);
-            const bandId = getBandId(band);
-            const name = bandInfo.name ?? bandInfo.bandName ?? keyword;
-            const genre = bandInfo.genre ? getGenreLabel(bandInfo.genre) : "장르";
-            const region = bandInfo.region
-              ? getRegionLabel(bandInfo.region)
-              : "지역";
+          <div className="flex flex-col gap-[12px]">
+            {bands.map((band) => {
+              const bandInfo = getBandInfo(band);
+              const bandId = getBandId(band);
+              const name = bandInfo.name ?? bandInfo.bandName ?? keyword;
+              const genre = bandInfo.genre ? getGenreLabel(bandInfo.genre) : "장르";
+              const region = bandInfo.region
+                ? getRegionLabel(bandInfo.region)
+                : "지역";
 
-            return (
-              <BandCard
-                key={String(bandInfo.bandId ?? bandInfo.id ?? name)}
-                imageSrc={
-                  bandInfo.profileImageUrl ??
-                  bandInfo.bandProfileImageUrl ??
-                  bandInfo.imageUrl ??
-                  BandImage
-                }
-                imageAlt={`${name} 프로필`}
-                title={name}
-                subtitle={`${genre} · ${region}`}
-                description={bandInfo.description ?? bandInfo.introduction ?? ""}
-                following={
-                  bandInfo.isFollowing ??
-                  bandInfo.following ??
-                  band.isFollowing ??
-                  band.following ??
-                  false
-                }
-                onClick={() => {
-                  if (bandId == null) return;
+              return (
+                <BandCard
+                  key={String(bandInfo.bandId ?? bandInfo.id ?? name)}
+                  imageSrc={
+                    bandInfo.profileImageUrl ??
+                    bandInfo.bandProfileImageUrl ??
+                    bandInfo.imageUrl ??
+                    BandImage
+                  }
+                  imageAlt={`${name} 프로필`}
+                  title={name}
+                  subtitle={`${genre} · ${region}`}
+                  description={bandInfo.description ?? bandInfo.introduction ?? ""}
+                  following={
+                    bandInfo.isFollowing ??
+                    bandInfo.following ??
+                    band.isFollowing ??
+                    band.following ??
+                    false
+                  }
+                  onClick={() => {
+                    if (bandId == null) return;
 
-                  navigate(`/fan/bands/${bandId}`, {
-                    state: {
-                      bandPreview: {
-                        bandId,
-                        name,
-                        genre: bandInfo.genre,
-                        region: bandInfo.region,
-                        profileImageUrl:
-                          bandInfo.profileImageUrl ??
-                          bandInfo.bandProfileImageUrl ??
-                          bandInfo.imageUrl ??
-                          null,
-                        description:
-                          bandInfo.description ?? bandInfo.introduction ?? "",
-                        followerCount:
-                          bandInfo.followerCount ??
-                          bandInfo.followers ??
-                          band.followerCount ??
-                          band.followers ??
-                          0,
-                        isFollowing:
-                          bandInfo.isFollowing ??
-                          bandInfo.following ??
-                          band.isFollowing ??
-                          band.following ??
-                          false,
+                    navigate(`/fan/bands/${bandId}`, {
+                      state: {
+                        bandPreview: {
+                          bandId,
+                          name,
+                          genre: bandInfo.genre,
+                          region: bandInfo.region,
+                          profileImageUrl:
+                            bandInfo.profileImageUrl ??
+                            bandInfo.bandProfileImageUrl ??
+                            bandInfo.imageUrl ??
+                            null,
+                          description:
+                            bandInfo.description ?? bandInfo.introduction ?? "",
+                          followerCount:
+                            bandInfo.followerCount ??
+                            bandInfo.followers ??
+                            band.followerCount ??
+                            band.followers ??
+                            0,
+                          isFollowing:
+                            bandInfo.isFollowing ??
+                            bandInfo.following ??
+                            band.isFollowing ??
+                            band.following ??
+                            false,
+                        },
                       },
-                    },
-                  });
-                }}
-                onToggleFollow={() => void followBand(band)}
-                className="!h-[86px] !w-[348px] !gap-[16px]"
-                contentClassName="!h-auto flex-1 shrink !w-auto"
-                descriptionClassName="line-clamp-2 text-primary-300"
-                descriptionMultiline
-              />
-            );
-          })
+                    });
+                  }}
+                  onToggleFollow={() => void followBand(band)}
+                  className="!h-[86px] !w-[348px] !gap-[16px]"
+                  contentClassName="!h-auto flex-1 shrink !w-auto"
+                  descriptionClassName="line-clamp-2 text-primary-300"
+                  descriptionMultiline
+                />
+              );
+            })}
+          </div>
         )}
       </section>
 

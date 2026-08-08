@@ -270,9 +270,16 @@ export interface FollowingPostsResponse {
 }
 
 export type UpcomingPerformanceSort = "IMMINENT" | "LATEST" | "POPULAR";
+export type RecommendedPerformanceSort = "POPULAR" | "IMMINENT";
 
 export interface UpcomingPerformancesParams {
   sort?: UpcomingPerformanceSort;
+  page?: number;
+  size?: number;
+}
+
+export interface RecommendedPerformancesParams {
+  sort?: RecommendedPerformanceSort;
   page?: number;
   size?: number;
 }
@@ -294,6 +301,8 @@ export interface UpcomingPerformancesResponse {
   totalElements?: number;
   total?: number;
 }
+
+export type RecommendedPerformancesResponse = UpcomingPerformancesResponse;
 
 export type PerformanceCalendarParams =
   | {
