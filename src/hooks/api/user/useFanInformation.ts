@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getFanInformation, updateFanInformation } from "@/api/user/fanInformation";
 import type { UpdateFanInformationRequest } from "@/types/user/fanInformation";
 import { fanMyPageKeys } from "@/hooks/api/user/useFanMyPage";
+import { myProfilesKeys } from "@/hooks/api/user/useMyProfiles";
 
 export const fanInformationKeys = {
   all: ["fanInformation"] as const,
@@ -23,6 +24,7 @@ export const useUpdateFanInformation = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: fanInformationKeys.all });
       queryClient.invalidateQueries({ queryKey: fanMyPageKeys.all });
+      queryClient.invalidateQueries({ queryKey: myProfilesKeys.all });
     },
   });
 };

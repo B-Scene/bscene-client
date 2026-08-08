@@ -6,6 +6,11 @@ import BellActiveIcon from "@/assets/icons/fan/bell-active-icon.svg";
 import BellIcon from "@/assets/icons/fan/bell-icon.svg";
 import ImagePlaceholderIcon from "@/assets/icons/fan/image-icon.svg";
 import LikedPerformIcon from "@/assets/icons/fan/liked-perform.svg";
+import { Toast } from "@/components/common/Toast/Toast";
+import {
+  useDeletePerformanceAlarm,
+  useSetPerformanceAlarm,
+} from "@/hooks/api/fan/useFanHome";
 import { useInterestedPerformancesQuery } from "@/hooks/api/user/useInterestedPerformances";
 import { useInfiniteScrollObserver } from "@/hooks/useInfiniteScrollObserver";
 import { useTodayTick } from "@/hooks/useTodayTick";
@@ -16,10 +21,14 @@ const InterestedConcertsPage = () => {
   const navigate = useNavigate();
   const [activeFilter, setActiveFilter] =
     useState<InterestedPerformanceFilter>("ALL");
+  const [pendingAlarmId, setPendingAlarmId] = useState<number | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const today = useTodayTick();
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage } =
     useInterestedPerformancesQuery(activeFilter);
+  const setPerformanceAlarmMutation = useSetPerformanceAlarm();
+  const deletePerformanceAlarmMutation = useDeletePerformanceAlarm();
 
   const baseYear = data?.pages[0]?.baseYear ?? new Date().getFullYear();
   const totalCount = data?.pages[0]?.totalCount ?? 0;
@@ -39,6 +48,27 @@ const InterestedConcertsPage = () => {
     enabled: Boolean(hasNextPage) && !isFetchingNextPage,
     onIntersect: fetchNextPage,
   });
+
+  const handleToggleAlarm = async (performanceId: number, isOn: boolean) => {
+    if (pendingAlarmId !== null) return;
+
+    setPendingAlarmId(performanceId);
+    try {
+      if (isOn) {
+        await deletePerformanceAlarmMutation.mutateAsync(performanceId);
+        setToastMessage("공연 알림을 해제했어요");
+      } else {
+        await setPerformanceAlarmMutation.mutateAsync(performanceId);
+        setToastMessage("공연 알림을 설정했어요");
+      }
+    } catch {
+      setToastMessage(
+        isOn ? "공연 알림 해제에 실패했어요" : "공연 알림 설정에 실패했어요",
+      );
+    } finally {
+      setPendingAlarmId(null);
+    }
+  };
 
   return (
     <main className="min-h-dvh bg-neutral-0 px-5 pb-[calc(var(--bottom-nav-height)+24px)]">
@@ -107,14 +137,26 @@ const InterestedConcertsPage = () => {
           {concerts.map((concert) => {
             const isCompleted = concert.participationStatus === "COMPLETED";
             const isNotifyOn = concert.participationStatus === "SCHEDULED";
+            const dDay = getDDay(concert.performanceDate, today);
+            const isPast = dDay < 0;
             const statusLabel = isCompleted
               ? "참여 완료"
-              : formatDDayLabel(getDDay(concert.performanceDate, today));
+              : formatDDayLabel(dDay);
 
             return (
               <li
                 key={concert.performanceId}
-                className="flex items-center justify-between gap-4 rounded-xl bg-neutral-0 px-4 py-3 shadow-[0_0_8px_0_rgba(0,0,0,0.10)]"
+                role="button"
+                tabIndex={0}
+                onClick={() =>
+                  navigate(`/fan/home/concerts/${concert.performanceId}`)
+                }
+                onKeyDown={(event) => {
+                  if (event.key !== "Enter" && event.key !== " ") return;
+                  event.preventDefault();
+                  navigate(`/fan/home/concerts/${concert.performanceId}`);
+                }}
+                className="flex cursor-pointer items-center justify-between gap-4 rounded-xl bg-neutral-0 px-4 py-3 shadow-[0_0_8px_0_rgba(0,0,0,0.10)]"
               >
                 <div className="flex min-w-0 flex-1 items-center gap-4">
                   <div className="flex w-12.5 h-15.5 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-neutral-400">
@@ -147,13 +189,20 @@ const InterestedConcertsPage = () => {
                 </div>
 
                 <div className="flex shrink-0 flex-col items-center gap-2">
-                  {!isCompleted ? (
-                    <span
+                  {!isCompleted && !isPast ? (
+                    <button
+                      type="button"
                       aria-label={`알림 ${isNotifyOn ? "켜짐" : "꺼짐"}`}
-                      className="flex size-6 items-center justify-center"
+                      aria-pressed={isNotifyOn}
+                      disabled={pendingAlarmId === concert.performanceId}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        handleToggleAlarm(concert.performanceId, isNotifyOn);
+                      }}
+                      className="flex size-6 items-center justify-center disabled:opacity-50"
                     >
                       <img src={isNotifyOn ? BellActiveIcon : BellIcon} alt="" />
-                    </span>
+                    </button>
                   ) : null}
 
                   <span className="flex h-6.5 min-w-16 items-center justify-center rounded-full bg-primary-50 px-3.75 text-caption3 text-primary-400">
@@ -167,6 +216,12 @@ const InterestedConcertsPage = () => {
 
         <div ref={sentinelRef} aria-hidden="true" className="h-px w-full" />
       </div>
+
+      <Toast
+        open={Boolean(toastMessage)}
+        message={toastMessage}
+        onClose={() => setToastMessage(null)}
+      />
     </main>
   );
 };

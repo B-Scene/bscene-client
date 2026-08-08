@@ -103,7 +103,17 @@ const AttendedConcertsPage = () => {
             return (
               <li
                 key={concert.performanceId}
-                className="flex items-center gap-4 rounded-xl bg-neutral-0 px-4 py-3 shadow-[0_0_8px_0_rgba(0,0,0,0.10)]"
+                role="button"
+                tabIndex={0}
+                onClick={() =>
+                  navigate(`/fan/home/concerts/${concert.performanceId}`)
+                }
+                onKeyDown={(event) => {
+                  if (event.key !== "Enter" && event.key !== " ") return;
+                  event.preventDefault();
+                  navigate(`/fan/home/concerts/${concert.performanceId}`);
+                }}
+                className="flex cursor-pointer items-center gap-4 rounded-xl bg-neutral-0 px-4 py-3 shadow-[0_0_8px_0_rgba(0,0,0,0.10)]"
               >
                 <div className="flex w-12.5 h-15.5 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-neutral-400">
                   {concert.posterImageUrl ? (

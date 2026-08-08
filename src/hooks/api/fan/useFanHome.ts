@@ -235,14 +235,22 @@ export const useDeletePerformanceParticipation = () => {
 };
 
 export const useSetPerformanceAlarm = () => {
+  const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: setPerformanceAlarm,
+    onSuccess: (_data, performanceId) =>
+      invalidatePerformanceInterestQueries(queryClient, performanceId),
   });
 };
 
 export const useDeletePerformanceAlarm = () => {
+  const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: deletePerformanceAlarm,
+    onSuccess: (_data, performanceId) =>
+      invalidatePerformanceInterestQueries(queryClient, performanceId),
   });
 };
 
