@@ -4,7 +4,10 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Header } from "@/components/common/Header/Header";
 import HeartIcon from "@/assets/icons/Heart.svg";
 import LikedHeartIcon from "@/assets/icons/Union.svg";
-import { performanceKeys, usePerformanceQuery } from "@/hooks/api/band/usePerformance";
+import {
+  performanceKeys,
+  usePerformanceQuery,
+} from "@/hooks/api/band/usePerformance";
 import {
   useAddPerformanceInterest,
   useDeletePerformanceInterest,
@@ -190,7 +193,8 @@ const BandScheduleDetailPage = () => {
     { label: "관람 연령", value: ageRating },
   ];
   const isLiked = likeOverride?.isLiked ?? detail.isInterested ?? false;
-  const interestCount = likeOverride?.interestCount ?? detail.interestCount ?? 0;
+  const interestCount =
+    likeOverride?.interestCount ?? detail.interestCount ?? 0;
   const isLikePending =
     addPerformanceInterestMutation.isPending ||
     deletePerformanceInterestMutation.isPending;
@@ -273,7 +277,11 @@ const BandScheduleDetailPage = () => {
             onClick={() => void handleLikeClick()}
             className="mt-[38px] flex shrink-0 items-center gap-1 font-body text-caption3 text-neutral-700"
           >
-            <img src={isLiked ? LikedHeartIcon : HeartIcon} alt="" className="size-6" />
+            <img
+              src={isLiked ? LikedHeartIcon : HeartIcon}
+              alt=""
+              className="size-6"
+            />
             {interestCount}
           </button>
         </div>
@@ -285,10 +293,8 @@ const BandScheduleDetailPage = () => {
 
       <div className="h-4 bg-secondary-0" />
 
-      <section className="px-6 pb-12 pt-4">
-        <h2 className="m-0 font-body text-body1 text-neutral-900">
-          공연 소개
-        </h2>
+      <section className="px-6 pb-25 pt-4">
+        <h2 className="m-0 font-body text-body1 text-neutral-900">공연 소개</h2>
         <p className="m-0 mt-[20px] whitespace-pre-line font-body text-caption2 text-neutral-900">
           {detail.description || "공연 소개가 준비 중이에요."}
         </p>
