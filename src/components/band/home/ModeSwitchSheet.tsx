@@ -266,9 +266,9 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
           </h2>
 
           <div className="flex w-full flex-col items-center gap-6">
-            {isFanMode ? fanModeSection : bandModeSection}
+            {fanModeSection}
 
-            {isFanMode ? bandModeSection : fanModeSection}
+            {bandModeSection}
 
             {!isFanMode ? (
               <div className="h-px w-90.75 shrink-0 bg-neutral-400" />
