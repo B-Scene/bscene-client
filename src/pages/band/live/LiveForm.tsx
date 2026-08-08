@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { AxiosError } from "axios";
+import CloseIcon from "@/assets/icons/close-header.svg";
 import { Header } from "@/components/common/Header/Header";
 import { BottomNavBar } from "@/components/layout/BottomNavBar";
 import {
@@ -184,8 +185,7 @@ function HeaderCloseButton({ onClick }: { onClick: () => void }) {
       aria-label="닫기"
       className="absolute top-0 right-5 z-20 flex h-[52px] w-10 items-center justify-center"
     >
-      <span className="absolute h-[28px] w-[2.5px] rotate-45 rounded-full bg-neutral-500" />
-      <span className="absolute h-[28px] w-[2.5px] -rotate-45 rounded-full bg-neutral-500" />
+      <img src={CloseIcon} alt="" className="size-7" />
     </button>
   );
 }
