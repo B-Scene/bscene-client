@@ -17,6 +17,16 @@ import { useTodayTick } from "@/hooks/useTodayTick";
 import { formatDDayLabel, getDDay } from "@/utils/getDDay";
 import type { InterestedPerformanceFilter } from "@/types/user/interestedPerformance";
 
+const hasPerformanceStarted = (
+  performanceDate: string,
+  startTime: string,
+  now: Date,
+) => {
+  const start = new Date(`${performanceDate}T${startTime}`);
+
+  return !Number.isNaN(start.getTime()) && start.getTime() <= now.getTime();
+};
+
 const InterestedConcertsPage = () => {
   const navigate = useNavigate();
   const [activeFilter, setActiveFilter] =
@@ -138,7 +148,11 @@ const InterestedConcertsPage = () => {
             const isCompleted = concert.participationStatus === "COMPLETED";
             const isNotifyOn = concert.participationStatus === "SCHEDULED";
             const dDay = getDDay(concert.performanceDate, today);
-            const isPast = dDay < 0;
+            const isPast = hasPerformanceStarted(
+              concert.performanceDate,
+              concert.startTime,
+              today,
+            );
             const statusLabel = isCompleted
               ? "참여 완료"
               : formatDDayLabel(dDay);
