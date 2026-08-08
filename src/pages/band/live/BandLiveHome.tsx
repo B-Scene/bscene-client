@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import type { AxiosError } from "axios";
 import LiveHeadIcon from "@/assets/icons/live-head.svg";
 import { Header } from "@/components/common/Header/Header";
@@ -9,6 +9,7 @@ import {
   useRespondCoHostInvitationMutation,
   useScheduledLiveQuery,
 } from "@/hooks/api/live/useLive";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import type {
   EnterLiveResponse,
   LiveApiResponse,
@@ -35,6 +36,36 @@ import {
   isScheduledLiveStartable,
   useScheduledLiveNow,
 } from "./scheduledLiveTime";
+
+export function PullToRefreshIndicator({
+  pullDistance,
+  isRefreshing,
+}: {
+  pullDistance: number;
+  isRefreshing: boolean;
+}) {
+  const shouldShow = pullDistance >= 24 || isRefreshing;
+
+  if (!shouldShow) {
+    return null;
+  }
+
+  const visibleDistance = Math.min(pullDistance, 52);
+  const opacity = Math.min(1, Math.max(0.35, pullDistance / 80));
+
+  return (
+    <div
+      className="pointer-events-none fixed left-1/2 z-[70] flex size-9 items-center justify-center rounded-full bg-neutral-0 shadow-[0_4px_18px_rgba(0,0,0,0.18)]"
+      style={{
+        top: "calc(env(safe-area-inset-top) + 72px)",
+        opacity,
+        transform: `translate(-50%, ${visibleDistance}px)`,
+      }}
+    >
+      <div className="size-5 animate-spin rounded-full border-2 border-neutral-300 border-t-secondary-500" />
+    </div>
+  );
+}
 
 export function HomeLiveCard({
   live,
@@ -264,6 +295,15 @@ export function BandLiveHome({
   const isEnterPending =
     enterLiveMutation.isPending || respondCoHostInvitationMutation.isPending;
 
+  const handleRefreshLiveHome = useCallback(async () => {
+    await Promise.all([refetchHome(), refetchScheduled()]);
+  }, [refetchHome, refetchScheduled]);
+
+  const liveHomePullToRefresh = usePullToRefresh<HTMLElement>({
+    enabled: !isLoading && !isEnterPending,
+    onRefresh: handleRefreshLiveHome,
+  });
+
   const handleRetry = () => {
     void refetchHome();
     void refetchScheduled();
@@ -337,7 +377,15 @@ export function BandLiveHome({
   };
 
   return (
-    <main className="relative min-h-dvh bg-neutral-0 pb-[calc(var(--bottom-nav-height)+24px)] text-neutral-900">
+    <main
+      ref={liveHomePullToRefresh.containerRef}
+      className="relative min-h-dvh overscroll-y-contain bg-neutral-0 pb-[calc(var(--bottom-nav-height)+24px)] text-neutral-900"
+    >
+      <PullToRefreshIndicator
+        pullDistance={liveHomePullToRefresh.pullDistance}
+        isRefreshing={liveHomePullToRefresh.isRefreshing}
+      />
+
       <Header title="라이브" showBack={false} variant="main" />
 
       <div className="px-5">

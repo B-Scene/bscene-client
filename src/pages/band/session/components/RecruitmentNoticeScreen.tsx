@@ -318,7 +318,9 @@ export const RecruitmentNoticeScreen = () => {
 
   const recruitmentPullToRefresh = usePullToRefresh<HTMLElement>({
     enabled:
-      (activeTab === "recruitment" || activeTab === "find") &&
+      (activeTab === "recruitment" ||
+        activeTab === "find" ||
+        activeTab === "applications") &&
       !isFilterOpen &&
       !isSearchOpen &&
       !isCreateOpen &&
@@ -624,7 +626,9 @@ export const RecruitmentNoticeScreen = () => {
       ref={recruitmentPullToRefresh.containerRef}
       className="relative min-h-dvh overscroll-y-contain bg-neutral-0 pb-[calc(var(--bottom-nav-height)+24px)]"
     >
-      {activeTab === "recruitment" || activeTab === "find" ? (
+      {activeTab === "recruitment" ||
+      activeTab === "find" ||
+      activeTab === "applications" ? (
         <PullToRefreshIndicator
           pullDistance={recruitmentPullToRefresh.pullDistance}
           isRefreshing={recruitmentPullToRefresh.isRefreshing}
@@ -729,7 +733,6 @@ export const RecruitmentNoticeScreen = () => {
               ? handleApplyFindFilters
               : handleApplyRecruitmentFilters
           }
-          filterKeys={activeTab === "find" ? [...FIND_FILTER_KEYS] : undefined}
           onClose={() => setIsFilterOpen(false)}
         />
       ) : null}
