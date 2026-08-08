@@ -25,7 +25,7 @@ const RegionSelectPage = () => {
     if (!selected.length) return;
 
     sessionStorage.setItem("onboardingRegions", JSON.stringify(selected));
-    navigate("/onboarding/complete");
+    navigate("/onboarding/notification-permission");
   };
 
   const regionRows = [

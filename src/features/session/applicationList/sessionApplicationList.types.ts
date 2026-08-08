@@ -1,9 +1,8 @@
-// src/features/session/applicationList/sessionApplicationList.types.ts
-
 import type {
   SessionApplicationDraft,
   SessionApplicationExperience,
 } from "@/features/session/applicationForm/applicationForm.types";
+import type { SessionApplicationPortfolioLink } from "@/types/session/sessionApplication";
 
 export interface ApplicationDetailFields {
   shortIntroduction?: string | null;
@@ -17,8 +16,7 @@ export interface ApplicationDetailFields {
   portfolioLinks?: readonly string[] | null;
 }
 
-export interface SessionApplicationSummaryItem
-  extends ApplicationDetailFields {
+export interface SessionApplicationSummaryItem extends ApplicationDetailFields {
   sessionApplicationId: number;
   displayDate?: string | null;
   title?: string | null;
@@ -27,6 +25,8 @@ export interface SessionApplicationSummaryItem
 }
 
 export interface SessionApplicationSummary {
+  hasDefaultApplication?: boolean | null;
+  sessionApplicationId?: number | null;
   nickname?: string | null;
   profileImageUrl?: string | null;
   part?: string | null;
@@ -45,8 +45,10 @@ export interface ApplicationCardItem {
   title: string;
   purpose: string;
   isPublic: boolean;
+  isDefault: boolean;
   isLocal: boolean;
   draft: SessionApplicationDraft;
+  portfolioLinkDetails?: readonly SessionApplicationPortfolioLink[] | null;
 }
 
 export interface MyApplicationDetailData {
@@ -55,9 +57,7 @@ export interface MyApplicationDetailData {
   applicationType: string;
   title: string;
   nickname: string;
-
-  // API에서 null이 올 수 있으므로 null도 허용
   profileImageUrl?: string | null;
-
   draft: SessionApplicationDraft;
+  portfolioLinks?: readonly SessionApplicationPortfolioLink[] | null;
 }

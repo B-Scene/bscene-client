@@ -1,9 +1,4 @@
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { AxiosError } from "axios";
 
@@ -17,15 +12,14 @@ import {
   useMySessionApplicationSummaryQuery,
 } from "@/hooks/api/session/useSessionApplication";
 import { useCreateSessionChatRoomMutation } from "@/hooks/api/session/useSessionChat";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import type {
   SessionRecruitmentListItem,
   SessionRecruitmentSort,
 } from "@/types/session/sessionRecruitment";
 import type { SessionApiResponse } from "@/types/session/sessionApplication";
 
-import {
-  INITIAL_SESSION_FILTERS,
-} from "../data/sessionRecruitmentPosts";
+import { INITIAL_SESSION_FILTERS } from "../data/sessionRecruitmentPosts";
 import type {
   SessionFilterValues,
   SessionRecruitmentPost,
@@ -50,6 +44,77 @@ import type {
   RecruitmentHistoryItem,
 } from "@/features/session/applicationHistory/applicationHistory.types";
 
+const FIND_FILTER_KEYS = ["genre", "region"] as const;
+
+const SESSION_ACTIVE_TAB_STORAGE_KEY = "bscene:session:active-tab";
+const SESSION_RECRUITMENT_FILTER_STORAGE_KEY =
+  "bscene:session:recruitment-filter";
+const SESSION_FIND_FILTER_STORAGE_KEY = "bscene:session:find-filter";
+
+const SESSION_TAB_IDS: SessionTabId[] = [
+  "recruitment",
+  "find",
+  "applications",
+];
+
+const isSessionTabId = (value: string | null): value is SessionTabId => {
+  return SESSION_TAB_IDS.includes(value as SessionTabId);
+};
+
+const readStoredActiveTab = (): SessionTabId => {
+  try {
+    const storedValue = window.sessionStorage.getItem(
+      SESSION_ACTIVE_TAB_STORAGE_KEY,
+    );
+
+    return isSessionTabId(storedValue) ? storedValue : "recruitment";
+  } catch {
+    return "recruitment";
+  }
+};
+
+const readStoredFilterValues = (
+  storageKey: string,
+): SessionFilterValues | null => {
+  try {
+    const storedValue = window.sessionStorage.getItem(storageKey);
+
+    if (!storedValue) {
+      return null;
+    }
+
+    const parsedValue = JSON.parse(storedValue) as Partial<SessionFilterValues>;
+
+    return {
+      part: parsedValue.part ?? INITIAL_SESSION_FILTERS.part,
+      skill: parsedValue.skill ?? INITIAL_SESSION_FILTERS.skill,
+      genre: parsedValue.genre ?? INITIAL_SESSION_FILTERS.genre,
+      region: parsedValue.region ?? INITIAL_SESSION_FILTERS.region,
+    };
+  } catch {
+    return null;
+  }
+};
+
+const writeStoredFilterValues = (
+  storageKey: string,
+  values: SessionFilterValues,
+) => {
+  try {
+    window.sessionStorage.setItem(storageKey, JSON.stringify(values));
+  } catch {
+    // sessionStorage 접근이 제한된 환경에서는 저장하지 않음
+  }
+};
+
+const writeStoredActiveTab = (tabId: SessionTabId) => {
+  try {
+    window.sessionStorage.setItem(SESSION_ACTIVE_TAB_STORAGE_KEY, tabId);
+  } catch {
+    // sessionStorage 접근이 제한된 환경에서는 저장하지 않음
+  }
+};
+
 const toDeadlineLabel = (dDay: number) => {
   if (dDay < 0) return "마감";
   if (dDay === 0) return "오늘 마감";
@@ -68,10 +133,7 @@ const mapRecruitmentToPost = (
     genre: recruitment.bandGenre,
     location: recruitment.bandRegion,
     description: recruitment.summary,
-    tags: [
-      recruitment.part,
-      recruitment.skillLevel,
-    ].filter(Boolean),
+    tags: [recruitment.part, recruitment.skillLevel].filter(Boolean),
     bookmarked: recruitment.isInterested,
   };
 };
@@ -87,10 +149,7 @@ const mapHistoryRecruitmentToPost = (
     genre: recruitment.genre,
     location: recruitment.region,
     description: recruitment.description,
-    tags: [
-      recruitment.part,
-      recruitment.skillLevel,
-    ].filter(Boolean),
+    tags: [recruitment.part, recruitment.skillLevel].filter(Boolean),
     bookmarked: recruitment.bookmarked,
   };
 };
@@ -113,63 +172,169 @@ const createFallbackPost = (
   };
 };
 
+const PullToRefreshIndicator = ({
+  pullDistance,
+  isRefreshing,
+}: {
+  pullDistance: number;
+  isRefreshing: boolean;
+}) => {
+  const shouldShow = pullDistance >= 24 || isRefreshing;
+
+  if (!shouldShow) {
+    return null;
+  }
+
+  const visibleDistance = Math.min(pullDistance, 52);
+  const opacity = Math.min(1, Math.max(0.35, pullDistance / 80));
+
+  return (
+    <div
+      className="pointer-events-none fixed left-1/2 z-[70] flex size-9 items-center justify-center rounded-full bg-neutral-0 shadow-[0_4px_18px_rgba(0,0,0,0.18)]"
+      style={{
+        top: "calc(env(safe-area-inset-top) + 72px)",
+        opacity,
+        transform: `translate(-50%, ${visibleDistance}px)`,
+      }}
+    >
+      <div className="size-5 animate-spin rounded-full border-2 border-neutral-300 border-t-secondary-500" />
+    </div>
+  );
+};
+
 export const RecruitmentNoticeScreen = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [activeTab, setActiveTab] =
-    useState<SessionTabId>("recruitment");
+  const [activeTab, setActiveTab] = useState<SessionTabId>(
+    () => readStoredActiveTab(),
+  );
 
-  const [
-    isFilterOpen,
-    setIsFilterOpen,
-  ] = useState(false);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
 
   const [recruitmentFilterValues, setRecruitmentFilterValues] =
     useState<SessionFilterValues>(
-      INITIAL_SESSION_FILTERS,
+      () =>
+        readStoredFilterValues(SESSION_RECRUITMENT_FILTER_STORAGE_KEY) ??
+        INITIAL_SESSION_FILTERS,
     );
 
   const [findFilterValues, setFindFilterValues] =
     useState<SessionFilterValues>(
-      INITIAL_SESSION_FILTERS,
+      () =>
+        readStoredFilterValues(SESSION_FIND_FILTER_STORAGE_KEY) ??
+        INITIAL_SESSION_FILTERS,
     );
 
   const hasInitializedFindFilters = useRef(false);
 
-  const [sort, setSort] =
-    useState<SessionRecruitmentSort>("LATEST");
+  const hasStoredFindFilters = useRef(
+    Boolean(readStoredFilterValues(SESSION_FIND_FILTER_STORAGE_KEY)),
+  );
 
-  const [
-    isSearchOpen,
-    setIsSearchOpen,
-  ] = useState(false);
+  const [sort, setSort] = useState<SessionRecruitmentSort>("LATEST");
 
-  const [
-    isCreateOpen,
-    setIsCreateOpen,
-  ] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
-  const [
-    isBasicProfileEditOpen,
-    setIsBasicProfileEditOpen,
-  ] = useState(false);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+
+  const [editingRecruitmentId, setEditingRecruitmentId] = useState<
+    number | null
+  >(null);
+
+  const [isBasicProfileEditOpen, setIsBasicProfileEditOpen] = useState(false);
 
   const openPostId =
     (location.state as { openPostId?: number } | null)?.openPostId ?? null;
 
-  const [
-    selectedPostId,
-    setSelectedPostId,
-  ] = useState<number | null>(
+  const [selectedPostId, setSelectedPostId] = useState<number | null>(
     () => openPostId,
   );
+
+  const [selectedPostOverride, setSelectedPostOverride] =
+    useState<SessionRecruitmentPost | null>(null);
+
+  const [selectedApplicationId, setSelectedApplicationId] = useState<
+    number | null
+  >(null);
+
+  const [deletedPostIds, setDeletedPostIds] = useState<number[]>([]);
+
+  const [createdPostIds, setCreatedPostIds] = useState<number[]>([]);
+
+  const [bookmarkOverrides, setBookmarkOverrides] = useState<
+    Record<number, boolean>
+  >({});
+
+  const addInterestMutation = useAddSessionRecruitmentInterest();
+  const removeInterestMutation = useRemoveSessionRecruitmentInterest();
+  const applyRecruitmentMutation = useApplySessionRecruitmentMutation();
+  const myApplicationSummaryQuery = useMySessionApplicationSummaryQuery();
+  const createChatRoomMutation = useCreateSessionChatRoomMutation();
+
+  const sessionRecruitmentsQuery = useSessionRecruitmentsQuery({
+    size: 20,
+    sort,
+  });
+
+  const handleTabChange = useCallback((nextTab: SessionTabId) => {
+    setActiveTab(nextTab);
+    writeStoredActiveTab(nextTab);
+  }, []);
+
+  const handleApplyRecruitmentFilters = useCallback(
+    (nextValues: SessionFilterValues) => {
+      setRecruitmentFilterValues(nextValues);
+      writeStoredFilterValues(
+        SESSION_RECRUITMENT_FILTER_STORAGE_KEY,
+        nextValues,
+      );
+    },
+    [],
+  );
+
+  const handleApplyFindFilters = useCallback(
+    (nextValues: SessionFilterValues) => {
+      setFindFilterValues(nextValues);
+      writeStoredFilterValues(SESSION_FIND_FILTER_STORAGE_KEY, nextValues);
+    },
+    [],
+  );
+
+  const handleRefreshPage = useCallback(async () => {
+    writeStoredActiveTab(activeTab);
+    writeStoredFilterValues(
+      SESSION_RECRUITMENT_FILTER_STORAGE_KEY,
+      recruitmentFilterValues,
+    );
+    writeStoredFilterValues(SESSION_FIND_FILTER_STORAGE_KEY, findFilterValues);
+
+    await new Promise<void>((resolve) => {
+      window.setTimeout(resolve, 250);
+    });
+
+    window.location.reload();
+  }, [activeTab, findFilterValues, recruitmentFilterValues]);
+
+  const recruitmentPullToRefresh = usePullToRefresh<HTMLElement>({
+    enabled:
+      (activeTab === "recruitment" || activeTab === "find") &&
+      !isFilterOpen &&
+      !isSearchOpen &&
+      !isCreateOpen &&
+      editingRecruitmentId === null &&
+      !isBasicProfileEditOpen &&
+      selectedPostId === null &&
+      selectedApplicationId === null,
+    onRefresh: handleRefreshPage,
+  });
 
   useEffect(() => {
     if (!Number.isFinite(openPostId)) return;
 
     const timeoutId = window.setTimeout(() => {
       setSelectedPostId(openPostId);
+
       navigate(`${location.pathname}${location.search}${location.hash}`, {
         replace: true,
         state: null,
@@ -179,92 +344,38 @@ export const RecruitmentNoticeScreen = () => {
     return () => window.clearTimeout(timeoutId);
   }, [location.hash, location.pathname, location.search, navigate, openPostId]);
 
-  const [
-    selectedPostOverride,
-    setSelectedPostOverride,
-  ] =
-    useState<SessionRecruitmentPost | null>(null);
-
-  const [
-    selectedApplicationId,
-    setSelectedApplicationId,
-  ] = useState<number | null>(null);
-
-  const [
-    deletedPostIds,
-    setDeletedPostIds,
-  ] = useState<number[]>([]);
-
-  const [
-    createdPostIds,
-    setCreatedPostIds,
-  ] = useState<number[]>([]);
-
-  const [
-    bookmarkOverrides,
-    setBookmarkOverrides,
-  ] = useState<Record<number, boolean>>({});
-
-  const addInterestMutation =
-    useAddSessionRecruitmentInterest();
-
-  const removeInterestMutation =
-    useRemoveSessionRecruitmentInterest();
-
-  const applyRecruitmentMutation =
-    useApplySessionRecruitmentMutation();
-
-  const myApplicationSummaryQuery =
-    useMySessionApplicationSummaryQuery();
-
-  const createChatRoomMutation =
-    useCreateSessionChatRoomMutation();
-
-  const sessionRecruitmentsQuery =
-    useSessionRecruitmentsQuery({
-      size: 20,
-      sort,
-    });
-
   useEffect(() => {
     const summary = myApplicationSummaryQuery.data;
 
-    if (!summary || hasInitializedFindFilters.current) {
+    if (
+      !summary ||
+      hasInitializedFindFilters.current ||
+      hasStoredFindFilters.current
+    ) {
       return;
     }
 
     hasInitializedFindFilters.current = true;
 
-    setFindFilterValues({
-      part: summary.part || INITIAL_SESSION_FILTERS.part,
-      skill: summary.skillLevel || INITIAL_SESSION_FILTERS.skill,
+    handleApplyFindFilters({
+      part: INITIAL_SESSION_FILTERS.part,
+      skill: INITIAL_SESSION_FILTERS.skill,
       genre: summary.genre || INITIAL_SESSION_FILTERS.genre,
       region: summary.region || INITIAL_SESSION_FILTERS.region,
     });
-  }, [myApplicationSummaryQuery.data]);
+  }, [handleApplyFindFilters, myApplicationSummaryQuery.data]);
 
   const posts = useMemo(() => {
     const apiPosts =
-      sessionRecruitmentsQuery.data?.content.map(
-        mapRecruitmentToPost,
-      ) ?? [];
+      sessionRecruitmentsQuery.data?.content.map(mapRecruitmentToPost) ?? [];
 
     return apiPosts
-      .filter(
-        (post) =>
-          !deletedPostIds.includes(post.id),
-      )
+      .filter((post) => !deletedPostIds.includes(post.id))
       .map((post) => ({
         ...post,
-        bookmarked:
-          bookmarkOverrides[post.id] ??
-          post.bookmarked,
+        bookmarked: bookmarkOverrides[post.id] ?? post.bookmarked,
       }));
-  }, [
-    bookmarkOverrides,
-    deletedPostIds,
-    sessionRecruitmentsQuery.data,
-  ]);
+  }, [bookmarkOverrides, deletedPostIds, sessionRecruitmentsQuery.data]);
 
   const filteredPosts = useMemo(() => {
     return posts.filter((post) => {
@@ -282,40 +393,24 @@ export const RecruitmentNoticeScreen = () => {
 
       const matchesRegion =
         recruitmentFilterValues.region === "전체" ||
-        post.location.includes(
-          recruitmentFilterValues.region,
-        );
+        post.location.includes(recruitmentFilterValues.region);
 
-      return (
-        matchesPart &&
-        matchesSkill &&
-        matchesGenre &&
-        matchesRegion
-      );
+      return matchesPart && matchesSkill && matchesGenre && matchesRegion;
     });
   }, [recruitmentFilterValues, posts]);
 
   const selectedPost = useMemo(() => {
     if (!selectedPostId) return null;
 
-    if (
-      selectedPostOverride?.id === selectedPostId
-    ) {
+    if (selectedPostOverride?.id === selectedPostId) {
       return selectedPostOverride;
     }
 
-    const isCreatedByCurrentUser =
-      createdPostIds.includes(selectedPostId);
+    const isCreatedByCurrentUser = createdPostIds.includes(selectedPostId);
 
     const post =
-      posts.find(
-        (candidate) =>
-          candidate.id === selectedPostId,
-      ) ??
-      createFallbackPost(
-        selectedPostId,
-        isCreatedByCurrentUser,
-      );
+      posts.find((candidate) => candidate.id === selectedPostId) ??
+      createFallbackPost(selectedPostId, isCreatedByCurrentUser);
 
     return isCreatedByCurrentUser
       ? {
@@ -323,19 +418,10 @@ export const RecruitmentNoticeScreen = () => {
           isMine: true,
         }
       : post;
-  }, [
-    createdPostIds,
-    posts,
-    selectedPostId,
-    selectedPostOverride,
-  ]);
+  }, [createdPostIds, posts, selectedPostId, selectedPostOverride]);
 
-  const handleToggleBookmark = (
-    postId: number,
-  ) => {
-    const currentPost = posts.find(
-      (post) => post.id === postId,
-    );
+  const handleToggleBookmark = (postId: number) => {
+    const currentPost = posts.find((post) => post.id === postId);
 
     const currentBookmarked =
       bookmarkOverrides[postId] ??
@@ -363,16 +449,12 @@ export const RecruitmentNoticeScreen = () => {
 
     mutation.mutate(postId, {
       onError: () => {
-        setBookmarkOverrides(
-          (currentOverrides) => ({
-            ...currentOverrides,
-            [postId]: currentBookmarked,
-          }),
-        );
+        setBookmarkOverrides((currentOverrides) => ({
+          ...currentOverrides,
+          [postId]: currentBookmarked,
+        }));
 
-        if (
-          selectedPostOverride?.id === postId
-        ) {
+        if (selectedPostOverride?.id === postId) {
           setSelectedPostOverride({
             ...selectedPostOverride,
             bookmarked: currentBookmarked,
@@ -382,13 +464,11 @@ export const RecruitmentNoticeScreen = () => {
     });
   };
 
-  const handleDeletePost = (
-    postId: number,
-  ) => {
-    setDeletedPostIds((currentIds) => [
-      ...currentIds,
-      postId,
-    ]);
+  const handleDeletePost = (postId: number) => {
+    setDeletedPostIds((currentIds) =>
+      currentIds.includes(postId) ? currentIds : [...currentIds, postId],
+    );
+
     setSelectedPostId(null);
     setSelectedPostOverride(null);
   };
@@ -408,35 +488,36 @@ export const RecruitmentNoticeScreen = () => {
   const handleMessageApplication = async (
     application: ApplicationHistoryItem,
   ) => {
-    try {
-      const room =
-        await createChatRoomMutation.mutateAsync({
-          contextType: "RECRUITMENT",
-          applicationSubmissionId:
-            application.applicationSubmissionId ??
-            application.id,
-        });
+    const sessionRecruitmentId = application.sessionRecruitmentId;
 
-      navigate(
-        `/band/session/messages/${room.chatRoomId}`,
-        {
-          state: {
-            senderName: room.recipientName,
-            chatRoomId: room.chatRoomId,
-            canSend: true,
-          },
+    if (!sessionRecruitmentId) {
+      window.alert("모집 공고 정보를 확인할 수 없어 쪽지방을 만들 수 없어요.");
+      return;
+    }
+
+    if (createChatRoomMutation.isPending) {
+      return;
+    }
+
+    try {
+      const room = await createChatRoomMutation.mutateAsync({
+        contextType: "RECRUITMENT",
+        sessionRecruitmentId,
+      });
+
+      navigate(`/band/session/messages/${room.chatRoomId}`, {
+        state: {
+          senderName: room.recipientName,
+          chatRoomId: room.chatRoomId,
+          canSend: true,
         },
-      );
+      });
     } catch (error) {
-      const apiMessage = (
-        error as AxiosError<
-          SessionApiResponse<null>
-        >
-      ).response?.data?.message;
+      const apiMessage = (error as AxiosError<SessionApiResponse<null>>)
+        .response?.data?.message;
 
       window.alert(
-        apiMessage ??
-          "쪽지방 생성에 실패했어요. 잠시 후 다시 시도해주세요.",
+        apiMessage ?? "쪽지방 생성에 실패했어요. 잠시 후 다시 시도해주세요.",
       );
     }
   };
@@ -444,10 +525,8 @@ export const RecruitmentNoticeScreen = () => {
   const handleOpenHistoryRecruitment = (
     recruitment: RecruitmentHistoryItem,
   ) => {
-    setActiveTab("recruitment");
-    setSelectedPostOverride(
-      mapHistoryRecruitmentToPost(recruitment),
-    );
+    handleTabChange("recruitment");
+    setSelectedPostOverride(mapHistoryRecruitmentToPost(recruitment));
     setSelectedPostId(recruitment.id);
   };
 
@@ -456,31 +535,38 @@ export const RecruitmentNoticeScreen = () => {
       <SessionRecruitmentFormScreen
         onBack={() => setIsCreateOpen(false)}
         onClose={() => setIsCreateOpen(false)}
-        onViewCreatedPost={(
-          sessionRecruitmentId,
-        ) => {
+        onViewCreatedPost={(sessionRecruitmentId) => {
           setIsCreateOpen(false);
 
           if (sessionRecruitmentId) {
-            setCreatedPostIds(
-              (currentIds) =>
-                currentIds.includes(
-                  sessionRecruitmentId,
-                )
-                  ? currentIds
-                  : [
-                      ...currentIds,
-                      sessionRecruitmentId,
-                    ],
+            setCreatedPostIds((currentIds) =>
+              currentIds.includes(sessionRecruitmentId)
+                ? currentIds
+                : [...currentIds, sessionRecruitmentId],
             );
 
-            setSelectedPostId(
-              sessionRecruitmentId,
-            );
-
+            setSelectedPostId(sessionRecruitmentId);
             setSelectedPostOverride(null);
-            sessionRecruitmentsQuery.refetch();
+            void sessionRecruitmentsQuery.refetch();
           }
+        }}
+      />
+    );
+  }
+
+  if (editingRecruitmentId !== null) {
+    return (
+      <SessionRecruitmentFormScreen
+        editSessionRecruitmentId={editingRecruitmentId}
+        onBack={() => setEditingRecruitmentId(null)}
+        onClose={() => setEditingRecruitmentId(null)}
+        onSaved={() => {
+          const savedRecruitmentId = editingRecruitmentId;
+
+          setEditingRecruitmentId(null);
+          setSelectedPostId(savedRecruitmentId);
+          setSelectedPostOverride(null);
+          void sessionRecruitmentsQuery.refetch();
         }}
       />
     );
@@ -489,9 +575,7 @@ export const RecruitmentNoticeScreen = () => {
   if (isBasicProfileEditOpen) {
     return (
       <SessionBasicProfileEditScreen
-        onBack={() =>
-          setIsBasicProfileEditOpen(false)
-        }
+        onBack={() => setIsBasicProfileEditOpen(false)}
       />
     );
   }
@@ -501,7 +585,7 @@ export const RecruitmentNoticeScreen = () => {
       <SessionSearchScreen
         values={recruitmentFilterValues}
         onBack={() => setIsSearchOpen(false)}
-        onApplyFilters={setRecruitmentFilterValues}
+        onApplyFilters={handleApplyRecruitmentFilters}
       />
     );
   }
@@ -509,13 +593,9 @@ export const RecruitmentNoticeScreen = () => {
   if (selectedApplicationId) {
     return (
       <SessionApplicationDetailScreen
-        sessionApplicationId={
-          selectedApplicationId
-        }
+        sessionApplicationId={selectedApplicationId}
         isOwnApplication
-        onBack={() =>
-          setSelectedApplicationId(null)
-        }
+        onBack={() => setSelectedApplicationId(null)}
       />
     );
   }
@@ -530,29 +610,33 @@ export const RecruitmentNoticeScreen = () => {
         }}
         onToggleBookmark={handleToggleBookmark}
         onDeletePost={handleDeletePost}
-        onPreviewApplication={
-          setSelectedApplicationId
-        }
-        onApplyApplication={
-          handleApplyApplication
-        }
+        onEditPost={(postId) => {
+          setEditingRecruitmentId(postId);
+        }}
+        onPreviewApplication={setSelectedApplicationId}
+        onApplyApplication={handleApplyApplication}
       />
     );
   }
 
   return (
-    <main className="relative min-h-dvh bg-neutral-0 pb-[calc(var(--bottom-nav-height)+24px)]">
+    <main
+      ref={recruitmentPullToRefresh.containerRef}
+      className="relative min-h-dvh overscroll-y-contain bg-neutral-0 pb-[calc(var(--bottom-nav-height)+24px)]"
+    >
+      {activeTab === "recruitment" || activeTab === "find" ? (
+        <PullToRefreshIndicator
+          pullDistance={recruitmentPullToRefresh.pullDistance}
+          isRefreshing={recruitmentPullToRefresh.isRefreshing}
+        />
+      ) : null}
+
       <SessionPageHeader
         onSearch={() => setIsSearchOpen(true)}
-        onMessages={() =>
-          navigate("/band/session/messages")
-        }
+        onMessages={() => navigate("/band/session/messages")}
       />
 
-      <SessionTabs
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
-      />
+      <SessionTabs activeTab={activeTab} onTabChange={handleTabChange} />
 
       {activeTab !== "applications" ? (
         <SessionFilterBar
@@ -565,9 +649,8 @@ export const RecruitmentNoticeScreen = () => {
           onSortChange={setSort}
           showBottomBorder={activeTab !== "find"}
           compactHeight={activeTab === "find"}
-          onOpenFilter={() =>
-            setIsFilterOpen(true)
-          }
+          filterKeys={activeTab === "find" ? [...FIND_FILTER_KEYS] : undefined}
+          onOpenFilter={() => setIsFilterOpen(true)}
         />
       ) : null}
 
@@ -580,15 +663,12 @@ export const RecruitmentNoticeScreen = () => {
           ) : sessionRecruitmentsQuery.isError ? (
             <div className="flex min-h-[220px] flex-col items-center justify-center rounded-[14px] bg-neutral-0 px-6 text-center shadow-[0_0_12px_rgba(0,0,0,0.08)]">
               <p className="text-caption1 text-neutral-500">
-                모집 공고를 불러오지
-                못했어요
+                모집 공고를 불러오지 못했어요
               </p>
 
               <button
                 type="button"
-                onClick={() =>
-                  sessionRecruitmentsQuery.refetch()
-                }
+                onClick={() => void sessionRecruitmentsQuery.refetch()}
                 className="mt-3 rounded-[8px] bg-secondary-500 px-4 py-2 text-caption2 text-neutral-0"
               >
                 다시 시도
@@ -599,9 +679,7 @@ export const RecruitmentNoticeScreen = () => {
               <RecruitmentPostCard
                 key={post.id}
                 post={post}
-                onToggleBookmark={
-                  handleToggleBookmark
-                }
+                onToggleBookmark={handleToggleBookmark}
                 onSelect={(postId) => {
                   setSelectedPostOverride(null);
                   setSelectedPostId(postId);
@@ -610,50 +688,33 @@ export const RecruitmentNoticeScreen = () => {
             ))
           ) : (
             <div className="flex min-h-[220px] items-center justify-center rounded-[14px] bg-neutral-0 px-6 text-center text-caption1 text-neutral-500 shadow-[0_0_12px_rgba(0,0,0,0.08)]">
-              선택한 조건에 맞는 모집 공고가
-              없어요
+              선택한 조건에 맞는 모집 공고가 없어요
             </div>
           )}
         </section>
       ) : activeTab === "find" ? (
-        <SessionFindScreen
-          values={findFilterValues}
-        />
+        <SessionFindScreen values={findFilterValues} />
       ) : activeTab === "applications" ? (
         <SessionApplicationsScreen
-          onEditBasicInfo={() =>
-            setIsBasicProfileEditOpen(true)
-          }
-          onBrowseRecruitments={() =>
-            setActiveTab("recruitment")
-          }
-          onViewHistoryApplication={(
-            application,
-          ) => {
-            if (
-              !application.sessionApplicationId
-            ) {
+          onEditBasicInfo={() => setIsBasicProfileEditOpen(true)}
+          onBrowseRecruitments={() => handleTabChange("recruitment")}
+          onViewHistoryApplication={(application) => {
+            if (!application.sessionApplicationId) {
               window.alert(
                 "지원서 정보를 확인할 수 없어요. 잠시 후 다시 시도해주세요.",
               );
               return;
             }
 
-            setSelectedApplicationId(
-              application.sessionApplicationId,
-            );
+            setSelectedApplicationId(application.sessionApplicationId);
           }}
           onMessage={handleMessageApplication}
-          onOpenRecruitment={
-            handleOpenHistoryRecruitment
-          }
+          onOpenRecruitment={handleOpenHistoryRecruitment}
         />
       ) : null}
 
       {activeTab === "recruitment" ? (
-        <FloatingCreateButton
-          onClick={() => setIsCreateOpen(true)}
-        />
+        <FloatingCreateButton onClick={() => setIsCreateOpen(true)} />
       ) : null}
 
       {isFilterOpen ? (
@@ -665,12 +726,11 @@ export const RecruitmentNoticeScreen = () => {
           }
           onApply={
             activeTab === "find"
-              ? setFindFilterValues
-              : setRecruitmentFilterValues
+              ? handleApplyFindFilters
+              : handleApplyRecruitmentFilters
           }
-          onClose={() =>
-            setIsFilterOpen(false)
-          }
+          filterKeys={activeTab === "find" ? [...FIND_FILTER_KEYS] : undefined}
+          onClose={() => setIsFilterOpen(false)}
         />
       ) : null}
     </main>

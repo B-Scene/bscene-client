@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import type { AxiosError } from "axios";
 import { useNavigate } from "react-router-dom";
-import BandImage from "@/assets/Img_Band.png";
+import BandImage from "@/assets/icons/band/band-default-profile.svg";
 import BandLiveCard from "@/components/common/Card/BandLiveCard";
 import LiveNowCard from "@/components/common/Card/LiveNowCard";
 import { BottomNavBar } from "@/components/layout/BottomNavBar";

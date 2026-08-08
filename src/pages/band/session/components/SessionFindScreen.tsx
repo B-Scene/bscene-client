@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
-import { useSessionApplicationsSearchQuery } from "@/hooks/api/session/useSessionApplication";
+import { useCallback, useMemo, useState } from "react";
+import { useSessionApplicationsSearchInfiniteQuery } from "@/hooks/api/session/useSessionApplication";
+import { useInfiniteScrollObserver } from "@/hooks/useInfiniteScrollObserver";
 import type { SessionApplicationSearchItem } from "@/types/session/sessionApplication";
 import type { SessionFilterValues } from "../types";
 import {
@@ -11,6 +12,8 @@ import { SessionApplicationDetailScreen } from "./SessionApplicationDetailScreen
 interface SessionFindScreenProps {
   values: SessionFilterValues;
 }
+
+const SESSION_FIND_PAGE_SIZE = 8;
 
 const mapApplicationToCandidate = (
   application: SessionApplicationSearchItem,
@@ -28,28 +31,61 @@ const mapApplicationToCandidate = (
   };
 };
 
+const getFilterParam = (value: string) => {
+  return value === "전체" ? undefined : value;
+};
+
 export const SessionFindScreen = ({ values }: SessionFindScreenProps) => {
   const [isNoticeVisible, setIsNoticeVisible] = useState(true);
-  const [selectedApplicationId, setSelectedApplicationId] = useState<number | null>(null);
+  const [selectedApplicationId, setSelectedApplicationId] = useState<
+    number | null
+  >(null);
 
-  const applicationsQuery = useSessionApplicationsSearchQuery({
-    size: 20,
-  });
+  const applicationSearchParams = useMemo(
+    () => ({
+      genre: getFilterParam(values.genre),
+      region: getFilterParam(values.region),
+      size: SESSION_FIND_PAGE_SIZE,
+    }),
+    [values.genre, values.region],
+  );
+
+  const applicationsQuery =
+    useSessionApplicationsSearchInfiniteQuery(applicationSearchParams);
 
   const candidates = useMemo(() => {
     const apiCandidates =
-      applicationsQuery.data?.content.map(mapApplicationToCandidate) ?? [];
+      applicationsQuery.data?.pages.flatMap((page) =>
+        page.content.map(mapApplicationToCandidate),
+      ) ?? [];
 
     return apiCandidates.filter((candidate) => {
-      const matchesPart = values.part === "전체" || candidate.part === values.part;
-      const matchesSkill = values.skill === "전체" || candidate.skill === values.skill;
-      const matchesGenre = values.genre === "전체" || candidate.genre.includes(values.genre);
+      const matchesGenre =
+        values.genre === "전체" || candidate.genre.includes(values.genre);
+
       const matchesRegion =
         values.region === "전체" || candidate.location.includes(values.region);
 
-      return matchesPart && matchesSkill && matchesGenre && matchesRegion;
+      return matchesGenre && matchesRegion;
     });
-  }, [applicationsQuery.data, values]);
+  }, [applicationsQuery.data, values.genre, values.region]);
+
+  const loadMore = useCallback(() => {
+    if (!applicationsQuery.hasNextPage || applicationsQuery.isFetchingNextPage) {
+      return;
+    }
+
+    void applicationsQuery.fetchNextPage();
+  }, [applicationsQuery]);
+
+  const loadMoreRef = useInfiniteScrollObserver({
+    enabled:
+      Boolean(applicationsQuery.hasNextPage) &&
+      !applicationsQuery.isFetchingNextPage &&
+      !applicationsQuery.isLoading &&
+      !applicationsQuery.isError,
+    onIntersect: loadMore,
+  });
 
   if (selectedApplicationId) {
     return (
@@ -61,15 +97,15 @@ export const SessionFindScreen = ({ values }: SessionFindScreenProps) => {
   }
 
   return (
-    <>
+    <div className="bg-neutral-0">
       {isNoticeVisible ? (
         <section className="border-b border-neutral-300 bg-neutral-0 px-6 pb-[9px]">
           <div className="relative flex min-h-[68px] w-full items-center justify-center rounded-[12px] border border-[#FBB10E] bg-secondary-0 px-[34px] py-[15px]">
             <p className="text-center text-caption2 text-neutral-600">
               필터를 선택하지 않으면 기본 지원서에서 선택한 <br />
-              활동 지역, 장르와
-              같은 세션 뮤지션이 먼저 보여요.
+              활동 지역, 장르와 같은 세션 뮤지션이 먼저 보여요.
             </p>
+
             <button
               type="button"
               aria-label="안내 닫기"
@@ -94,6 +130,7 @@ export const SessionFindScreen = ({ values }: SessionFindScreenProps) => {
             <p className="text-caption1 text-neutral-500">
               세션 뮤지션을 불러오지 못했어요
             </p>
+
             <button
               type="button"
               onClick={() => applicationsQuery.refetch()}
@@ -103,19 +140,35 @@ export const SessionFindScreen = ({ values }: SessionFindScreenProps) => {
             </button>
           </div>
         ) : candidates.length > 0 ? (
-          candidates.map((candidate) => (
-            <SessionCandidateCard
-              key={candidate.id}
-              candidate={candidate}
-              onSelect={setSelectedApplicationId}
-            />
-          ))
+          <>
+            {candidates.map((candidate) => (
+              <SessionCandidateCard
+                key={candidate.id}
+                candidate={candidate}
+                onSelect={setSelectedApplicationId}
+              />
+            ))}
+
+            <div ref={loadMoreRef} className="h-1" />
+
+            {applicationsQuery.isFetchingNextPage ? (
+              <p className="py-3 text-center text-caption2 text-neutral-500">
+                세션 뮤지션을 더 불러오는 중이에요
+              </p>
+            ) : null}
+          </>
         ) : (
-          <div className="flex min-h-[220px] items-center justify-center rounded-[12px] bg-neutral-0 px-6 text-center text-caption1 text-neutral-500 shadow-[0_0_8px_rgba(0,0,0,0.08)]">
-            선택한 조건에 맞는 세션 뮤지션이 없어요
-          </div>
+          <>
+            <div className="flex min-h-[220px] items-center justify-center rounded-[12px] bg-neutral-0 px-6 text-center text-caption1 text-neutral-500 shadow-[0_0_8px_rgba(0,0,0,0.08)]">
+              선택한 조건에 맞는 세션 뮤지션이 없어요
+            </div>
+
+            {applicationsQuery.hasNextPage ? (
+              <div ref={loadMoreRef} className="h-1" />
+            ) : null}
+          </>
         )}
       </section>
-    </>
+    </div>
   );
 };

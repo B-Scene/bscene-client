@@ -9,7 +9,7 @@ import PlusIcon from "@/assets/icons/Plus.svg";
 import SoundCloudIcon from "@/assets/icons/soundcloude.svg";
 import SpotifyIcon from "@/assets/icons/Spotify.svg";
 import YouTubeIcon from "@/assets/icons/youtube.svg";
-import BandImage from "@/assets/Img_Band.png";
+import BandImage from "@/assets/icons/band/band-default-profile.svg";
 import ConcertCard from "@/components/common/Card/ConcertCard";
 import { Header } from "@/components/common/Header/Header";
 import { ModalOverlay } from "@/components/common/Modal/ModalOverlay";
@@ -572,7 +572,12 @@ const FanBandProfilePage = () => {
             type="button"
             disabled={!canEnterLive || enterLiveMutation.isPending}
             onClick={() => void handleOpenLive()}
-            className="flex h-[38px] items-center justify-center rounded-[8px] border border-primary-400 bg-primary-400 font-body text-body1 text-neutral-0"
+            className={[
+              "flex h-[38px] items-center justify-center rounded-[8px] border font-body text-body1",
+              canEnterLive
+                ? "border-primary-400 bg-primary-400 text-neutral-0"
+                : "border-neutral-300 bg-neutral-300 text-neutral-500",
+            ].join(" ")}
           >
             라이브 입장
           </button>

@@ -7,7 +7,7 @@ import { Toast } from "@/components/common/Toast/Toast";
 import { useModeStore } from "@/stores/useModeStore";
 import { getFanAccountDisplay } from "@/utils/authUser";
 import { BAND_GENRE_LABELS, BAND_REGION_LABELS } from "@/utils/bandLabels";
-import BandAvatar from "@/assets/images/IMG_my.svg";
+import BandAvatar from "@/assets/icons/band/band-default-profile.svg";
 import FanAvatar from "@/assets/icons/band/user-default-profile.svg";
 import CheckCircleYellowIcon from "@/assets/icons/band/check-circle-yellow.svg";
 import CheckApproveIcon from "@/assets/icons/band/check-approve.svg";
@@ -174,6 +174,7 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
     setSelectedId(accountId);
   };
   const selectedMode = selectedId.startsWith("fan") ? "fan" : "band";
+  const isSelectionUnchanged = selectedId === initialSelectedId;
 
   const bandModeSection = (
     <div className="flex w-82.5 flex-col gap-4">
@@ -361,9 +362,21 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
 
                 proceed();
               }}
-              disabled={changeUserMode.isPending || toggleUserMode.isPending}
-              className={`flex h-[52px] w-[353px] items-center justify-center rounded-[12px] text-label1 text-neutral-0 ${
-                selectedMode === "fan" ? "bg-primary-400" : "bg-secondary-500"
+              disabled={
+                isSelectionUnchanged ||
+                changeUserMode.isPending ||
+                toggleUserMode.isPending
+              }
+              className={`flex h-13 w-[353px] items-center justify-center rounded-xl text-label1 ${
+                isSelectionUnchanged ||
+                changeUserMode.isPending ||
+                toggleUserMode.isPending
+                  ? "cursor-not-allowed bg-neutral-300 text-neutral-600"
+                  : `text-neutral-0 ${
+                      selectedMode === "fan"
+                        ? "bg-primary-400"
+                        : "bg-secondary-500"
+                    }`
               }`}
             >
               모드 전환

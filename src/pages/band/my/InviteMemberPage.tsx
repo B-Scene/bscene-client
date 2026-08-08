@@ -12,7 +12,6 @@ import {
   useBandMembersQuery,
   useRemoveBandMember,
 } from "@/hooks/api/band/useBandMember";
-import { useBandMemberProfileQuery } from "@/hooks/api/band/useBandMemberProfile";
 import { getStoredAuthUser } from "@/utils/authUser";
 import { getPartLabel } from "@/utils/bandLabels";
 import { getCachedNickname } from "@/utils/bandMemberNicknameCache";
@@ -34,14 +33,9 @@ interface MemberRowProps {
 }
 
 const MemberRow = ({ member, isSelf, isOwner, onRemoveClick }: MemberRowProps) => {
-  const profileQuery = useBandMemberProfileQuery(
-    member.bandMemberProfileId ?? NaN,
-  );
-  const profile = profileQuery.data;
-
-  const name = profile?.nickname ?? member.profileNickname ?? "닉네임 없음";
-  const roleLabel = profile?.part
-    ? `${MEMBER_TYPE_LABELS[member.memberType]} · ${getPartLabel(profile.part)}`
+  const name = member.profileNickname ?? "닉네임 없음";
+  const roleLabel = member.part
+    ? `${MEMBER_TYPE_LABELS[member.memberType]} · ${getPartLabel(member.part)}`
     : MEMBER_TYPE_LABELS[member.memberType];
 
   return (
@@ -137,7 +131,7 @@ const InviteMemberPage = () => {
                 key={member.id}
                 member={member}
                 isSelf={member.userId === myUserId}
-                isOwner={member.userId === band?.ownerId}
+                isOwner={member.owner}
                 onRemoveClick={setRemoveTargetId}
               />
             ))}
