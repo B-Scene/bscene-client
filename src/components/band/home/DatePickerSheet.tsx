@@ -10,6 +10,8 @@ interface DatePickerSheetProps {
   open: boolean;
   startDate: string;
   endDate: string;
+  minDate?: string;
+  maxDate?: string;
   selectionMode?: "single" | "range";
   onClose: () => void;
   onSelect: (range: DateRange) => void;
@@ -24,6 +26,7 @@ type CalendarDay = {
   muted: boolean;
   sunday: boolean;
   today: boolean;
+  disabled: boolean;
 };
 
 const formatDateKey = (date: Date) =>
@@ -33,10 +36,15 @@ const formatDateKey = (date: Date) =>
 
 const parseDateKey = (dateKey: string) => {
   const [year, month, day] = dateKey.split("-").map(Number);
+
   return new Date(year, month - 1, day);
 };
 
-const getCalendarDays = (displayedMonth: Date): CalendarDay[] => {
+const getCalendarDays = (
+  displayedMonth: Date,
+  minDate?: string,
+  maxDate?: string,
+): CalendarDay[] => {
   const year = displayedMonth.getFullYear();
   const month = displayedMonth.getMonth();
   const firstDate = new Date(year, month, 1);
@@ -57,6 +65,11 @@ const getCalendarDays = (displayedMonth: Date): CalendarDay[] => {
       muted,
       sunday: !muted && date.getDay() === 0,
       today: !muted && dateKey === todayKey,
+      disabled:
+        !muted &&
+        Boolean(
+          (minDate && dateKey < minDate) || (maxDate && dateKey > maxDate),
+        ),
     };
   });
 };
@@ -83,6 +96,8 @@ export const DatePickerSheet = ({
   open,
   startDate,
   endDate,
+  minDate,
+  maxDate,
   selectionMode = "range",
   onClose,
   onSelect,
@@ -103,8 +118,8 @@ export const DatePickerSheet = ({
   );
 
   const calendarDays = useMemo(
-    () => getCalendarDays(displayedMonth),
-    [displayedMonth],
+    () => getCalendarDays(displayedMonth, minDate, maxDate),
+    [displayedMonth, minDate, maxDate],
   );
 
   const monthLabel = `${displayedMonth.getFullYear()}년 ${String(
@@ -152,13 +167,14 @@ export const DatePickerSheet = ({
       onSelect({ start: rangeStart, end: rangeEnd || rangeStart });
       return;
     }
+
     onClose();
   };
 
   if (!rendered) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center">
+    <div className="absolute inset-0 z-50 flex items-end overflow-hidden">
       <div
         className={`absolute inset-0 bg-neutral-900/50 transition-opacity duration-300 ease-out ${
           isVisible ? "opacity-100" : "opacity-0"
@@ -233,12 +249,13 @@ export const DatePickerSheet = ({
               const inRangeCheck = (candidate?: CalendarDay) =>
                 Boolean(
                   candidate &&
-                  !candidate.muted &&
-                  rangeStart &&
-                  rangeEnd &&
-                  candidate.dateKey >= rangeStart &&
-                  candidate.dateKey <= rangeEnd,
+                    !candidate.muted &&
+                    rangeStart &&
+                    rangeEnd &&
+                    candidate.dateKey >= rangeStart &&
+                    candidate.dateKey <= rangeEnd,
                 );
+
               const inRange = inRangeCheck(day);
               const isFirstColumn = index % 7 === 0;
               const isLastColumn = index % 7 === 6;
@@ -273,12 +290,12 @@ export const DatePickerSheet = ({
 
                   <button
                     type="button"
-                    disabled={day.muted}
+                    disabled={day.muted || day.disabled}
                     onClick={() => handleDayClick(day.dateKey)}
                     className={`relative z-10 flex size-7.5 shrink-0 items-center justify-center rounded-full text-caption3 ${
                       isStart || isEnd
                         ? "bg-secondary-500 text-neutral-0"
-                        : day.muted
+                        : day.muted || day.disabled
                           ? "text-neutral-400"
                           : day.sunday
                             ? "text-error"
@@ -286,6 +303,7 @@ export const DatePickerSheet = ({
                     }`}
                   >
                     {day.label}
+
                     {day.today && !isStart && !isEnd ? (
                       <span className="absolute bottom-0.5 size-1 rounded-full bg-primary-400" />
                     ) : null}
