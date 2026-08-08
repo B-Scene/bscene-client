@@ -39,32 +39,35 @@ const getFilterParam = (value: string) => {
 const PullToRefreshIndicator = ({
   pullDistance,
   isRefreshing,
-  isReadyToRefresh,
 }: {
   pullDistance: number;
   isRefreshing: boolean;
-  isReadyToRefresh: boolean;
 }) => {
-  const isVisible = pullDistance > 0 || isRefreshing;
+  const shouldShow = pullDistance > 0 || isRefreshing;
 
-  if (!isVisible) {
+  if (!shouldShow) {
     return null;
   }
 
+  const visibleDistance = Math.min(pullDistance, 52);
+  const opacity = Math.min(1, Math.max(0.35, pullDistance / 76));
+
   return (
     <div
-      className="pointer-events-none fixed left-1/2 z-[60] flex h-8 -translate-x-1/2 items-center justify-center rounded-full bg-neutral-900/80 px-4 text-caption3 text-neutral-0 shadow-[0_4px_12px_rgba(0,0,0,0.18)] transition-opacity"
+      className="pointer-events-none fixed left-1/2 z-[70] flex size-9 items-center justify-center rounded-full bg-neutral-0 shadow-[0_4px_18px_rgba(0,0,0,0.18)]"
       style={{
-        top: 158,
-        opacity: Math.min(1, Math.max(0.35, pullDistance / 72)),
-        transform: `translate(-50%, ${Math.min(pullDistance, 48)}px)`,
+        top: "calc(env(safe-area-inset-top) + 96px)",
+        opacity,
+        transform: `translate(-50%, ${visibleDistance}px)`,
       }}
     >
-      {isRefreshing
-        ? "새로고침 중..."
-        : isReadyToRefresh
-          ? "놓으면 새로고침"
-          : "아래로 당겨 새로고침"}
+      <div
+        className={
+          isRefreshing
+            ? "size-5 animate-spin rounded-full border-2 border-neutral-300 border-t-secondary-500"
+            : "size-5 rounded-full border-2 border-neutral-300 border-t-secondary-500"
+        }
+      />
     </div>
   );
 };
@@ -143,11 +146,13 @@ export const SessionFindScreen = ({ values }: SessionFindScreenProps) => {
   }
 
   return (
-    <div ref={pullToRefresh.containerRef} className="relative overscroll-y-contain">
+    <div
+      ref={pullToRefresh.containerRef}
+      className="relative min-h-dvh overscroll-y-contain bg-neutral-0 pb-[calc(var(--bottom-nav-height)+24px)]"
+    >
       <PullToRefreshIndicator
         pullDistance={pullToRefresh.pullDistance}
         isRefreshing={pullToRefresh.isRefreshing}
-        isReadyToRefresh={pullToRefresh.isReadyToRefresh}
       />
 
       {isNoticeVisible ? (
