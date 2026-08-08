@@ -17,21 +17,6 @@ const getDocumentScrollTop = () => {
   );
 };
 
-const getPageScrollTop = (container: HTMLElement | null) => {
-  if (!container) {
-    return getDocumentScrollTop();
-  }
-
-  const isContainerScrollable =
-    container.scrollHeight > container.clientHeight + 1;
-
-  if (isContainerScrollable) {
-    return container.scrollTop;
-  }
-
-  return getDocumentScrollTop();
-};
-
 export const usePullToRefresh = <T extends HTMLElement>({
   enabled = true,
   threshold = 76,
@@ -67,6 +52,10 @@ export const usePullToRefresh = <T extends HTMLElement>({
       return;
     }
 
+    const isAtPageTop = () => {
+      return getDocumentScrollTop() <= 2;
+    };
+
     const isEventInsideContainer = (event: TouchEvent) => {
       const target = event.target;
 
@@ -77,10 +66,6 @@ export const usePullToRefresh = <T extends HTMLElement>({
       return container.contains(target);
     };
 
-    const isAtTop = () => {
-      return getPageScrollTop(container) <= 2;
-    };
-
     const resetPull = () => {
       isPullingRef.current = false;
       startYRef.current = 0;
@@ -88,11 +73,12 @@ export const usePullToRefresh = <T extends HTMLElement>({
     };
 
     const handleTouchStart = (event: TouchEvent) => {
-      if (!enabled || isRefreshingRef.current || !isEventInsideContainer(event)) {
-        return;
-      }
-
-      if (!isAtTop()) {
+      if (
+        !enabled ||
+        isRefreshingRef.current ||
+        !isEventInsideContainer(event) ||
+        !isAtPageTop()
+      ) {
         return;
       }
 
@@ -105,16 +91,16 @@ export const usePullToRefresh = <T extends HTMLElement>({
         return;
       }
 
+      if (!isAtPageTop()) {
+        resetPull();
+        return;
+      }
+
       const currentY = event.touches[0]?.clientY ?? 0;
       const rawDistance = currentY - startYRef.current;
 
       if (rawDistance <= activationDistance) {
         setPullDistance(0);
-        return;
-      }
-
-      if (!isAtTop()) {
-        resetPull();
         return;
       }
 
@@ -148,13 +134,7 @@ export const usePullToRefresh = <T extends HTMLElement>({
       setIsRefreshing(true);
       setPullDistance(threshold);
 
-      try {
-        await onRefreshRef.current();
-      } finally {
-        isRefreshingRef.current = false;
-        setIsRefreshing(false);
-        resetPull();
-      }
+      await onRefreshRef.current();
     };
 
     const handleTouchCancel = () => {

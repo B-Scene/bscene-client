@@ -1,7 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { useSessionApplicationsSearchInfiniteQuery } from "@/hooks/api/session/useSessionApplication";
 import { useInfiniteScrollObserver } from "@/hooks/useInfiniteScrollObserver";
-import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import type { SessionApplicationSearchItem } from "@/types/session/sessionApplication";
 import type { SessionFilterValues } from "../types";
 import {
@@ -36,42 +35,6 @@ const getFilterParam = (value: string) => {
   return value === "전체" ? undefined : value;
 };
 
-const PullToRefreshIndicator = ({
-  pullDistance,
-  isRefreshing,
-}: {
-  pullDistance: number;
-  isRefreshing: boolean;
-}) => {
-  const shouldShow = pullDistance > 0 || isRefreshing;
-
-  if (!shouldShow) {
-    return null;
-  }
-
-  const visibleDistance = Math.min(pullDistance, 52);
-  const opacity = Math.min(1, Math.max(0.35, pullDistance / 76));
-
-  return (
-    <div
-      className="pointer-events-none fixed left-1/2 z-[70] flex size-9 items-center justify-center rounded-full bg-neutral-0 shadow-[0_4px_18px_rgba(0,0,0,0.18)]"
-      style={{
-        top: "calc(env(safe-area-inset-top) + 96px)",
-        opacity,
-        transform: `translate(-50%, ${visibleDistance}px)`,
-      }}
-    >
-      <div
-        className={
-          isRefreshing
-            ? "size-5 animate-spin rounded-full border-2 border-neutral-300 border-t-secondary-500"
-            : "size-5 rounded-full border-2 border-neutral-300 border-t-secondary-500"
-        }
-      />
-    </div>
-  );
-};
-
 export const SessionFindScreen = ({ values }: SessionFindScreenProps) => {
   const [isNoticeVisible, setIsNoticeVisible] = useState(true);
   const [selectedApplicationId, setSelectedApplicationId] = useState<
@@ -89,18 +52,6 @@ export const SessionFindScreen = ({ values }: SessionFindScreenProps) => {
 
   const applicationsQuery =
     useSessionApplicationsSearchInfiniteQuery(applicationSearchParams);
-
-  const handleRefresh = useCallback(async () => {
-    await applicationsQuery.refetch();
-  }, [applicationsQuery]);
-
-  const pullToRefresh = usePullToRefresh<HTMLDivElement>({
-    enabled:
-      !applicationsQuery.isLoading &&
-      !applicationsQuery.isFetchingNextPage &&
-      !applicationsQuery.isRefetching,
-    onRefresh: handleRefresh,
-  });
 
   const candidates = useMemo(() => {
     const apiCandidates =
@@ -146,15 +97,7 @@ export const SessionFindScreen = ({ values }: SessionFindScreenProps) => {
   }
 
   return (
-    <div
-      ref={pullToRefresh.containerRef}
-      className="relative min-h-dvh overscroll-y-contain bg-neutral-0 pb-[calc(var(--bottom-nav-height)+24px)]"
-    >
-      <PullToRefreshIndicator
-        pullDistance={pullToRefresh.pullDistance}
-        isRefreshing={pullToRefresh.isRefreshing}
-      />
-
+    <div className="bg-neutral-0">
       {isNoticeVisible ? (
         <section className="border-b border-neutral-300 bg-neutral-0 px-6 pb-[9px]">
           <div className="relative flex min-h-[68px] w-full items-center justify-center rounded-[12px] border border-[#FBB10E] bg-secondary-0 px-[34px] py-[15px]">
