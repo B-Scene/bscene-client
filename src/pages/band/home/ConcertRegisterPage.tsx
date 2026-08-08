@@ -314,7 +314,7 @@ const ConcertRegisterForm = ({
       setIsUploading(false);
     }
 
-    const onSuccess = () => {
+    const onSuccess = (response: PerformanceResponse) => {
       navigate("/band/register/complete", {
         state: {
           title: isEditMode ? "공연이 수정됐어요" : "공연이 등록됐어요",
@@ -327,7 +327,7 @@ const ConcertRegisterForm = ({
             { label: "장소", value: location },
           ],
           primaryLabel: "공연 상세 보기",
-          primaryTo: "/band/home",
+          primaryTo: `/band/concerts/${response.performanceId}`,
         },
       });
     };

@@ -1,4 +1,4 @@
-import { useState, type KeyboardEvent, type MouseEvent } from "react";
+import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import HeartIcon from "@/assets/icons/Heart.svg";
 import LikedHeartIcon from "@/assets/icons/Union.svg";
@@ -36,9 +36,7 @@ const ConcertLikeButton = ({
     : undefined;
   const isLiked = isInterested ?? cachedDetail?.isInterested ?? false;
 
-  const handleClick = async (event: MouseEvent<HTMLButtonElement>) => {
-    event.stopPropagation();
-
+  const handleClick = async () => {
     if (!Number.isFinite(performanceId) || performanceId <= 0) {
       return;
     }
@@ -67,10 +65,6 @@ const ConcertLikeButton = ({
     }
   };
 
-  const handleKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
-    event.stopPropagation();
-  };
-
   return (
     <button
       type="button"
@@ -85,8 +79,7 @@ const ConcertLikeButton = ({
         deletePerformanceInterestMutation.isPending ||
         isInterestSyncing
       }
-      onClick={(event) => void handleClick(event)}
-      onKeyDown={handleKeyDown}
+      onClick={() => void handleClick()}
       className={`flex size-6 items-center justify-center ${className}`}
     >
       <img

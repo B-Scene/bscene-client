@@ -2,6 +2,18 @@
   --bottom-nav-height: 5rem;
 }
 
+/* Samsung Internet / some Galaxy browsers report 100dvh larger than the
+   actually visible viewport, leaving a stale gap below short page content.
+   Route dvh-based height utilities through the corrected --app-height
+   (see MobileLayout) instead of the raw dvh unit. */
+.min-h-dvh {
+  min-height: var(--app-height, 100dvh);
+}
+
+.h-dvh {
+  height: var(--app-height, 100dvh);
+}
+
 .page-frame {
   display: flex;
   align-items: center;

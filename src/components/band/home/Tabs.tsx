@@ -29,7 +29,7 @@ export const Tabs = ({ tabs, activeTabId, onChange }: TabsProps) => {
             >
               <span>{tab.label}</span>
               <span
-                className={`h-0.5 w-28.5 ${isActive ? 'bg-secondary-500' : 'bg-transparent'}`}
+                className={`h-0.5 w-full ${isActive ? 'bg-secondary-500' : 'bg-transparent'}`}
               />
             </button>
           );

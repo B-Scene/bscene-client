@@ -975,6 +975,7 @@ const FanHomePage = () => {
           <SectionHeader
             title="이런 밴드는 어때요?"
             description="관심사 장르 · 지역 기반 추천"
+            onMoreClick={() => navigate("/fan/explore")}
           />
           <BandRecommendationStrip bands={homeData.recommendedBands} />
         </section>
@@ -993,6 +994,7 @@ const FanHomePage = () => {
           <section className="mt-8">
             <SectionHeader
               title="이런 공연은 어때요?"
+              onMoreClick={() => navigate("/fan/home/concerts?type=recommended")}
               description={
                 hasUpcomingConcerts
                   ? "지금 인기 있는 공연을 추천해드릴게요!"
@@ -1025,6 +1027,7 @@ const FanHomePage = () => {
                   ? "이런 공연은 어때요?"
                   : "추천 공연이 없어요"
               }
+              onMoreClick={() => navigate("/fan/home/concerts?type=recommended")}
               description={
                 hasUpcomingConcerts
                   ? "지금 인기 있는 공연을 추천해드릴게요!"

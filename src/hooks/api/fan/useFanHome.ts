@@ -18,12 +18,14 @@ import {
   getPerformanceCalendar,
   getPerformancesByDate,
   getPendingPerformanceParticipation,
+  getRecommendedPerformances,
   getUpcomingPerformances,
   setPerformanceAlarm,
 } from "@/api/fan/home";
 import type {
   PerformanceCalendarParams,
   PerformancesByDateParams,
+  RecommendedPerformanceSort,
   UpcomingPerformanceSort,
 } from "@/types/fan/home";
 import { interestedPerformancesKeys } from "@/hooks/api/user/useInterestedPerformances";
@@ -41,6 +43,10 @@ export const fanHomeKeys = {
     [...fanHomeKeys.all, "upcomingPerformances", sort, size] as const,
   upcomingPerformancesLists: () =>
     [...fanHomeKeys.all, "upcomingPerformances"] as const,
+  recommendedPerformances: (sort: RecommendedPerformanceSort, size: number) =>
+    [...fanHomeKeys.all, "recommendedPerformances", sort, size] as const,
+  recommendedPerformancesLists: () =>
+    [...fanHomeKeys.all, "recommendedPerformances"] as const,
   performanceCalendar: ({ year, month }: PerformanceCalendarParams) =>
     [...fanHomeKeys.all, "performanceCalendar", year ?? null, month ?? null] as const,
   performancesByDate: (date: string | undefined, size: number) =>
@@ -63,6 +69,9 @@ export const invalidatePerformanceInterestQueries = (
     }),
     queryClient.invalidateQueries({
       queryKey: fanHomeKeys.upcomingPerformancesLists(),
+    }),
+    queryClient.invalidateQueries({
+      queryKey: fanHomeKeys.recommendedPerformancesLists(),
     }),
     queryClient.invalidateQueries({
       queryKey: fanHomeKeys.performancesByDateLists(),
@@ -124,6 +133,7 @@ export const useFollowingPostsInfiniteQuery = (size = 10) => {
 export const useUpcomingPerformancesInfiniteQuery = (
   sort: UpcomingPerformanceSort = "IMMINENT",
   size = 10,
+  enabled = true,
 ) => {
   return useInfiniteQuery({
     queryKey: fanHomeKeys.upcomingPerformances(sort, size),
@@ -138,6 +148,30 @@ export const useUpcomingPerformancesInfiniteQuery = (
       if (!lastPage.hasNext) return undefined;
       return lastPage.nextPage ?? pages.length;
     },
+    enabled,
+    staleTime: 1000 * 30,
+  });
+};
+
+export const useRecommendedPerformancesInfiniteQuery = (
+  sort: RecommendedPerformanceSort = "POPULAR",
+  size = 10,
+  enabled = true,
+) => {
+  return useInfiniteQuery({
+    queryKey: fanHomeKeys.recommendedPerformances(sort, size),
+    queryFn: ({ pageParam }) =>
+      getRecommendedPerformances({
+        sort,
+        page: pageParam,
+        size,
+      }),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, pages) => {
+      if (!lastPage.hasNext) return undefined;
+      return lastPage.nextPage ?? pages.length;
+    },
+    enabled,
     staleTime: 1000 * 30,
   });
 };
@@ -201,14 +235,22 @@ export const useDeletePerformanceParticipation = () => {
 };
 
 export const useSetPerformanceAlarm = () => {
+  const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: setPerformanceAlarm,
+    onSuccess: (_data, performanceId) =>
+      invalidatePerformanceInterestQueries(queryClient, performanceId),
   });
 };
 
 export const useDeletePerformanceAlarm = () => {
+  const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: deletePerformanceAlarm,
+    onSuccess: (_data, performanceId) =>
+      invalidatePerformanceInterestQueries(queryClient, performanceId),
   });
 };
 

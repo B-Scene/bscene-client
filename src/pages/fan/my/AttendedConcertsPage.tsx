@@ -2,34 +2,11 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ArrowLeftIcon from "@/assets/icons/arrow-left.svg";
 import LocationIcon from "@/assets/icons/band/ic_location.svg";
+import ImagePlaceholderIcon from "@/assets/icons/fan/image-icon.svg";
 import TicketPerformIcon from "@/assets/icons/fan/ticket-perform.svg";
 import { usePerformanceHistoryQuery } from "@/hooks/api/user/usePerformanceHistory";
 import { useInfiniteScrollObserver } from "@/hooks/useInfiniteScrollObserver";
 import type { PerformanceHistoryFilter } from "@/types/user/performanceHistory";
-
-const MONTH_ABBREVIATIONS = [
-  "JAN",
-  "FEB",
-  "MAR",
-  "APR",
-  "MAY",
-  "JUN",
-  "JUL",
-  "AUG",
-  "SEP",
-  "OCT",
-  "NOV",
-  "DEC",
-];
-
-const getDateBadge = (performanceDate: string) => {
-  const [, month, day] = performanceDate.split("-");
-
-  return {
-    month: MONTH_ABBREVIATIONS[Number(month) - 1] ?? "",
-    day: day ?? "",
-  };
-};
 
 const AttendedConcertsPage = () => {
   const navigate = useNavigate();
@@ -123,20 +100,31 @@ const AttendedConcertsPage = () => {
 
         <ul className="flex flex-col gap-3">
           {concerts.map((concert) => {
-            const { month, day } = getDateBadge(concert.performanceDate);
-
             return (
               <li
                 key={concert.performanceId}
-                className="flex items-center gap-4 rounded-xl bg-neutral-0 px-4 py-3 shadow-[0_0_8px_0_rgba(0,0,0,0.10)]"
+                role="button"
+                tabIndex={0}
+                onClick={() =>
+                  navigate(`/fan/home/concerts/${concert.performanceId}`)
+                }
+                onKeyDown={(event) => {
+                  if (event.key !== "Enter" && event.key !== " ") return;
+                  event.preventDefault();
+                  navigate(`/fan/home/concerts/${concert.performanceId}`);
+                }}
+                className="flex cursor-pointer items-center gap-4 rounded-xl bg-neutral-0 px-4 py-3 shadow-[0_0_8px_0_rgba(0,0,0,0.10)]"
               >
-                <div className="flex w-12.5 h-15.5 shrink-0 flex-col items-center justify-center rounded-lg bg-primary-600">
-                  <span className="text-[14px] leading-none font-medium text-neutral-0">
-                    {month}
-                  </span>
-                  <span className="mt-1 text-[22px] leading-none font-semibold text-neutral-0">
-                    {day}
-                  </span>
+                <div className="flex w-12.5 h-15.5 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-neutral-400">
+                  {concert.posterImageUrl ? (
+                    <img
+                      src={concert.posterImageUrl}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <img src={ImagePlaceholderIcon} alt="" />
+                  )}
                 </div>
 
                 <div className="flex min-w-0 flex-col gap-1.25">

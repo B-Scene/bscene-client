@@ -310,20 +310,16 @@ const BandHomePage = () => {
                       <>
                         <button
                           type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            navigate(`/band/contents/${post.postId}/edit`);
-                          }}
+                          onClick={() =>
+                            navigate(`/band/contents/${post.postId}/edit`)
+                          }
                           className="flex h-6.5 items-center justify-center gap-2.5 rounded-lg bg-[#FFF6E5] px-3.75 py-1.75 text-center text-caption3 text-neutral-600"
                         >
                           수정
                         </button>
                         <button
                           type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            setDeletePostTargetId(post.postId);
-                          }}
+                          onClick={() => setDeletePostTargetId(post.postId)}
                           className="flex h-6.5 items-center justify-center gap-2.5 rounded-lg bg-neutral-300 px-3.75 py-1.75 text-caption3 text-neutral-600"
                         >
                           삭제
@@ -373,22 +369,20 @@ const BandHomePage = () => {
                         <>
                           <button
                             type="button"
-                            onClick={(event) => {
-                              event.stopPropagation();
+                            onClick={() =>
                               navigate(
                                 `/band/concerts/${performance.performanceId}/edit`,
-                              );
-                            }}
+                              )
+                            }
                             className="flex h-6.5 items-center justify-center gap-2.5 rounded-lg bg-[#FFF6E5] px-3.75 py-1.75 text-center text-caption3 text-neutral-600"
                           >
                             수정
                           </button>
                           <button
                             type="button"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setDeleteTargetId(performance.performanceId);
-                            }}
+                            onClick={() =>
+                              setDeleteTargetId(performance.performanceId)
+                            }
                             className="flex h-6.5 items-center justify-center gap-2.5 rounded-lg bg-neutral-300 px-3.75 py-1.75 text-caption3 text-neutral-600"
                           >
                             삭제
