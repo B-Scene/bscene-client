@@ -10,12 +10,7 @@ interface DatePickerSheetProps {
   open: boolean;
   startDate: string;
   endDate: string;
-<<<<<<< HEAD
-  minDate?: string;
-  maxDate?: string;
-=======
   selectionMode?: "single" | "range";
->>>>>>> develop
   onClose: () => void;
   onSelect: (range: DateRange) => void;
 }
@@ -29,7 +24,6 @@ type CalendarDay = {
   muted: boolean;
   sunday: boolean;
   today: boolean;
-  disabled: boolean;
 };
 
 const formatDateKey = (date: Date) =>
@@ -42,11 +36,7 @@ const parseDateKey = (dateKey: string) => {
   return new Date(year, month - 1, day);
 };
 
-const getCalendarDays = (
-  displayedMonth: Date,
-  minDate?: string,
-  maxDate?: string,
-): CalendarDay[] => {
+const getCalendarDays = (displayedMonth: Date): CalendarDay[] => {
   const year = displayedMonth.getFullYear();
   const month = displayedMonth.getMonth();
   const firstDate = new Date(year, month, 1);
@@ -67,11 +57,6 @@ const getCalendarDays = (
       muted,
       sunday: !muted && date.getDay() === 0,
       today: !muted && dateKey === todayKey,
-      disabled:
-        !muted &&
-        Boolean(
-          (minDate && dateKey < minDate) || (maxDate && dateKey > maxDate),
-        ),
     };
   });
 };
@@ -98,12 +83,7 @@ export const DatePickerSheet = ({
   open,
   startDate,
   endDate,
-<<<<<<< HEAD
-  minDate,
-  maxDate,
-=======
   selectionMode = "range",
->>>>>>> develop
   onClose,
   onSelect,
 }: DatePickerSheetProps) => {
@@ -123,8 +103,8 @@ export const DatePickerSheet = ({
   );
 
   const calendarDays = useMemo(
-    () => getCalendarDays(displayedMonth, minDate, maxDate),
-    [displayedMonth, minDate, maxDate],
+    () => getCalendarDays(displayedMonth),
+    [displayedMonth],
   );
 
   const monthLabel = `${displayedMonth.getFullYear()}년 ${String(
@@ -293,12 +273,12 @@ export const DatePickerSheet = ({
 
                   <button
                     type="button"
-                    disabled={day.muted || day.disabled}
+                    disabled={day.muted}
                     onClick={() => handleDayClick(day.dateKey)}
                     className={`relative z-10 flex size-7.5 shrink-0 items-center justify-center rounded-full text-caption3 ${
                       isStart || isEnd
                         ? "bg-secondary-500 text-neutral-0"
-                        : day.muted || day.disabled
+                        : day.muted
                           ? "text-neutral-400"
                           : day.sunday
                             ? "text-error"
