@@ -156,7 +156,7 @@ const InterestedConcertsPage = () => {
                     </span>
                   ) : null}
 
-                  <span className="flex h-6.5 items-center justify-center rounded-full bg-primary-50 px-3.75 text-caption3 text-primary-400">
+                  <span className="flex h-6.5 min-w-16 items-center justify-center rounded-full bg-primary-50 px-3.75 text-caption3 text-primary-400">
                     {statusLabel}
                   </span>
                 </div>
