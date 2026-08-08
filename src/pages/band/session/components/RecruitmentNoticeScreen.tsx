@@ -729,7 +729,6 @@ export const RecruitmentNoticeScreen = () => {
               ? handleApplyFindFilters
               : handleApplyRecruitmentFilters
           }
-          filterKeys={activeTab === "find" ? [...FIND_FILTER_KEYS] : undefined}
           onClose={() => setIsFilterOpen(false)}
         />
       ) : null}
