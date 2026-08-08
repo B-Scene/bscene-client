@@ -1,4 +1,4 @@
-import type { KeyboardEvent, MouseEventHandler, ReactNode } from "react";
+import type { MouseEventHandler, ReactNode } from "react";
 import arrowIcon from "@/assets/Arrow.svg";
 import locationIcon from "@/assets/icons/band/ic_location.svg";
 
@@ -76,30 +76,11 @@ const ConcertCard = ({
     ? "bg-neutral-300"
     : dateBadgeClassName;
 
-  const handleKeyDown = (event: KeyboardEvent<HTMLElement>) => {
-    if (
-      !onClick ||
-      event.repeat ||
-      (event.key !== "Enter" && event.key !== " ")
-    ) {
-      return;
-    }
-
-    event.preventDefault();
-    event.currentTarget.click();
-  };
-
-  return (
-    <article
-      aria-label={ariaLabel}
-      className={`box-border flex h-[86px] w-full max-w-[348px] items-center justify-between gap-4 rounded-xl bg-neutral-0 px-4 py-3 text-left shadow-[0_0_8px_0_rgba(0,0,0,0.10)]${
-        onClick ? " cursor-pointer" : ""
-      }`}
-      onClick={onClick}
-      onKeyDown={handleKeyDown}
-      role={onClick ? "button" : undefined}
-      tabIndex={onClick ? 0 : undefined}
-    >
+  // Kept out of any clickable wrapper so it never nests inside the primary
+  // button below — nested interactive elements resolve inconsistently
+  // across mobile browsers/accessibility services.
+  const content = (
+    <>
       <div className="flex min-w-0 flex-1 items-center gap-4">
         {showThumbnail ? (
           <div
@@ -158,19 +139,42 @@ const ConcertCard = ({
         </div>
       </div>
 
+      {!actions ? (
+        arrowIconSrc ? (
+          <img
+            src={arrowIconSrc}
+            alt={arrowIconAlt}
+            className="h-6 w-6 shrink-0"
+          />
+        ) : (
+          <span className="text-h2 shrink-0 text-neutral-600">›</span>
+        )
+      ) : null}
+    </>
+  );
+
+  return (
+    <article className="box-border flex h-[86px] w-full max-w-[348px] items-center justify-between gap-4 rounded-xl bg-neutral-0 px-4 py-3 shadow-[0_0_8px_0_rgba(0,0,0,0.10)]">
+      {onClick ? (
+        <button
+          type="button"
+          aria-label={ariaLabel}
+          onClick={onClick}
+          className="flex min-w-0 flex-1 items-center justify-between gap-4 text-left"
+        >
+          {content}
+        </button>
+      ) : (
+        <div className="flex min-w-0 flex-1 items-center justify-between gap-4">
+          {content}
+        </div>
+      )}
+
       {actions ? (
         <div className="flex shrink-0 flex-col items-center gap-2">
           {actions}
         </div>
-      ) : arrowIconSrc ? (
-        <img
-          src={arrowIconSrc}
-          alt={arrowIconAlt}
-          className="h-6 w-6 shrink-0"
-        />
-      ) : (
-        <span className="text-h2 shrink-0 text-neutral-600">›</span>
-      )}
+      ) : null}
     </article>
   );
 };
