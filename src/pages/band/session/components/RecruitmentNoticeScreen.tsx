@@ -123,18 +123,12 @@ const PullToRefreshIndicator = ({
     <div
       className="pointer-events-none fixed left-1/2 z-[70] flex size-9 items-center justify-center rounded-full bg-neutral-0 shadow-[0_4px_18px_rgba(0,0,0,0.18)]"
       style={{
-        top: "calc(env(safe-area-inset-top) + 96px)",
+        top: "calc(env(safe-area-inset-top) + 72px)",
         opacity,
         transform: `translate(-50%, ${visibleDistance}px)`,
       }}
     >
-      <div
-        className={
-          isRefreshing
-            ? "size-5 animate-spin rounded-full border-2 border-neutral-300 border-t-secondary-500"
-            : "size-5 rounded-full border-2 border-neutral-300 border-t-secondary-500"
-        }
-      />
+      <div className="size-5 animate-spin rounded-full border-2 border-neutral-300 border-t-secondary-500" />
     </div>
   );
 };
@@ -200,23 +194,25 @@ export const RecruitmentNoticeScreen = () => {
     sort,
   });
 
-  const handleRefreshRecruitments = useCallback(async () => {
-    await sessionRecruitmentsQuery.refetch();
-  }, [sessionRecruitmentsQuery]);
+  const handleRefreshPage = useCallback(async () => {
+    await new Promise<void>((resolve) => {
+      window.setTimeout(resolve, 250);
+    });
+
+    window.location.reload();
+  }, []);
 
   const recruitmentPullToRefresh = usePullToRefresh<HTMLElement>({
     enabled:
-      activeTab === "recruitment" &&
+      (activeTab === "recruitment" || activeTab === "find") &&
       !isFilterOpen &&
       !isSearchOpen &&
       !isCreateOpen &&
       editingRecruitmentId === null &&
       !isBasicProfileEditOpen &&
       selectedPostId === null &&
-      selectedApplicationId === null &&
-      !sessionRecruitmentsQuery.isLoading &&
-      !sessionRecruitmentsQuery.isFetching,
-    onRefresh: handleRefreshRecruitments,
+      selectedApplicationId === null,
+    onRefresh: handleRefreshPage,
   });
 
   useEffect(() => {
@@ -510,7 +506,7 @@ export const RecruitmentNoticeScreen = () => {
       ref={recruitmentPullToRefresh.containerRef}
       className="relative min-h-dvh overscroll-y-contain bg-neutral-0 pb-[calc(var(--bottom-nav-height)+24px)]"
     >
-      {activeTab === "recruitment" ? (
+      {activeTab === "recruitment" || activeTab === "find" ? (
         <PullToRefreshIndicator
           pullDistance={recruitmentPullToRefresh.pullDistance}
           isRefreshing={recruitmentPullToRefresh.isRefreshing}
