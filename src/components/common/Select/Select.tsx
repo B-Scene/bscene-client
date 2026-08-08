@@ -9,6 +9,7 @@ interface SelectProps {
   placeholder: string;
   className?: string;
   error?: boolean;
+  direction?: "down" | "up";
 }
 
 export const Select = ({
@@ -18,6 +19,7 @@ export const Select = ({
   placeholder,
   className = "",
   error = false,
+  direction = "down",
 }: SelectProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -53,7 +55,11 @@ export const Select = ({
       </button>
 
       {isOpen ? (
-        <div className="absolute inset-x-0 top-full z-50 mt-1 flex flex-col gap-1 rounded-[5px] border border-secondary-500 bg-neutral-0 px-4 py-2.5">
+        <div
+          className={`absolute inset-x-0 z-50 flex flex-col gap-1 rounded-[5px] border border-secondary-500 bg-neutral-0 px-4 py-2.5 ${
+            direction === "up" ? "bottom-full mb-1" : "top-full mt-1"
+          }`}
+        >
           {options.map((option) => (
             <button
               key={option}

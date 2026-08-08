@@ -252,7 +252,7 @@ const ConcertRegisterForm = ({
   };
 
   const handleTagInputKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key !== "Enter") return;
+    if (event.nativeEvent.isComposing || event.key !== "Enter") return;
     event.preventDefault();
 
     const trimmed = tagInput.trim();
@@ -373,7 +373,7 @@ const ConcertRegisterForm = ({
   };
 
   return (
-    <main className="relative flex min-h-dvh flex-col bg-secondary-0 pb-40">
+    <main className="relative flex min-h-dvh flex-col bg-secondary-0 pb-[calc(var(--bottom-nav-height)+24px)]">
       <Header
         title={isEditMode ? "공연 수정" : "공연 등록"}
         align="between"
@@ -615,7 +615,7 @@ const ConcertRegisterForm = ({
         </section>
       </div>
 
-      <div className="fixed inset-x-0 bottom-[calc(var(--bottom-nav-height)+16px)] flex flex-col gap-2 px-5">
+      <div className="mt-4.5 flex flex-col gap-2 px-5">
         {uploadError ? (
           <span className="text-center text-body5 text-error">
             {uploadError}

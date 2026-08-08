@@ -126,7 +126,7 @@ const MusicRegisterForm = ({
   };
 
   return (
-    <main className="relative min-h-dvh bg-neutral-0 pb-40">
+    <main className="relative min-h-dvh bg-neutral-0 pb-[calc(var(--bottom-nav-height)+24px)]">
       <Header title="음원 등록" />
 
       <section className="flex flex-col gap-6 px-8 pt-6">
@@ -218,7 +218,7 @@ const MusicRegisterForm = ({
         </div>
       </section>
 
-      <div className="fixed inset-x-0 bottom-[calc(var(--bottom-nav-height)+16px)] flex flex-col gap-2 px-5">
+      <div className="mt-4.5 flex flex-col gap-2 px-5">
         {saveMusicLinks.isError ? (
           <span className="text-center text-body5 text-error">
             {getApiErrorMessage(

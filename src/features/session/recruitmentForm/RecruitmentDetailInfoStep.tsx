@@ -1,14 +1,19 @@
-import { useRef, type ChangeEvent } from "react";
+import { useState, type ChangeEvent } from "react";
 
 import CalendarIcon from "@/assets/icons/band/data-range.svg";
 import ClockIcon from "@/assets/icons/band/clock-band.svg";
+import { DatePickerSheet } from "@/components/band/home/DatePickerSheet";
+import { TimePickerSheet } from "@/components/band/home/TimePickerSheet";
+import { Select } from "@/components/common/Select/Select";
 
+import { RECRUITMENT_REGION_OPTIONS } from "./sessionRecruitmentForm.constants";
 import type {
   DetailFormValues,
   FormErrors,
 } from "./sessionRecruitmentForm.types";
 import {
   formatRecruitmentDeadlineDate,
+  getTodayDateKey,
   joinClassNames,
 } from "./sessionRecruitmentForm.utils";
 import {
@@ -16,7 +21,6 @@ import {
   RecruitmentDeadlinePickerButton,
   RecruitmentErrorMessage,
   RecruitmentFieldLabel,
-  RecruitmentSelectButton,
   RecruitmentTextInput,
 } from "./RecruitmentFormFields";
 
@@ -34,9 +38,9 @@ interface RecruitmentDetailInfoStepProps {
       "practiceSchedule" | "practiceLocation" | "qualification"
     >,
   ) => (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
-  onOpenRegionSelect: () => void;
-  onDeadlineDateChange: (event: ChangeEvent<HTMLInputElement>) => void;
-  onDeadlineTimeChange: (event: ChangeEvent<HTMLInputElement>) => void;
+  onRegionChange: (region: string) => void;
+  onDeadlineDateChange: (date: string) => void;
+  onDeadlineTimeChange: (time: string) => void;
   onSubmit: () => void;
 }
 
@@ -49,37 +53,26 @@ export const RecruitmentDetailInfoStep = ({
   submitLabel = "모집 공고 등록",
   submittingLabel = "등록 중",
   onFieldChange,
-  onOpenRegionSelect,
+  onRegionChange,
   onDeadlineDateChange,
   onDeadlineTimeChange,
   onSubmit,
 }: RecruitmentDetailInfoStepProps) => {
-  const dateInputRef = useRef<HTMLInputElement>(null);
-  const timeInputRef = useRef<HTMLInputElement>(null);
-
-  const openNativePicker = (input: HTMLInputElement | null) => {
-    if (!input) return;
-
-    const pickerInput = input as HTMLInputElement & { showPicker?: () => void };
-    if (pickerInput.showPicker) {
-      pickerInput.showPicker();
-      return;
-    }
-
-    input.focus();
-    input.click();
-  };
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const [isTimePickerOpen, setIsTimePickerOpen] = useState(false);
 
   return (
     <>
       <section className="px-5 pt-0">
         <div className="rounded-[16px] bg-neutral-0 px-[18px] py-4 shadow-[0_0_8px_rgba(0,0,0,0.08)]">
           <RecruitmentFieldLabel required>활동 지역</RecruitmentFieldLabel>
-          <RecruitmentSelectButton
+          <Select
             value={values.region}
+            onChange={onRegionChange}
+            options={RECRUITMENT_REGION_OPTIONS}
             placeholder="지역 선택"
             error={Boolean(errors.region)}
-            onClick={onOpenRegionSelect}
+            className="w-full"
           />
           {errors.region ? (
             <RecruitmentErrorMessage>{errors.region}</RecruitmentErrorMessage>
@@ -126,43 +119,21 @@ export const RecruitmentDetailInfoStep = ({
           <div className="mt-3">
             <RecruitmentFieldLabel required>모집 마감일</RecruitmentFieldLabel>
             <div className="flex flex-col gap-1">
-              <div className="relative">
-                <RecruitmentDeadlinePickerButton
-                  value={formatRecruitmentDeadlineDate(values.deadlineDate)}
-                  placeholder="날짜 선택"
-                  icon={CalendarIcon}
-                  error={Boolean(errors.deadlineDate)}
-                  onClick={() => openNativePicker(dateInputRef.current)}
-                />
-                <input
-                  ref={dateInputRef}
-                  type="date"
-                  value={values.deadlineDate}
-                  tabIndex={-1}
-                  aria-hidden="true"
-                  onChange={onDeadlineDateChange}
-                  className="pointer-events-none absolute top-0 right-0 h-px w-px opacity-0"
-                />
-              </div>
+              <RecruitmentDeadlinePickerButton
+                value={formatRecruitmentDeadlineDate(values.deadlineDate)}
+                placeholder="날짜 선택"
+                icon={CalendarIcon}
+                error={Boolean(errors.deadlineDate)}
+                onClick={() => setIsDatePickerOpen(true)}
+              />
 
-              <div className="relative">
-                <RecruitmentDeadlinePickerButton
-                  value={values.deadlineTime}
-                  placeholder="시간 선택"
-                  icon={ClockIcon}
-                  error={Boolean(errors.deadlineTime)}
-                  onClick={() => openNativePicker(timeInputRef.current)}
-                />
-                <input
-                  ref={timeInputRef}
-                  type="time"
-                  value={values.deadlineTime}
-                  tabIndex={-1}
-                  aria-hidden="true"
-                  onChange={onDeadlineTimeChange}
-                  className="pointer-events-none absolute top-0 right-0 h-px w-px opacity-0"
-                />
-              </div>
+              <RecruitmentDeadlinePickerButton
+                value={values.deadlineTime}
+                placeholder="시간 선택"
+                icon={ClockIcon}
+                error={Boolean(errors.deadlineTime)}
+                onClick={() => setIsTimePickerOpen(true)}
+              />
             </div>
             {errors.deadlineDate ? (
               <RecruitmentErrorMessage>
@@ -207,16 +178,34 @@ export const RecruitmentDetailInfoStep = ({
         </div>
       </section>
 
-      {submitErrorMessage ? (
-        <p className="fixed left-1/2 bottom-[calc(var(--bottom-nav-height)+128px)] z-30 w-full max-w-[393px] -translate-x-1/2 px-6 text-center text-caption2 text-error">
-          {submitErrorMessage}
-        </p>
-      ) : null}
-
       <RecruitmentBottomActionButton
         active={isComplete && !isSubmitting}
         label={isSubmitting ? submittingLabel : submitLabel}
+        errorMessage={submitErrorMessage || undefined}
         onClick={onSubmit}
+      />
+
+      <DatePickerSheet
+        open={isDatePickerOpen}
+        startDate={values.deadlineDate}
+        endDate={values.deadlineDate}
+        minDate={getTodayDateKey()}
+        onClose={() => setIsDatePickerOpen(false)}
+        onSelect={(range) => {
+          onDeadlineDateChange(range.start);
+          setIsDatePickerOpen(false);
+        }}
+      />
+
+      <TimePickerSheet
+        open={isTimePickerOpen}
+        value={values.deadlineTime}
+        title="모집 마감 시간"
+        onClose={() => setIsTimePickerOpen(false)}
+        onConfirm={(time) => {
+          onDeadlineTimeChange(time);
+          setIsTimePickerOpen(false);
+        }}
       />
     </>
   );

@@ -1,6 +1,9 @@
 import type { ChangeEvent } from "react";
 
+import { Select } from "@/components/common/Select/Select";
+
 import {
+  RECRUITMENT_GENRE_OPTIONS,
   RECRUITMENT_PART_OPTIONS,
   RECRUITMENT_SKILL_OPTIONS,
 } from "./sessionRecruitmentForm.constants";
@@ -14,7 +17,6 @@ import {
   RecruitmentErrorMessage,
   RecruitmentFieldLabel,
   RecruitmentOptionChip,
-  RecruitmentSelectButton,
   RecruitmentTextInput,
 } from "./RecruitmentFormFields";
 
@@ -27,7 +29,7 @@ interface RecruitmentBasicInfoStepProps {
   ) => (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
   onPartClick: (part: string) => void;
   onSkillClick: (skill: string) => void;
-  onOpenGenreSelect: () => void;
+  onGenreChange: (genre: string) => void;
   onNext: () => void;
 }
 
@@ -38,7 +40,7 @@ export const RecruitmentBasicInfoStep = ({
   onFieldChange,
   onPartClick,
   onSkillClick,
-  onOpenGenreSelect,
+  onGenreChange,
   onNext,
 }: RecruitmentBasicInfoStepProps) => (
   <>
@@ -138,11 +140,14 @@ export const RecruitmentBasicInfoStep = ({
 
         <div className="mt-3">
           <RecruitmentFieldLabel required>장르</RecruitmentFieldLabel>
-          <RecruitmentSelectButton
+          <Select
             value={values.genre === "etc" ? "etc." : values.genre}
+            onChange={onGenreChange}
+            options={RECRUITMENT_GENRE_OPTIONS}
             placeholder="장르 선택"
             error={Boolean(errors.genre)}
-            onClick={onOpenGenreSelect}
+            direction="up"
+            className="w-full"
           />
           {errors.genre ? (
             <RecruitmentErrorMessage>{errors.genre}</RecruitmentErrorMessage>

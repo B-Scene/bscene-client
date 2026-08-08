@@ -1,4 +1,4 @@
-import DefaultAvatar from "@/assets/images/IMG_my.svg";
+import DefaultAvatar from "@/assets/icons/band/user-default-profile.svg";
 import { getRenderableProfileImageUrl } from "@/utils/profileImageUrl";
 
 interface ProfileSummaryProps {
@@ -17,7 +17,7 @@ export const ProfileSummary = ({
       <img
         src={getRenderableProfileImageUrl(profileImageUrl) ?? DefaultAvatar}
         alt=""
-        className="size-14 shrink-0 rounded-full object-cover"
+        className="size-15.5 shrink-0 rounded-full object-cover"
       />
 
       <div className="flex min-w-0 flex-col gap-1">

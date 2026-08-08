@@ -24,7 +24,7 @@ export const ProfileSummary = ({
         <img
           src={getRenderableProfileImageUrl(profileImageUrl) ?? DefaultAvatar}
           alt=""
-          className="size-14 shrink-0 rounded-full object-cover"
+          className="size-15.5 shrink-0 rounded-full object-cover"
         />
 
         <div className="flex min-w-0 flex-col gap-1">

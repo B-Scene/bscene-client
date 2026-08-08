@@ -4,6 +4,7 @@ import { useSlideUpSheet } from "@/hooks/useSlideUpSheet";
 interface TimePickerSheetProps {
   open: boolean;
   value: string;
+  title?: string;
   onClose: () => void;
   onConfirm: (time: string) => void;
 }
@@ -24,6 +25,7 @@ const onlyDigits = (value: string) => value.replace(/\D/g, "").slice(0, 2);
 export const TimePickerSheet = ({
   open,
   value,
+  title = "공연 시작 시간",
   onClose,
   onConfirm,
 }: TimePickerSheetProps) => {
@@ -108,7 +110,7 @@ export const TimePickerSheet = ({
             <span aria-hidden="true" />
 
             <h2 className="justify-self-center text-label1 text-neutral-900">
-              공연 시작 시간
+              {title}
             </h2>
 
             <button
