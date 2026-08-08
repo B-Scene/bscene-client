@@ -107,8 +107,13 @@ export const usePullToRefresh = <T extends HTMLElement>({
     const resetPull = () => {
       isPullingRef.current = false;
       startYRef.current = 0;
-      pullDistanceRef.current = 0;
-      setPullDistanceState(0);
+      setPullDistance(0);
+    };
+
+    const finishRefresh = () => {
+      isRefreshingRef.current = false;
+      setIsRefreshing(false);
+      resetPull();
     };
 
     const handleTouchStart = (event: TouchEvent) => {
@@ -178,7 +183,11 @@ export const usePullToRefresh = <T extends HTMLElement>({
       setIsRefreshing(true);
       setPullDistance(threshold);
 
-      await onRefreshRef.current();
+      try {
+        await onRefreshRef.current();
+      } finally {
+        finishRefresh();
+      }
     };
 
     const handleTouchCancel = () => {
