@@ -660,23 +660,29 @@ const normalizePostComment = (
     toNumericId(authorInfo.id) ??
     null;
 
+  const resolvedAuthorName =
+    toStringOrNull(result.authorName) ??
+    toStringOrNull(result.nickname) ??
+    toStringOrNull(result.userName) ??
+    toStringOrNull(result.memberName) ??
+    toStringOrNull(result.writerName) ??
+    toStringOrNull(result.name) ??
+    toStringOrNull(authorInfo.authorName) ??
+    toStringOrNull(authorInfo.nickname) ??
+    toStringOrNull(authorInfo.userName) ??
+    toStringOrNull(authorInfo.memberName) ??
+    toStringOrNull(authorInfo.writerName) ??
+    toStringOrNull(authorInfo.name);
+
   return {
     commentId,
     authorId,
-    authorName:
-      toStringOrNull(result.authorName) ??
-      toStringOrNull(result.nickname) ??
-      toStringOrNull(result.userName) ??
-      toStringOrNull(result.memberName) ??
-      toStringOrNull(result.writerName) ??
-      toStringOrNull(result.name) ??
-      toStringOrNull(authorInfo.authorName) ??
-      toStringOrNull(authorInfo.nickname) ??
-      toStringOrNull(authorInfo.userName) ??
-      toStringOrNull(authorInfo.memberName) ??
-      toStringOrNull(authorInfo.writerName) ??
-      toStringOrNull(authorInfo.name) ??
-      "익명",
+    writerMode:
+      result.writerMode === "FAN" || result.writerMode === "BAND"
+        ? result.writerMode
+        : null,
+    hasUnresolvedNickname: resolvedAuthorName === null,
+    authorName: resolvedAuthorName ?? "익명",
     profileImageUrl:
       toStringOrNull(result.profileImageUrl) ??
       toStringOrNull(result.authorProfileImageUrl) ??

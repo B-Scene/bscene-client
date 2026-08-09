@@ -10,10 +10,12 @@ import CommentIcon from "@/assets/icons/Comment.svg";
 import HeartIcon from "@/assets/icons/Heart.svg";
 import LikedHeartIcon from "@/assets/icons/Union.svg";
 import DefaultBandAvatar from "@/assets/icons/band/band-default-profile.svg";
+import OfficialIcon from "@/assets/icons/band/official-icon.svg";
 import FanImage from "@/assets/images/IMG_my.svg";
 import { Header } from "@/components/common/Header/Header";
 import { useActiveBandId } from "@/hooks/api/user/useMyProfiles";
 import { useBandQuery } from "@/hooks/api/band/useBand";
+import { useBandMembersQuery } from "@/hooks/api/band/useBandMember";
 import {
   useBandPostCommentsQuery,
   useBandPostDetailQuery,
@@ -89,6 +91,9 @@ const CommentItem = ({
   onSubmitEdit,
   onDelete,
 }: CommentItemProps) => {
+  const isBandMember =
+    comment.writerMode === "BAND" || comment.hasUnresolvedNickname;
+
   return (
     <article className="flex w-full gap-[16px]">
       <img
@@ -102,6 +107,9 @@ const CommentItem = ({
           <strong className="font-body text-caption3 text-neutral-900">
             {comment.authorName}
           </strong>
+          {isBandMember ? (
+            <img src={OfficialIcon} alt="밴드 멤버" className="size-4 shrink-0" />
+          ) : null}
           {comment.createdAt ? (
             <span className="font-body text-caption4 text-neutral-500">
               {formatRelativeTime(comment.createdAt)}
@@ -137,31 +145,30 @@ const CommentItem = ({
             </div>
           </div>
         ) : (
-          <>
-            <p className="m-0 font-body text-caption2 text-neutral-700">
-              {comment.content}
-            </p>
-            {isEditable ? (
-              <div className="mt-[6px] flex gap-[10px]">
-                <button
-                  type="button"
-                  onClick={onStartEdit}
-                  className="font-body text-caption4 text-neutral-600"
-                >
-                  수정
-                </button>
-                <button
-                  type="button"
-                  onClick={onDelete}
-                  disabled={isPending}
-                  className="font-body text-caption4 text-neutral-600 disabled:opacity-50"
-                >
-                  삭제
-                </button>
-              </div>
-            ) : null}
-          </>
+          <p className="m-0 font-body text-caption2 text-neutral-700">
+            {comment.content}
+          </p>
         )}
+
+        {!isEditing && isEditable ? (
+          <div className="mt-[6px] flex gap-[10px]">
+            <button
+              type="button"
+              onClick={onStartEdit}
+              className="font-body text-caption4 text-neutral-600"
+            >
+              수정
+            </button>
+            <button
+              type="button"
+              onClick={onDelete}
+              disabled={isPending}
+              className="font-body text-caption4 text-neutral-600 disabled:opacity-50"
+            >
+              삭제
+            </button>
+          </div>
+        ) : null}
       </div>
     </article>
   );
@@ -202,6 +209,12 @@ const ContentDetailPage = () => {
     ? numericPostId
     : undefined;
 
+  const bandMembersQuery = useBandMembersQuery(activeBandId ?? NaN);
+  const currentUser = getStoredAuthUser();
+  const myBandMemberNickname = bandMembersQuery.data?.find(
+    (member) => member.userId === currentUser?.userId,
+  )?.profileNickname;
+
   const postDetailQuery = useBandPostDetailQuery(validPostId);
   const commentsQuery = useBandPostCommentsQuery(validPostId, {
     size: COMMENT_PAGE_SIZE,
@@ -223,7 +236,6 @@ const ContentDetailPage = () => {
   const [editingCommentId, setEditingCommentId] = useState<number | null>(null);
   const [editingCommentDraft, setEditingCommentDraft] = useState("");
   const [commentErrorMessage, setCommentErrorMessage] = useState("");
-  const currentUser = getStoredAuthUser();
   const commentSentinelRef = useInfiniteScrollObserver({
     enabled:
       Boolean(commentsQuery.hasNextPage) && !commentsQuery.isFetchingNextPage,
@@ -282,10 +294,24 @@ const ContentDetailPage = () => {
       .map((comment) => comment.commentId)
       .filter((commentId): commentId is number => commentId !== null),
   );
-  const myComments = (commentsQuery.data?.pages[0]?.myComments ?? []).filter(
-    (comment) =>
-      comment.commentId === null || !commentIds.has(comment.commentId),
+  const applyMyNicknameFallback = (
+    comment: NormalizedFanExplorePostComment,
+  ): NormalizedFanExplorePostComment =>
+    comment.hasUnresolvedNickname && myBandMemberNickname
+      ? { ...comment, authorName: myBandMemberNickname }
+      : comment;
+  const rawMyComments = commentsQuery.data?.pages[0]?.myComments ?? [];
+  const myCommentIds = new Set(
+    rawMyComments
+      .map((comment) => comment.commentId)
+      .filter((commentId): commentId is number => commentId !== null),
   );
+  const myComments = rawMyComments
+    .filter(
+      (comment) =>
+        comment.commentId === null || !commentIds.has(comment.commentId),
+    )
+    .map(applyMyNicknameFallback);
   const commentCount =
     postDetail.commentCount ?? myComments.length + comments.length;
   const isCommentMutationPending =
@@ -651,13 +677,17 @@ const ContentDetailPage = () => {
                   const isEditable =
                     comment.commentId !== null &&
                     (comment.isMine ||
+                      myCommentIds.has(comment.commentId) ||
                       (currentUser?.userId != null &&
                         comment.authorId === currentUser.userId));
+                  const displayComment = isEditable
+                    ? applyMyNicknameFallback(comment)
+                    : comment;
 
                   return (
                     <CommentItem
                       key={getCommentKey("comment", comment, index)}
-                      comment={comment}
+                      comment={displayComment}
                       isEditable={isEditable}
                       isEditing={
                         comment.commentId !== null &&
