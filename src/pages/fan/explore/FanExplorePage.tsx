@@ -161,8 +161,14 @@ const mapBandToItem = (band: FanExploreBand): RecommendedBandItem => {
     contentTypes: bandInfo.contentTypes ?? band.contentTypes ?? ["밴드"],
     followers:
       bandInfo.followerCount ??
+      bandInfo.followersCount ??
+      bandInfo.followerCnt ??
+      bandInfo.followCount ??
       bandInfo.followers ??
       band.followerCount ??
+      band.followersCount ??
+      band.followerCnt ??
+      band.followCount ??
       band.followers ??
       0,
     score: band.recommendationScore ?? band.score ?? 0,

@@ -203,11 +203,11 @@ export const FollowedNewsCard = ({
       </p>
 
       {tags.length > 0 ? (
-        <div className="mt-4 flex flex-wrap gap-1">
+        <div className="mt-3 flex max-h-[38px] max-w-full flex-wrap gap-1 overflow-hidden">
           {tags.map((tag, index) => (
             <span
               key={`${tag}-${index}`}
-              className="inline-flex h-[16px] min-w-[35px] items-center justify-center rounded-full bg-primary-50 px-[5px] font-body text-label4 text-primary-400"
+              className="inline-flex h-[16px] min-w-[35px] max-w-full items-center justify-center truncate whitespace-nowrap rounded-full bg-primary-50 px-[5px] font-body text-label4 text-primary-400"
             >
               {tag}
             </span>

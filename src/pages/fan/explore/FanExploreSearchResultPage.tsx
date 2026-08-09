@@ -504,8 +504,14 @@ const FanExploreSearchResultPage = () => {
                             bandInfo.description ?? bandInfo.introduction ?? "",
                           followerCount:
                             bandInfo.followerCount ??
+                            bandInfo.followersCount ??
+                            bandInfo.followerCnt ??
+                            bandInfo.followCount ??
                             bandInfo.followers ??
                             band.followerCount ??
+                            band.followersCount ??
+                            band.followerCnt ??
+                            band.followCount ??
                             band.followers ??
                             0,
                           isFollowing:

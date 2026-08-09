@@ -49,7 +49,7 @@ const NewsCard = ({
       aria-label={ariaLabel}
       onClick={onClick}
       onKeyDown={isInteractive ? handleKeyDown : undefined}
-      className={`box-border flex h-[187px] w-[146px] shrink-0 flex-col items-start gap-[8px] rounded-[12px] bg-neutral-0 px-[10px] py-[12px] text-left shadow-[0_0_4px_0_rgba(0,0,0,0.10)] ${
+      className={`box-border flex h-[210px] w-[146px] shrink-0 flex-col items-start gap-[8px] rounded-[12px] bg-neutral-0 px-[10px] py-[12px] text-left shadow-[0_0_4px_0_rgba(0,0,0,0.10)] ${
         isInteractive
           ? 'cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-400'
           : ''
@@ -79,11 +79,11 @@ const NewsCard = ({
         />
       ) : null}
 
-      <p className={`font-body text-body5 m-0 text-neutral-900${hasContentImage ? '' : ' mt-[8px]'}`}>
+      <p className={`font-body text-body5 m-0 line-clamp-2 overflow-hidden text-neutral-900${hasContentImage ? '' : ' mt-[8px]'}`}>
         {title}
       </p>
 
-      <div className={`flex max-w-full flex-wrap gap-[4px]${hasContentImage ? '' : ' mt-auto'}`}>
+      <div className="mt-auto mb-[2px] flex max-h-[30px] max-w-full flex-wrap gap-[4px] overflow-hidden">
         {tags.map((tag, index) => (
           <span
             className="font-body text-caption5 inline-flex h-[12px] min-w-[30px] max-w-full items-center justify-center truncate whitespace-nowrap rounded-full bg-primary-50 px-[5px] text-primary-400"

@@ -231,6 +231,9 @@ export interface FanExploreBand {
   description?: string | null;
   introduction?: string | null;
   followerCount?: number;
+  followersCount?: number;
+  followCount?: number;
+  followerCnt?: number;
   followers?: number;
   isFollowing?: boolean;
   isFollowed?: boolean;

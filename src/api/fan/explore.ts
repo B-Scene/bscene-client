@@ -462,6 +462,115 @@ const normalizeBandDetail = (
   };
 };
 
+const BAND_FOLLOWER_COUNT_KEYS = [
+  "followerCount",
+  "followersCount",
+  "followerCnt",
+  "followCount",
+  "followers",
+  "bandFollowerCount",
+  "bandFollowersCount",
+  "fanCount",
+  "fansCount",
+  "subscriberCount",
+  "subscribersCount",
+  "totalFollowerCount",
+  "totalFollowers",
+] as const;
+
+const toNumberOrUndefined = (value: unknown) => {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim()) {
+    const parsedValue = Number(value);
+
+    return Number.isFinite(parsedValue) ? parsedValue : undefined;
+  }
+
+  return undefined;
+};
+
+const getBandFollowerCount = (band?: FanExploreBand | FanExploreBandDetail) => {
+  if (!band) return undefined;
+
+  const record = band as Record<string, unknown>;
+
+  for (const key of BAND_FOLLOWER_COUNT_KEYS) {
+    const count = toNumberOrUndefined(record[key]);
+
+    if (count !== undefined) return count;
+  }
+
+  return undefined;
+};
+
+const normalizeExploreBand = (band: FanExploreBand): FanExploreBand => {
+  const bandInfo = band.band ?? band;
+  const followerCount =
+    getBandFollowerCount(band) ?? getBandFollowerCount(bandInfo);
+
+  if (followerCount == null) {
+    return band;
+  }
+
+  return {
+    ...band,
+    followerCount,
+    followers: band.followers ?? followerCount,
+    band: band.band
+      ? {
+          ...bandInfo,
+          followerCount,
+          followers: bandInfo.followers ?? followerCount,
+        }
+      : band.band,
+  };
+};
+
+const enrichBandsWithFollowerCounts = async (bands: FanExploreBand[]) => {
+  return Promise.all(
+    bands.map(async (band) => {
+      const normalizedBand = normalizeExploreBand(band);
+      const bandInfo = normalizedBand.band ?? normalizedBand;
+      const bandId = toNumericId(bandInfo.bandId) ?? toNumericId(bandInfo.id);
+      const followerCount = getBandFollowerCount(normalizedBand);
+
+      if (bandId == null || (followerCount != null && followerCount > 0)) {
+        return normalizedBand;
+      }
+
+      try {
+        const detail = normalizeBandDetail(
+          await assertSuccess(
+            await axiosInstance.get<FanExploreApiResponse<FanExploreBandDetail>>(
+              `/bands/${bandId}/detail`,
+            ),
+          ),
+        );
+        const detailFollowerCount = getBandFollowerCount(detail);
+
+        if (detailFollowerCount == null) {
+          return normalizedBand;
+        }
+
+        return normalizeExploreBand({
+          ...normalizedBand,
+          followerCount: detailFollowerCount,
+          followers: detailFollowerCount,
+          band: normalizedBand.band
+            ? {
+                ...normalizedBand.band,
+                followerCount: detailFollowerCount,
+                followers: detailFollowerCount,
+              }
+            : normalizedBand.band,
+        });
+      } catch {
+        return normalizedBand;
+      }
+    }),
+  );
+};
+
 const toNumericId = (value?: number | string | null) => {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value === "string") {
@@ -926,7 +1035,14 @@ export const getRecommendedExploreBands = async ({
     }),
   });
 
-  return normalizeNumberCursorPage(assertSuccess(response), cursor);
+  const normalizedPage = normalizeNumberCursorPage(assertSuccess(response), cursor);
+
+  const items = await enrichBandsWithFollowerCounts(normalizedPage.items);
+
+  return {
+    ...normalizedPage,
+    items,
+  };
 };
 
 export const getFanExploreBandDetail = async (
@@ -1077,7 +1193,7 @@ export const searchFanExplore = async ({
     sections.postSection ??
     sections.contentResults ??
     sections.POST;
-  const bands = getSectionItems(bandSection);
+  const bands = getSectionItems(bandSection).map(normalizeExploreBand);
   const performances = getSectionItems(performanceSection);
   const contents = getSectionItems(contentSection).map(normalizeExploreContent);
 
