@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { AxiosError } from "axios";
 
@@ -44,7 +44,7 @@ import type {
   RecruitmentHistoryItem,
 } from "@/features/session/applicationHistory/applicationHistory.types";
 
-const FIND_FILTER_KEYS = ["genre", "region"] as const;
+const FIND_FILTER_KEYS = ["part", "skill", "genre", "region"] as const;
 
 const SESSION_ACTIVE_TAB_STORAGE_KEY = "bscene:session:active-tab";
 const SESSION_RECRUITMENT_FILTER_STORAGE_KEY =
@@ -226,12 +226,6 @@ export const RecruitmentNoticeScreen = () => {
         INITIAL_SESSION_FILTERS,
     );
 
-  const hasInitializedFindFilters = useRef(false);
-
-  const hasStoredFindFilters = useRef(
-    Boolean(readStoredFilterValues(SESSION_FIND_FILTER_STORAGE_KEY)),
-  );
-
   const [sort, setSort] = useState<SessionRecruitmentSort>("LATEST");
 
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -295,10 +289,18 @@ export const RecruitmentNoticeScreen = () => {
 
   const handleApplyFindFilters = useCallback(
     (nextValues: SessionFilterValues) => {
-      setFindFilterValues(nextValues);
-      writeStoredFilterValues(SESSION_FIND_FILTER_STORAGE_KEY, nextValues);
+      const summary = myApplicationSummaryQuery.data;
+
+      const syncedValues = {
+        ...nextValues,
+        genre: summary?.genre || INITIAL_SESSION_FILTERS.genre,
+        region: summary?.region || INITIAL_SESSION_FILTERS.region,
+      };
+
+      setFindFilterValues(syncedValues);
+      writeStoredFilterValues(SESSION_FIND_FILTER_STORAGE_KEY, syncedValues);
     },
-    [],
+    [myApplicationSummaryQuery.data],
   );
 
   const handleRefreshPage = useCallback(async () => {
@@ -316,7 +318,11 @@ export const RecruitmentNoticeScreen = () => {
     window.location.reload();
   }, [activeTab, findFilterValues, recruitmentFilterValues]);
 
-  const recruitmentPullToRefresh = usePullToRefresh<HTMLElement>({
+  const {
+    containerRef: recruitmentRefreshRef,
+    pullDistance: recruitmentPullDistance,
+    isRefreshing: isRecruitmentRefreshing,
+  } = usePullToRefresh<HTMLElement>({
     enabled:
       (activeTab === "recruitment" ||
         activeTab === "find" ||
@@ -349,23 +355,30 @@ export const RecruitmentNoticeScreen = () => {
   useEffect(() => {
     const summary = myApplicationSummaryQuery.data;
 
-    if (
-      !summary ||
-      hasInitializedFindFilters.current ||
-      hasStoredFindFilters.current
-    ) {
+    if (!summary) {
       return;
     }
 
-    hasInitializedFindFilters.current = true;
+    setFindFilterValues((currentValues) => {
+      const nextValues = {
+        ...currentValues,
+        genre: summary.genre || INITIAL_SESSION_FILTERS.genre,
+        region: summary.region || INITIAL_SESSION_FILTERS.region,
+      };
 
-    handleApplyFindFilters({
-      part: INITIAL_SESSION_FILTERS.part,
-      skill: INITIAL_SESSION_FILTERS.skill,
-      genre: summary.genre || INITIAL_SESSION_FILTERS.genre,
-      region: summary.region || INITIAL_SESSION_FILTERS.region,
+      const hasChanged =
+        currentValues.genre !== nextValues.genre ||
+        currentValues.region !== nextValues.region;
+
+      if (!hasChanged) {
+        return currentValues;
+      }
+
+      writeStoredFilterValues(SESSION_FIND_FILTER_STORAGE_KEY, nextValues);
+
+      return nextValues;
     });
-  }, [handleApplyFindFilters, myApplicationSummaryQuery.data]);
+  }, [myApplicationSummaryQuery.data]);
 
   const posts = useMemo(() => {
     const apiPosts =
@@ -577,7 +590,10 @@ export const RecruitmentNoticeScreen = () => {
   if (isBasicProfileEditOpen) {
     return (
       <SessionBasicProfileEditScreen
-        onBack={() => setIsBasicProfileEditOpen(false)}
+        onBack={() => {
+          setIsBasicProfileEditOpen(false);
+          void myApplicationSummaryQuery.refetch();
+        }}
       />
     );
   }
@@ -623,15 +639,15 @@ export const RecruitmentNoticeScreen = () => {
 
   return (
     <main
-      ref={recruitmentPullToRefresh.containerRef}
+      ref={recruitmentRefreshRef}
       className="relative min-h-dvh overscroll-y-contain bg-neutral-0 pb-[calc(var(--bottom-nav-height)+24px)]"
     >
       {activeTab === "recruitment" ||
       activeTab === "find" ||
       activeTab === "applications" ? (
         <PullToRefreshIndicator
-          pullDistance={recruitmentPullToRefresh.pullDistance}
-          isRefreshing={recruitmentPullToRefresh.isRefreshing}
+          pullDistance={recruitmentPullDistance}
+          isRefreshing={isRecruitmentRefreshing}
         />
       ) : null}
 

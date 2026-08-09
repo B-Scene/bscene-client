@@ -1,19 +1,22 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import Modal from "@/components/Modal/Modal";
-import { ModalOverlay } from "@/components/common/Modal/ModalOverlay";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   createWhipSession,
   deleteWhipSession,
   getLiveMembers,
   subscribeViewerCount,
 } from "@/api/live/live";
+import Modal from "@/components/Modal/Modal";
+import { ModalOverlay } from "@/components/common/Modal/ModalOverlay";
 import {
   useAcceptCoHostUpgradeMutation,
+  useBlockLiveUserMutation,
   useCloseLiveMutation,
   useLeaveLiveMutation,
+  useReportLiveUserMutation,
+  useUnblockLiveUserMutation,
 } from "@/hooks/api/live/useLive";
+import type { LiveMemberItem, ReportLiveUserRequest } from "@/types/live/live";
 import { getApiErrorMessage } from "@/utils/getApiErrorMessage";
-import type { LiveMemberItem } from "@/types/live/live";
 import type { ActiveLive, ChatMessage, GoLiveScreen } from "./types";
 import { getCachedScheduledCoHostUserIds } from "./scheduledLiveCache";
 import {
@@ -25,11 +28,16 @@ import { useLiveRoomPlayback } from "./hooks/useLiveRoomPlayback";
 import {
   ChatComposer,
   LiveActionBar,
+  LiveChatProfileActionSheet,
   LiveRoomHeader,
   LiveRoomHero,
   MemberSheet,
   RoomMessageArea,
 } from "./components/LiveRoomParts";
+import {
+  BandLiveReportCompletePage,
+  BandLiveReportPage,
+} from "./components/LiveReportFlow";
 
 interface LiveRoomProps {
   go: GoLiveScreen;
@@ -39,12 +47,20 @@ interface LiveRoomProps {
   chatOpen?: boolean;
   overlay?: "members" | "endConfirm";
 }
+
 type LiveAudioStatus =
   | "idle"
   | "connecting"
   | "connected"
   | "error"
   | "unsupported";
+
+type LiveRoomView = "room" | "report" | "reportComplete";
+
+type ReportTarget = {
+  targetUserId?: number;
+  chatMessage: string;
+};
 
 const MIC_VOLUME_MIN = 0;
 const MIC_VOLUME_MAX = 150;
@@ -100,14 +116,19 @@ export function LiveRoom({
   const closeLiveMutation = useCloseLiveMutation();
   const leaveLiveMutation = useLeaveLiveMutation();
   const acceptCoHostUpgradeMutation = useAcceptCoHostUpgradeMutation();
+  const reportLiveUserMutation = useReportLiveUserMutation();
+  const blockLiveUserMutation = useBlockLiveUserMutation();
+  const unblockLiveUserMutation = useUnblockLiveUserMutation();
 
   const playbackRole = live?.playback?.role;
   const playbackProtocol = live?.playback?.protocol;
   const playbackUrl = live?.playback?.playbackUrl;
+
   const canBroadcast =
     playbackRole === "BROADCASTER" || playbackRole === "CO_HOST";
   const canCloseLive = playbackRole === "BROADCASTER";
 
+  const [view, setView] = useState<LiveRoomView>("room");
   const [viewerCount, setViewerCount] = useState(() =>
     getInitialViewerCount(live),
   );
@@ -122,6 +143,29 @@ export function LiveRoom({
   const [isMicMuted, setIsMicMuted] = useState(false);
   const [liveMembers, setLiveMembers] = useState<LiveMemberItem[]>([]);
   const [isMembersLoading, setIsMembersLoading] = useState(false);
+  const [isProfileActionSheetOpen, setIsProfileActionSheetOpen] =
+    useState(false);
+  const [isBlockConfirmOpen, setIsBlockConfirmOpen] = useState(false);
+  const [reportTarget, setReportTarget] = useState<ReportTarget | null>(null);
+  const [blockedUserIds, setBlockedUserIds] = useState<Set<number>>(
+    () => new Set(),
+  );
+
+  const selectedUserId = reportTarget?.targetUserId;
+
+  const isSelectedUserBlocked = selectedUserId
+    ? blockedUserIds.has(selectedUserId)
+    : false;
+
+  const isBlockPending =
+    blockLiveUserMutation.isPending || unblockLiveUserMutation.isPending;
+
+  const visibleMessages = useMemo(() => {
+    return messages.filter(
+      (message) =>
+        !message.senderId || !blockedUserIds.has(message.senderId),
+    );
+  }, [blockedUserIds, messages]);
 
   const audioStatusRef = useRef<LiveAudioStatus>("idle");
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
@@ -152,6 +196,101 @@ export function LiveRoom({
     audioConnected: audioStatus === "connected",
   });
 
+  const handleSubmitReport = async (
+    request: Omit<ReportLiveUserRequest, "targetUserId" | "chatMessage">,
+  ) => {
+    if (!live?.liveId || !reportTarget?.targetUserId) {
+      alert("신고 대상 사용자 정보를 확인할 수 없어요.");
+      return;
+    }
+
+    try {
+      await reportLiveUserMutation.mutateAsync({
+        liveId: live.liveId,
+        request: {
+          ...request,
+          targetUserId: reportTarget.targetUserId,
+          chatMessage: reportTarget.chatMessage,
+        },
+      });
+
+      setView("reportComplete");
+    } catch (error) {
+      alert(getApiErrorMessage(error, "신고를 접수하지 못했어요."));
+    }
+  };
+
+    const handleOpenProfileAction = (chat: ChatMessage) => {
+      if (chat.pending) {
+        return;
+      }
+
+      setReportTarget({
+        targetUserId: chat.senderId,
+        chatMessage: chat.message,
+      });
+      setIsProfileActionSheetOpen(true);
+    };
+  const handleConfirmBlock = async () => {
+    if (!live?.liveId || !selectedUserId || blockLiveUserMutation.isPending) {
+      return;
+    }
+
+    try {
+      await blockLiveUserMutation.mutateAsync({
+        liveId: live.liveId,
+        targetUserId: selectedUserId,
+      });
+
+      setBlockedUserIds((current) => {
+        const next = new Set(current);
+        next.add(selectedUserId);
+        return next;
+      });
+
+      setIsBlockConfirmOpen(false);
+      setIsProfileActionSheetOpen(false);
+    } catch (error) {
+      alert(getApiErrorMessage(error, "사용자를 차단하지 못했어요."));
+    }
+  };
+
+  const handleUnblockUser = async () => {
+    if (!live?.liveId || !selectedUserId || unblockLiveUserMutation.isPending) {
+      return;
+    }
+
+    try {
+      await unblockLiveUserMutation.mutateAsync({
+        liveId: live.liveId,
+        targetUserId: selectedUserId,
+      });
+
+      setBlockedUserIds((current) => {
+        const next = new Set(current);
+        next.delete(selectedUserId);
+        return next;
+      });
+    } catch (error) {
+      alert(getApiErrorMessage(error, "사용자 차단을 해제하지 못했어요."));
+    }
+  };
+
+  const handleBlockToggle = () => {
+    if (!selectedUserId) {
+      alert("신고/차단 대상 사용자 정보를 확인할 수 없어요.");
+      return;
+    }
+
+    if (isSelectedUserBlocked) {
+      void handleUnblockUser();
+      return;
+    }
+
+    setIsProfileActionSheetOpen(false);
+    setIsBlockConfirmOpen(true);
+  };
+
   const handleAcceptCoHostUpgrade = async () => {
     if (!live?.liveId || acceptCoHostUpgradeMutation.isPending) return;
 
@@ -175,6 +314,7 @@ export function LiveRoom({
             liveId: live.liveId,
             userId,
           });
+
           setCoHostApprovalMessage("공동 진행 요청을 승인했어요.");
           return;
         } catch (error) {
@@ -278,11 +418,14 @@ export function LiveRoom({
 
   const toggleMicTrackOnly = useCallback(() => {
     const originalTracks = micStreamRef.current?.getAudioTracks() ?? [];
-    const processedTracks = processedMicStreamRef.current?.getAudioTracks() ?? [];
+    const processedTracks =
+      processedMicStreamRef.current?.getAudioTracks() ?? [];
     const allAudioTracks = [...originalTracks, ...processedTracks];
 
     if (allAudioTracks.length === 0) {
-      setAudioErrorMessage("마이크 트랙을 찾을 수 없어요. 송출을 다시 시작해주세요.");
+      setAudioErrorMessage(
+        "마이크 트랙을 찾을 수 없어요. 송출을 다시 시작해주세요.",
+      );
       return;
     }
 
@@ -540,13 +683,17 @@ export function LiveRoom({
     if (overlay !== "members" || !live?.liveId) return;
 
     let isMounted = true;
+
     const loadMembers = async () => {
       await Promise.resolve();
+
       if (!isMounted) return;
 
       setIsMembersLoading(true);
+
       try {
         const response = await getLiveMembers(live.liveId);
+
         if (!isMounted) return;
 
         setLiveMembers(response.members);
@@ -555,7 +702,9 @@ export function LiveRoom({
 
         setLiveMembers([]);
       } finally {
-        if (isMounted) setIsMembersLoading(false);
+        if (isMounted) {
+          setIsMembersLoading(false);
+        }
       }
     };
 
@@ -572,13 +721,34 @@ export function LiveRoom({
     };
   }, [cleanupWhipBroadcast]);
 
+  if (view === "report") {
+    return (
+      <BandLiveReportPage
+        isSubmitting={reportLiveUserMutation.isPending}
+        onBack={() => setView("room")}
+        onSubmit={handleSubmitReport}
+      />
+    );
+  }
+
+  if (view === "reportComplete") {
+    return (
+      <BandLiveReportCompletePage
+        onBackToLive={() => {
+          setView("room");
+          setReportTarget(null);
+        }}
+      />
+    );
+  }
+
   return (
     <main className="relative flex h-dvh min-h-0 flex-col overflow-hidden bg-neutral-0 text-neutral-900">
       <LiveRoomHeader
         canCloseLive={canCloseLive}
-        onClose={() => void handleHeaderAction()}
-        viewerCount={viewerCount}
         durationSeconds={durationSeconds}
+        viewerCount={viewerCount}
+        onClose={() => void handleHeaderAction()}
       />
 
       <LiveRoomHero
@@ -602,6 +772,7 @@ export function LiveRoom({
               ? "승인 중"
               : "공동 진행 요청 승인"}
           </button>
+
           {coHostApprovalMessage ? (
             <p className="rounded-lg bg-neutral-900/85 px-3 py-2 text-right text-caption3 text-neutral-0">
               {coHostApprovalMessage}
@@ -648,13 +819,18 @@ export function LiveRoom({
         </button>
       ) : null}
 
-      <RoomMessageArea composerOpen={chatOpen} messages={messages} />
+      <RoomMessageArea
+        composerOpen={chatOpen}
+        messages={visibleMessages}
+        onProfileClick={handleOpenProfileAction}
+      />
+
       {chatOpen ? <ChatComposer onSendMessage={onSendMessage} /> : null}
 
       <LiveActionBar
         go={go}
-        chatOpen={chatOpen}
         audioStatus={audioStatus}
+        chatOpen={chatOpen}
         isMicMuted={isMicMuted}
         micVolume={micVolume}
         onMicVolumeChange={handleMicVolumeChange}
@@ -664,10 +840,56 @@ export function LiveRoom({
       {overlay === "members" ? (
         <MemberSheet
           go={go}
-          members={liveMembers}
           isLoading={isMembersLoading}
+          members={liveMembers}
         />
       ) : null}
+
+      <LiveChatProfileActionSheet
+        isBlocked={isSelectedUserBlocked}
+        isBlockPending={isBlockPending}
+        open={isProfileActionSheetOpen}
+        onBlockToggle={handleBlockToggle}
+        onClose={() => setIsProfileActionSheetOpen(false)}
+        onReport={() => {
+          if (!reportTarget?.targetUserId) {
+            alert("신고 대상 사용자 정보를 확인할 수 없어요.");
+            return;
+          }
+
+          setIsProfileActionSheetOpen(false);
+          setView("report");
+        }}
+      />
+
+      <ModalOverlay
+        open={isBlockConfirmOpen}
+        panelClassName="rounded-[24px]"
+        onClose={() => {
+          if (!blockLiveUserMutation.isPending) {
+            setIsBlockConfirmOpen(false);
+          }
+        }}
+      >
+        <Modal
+          tone="orange"
+          title="이 사용자를 차단할까요?"
+          description={
+            <>
+              이 라이브에서 서로의 메시지를
+              <br />
+              더 이상 볼 수 없어요.
+            </>
+          }
+          cancelDisabled={blockLiveUserMutation.isPending}
+          confirmDisabled={blockLiveUserMutation.isPending}
+          confirmLabel={
+            blockLiveUserMutation.isPending ? "차단 중" : "차단하기"
+          }
+          onCancel={() => setIsBlockConfirmOpen(false)}
+          onConfirm={() => void handleConfirmBlock()}
+        />
+      </ModalOverlay>
 
       {overlay === "endConfirm" ? (
         <ModalOverlay open onClose={() => go("room")}>

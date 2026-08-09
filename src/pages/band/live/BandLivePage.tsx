@@ -32,7 +32,9 @@ import {
 const toChatTime = (value?: string) => {
   if (!value) return "지금";
 
-  const normalizedValue = value.includes("T") ? value : value.replace(" ", "T");
+  const normalizedValue = value.includes("T")
+    ? value
+    : value.replace(" ", "T");
   const date = new Date(normalizedValue);
 
   if (Number.isNaN(date.getTime())) {
@@ -44,19 +46,41 @@ const toChatTime = (value?: string) => {
   ).padStart(2, "0")}`;
 };
 
+const getCoHostUserIds = (live?: ActiveLive) => {
+  return new Set(
+    [...(live?.coHosts ?? []), ...(live?.coHostList ?? [])]
+      .map((coHost) => coHost.userId)
+      .filter((userId): userId is number => Number.isFinite(userId)),
+  );
+};
+
+const isLiveSpeakerChatMessage = (
+  message: LiveChatMessageData,
+  live?: ActiveLive,
+) => {
+  const coHostUserIds = getCoHostUserIds(live);
+
+  const isBandProfileMessage =
+    Boolean(live?.bandProfileImageUrl) &&
+    message.senderProfileImageUrl === live?.bandProfileImageUrl;
+
+  const isCoHostMessage = coHostUserIds.has(message.senderId);
+
+  return isBandProfileMessage || isCoHostMessage;
+};
+
 const mapLiveChatMessageToChatMessage = (
   message: LiveChatMessageData,
   frame: LiveChatMessageFrame,
-  bandProfileImageUrl?: string | null,
+  live?: ActiveLive,
 ): ChatMessage => {
   return {
     id: Date.now() + Math.random(),
+    senderId: message.senderId,
     sender: message.senderName,
     message: message.content,
     time: toChatTime(message.sentAt),
-    highlighted:
-      Boolean(bandProfileImageUrl) &&
-      message.senderProfileImageUrl === bandProfileImageUrl,
+    highlighted: isLiveSpeakerChatMessage(message, live),
     clientMsgId: frame.clientMsgId,
     serverMessageId: message.messageId,
     senderProfileImageUrl: message.senderProfileImageUrl,
@@ -212,6 +236,7 @@ const isCoHostBroadcastReady = (live: NonNullable<ActiveLive>) =>
 export function BandLivePage() {
   const activeBandId = useActiveBandId();
   const [searchParams, setSearchParams] = useSearchParams();
+
   const [screen, setScreen] = useState<BandLiveScreen>("home");
   const [activeLive, setActiveLive] = useState<ActiveLive>(null);
   const [endedLiveId, setEndedLiveId] = useState<number | null>(null);
@@ -244,10 +269,12 @@ export function BandLivePage() {
     () => getCoHostInviteLiveId(searchParams),
     [searchParams],
   );
+
   const coHostUpgradeApprovalLiveId = useMemo(
     () => getCoHostUpgradeApprovalLiveId(searchParams),
     [searchParams],
   );
+
   const coHostRequesterUserId = getValidLiveId(
     searchParams.get("coHostRequesterUserId"),
   );
@@ -279,7 +306,7 @@ export function BandLivePage() {
         const messageFromServer = mapLiveChatMessageToChatMessage(
           message,
           frame,
-          activeLive?.bandProfileImageUrl,
+          activeLive,
         );
 
         const optimisticMessageIndex = frame.clientMsgId
@@ -305,7 +332,7 @@ export function BandLivePage() {
         return [...prevMessages, messageFromServer];
       });
     },
-    [activeLive?.bandProfileImageUrl],
+    [activeLive],
   );
 
   const handleLiveEndedFromSocket = useCallback(() => {
@@ -458,6 +485,7 @@ export function BandLivePage() {
 
   useEffect(() => {
     if (!coHostUpgradeApprovalLiveId) return;
+
     if (
       handledCoHostUpgradeApprovalLiveIdRef.current ===
       coHostUpgradeApprovalLiveId
@@ -550,9 +578,9 @@ export function BandLivePage() {
     acceptCoHostUpgradeMutation,
     activeBandId,
     clearCoHostInviteSearchParams,
-    coHostUpgradeApprovalLiveId,
     coHostRequesterNickname,
     coHostRequesterUserId,
+    coHostUpgradeApprovalLiveId,
     enterLiveMutation,
     handleEnterLive,
   ]);
@@ -705,14 +733,14 @@ export function BandLivePage() {
   }
 
   if (screen === "scheduledList") {
-  return (
-    <BandLiveScheduledListPage
-      go={handleGo}
-      onEnterLive={handleEnterLive}
-      onEditReservation={handleEditReservation}
-    />
-  );
-}
+    return (
+      <BandLiveScheduledListPage
+        go={handleGo}
+        onEnterLive={handleEnterLive}
+        onEditReservation={handleEditReservation}
+      />
+    );
+  }
 
   if (screen === "room" || screen === "chat") {
     if (!activeLive) {
