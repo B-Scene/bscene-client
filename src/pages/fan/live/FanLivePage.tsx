@@ -166,8 +166,8 @@ export function FanLivePage() {
       if (blockedUserIds.has(message.senderId)) return;
 
       const isBandMember =
-        message.senderName === live?.bandName ||
-        liveMembers.some((member) => member.nickname === message.senderName);
+        Boolean(live?.bandProfileImageUrl) &&
+        message.senderProfileImageUrl === live?.bandProfileImageUrl;
 
       const confirmedMessage: FanChatMessage = {
         id: message.messageId,
@@ -197,7 +197,7 @@ export function FanLivePage() {
         );
       });
     },
-    [blockedUserIds, live?.bandName, liveMembers],
+    [blockedUserIds, live?.bandProfileImageUrl],
   );
 
   const {
@@ -296,18 +296,7 @@ export function FanLivePage() {
         const response = await getLiveMembers(live.liveId);
         if (!isMounted) return;
 
-        const memberNames = new Set(
-          response.members.map((member) => member.nickname),
-        );
-
         setLiveMembers(response.members);
-        setChatMessages((current) =>
-          current.map((chat) => ({
-            ...chat,
-            band:
-              chat.sender === live.bandName || memberNames.has(chat.sender),
-          })),
-        );
       } catch {
         if (!isMounted) return;
 
@@ -323,7 +312,7 @@ export function FanLivePage() {
     return () => {
       isMounted = false;
     };
-  }, [live?.bandName, live?.liveId]);
+  }, [live?.liveId]);
 
   useEffect(() => {
     const audio = audioRef.current;

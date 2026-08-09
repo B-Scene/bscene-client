@@ -221,6 +221,7 @@ const ProfileEditForm = ({
             onChange={(event) => setNickname(event.target.value)}
             placeholder="닉네임을 입력해주세요"
             maxLength={8}
+            focusColor="primary"
             className="w-full rounded-[5px] py-1.25 pl-4"
           />
         </div>
