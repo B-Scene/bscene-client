@@ -634,7 +634,7 @@ const FanContentDetailPage = () => {
                     src={url}
                     alt={`콘텐츠 이미지 ${index + 1}`}
                     onClick={() => setLightboxIndex(index)}
-                    className="h-full w-full shrink-0 snap-center cursor-zoom-in object-cover"
+                    className="h-full w-full shrink-0 snap-center cursor-zoom-in object-cover [dynamic-range-limit:standard]"
                   />
                 ))
               )

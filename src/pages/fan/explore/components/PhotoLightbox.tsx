@@ -96,7 +96,7 @@ export const PhotoLightbox = ({
         <img
           src={images[currentIndex]}
           alt={`이미지 ${currentIndex + 1}/${images.length}`}
-          className="max-h-full max-w-full object-contain"
+          className="max-h-full max-w-full object-contain [dynamic-range-limit:standard]"
           onClick={(event) => event.stopPropagation()}
         />
       </div>
