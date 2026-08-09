@@ -8,6 +8,7 @@ import IcMicIcon from "@/assets/icons/ic_Mic.svg";
 import LiveHeadIcon from "@/assets/icons/live-head.svg";
 import UsersIcon from "@/assets/icons/users.svg";
 import ProfileIcon from "@/assets/icons/profile.svg";
+import { useSlideUpSheet } from "@/hooks/useSlideUpSheet";
 import type { LiveMemberItem } from "@/types/live/live";
 import type { ActiveLive, ChatMessage, GoLiveScreen } from "../types";
 import { ProfileImage } from "./ProfileImage";
@@ -162,43 +163,140 @@ function VerifiedBadge() {
   return <img src={BadgeIcon} alt="인증됨" className="size-6 object-contain" />;
 }
 
-function ChatBubble({ chat }: { chat: ChatMessage }) {
+function ChatProfileImage({
+  chat,
+  onClick,
+}: {
+  chat: ChatMessage;
+  onClick?: () => void;
+}) {
+  const fallbackSrc = chat.highlighted ? FBandProfileIcon : ProfileIcon;
+  const imageSrc = chat.senderProfileImageUrl ?? fallbackSrc;
+
+  const imageElement = (
+    <div className="relative flex size-10 shrink-0">
+      <img
+        src={imageSrc}
+        alt=""
+        onError={(event) => {
+          event.currentTarget.onerror = null;
+          event.currentTarget.src = fallbackSrc;
+        }}
+        className={`size-10 rounded-full object-cover ${
+          chat.highlighted ? "border border-secondary-300" : ""
+        }`}
+      />
+
+      {chat.highlighted ? (
+        <span className="absolute -right-0.5 -bottom-0.5 flex size-3.5 items-center justify-center rounded-full bg-neutral-0 shadow-[0_1px_4px_rgba(20,20,20,0.12)]">
+          <img src={IcMicIcon} alt="" className="size-2.5 object-contain" />
+        </span>
+      ) : null}
+    </div>
+  );
+
+  if (!onClick || chat.pending) {
+    return imageElement;
+  }
+
   return (
-    <article className="grid grid-cols-[44px_minmax(0,1fr)_38px] items-start gap-2">
-      <div className="relative row-span-2 mt-1 flex size-11 shrink-0 items-start justify-center">
-        <img
-          src={
-            chat.highlighted
-              ? FBandProfileIcon
-              : (chat.senderProfileImageUrl ?? ProfileIcon)
+    <button
+      type="button"
+      aria-label="채팅 사용자 메뉴 열기"
+      onClick={(event) => {
+        event.stopPropagation();
+        onClick();
+      }}
+      className="flex size-10 shrink-0 items-center justify-center rounded-full"
+    >
+      {imageElement}
+    </button>
+  );
+}
+
+function ChatBubble({
+  chat,
+  onProfileClick,
+}: {
+  chat: ChatMessage;
+  onProfileClick?: (chat: ChatMessage) => void;
+}) {
+  const canOpenProfileAction = !chat.pending;
+
+  const handleOpenProfileAction = () => {
+    if (!canOpenProfileAction) return;
+    onProfileClick?.(chat);
+  };
+if (chat.highlighted) {
+  return (
+    <article className="grid grid-cols-[40px_283px] items-start gap-[15px]">
+      <ChatProfileImage chat={chat} onClick={handleOpenProfileAction} />
+
+      <div
+        role={canOpenProfileAction ? "button" : undefined}
+        tabIndex={canOpenProfileAction ? 0 : undefined}
+        onClick={handleOpenProfileAction}
+        onKeyDown={(event) => {
+          if (!canOpenProfileAction) return;
+
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            handleOpenProfileAction();
           }
-          alt=""
-          className={
-            chat.highlighted
-              ? "size-11 object-contain"
-              : "size-10 rounded-full object-cover"
-          }
-        />
+        }}
+        className={`relative min-h-[73px] w-[283px] max-w-full rounded-2xl border border-secondary-300 bg-secondary-0/50 px-[11px] py-[7px] pr-11 ${
+          canOpenProfileAction ? "cursor-pointer" : ""
+        }`}
+      >
+        <strong className="block text-caption3 text-neutral-900">
+          {chat.sender}
+        </strong>
+
+        <p
+          className={`mt-1 break-words whitespace-pre-wrap text-body3 text-neutral-900 ${
+            chat.pending ? "opacity-60" : ""
+          }`}
+        >
+          {chat.message}
+        </p>
+
+        <time className="absolute right-[11px] top-1/2 -translate-y-1/2 text-caption4 text-neutral-600">
+          {chat.time}
+        </time>
+      </div>
+    </article>
+  );
+}
+
+  return (
+    <article className="grid grid-cols-[40px_283px] items-start gap-[15px]">
+      <div className="row-span-1">
+        <ChatProfileImage chat={chat} onClick={handleOpenProfileAction} />
       </div>
 
-      <strong className="min-w-0 truncate text-caption3 text-neutral-900">
-        {chat.sender}
-      </strong>
-      <span />
+      <div className="w-[283px] max-w-full">
+        <button
+          type="button"
+          onClick={handleOpenProfileAction}
+          className="block max-w-full truncate text-left text-caption3 text-neutral-900"
+        >
+          {chat.sender}
+        </button>
 
-      <p
-        className={`mt-1 min-h-7 max-w-[191px] break-words whitespace-pre-wrap rounded-xl px-[11px] py-1 text-body3 text-neutral-900 ${
-          chat.highlighted
-            ? "border border-secondary-300 bg-secondary-100/25"
-            : "bg-neutral-0"
-        } ${chat.pending ? "opacity-60" : ""}`}
-      >
-        {chat.message}
-      </p>
+        <div className="mt-1 grid grid-cols-[minmax(0,1fr)_38px] items-start">
+          <p
+            className={`min-h-7 max-w-[191px] break-words whitespace-pre-wrap rounded-xl bg-neutral-0 px-[11px] py-1 text-body3 text-neutral-900 ${
+              chat.pending ? "opacity-60" : ""
+            }`}
+          >
+            {chat.message}
+          </p>
 
-      <time className="mt-[13px] justify-self-end text-caption4 text-neutral-600">
-        {chat.time}
-      </time>
+          <time className="mr-[11px] mt-[8px] justify-self-end self-start text-caption4 text-neutral-600">
+            {chat.time}
+          </time>
+        </div>
+      </div>
     </article>
   );
 }
@@ -206,9 +304,11 @@ function ChatBubble({ chat }: { chat: ChatMessage }) {
 export function RoomMessageArea({
   composerOpen,
   messages,
+  onProfileClick,
 }: {
   composerOpen: boolean;
   messages: ChatMessage[];
+  onProfileClick?: (chat: ChatMessage) => void;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -229,7 +329,11 @@ export function RoomMessageArea({
       >
         <div className="grid gap-3.5">
           {messages.map((chat) => (
-            <ChatBubble key={chat.id} chat={chat} />
+            <ChatBubble
+              key={chat.id}
+              chat={chat}
+              onProfileClick={onProfileClick}
+            />
           ))}
         </div>
       </div>
@@ -358,7 +462,9 @@ export function LiveActionBar({
               max={150}
               step={5}
               value={displayVolume}
-              onChange={(event) => onMicVolumeChange(Number(event.target.value))}
+              onChange={(event) =>
+                onMicVolumeChange(Number(event.target.value))
+              }
               aria-label="마이크 볼륨"
               className="h-1 min-w-0 flex-1 cursor-pointer accent-secondary-500"
             />
@@ -455,6 +561,95 @@ export function MemberSheet({
         </div>
 
         <div className="mx-auto mt-5 h-1 w-[132px] rounded-full bg-neutral-300" />
+      </section>
+    </div>
+  );
+}
+
+export function LiveChatProfileActionSheet({
+  isBlocked,
+  isBlockPending,
+  open,
+  onBlockToggle,
+  onClose,
+  onReport,
+}: {
+  isBlocked: boolean;
+  isBlockPending: boolean;
+  open: boolean;
+  onBlockToggle: () => void;
+  onClose: () => void;
+  onReport: () => void;
+}) {
+  const { rendered, isVisible, handleTransitionEnd } = useSlideUpSheet(open);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [open, onClose]);
+
+  if (!rendered) return null;
+
+  return (
+    <div className="fixed inset-0 z-[90] flex items-end justify-center">
+      <button
+        type="button"
+        aria-label="사용자 메뉴 닫기"
+        onClick={onClose}
+        className={`absolute inset-0 bg-neutral-900/70 transition-opacity duration-300 ease-out ${
+          isVisible ? "opacity-100" : "opacity-0"
+        }`}
+      />
+
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-label="사용자 관리"
+        onTransitionEnd={handleTransitionEnd}
+        className={`relative z-10 h-[268px] w-full max-w-[393px] rounded-t-[24px] bg-neutral-0 px-5 pt-12 pb-12 shadow-[0_-8px_24px_rgba(20,20,20,0.16)] transition-transform duration-300 ease-out ${
+          isVisible ? "translate-y-0" : "translate-y-full"
+        }`}
+      >
+        <div className="absolute top-[7px] left-1/2 h-1 w-[42px] -translate-x-1/2 rounded-full bg-neutral-300" />
+
+        <div className="w-full overflow-hidden rounded-xl bg-neutral-200/70">
+          <button
+            type="button"
+            onClick={onReport}
+            className="flex h-14 w-full items-center justify-center border-b border-neutral-300 px-4 py-[18px] text-label2 text-[#007AFF]"
+          >
+            댓글 신고하기
+          </button>
+
+          <button
+            type="button"
+            onClick={onBlockToggle}
+            disabled={isBlockPending}
+            className="flex h-14 w-full items-center justify-center px-4 py-[18px] text-label2 text-[#FF3B30]"
+          >
+            {isBlockPending
+              ? "처리 중"
+              : isBlocked
+                ? "차단 해제하기"
+                : "사용자 차단하기"}
+          </button>
+        </div>
+
+        <button
+          type="button"
+          onClick={onClose}
+          className="mt-2 flex h-[52px] w-full items-center justify-center rounded-xl bg-neutral-400 px-[159px] py-[14px] text-label2 text-neutral-700"
+        >
+          취소
+        </button>
+
+        <div className="absolute bottom-[8px] left-1/2 h-1 w-[132px] -translate-x-1/2 rounded-full bg-neutral-300" />
       </section>
     </div>
   );

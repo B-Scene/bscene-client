@@ -43,11 +43,13 @@ export const SessionFindScreen = ({ values }: SessionFindScreenProps) => {
 
   const applicationSearchParams = useMemo(
     () => ({
+      part: getFilterParam(values.part),
+      skillLevel: getFilterParam(values.skill),
       genre: getFilterParam(values.genre),
       region: getFilterParam(values.region),
       size: SESSION_FIND_PAGE_SIZE,
     }),
-    [values.genre, values.region],
+    [values.part, values.skill, values.genre, values.region],
   );
 
   const applicationsQuery =
@@ -60,15 +62,27 @@ export const SessionFindScreen = ({ values }: SessionFindScreenProps) => {
       ) ?? [];
 
     return apiCandidates.filter((candidate) => {
+      const matchesPart =
+        values.part === "전체" || candidate.part.includes(values.part);
+
+      const matchesSkill =
+        values.skill === "전체" || candidate.skill.includes(values.skill);
+
       const matchesGenre =
         values.genre === "전체" || candidate.genre.includes(values.genre);
 
       const matchesRegion =
         values.region === "전체" || candidate.location.includes(values.region);
 
-      return matchesGenre && matchesRegion;
+      return matchesPart && matchesSkill && matchesGenre && matchesRegion;
     });
-  }, [applicationsQuery.data, values.genre, values.region]);
+  }, [
+    applicationsQuery.data,
+    values.part,
+    values.skill,
+    values.genre,
+    values.region,
+  ]);
 
   const loadMore = useCallback(() => {
     if (!applicationsQuery.hasNextPage || applicationsQuery.isFetchingNextPage) {
@@ -102,8 +116,8 @@ export const SessionFindScreen = ({ values }: SessionFindScreenProps) => {
         <section className="border-b border-neutral-300 bg-neutral-0 px-6 pb-[9px]">
           <div className="relative flex min-h-[68px] w-full items-center justify-center rounded-[12px] border border-[#FBB10E] bg-secondary-0 px-[34px] py-[15px]">
             <p className="text-center text-caption2 text-neutral-600">
-              필터를 선택하지 않으면 기본 지원서에서 선택한 <br />
-              활동 지역, 장르와 같은 세션 뮤지션이 먼저 보여요.
+              기본 지원서의 활동 지역과 장르가 먼저 적용돼요. <br />
+              파트와 실력대를 추가로 선택하면 더 정확하게 찾을 수 있어요.
             </p>
 
             <button
