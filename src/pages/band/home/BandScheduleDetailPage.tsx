@@ -282,7 +282,9 @@ const BandScheduleDetailPage = () => {
               alt=""
               className="size-6"
             />
-            {interestCount}
+            <span className="inline-block min-w-[3ch] tabular-nums">
+              {interestCount}
+            </span>
           </button>
         </div>
 

@@ -408,6 +408,7 @@ const ConcertDetailPage = () => {
   );
   const detail = detailQuery.data;
   const isLiked = detail?.isInterested ?? false;
+  const interestCount = detail?.interestCount ?? 0;
   const isNotificationEnabled =
     notificationOverride ?? detail?.participationStatus != null;
   const showNotificationHint =
@@ -723,13 +724,16 @@ const ConcertDetailPage = () => {
               isInterestSyncing
             }
             onClick={() => void handleLikeClick()}
-            className="mt-[38px] flex size-6 shrink-0 items-center justify-center"
+            className="mt-[38px] flex shrink-0 items-center gap-1 font-body text-caption3 text-neutral-700"
           >
             <img
               src={isLiked ? LikedHeartIcon : HeartIcon}
               alt=""
               className="size-6"
             />
+            <span className="inline-block min-w-[3ch] tabular-nums">
+              {interestCount}
+            </span>
           </button>
         </div>
 
