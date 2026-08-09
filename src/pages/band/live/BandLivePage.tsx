@@ -10,7 +10,6 @@ import {
 } from "@/hooks/api/live/useLive";
 import { useLiveChatSocket } from "@/hooks/api/live/useLiveChatSocket";
 import { useActiveBandId } from "@/hooks/api/user/useMyProfiles";
-import { useActiveBandMemberProfileQuery } from "@/hooks/api/band/useBandMemberProfile";
 import type {
   LiveChatMessageData,
   LiveChatMessageFrame,
@@ -48,13 +47,16 @@ const toChatTime = (value?: string) => {
 const mapLiveChatMessageToChatMessage = (
   message: LiveChatMessageData,
   frame: LiveChatMessageFrame,
+  bandProfileImageUrl?: string | null,
 ): ChatMessage => {
   return {
     id: Date.now() + Math.random(),
     sender: message.senderName,
     message: message.content,
     time: toChatTime(message.sentAt),
-    highlighted: false,
+    highlighted:
+      Boolean(bandProfileImageUrl) &&
+      message.senderProfileImageUrl === bandProfileImageUrl,
     clientMsgId: frame.clientMsgId,
     serverMessageId: message.messageId,
     senderProfileImageUrl: message.senderProfileImageUrl,
@@ -209,8 +211,6 @@ const isCoHostBroadcastReady = (live: NonNullable<ActiveLive>) =>
 
 export function BandLivePage() {
   const activeBandId = useActiveBandId();
-  const { data: activeBandMemberProfile } =
-    useActiveBandMemberProfileQuery();
   const [searchParams, setSearchParams] = useSearchParams();
   const [screen, setScreen] = useState<BandLiveScreen>("home");
   const [activeLive, setActiveLive] = useState<ActiveLive>(null);
@@ -279,6 +279,7 @@ export function BandLivePage() {
         const messageFromServer = mapLiveChatMessageToChatMessage(
           message,
           frame,
+          activeLive?.bandProfileImageUrl,
         );
 
         const optimisticMessageIndex = frame.clientMsgId
@@ -291,16 +292,11 @@ export function BandLivePage() {
           const copiedMessages = [...prevMessages];
 
           copiedMessages[optimisticMessageIndex] = {
-            ...copiedMessages[optimisticMessageIndex],
+            ...messageFromServer,
             id: copiedMessages[optimisticMessageIndex].id,
-            sender: copiedMessages[optimisticMessageIndex].sender,
-            message: message.content,
-            time: toChatTime(message.sentAt),
-            highlighted: true,
-            clientMsgId: frame.clientMsgId,
-            serverMessageId: message.messageId,
-            senderProfileImageUrl: message.senderProfileImageUrl,
-            pending: false,
+            highlighted:
+              copiedMessages[optimisticMessageIndex].highlighted ||
+              messageFromServer.highlighted,
           };
 
           return copiedMessages;
@@ -309,7 +305,7 @@ export function BandLivePage() {
         return [...prevMessages, messageFromServer];
       });
     },
-    [],
+    [activeLive?.bandProfileImageUrl],
   );
 
   const handleLiveEndedFromSocket = useCallback(() => {
@@ -346,11 +342,7 @@ export function BandLivePage() {
       ...prevMessages,
       {
         id: Date.now(),
-        sender:
-          activeLive?.myNickname ??
-          activeLive?.nickname ??
-          activeBandMemberProfile?.nickname ??
-          "나",
+        sender: "나",
         message,
         time: "지금",
         highlighted: true,
