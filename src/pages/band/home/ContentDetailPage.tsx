@@ -11,7 +11,7 @@ import HeartIcon from "@/assets/icons/Heart.svg";
 import LikedHeartIcon from "@/assets/icons/Union.svg";
 import DefaultBandAvatar from "@/assets/icons/band/band-default-profile.svg";
 import OfficialIcon from "@/assets/icons/band/official-icon.svg";
-import FanImage from "@/assets/images/IMG_my.svg";
+import DefaultUserAvatar from "@/assets/icons/band/user-default-profile.svg";
 import { Header } from "@/components/common/Header/Header";
 import { useActiveBandId } from "@/hooks/api/user/useMyProfiles";
 import { useBandQuery } from "@/hooks/api/band/useBand";
@@ -97,7 +97,7 @@ const CommentItem = ({
   return (
     <article className="flex w-full gap-[16px]">
       <img
-        src={comment.profileImageUrl ?? FanImage}
+        src={comment.profileImageUrl ?? DefaultUserAvatar}
         alt=""
         className="size-[35px] shrink-0 rounded-full object-cover"
       />
