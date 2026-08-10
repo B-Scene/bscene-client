@@ -220,6 +220,11 @@ export interface FanPerformanceDetailResponse {
   imageUrls?: string[] | string;
   isInterested: boolean;
   interestCount?: number;
+  notificationEnabled?: boolean;
+  isAlarmSet?: boolean;
+  alarmSet?: boolean;
+  alarmEnabled?: boolean;
+  isAlarmEnabled?: boolean;
   participationStatus: PerformanceParticipationStatus | null;
   casting: FanPerformanceCastingBand[];
 }

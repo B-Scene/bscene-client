@@ -16,6 +16,7 @@ import type {
   FanExploreRecommendationParams,
   FanExploreSearchParams,
   FanExploreSearchResponse,
+  NormalizedFanExploreBandSearchResponse,
   NormalizedFanExploreBandsResponse,
   NormalizedFanExploreContentsResponse,
   NormalizedFanExplorePerformancesResponse,
@@ -29,6 +30,7 @@ import type {
 type FanExplorePageLike<T> = Omit<FanExplorePageResponse<T>, "results"> & {
   sections?: FanExplorePageLike<T>;
   results?: T[] | FanExplorePageResponse<T> | FanExplorePageLike<T>;
+  band?: FanExplorePageResponse<T> | T[];
   bandSection?: FanExplorePageResponse<T> | T[];
   performanceSection?: FanExplorePageResponse<T> | T[];
   postSection?: FanExplorePageResponse<T> | T[];
@@ -47,6 +49,13 @@ const PERFORMANCE_SECTION_KEYS: Array<FanExploreSectionKey<FanExplorePerformance
 const CONTENT_SECTION_KEYS: Array<FanExploreSectionKey<FanExploreContent>> = [
   "contents",
   "posts",
+];
+const BAND_SECTION_KEYS: Array<FanExploreSectionKey<FanExploreBand>> = [
+  "bands",
+  "band",
+  "bandSection",
+  "bandResults",
+  "BAND",
 ];
 
 type FanExploreContentAlias = FanExploreContent & {
@@ -1226,6 +1235,41 @@ export const searchFanExplore = async ({
       sections.totalContentCount ??
       getSectionCount(contentSection) ??
       contents.length,
+  };
+};
+
+export const searchFanExploreBands = async ({
+  keyword,
+  sort = "POPULAR",
+  cursor,
+  size = 20,
+  genre,
+  region,
+}: FanExploreSearchParams): Promise<NormalizedFanExploreBandSearchResponse> => {
+  const response = await axiosInstance.get<
+    FanExploreApiResponse<FanExplorePageResponse<FanExploreBand> | FanExploreBand[]>
+  >("/explore/search", {
+    params: removeEmptyParams({
+      keyword,
+      type: "BAND",
+      sort,
+      genre,
+      region,
+      cursor,
+      size,
+    }),
+  });
+
+  const normalized = normalizeCursorPage(
+    assertSuccess(response),
+    cursor,
+    BAND_SECTION_KEYS,
+  );
+  const items = await enrichBandsWithFollowerCounts(normalized.items);
+
+  return {
+    ...normalized,
+    items,
   };
 };
 

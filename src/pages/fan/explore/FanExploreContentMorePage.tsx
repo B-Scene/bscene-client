@@ -10,6 +10,7 @@ import {
 import { useInfiniteScrollObserver } from "@/hooks/useInfiniteScrollObserver";
 import {
   ExploreFilterBar,
+  ExploreFilterSheet,
   type AppliedExploreFilters,
 } from "@/pages/fan/explore/FanExplorePage";
 import { FanExploreContentNewsList } from "@/pages/fan/explore/components/FanExploreContentNewsList";
@@ -41,6 +42,15 @@ const getGenreFilterParam = (genre: string) => {
 const getRegionFilterParam = (region: string) => {
   if (region === "전체") return undefined;
   return BAND_REGION_BY_LABEL[region] ?? region;
+};
+
+const getResultPathByContent = (content: string) => {
+  if (content === "밴드") return "/fan/explore/search/results/bands";
+  if (content === "공연") return "/fan/explore/search/results/concerts";
+  if (content === "영상" || content === "콘텐츠") {
+    return "/fan/explore/search/results/contents";
+  }
+  return "/fan/explore/search/results";
 };
 
 const getContentId = (content: FanExploreContent) =>
@@ -113,15 +123,17 @@ const ContentMoreTopBar = ({ initialKeyword }: { initialKeyword: string }) => {
 };
 
 const FanExploreContentMorePage = () => {
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const keyword = searchParams.get("q") || "WAVY";
   const sort = getSortParam(searchParams.get("sort"));
+  const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
   const shouldHighlightSort =
     sort === "POPULAR" || searchParams.get("sortSelected") === "1";
   const appliedFilters: AppliedExploreFilters = {
     genre: getFilterLabelParam(searchParams.get("genre")),
     region: getFilterLabelParam(searchParams.get("region")),
-    content: "콘텐츠",
+    content: "영상",
   };
   const contentsQuery = useFanExploreContentSearchQuery({
     keyword,
@@ -162,6 +174,21 @@ const FanExploreContentMorePage = () => {
     isLoading && allSearchQuery.isLoading && contents.length === 0;
   const isContentError = isError && allSearchQuery.isError && contents.length === 0;
 
+  const applyFilters = (filters: AppliedExploreFilters) => {
+    const params = new URLSearchParams({
+      q: keyword,
+      sort,
+    });
+
+    if (shouldHighlightSort) params.set("sortSelected", "1");
+    if (filters.genre !== "전체") params.set("genre", filters.genre);
+    if (filters.region !== "전체") params.set("region", filters.region);
+
+    navigate(`${getResultPathByContent(filters.content)}?${params.toString()}`, {
+      replace: true,
+    });
+  };
+
   return (
     <main className="min-h-dvh bg-neutral-0 pb-[calc(var(--bottom-nav-height)+24px)]">
       <ContentMoreTopBar initialKeyword={keyword} />
@@ -169,6 +196,7 @@ const FanExploreContentMorePage = () => {
         appliedFilters={appliedFilters}
         appliedSort={SORT_LABELS[sort]}
         highlightSort={shouldHighlightSort}
+        onFilterClick={() => setIsFilterSheetOpen(true)}
       />
 
       <section className="px-[25px] pt-[16px]">
@@ -193,6 +221,14 @@ const FanExploreContentMorePage = () => {
           loadMoreRef={sentinelRef}
         />
       </section>
+
+      <ExploreFilterSheet
+        open={isFilterSheetOpen}
+        onClose={() => setIsFilterSheetOpen(false)}
+        appliedFilters={appliedFilters}
+        contentSelectable
+        onApply={applyFilters}
+      />
     </main>
   );
 };

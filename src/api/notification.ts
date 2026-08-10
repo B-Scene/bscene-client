@@ -12,7 +12,7 @@ import type {
   NotificationsPageResponse,
   RegisterPushTokenRequest,
   SendTestNotificationRequest,
-  UpdateNotificationSettingRequest,
+  UpdateNotificationSettingParams,
 } from "@/types/notification";
 
 type RawRecord = Record<string, unknown>;
@@ -300,12 +300,26 @@ export const getNotificationSettings = async ({
 };
 
 export const updateNotificationSetting = async ({
+  mode,
   settingType,
   enabled,
-}: UpdateNotificationSettingRequest) => {
-  const { data } = await axiosInstance.patch<ApiResponse<unknown>>(
-    `/users/me/notification-settings/${settingType}`,
-    { enabled },
+}: UpdateNotificationSettingParams) => {
+  const body = { mode, settingType, enabled, isEnabled: enabled };
+  const requestWithSettingTypePath = () =>
+    axiosInstance.patch<ApiResponse<unknown>>(
+      `/users/me/notification-settings/${settingType}`,
+      body,
+      { params: { mode } },
+    );
+  const requestWithCollectionPath = () =>
+    axiosInstance.patch<ApiResponse<unknown>>(
+      "/users/me/notification-settings",
+      body,
+      { params: { mode } },
+    );
+
+  const { data } = await requestWithSettingTypePath().catch(() =>
+    requestWithCollectionPath(),
   );
 
   if (data.isSuccess === false) {

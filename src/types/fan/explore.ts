@@ -406,6 +406,14 @@ export interface NormalizedFanExploreBandsResponse
   nextCursor: number | null;
 }
 
+export interface NormalizedFanExploreBandSearchResponse
+  extends FanExplorePageResponse<FanExploreBand> {
+  items: FanExploreBand[];
+  hasNext: boolean;
+  page: number;
+  nextCursor: string | number | null;
+}
+
 export interface NormalizedFanExplorePerformancesResponse
   extends FanExplorePageResponse<FanExplorePerformance> {
   items: FanExplorePerformance[];

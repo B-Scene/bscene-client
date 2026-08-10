@@ -48,7 +48,7 @@ const ImagePlaceholderIcon = () => (
 );
 
 const Tag = ({ children }: { children: string }) => (
-  <span className="rounded-full bg-secondary-100 px-[9px] py-[3px] font-body text-caption5 text-secondary-600">
+  <span className="rounded-full bg-secondary-100 px-3 py-1 font-body text-caption2 text-secondary-600">
     {children}
   </span>
 );

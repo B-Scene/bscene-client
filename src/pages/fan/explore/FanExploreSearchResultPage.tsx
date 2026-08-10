@@ -53,12 +53,6 @@ const SEARCH_CONTENT_TO_API = {
   공연: "PERFORMANCE",
   영상: "POST",
 } as const;
-const DEFAULT_SEARCH_FILTERS: AppliedExploreFilters = {
-  genre: "전체",
-  region: "전체",
-  content: "전체",
-};
-
 const getGenreFilterParam = (genre: string) => {
   if (genre === "전체") return undefined;
   return BAND_GENRE_BY_LABEL[genre] ?? genre;
@@ -69,6 +63,8 @@ const getRegionFilterParam = (region: string) => {
   return BAND_REGION_BY_LABEL[region] ?? region;
 };
 
+const getFilterLabelParam = (value: string | null) => value || "전체";
+
 const createMoreResultPath = ({
   keyword,
   path,
@@ -77,7 +73,7 @@ const createMoreResultPath = ({
   filters,
 }: {
   keyword: string;
-  path: "concerts" | "contents";
+  path: "bands" | "concerts" | "contents";
   sort: FanExploreSort;
   shouldHighlightSort: boolean;
   filters: AppliedExploreFilters;
@@ -92,6 +88,13 @@ const createMoreResultPath = ({
   if (filters.region !== "전체") params.set("region", filters.region);
 
   return `/fan/explore/search/results/${path}?${params.toString()}`;
+};
+
+const getMoreResultPathByContent = (content: string) => {
+  if (content === "밴드") return "bands";
+  if (content === "공연") return "concerts";
+  if (content === "영상" || content === "콘텐츠") return "contents";
+  return null;
 };
 
 const MONTH_LABELS = [
@@ -336,7 +339,11 @@ const FanExploreSearchResultPage = () => {
   const [isSortSheetOpen, setIsSortSheetOpen] = useState(false);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
   const [appliedFilters, setAppliedFilters] = useState<AppliedExploreFilters>(
-    DEFAULT_SEARCH_FILTERS,
+    () => ({
+      genre: getFilterLabelParam(searchParams.get("genre")),
+      region: getFilterLabelParam(searchParams.get("region")),
+      content: getFilterLabelParam(searchParams.get("content")),
+    }),
   );
   const [sortState, setSortState] = useState<SearchResultSortState>(() => ({
     keyword,
@@ -371,6 +378,7 @@ const FanExploreSearchResultPage = () => {
   const performances = searchQuery.data?.performances ?? [];
   const contents = searchQuery.data?.contents ?? [];
   const unfollowTarget = bands.find((band) => getBandId(band) === unfollowTargetBandId);
+  const visibleBands = bands.slice(0, 4);
   const visiblePerformances = performances.slice(0, 4);
   const visibleContents = contents.slice(0, 4);
   const resultCounts = {
@@ -386,6 +394,25 @@ const FanExploreSearchResultPage = () => {
 
     return () => window.clearTimeout(timerId);
   }, [toastMessage]);
+
+  const applyFilters = (filters: AppliedExploreFilters) => {
+    const moreResultPath = getMoreResultPathByContent(filters.content);
+
+    if (moreResultPath) {
+      navigate(
+        createMoreResultPath({
+          keyword,
+          path: moreResultPath,
+          sort: selectedSort,
+          shouldHighlightSort,
+          filters,
+        }),
+      );
+      return;
+    }
+
+    setAppliedFilters(filters);
+  };
 
   const followBand = async (band: FanExploreBand) => {
     const bandId = getBandId(band);
@@ -441,7 +468,22 @@ const FanExploreSearchResultPage = () => {
       />
 
       <section className="px-[23px] pt-[16px]">
-        <SectionTitle title="밴드" count={resultCounts.bands} />
+        <SectionTitle
+          title="밴드"
+          count={resultCounts.bands}
+          showMore
+          onMoreClick={() =>
+            navigate(
+              createMoreResultPath({
+                keyword,
+                path: "bands",
+                sort: selectedSort,
+                shouldHighlightSort,
+                filters: appliedFilters,
+              }),
+            )
+          }
+        />
         {searchQuery.isLoading ? (
           <p className="m-0 font-body text-caption2 text-neutral-600">
             검색 결과를 불러오는 중이에요
@@ -456,7 +498,7 @@ const FanExploreSearchResultPage = () => {
           </button>
         ) : (
           <div className="flex flex-col gap-[12px]">
-            {bands.map((band) => {
+            {visibleBands.map((band) => {
               const bandInfo = getBandInfo(band);
               const bandId = getBandId(band);
               const name = bandInfo.name ?? bandInfo.bandName ?? keyword;
@@ -647,7 +689,7 @@ const FanExploreSearchResultPage = () => {
         onClose={() => setIsFilterSheetOpen(false)}
         appliedFilters={appliedFilters}
         contentSelectable
-        onApply={setAppliedFilters}
+        onApply={applyFilters}
       />
 
       <ModalOverlay

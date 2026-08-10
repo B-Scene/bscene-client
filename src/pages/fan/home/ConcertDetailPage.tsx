@@ -158,7 +158,7 @@ const LinkCopyIcon = () => (
 );
 
 const Tag = ({ children }: { children: string }) => (
-  <span className="rounded-full bg-primary-50 px-[9px] py-[3px] font-body text-caption5 text-primary-400">
+  <span className="rounded-full bg-primary-50 px-3 py-1 font-body text-caption2 text-primary-400">
     {children}
   </span>
 );
@@ -385,6 +385,19 @@ const getDetailTags = (detail?: FanPerformanceDetailResponse) => {
   return detail?.tags?.length ? detail.tags : [getDetailTitle(detail)];
 };
 
+const getPerformanceAlarmEnabled = (
+  detail?: FanPerformanceDetailResponse,
+) => {
+  return (
+    detail?.isAlarmSet ??
+    detail?.alarmSet ??
+    detail?.notificationEnabled ??
+    detail?.isAlarmEnabled ??
+    detail?.alarmEnabled ??
+    false
+  );
+};
+
 const ConcertDetailPage = () => {
   const navigate = useNavigate();
   const { concertId = "default-concert" } = useParams();
@@ -410,7 +423,7 @@ const ConcertDetailPage = () => {
   const isLiked = detail?.isInterested ?? false;
   const interestCount = detail?.interestCount ?? 0;
   const isNotificationEnabled =
-    notificationOverride ?? detail?.participationStatus != null;
+    notificationOverride ?? getPerformanceAlarmEnabled(detail);
   const showNotificationHint =
     Boolean(detail) && !isNotificationEnabled && !isNotificationHintDismissed;
   const title = getDetailTitle(detail);
@@ -724,14 +737,14 @@ const ConcertDetailPage = () => {
               isInterestSyncing
             }
             onClick={() => void handleLikeClick()}
-            className="mt-[38px] flex shrink-0 items-center gap-1 font-body text-caption3 text-neutral-700"
+            className="mt-[38px] flex shrink-0 items-center gap-[2px] font-body text-caption3 text-neutral-700"
           >
             <img
               src={isLiked ? LikedHeartIcon : HeartIcon}
               alt=""
               className="size-6"
             />
-            <span className="inline-block min-w-[3ch] tabular-nums">
+            <span className="tabular-nums">
               {interestCount}
             </span>
           </button>

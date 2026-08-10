@@ -29,6 +29,7 @@ import type {
   FanHomeNewsItem,
   FanHomeRecommendedBand,
   FanHomeResponse,
+  PendingPerformanceParticipationItem,
 } from "@/types/fan/home";
 import {
   isNotificationForMode,
@@ -421,6 +422,23 @@ const mapConcertItem = (
   };
 };
 
+const getPendingPerformanceTitle = (
+  performance?: PendingPerformanceParticipationItem,
+) => {
+  if (!performance) return null;
+
+  return (
+    performance.performanceTitle ??
+    performance.performanceName ??
+    performance.concertName ??
+    performance.showTitle ??
+    performance.showName ??
+    performance.name ??
+    performance.title ??
+    null
+  );
+};
+
 const isUpcomingConcert = (concert: HomeConcertItem) => {
   if (["종료", "COMPLETED", "ENDED", "FINISHED"].includes(concert.status)) {
     return false;
@@ -762,18 +780,20 @@ const NewsCarousel = ({ items }: { items: HomeNewsCardItem[] }) => {
         ))}
       </div>
 
-      <div className="flex justify-center gap-1">
-        {items.map((item, index) => (
-          <span
-            key={item.id}
-            className={
-              index === displayedActiveIndex
-                ? "size-1 rounded-full bg-primary-300"
-                : "size-1 rounded-full bg-neutral-400"
-            }
-          />
-        ))}
-      </div>
+      {items.length > 1 ? (
+        <div className="flex justify-center gap-1">
+          {items.map((item, index) => (
+            <span
+              key={item.id}
+              className={
+                index === displayedActiveIndex
+                  ? "size-1 rounded-full bg-primary-300"
+                  : "size-1 rounded-full bg-neutral-400"
+              }
+            />
+          ))}
+        </div>
+      ) : null}
     </section>
   );
 };
@@ -904,6 +924,9 @@ const FanHomePage = () => {
     );
   }, [answeredPendingPerformanceIds, pendingParticipationQuery.data]);
   const currentPendingPerformance = pendingPerformances[0];
+  const currentPendingPerformanceTitle = getPendingPerformanceTitle(
+    currentPendingPerformance,
+  );
   const isParticipationResponding =
     completeParticipationMutation.isPending ||
     deleteParticipationMutation.isPending;
@@ -1141,7 +1164,9 @@ const FanHomePage = () => {
           title="공연은 재미있게 보셨나요?"
           description={
             <>
-              공연에 참여했다면
+              {currentPendingPerformanceTitle
+                ? `${currentPendingPerformanceTitle}에 참여했다면`
+                : "참여했다면"}
               <br />
               &apos;참여했어요&apos;를 눌러주세요
               {participationErrorMessage ? (

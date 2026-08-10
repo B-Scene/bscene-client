@@ -595,7 +595,7 @@ const RecommendationSection = ({
             imageSrc={band.imageSrc}
             imageAlt={`${band.name} 프로필`}
             title={band.name}
-            subtitle={`${band.genre} · ${band.region} · 팔로워 ${band.followers.toLocaleString()}명`}
+            subtitle={`${band.genre} · ${band.region}`}
             description={band.description}
             following={band.isFollowing}
             onClick={() =>

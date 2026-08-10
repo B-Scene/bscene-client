@@ -16,6 +16,7 @@ import {
   getFanExploreRecentSearches,
   getRecommendedExploreBands,
   likeFanExplorePost,
+  searchFanExploreBands,
   searchFanExplore,
   searchFanExploreContents,
   searchFanExplorePerformances,
@@ -47,6 +48,8 @@ export const fanExploreKeys = {
   searches: () => [...fanExploreKeys.all, "search"] as const,
   search: (params: FanExploreSearchParams) =>
     [...fanExploreKeys.all, "search", params] as const,
+  searchBands: (params: FanExploreSearchParams) =>
+    [...fanExploreKeys.all, "searchBands", params] as const,
   searchPerformances: (params: FanExploreSearchParams) =>
     [...fanExploreKeys.all, "searchPerformances", params] as const,
   searchContentsLists: () => [...fanExploreKeys.all, "searchContents"] as const,
@@ -265,6 +268,24 @@ export const useFanExploreSearchQuery = (params: FanExploreSearchParams) => {
   return useQuery({
     queryKey: fanExploreKeys.search(params),
     queryFn: () => searchFanExplore(params),
+    enabled: params.keyword.trim().length > 0,
+    staleTime: 1000 * 30,
+  });
+};
+
+export const useFanExploreBandSearchQuery = (
+  params: Omit<FanExploreSearchParams, "cursor" | "type">,
+) => {
+  return useInfiniteQuery({
+    queryKey: fanExploreKeys.searchBands(params),
+    queryFn: ({ pageParam }) =>
+      searchFanExploreBands({
+        ...params,
+        cursor: pageParam == null ? undefined : String(pageParam),
+      }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) =>
+      lastPage.hasNext ? String(lastPage.nextCursor ?? "") || undefined : undefined,
     enabled: params.keyword.trim().length > 0,
     staleTime: 1000 * 30,
   });

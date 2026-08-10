@@ -109,11 +109,6 @@ export const useUpdateNotificationSettingMutation = () => {
       }
     },
 
-    onSettled: (_data, _error, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: notificationKeys.settings(variables.mode),
-      });
-    },
   });
 };
 

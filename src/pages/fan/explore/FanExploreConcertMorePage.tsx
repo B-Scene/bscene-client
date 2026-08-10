@@ -11,6 +11,7 @@ import {
 import { useInfiniteScrollObserver } from "@/hooks/useInfiniteScrollObserver";
 import {
   ExploreFilterBar,
+  ExploreFilterSheet,
   type AppliedExploreFilters,
 } from "@/pages/fan/explore/FanExplorePage";
 import type { FanExplorePerformance, FanExploreSort } from "@/types/fan/explore";
@@ -41,6 +42,15 @@ const getGenreFilterParam = (genre: string) => {
 const getRegionFilterParam = (region: string) => {
   if (region === "전체") return undefined;
   return BAND_REGION_BY_LABEL[region] ?? region;
+};
+
+const getResultPathByContent = (content: string) => {
+  if (content === "밴드") return "/fan/explore/search/results/bands";
+  if (content === "영상" || content === "콘텐츠") {
+    return "/fan/explore/search/results/contents";
+  }
+  if (content === "공연") return "/fan/explore/search/results/concerts";
+  return "/fan/explore/search/results";
 };
 
 const MONTH_LABELS = [
@@ -195,6 +205,7 @@ const FanExploreConcertMorePage = () => {
   const [searchParams] = useSearchParams();
   const keyword = searchParams.get("q") || "WAVY";
   const sort = getSortParam(searchParams.get("sort"));
+  const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
   const shouldHighlightSort =
     sort === "POPULAR" || searchParams.get("sortSelected") === "1";
   const appliedFilters: AppliedExploreFilters = {
@@ -242,6 +253,21 @@ const FanExploreConcertMorePage = () => {
   const isPerformanceError =
     isError && allSearchQuery.isError && concerts.length === 0;
 
+  const applyFilters = (filters: AppliedExploreFilters) => {
+    const params = new URLSearchParams({
+      q: keyword,
+      sort,
+    });
+
+    if (shouldHighlightSort) params.set("sortSelected", "1");
+    if (filters.genre !== "전체") params.set("genre", filters.genre);
+    if (filters.region !== "전체") params.set("region", filters.region);
+
+    navigate(`${getResultPathByContent(filters.content)}?${params.toString()}`, {
+      replace: true,
+    });
+  };
+
   return (
     <main className="min-h-dvh bg-neutral-0 pb-[calc(var(--bottom-nav-height)+24px)]">
       <ConcertMoreTopBar initialKeyword={keyword} />
@@ -249,6 +275,7 @@ const FanExploreConcertMorePage = () => {
         appliedFilters={appliedFilters}
         appliedSort={SORT_LABELS[sort]}
         highlightSort={shouldHighlightSort}
+        onFilterClick={() => setIsFilterSheetOpen(true)}
       />
 
       <section className="px-[25px] pt-[16px]">
@@ -329,6 +356,14 @@ const FanExploreConcertMorePage = () => {
         </div>
         <div ref={sentinelRef} aria-hidden="true" className="h-px w-full" />
       </section>
+
+      <ExploreFilterSheet
+        open={isFilterSheetOpen}
+        onClose={() => setIsFilterSheetOpen(false)}
+        appliedFilters={appliedFilters}
+        contentSelectable
+        onApply={applyFilters}
+      />
     </main>
   );
 };

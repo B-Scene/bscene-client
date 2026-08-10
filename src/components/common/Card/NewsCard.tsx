@@ -62,10 +62,10 @@ const NewsCard = ({
           src={profileImageSrc}
         />
         <div className="min-w-0">
-          <h3 className="m-0 truncate font-body text-[7px] font-bold leading-[10px] text-neutral-900">
+          <h3 className="m-0 truncate font-body text-body4 text-neutral-900">
             {bandName}
           </h3>
-          <p className="m-0 mt-[1px] truncate font-body text-[5px] font-medium leading-[6px] tracking-[0.25px] text-neutral-600">
+          <p className="m-0 mt-[2px] truncate font-body text-caption4 text-neutral-600">
             {meta}
           </p>
         </div>

@@ -34,7 +34,6 @@ export const useNotificationSettingToggle = ({
   );
   const isDisabled =
     settingsQuery.isLoading ||
-    settingsQuery.isError ||
     updateSetting.isPending ||
     isRegisteringPushToken;
   const message =
@@ -50,26 +49,6 @@ export const useNotificationSettingToggle = ({
 
     setStatusMessage(null);
 
-    if (checked) {
-      setIsRegisteringPushToken(true);
-
-      try {
-        const token = await requestAndRegisterWebPushToken();
-
-        if (!token) {
-          setStatusMessage(
-            "브라우저 알림 권한을 허용해야 알림을 받을 수 있어요",
-          );
-          return;
-        }
-      } catch {
-        setStatusMessage("푸시 알림 토큰을 등록하지 못했어요");
-        return;
-      } finally {
-        setIsRegisteringPushToken(false);
-      }
-    }
-
     try {
       await updateSetting.mutateAsync({
         mode,
@@ -78,6 +57,27 @@ export const useNotificationSettingToggle = ({
       });
     } catch {
       setStatusMessage("알림 설정을 변경하지 못했어요");
+      return;
+    }
+
+    if (checked) {
+      setIsRegisteringPushToken(true);
+
+      try {
+        const token = await requestAndRegisterWebPushToken();
+
+        if (!token) {
+          setStatusMessage(
+            "알림 설정은 저장됐지만 브라우저 알림 권한을 허용해야 알림을 받을 수 있어요",
+          );
+        }
+      } catch {
+        setStatusMessage(
+          "알림 설정은 저장됐지만 푸시 알림 토큰을 등록하지 못했어요",
+        );
+      } finally {
+        setIsRegisteringPushToken(false);
+      }
     }
   };
 
