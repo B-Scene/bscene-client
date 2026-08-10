@@ -117,7 +117,7 @@ export const SessionFindScreen = ({ values }: SessionFindScreenProps) => {
           <div className="relative flex min-h-[68px] w-full items-center justify-center rounded-[12px] border border-[#FBB10E] bg-secondary-0 px-[34px] py-[15px]">
             <p className="text-center text-caption2 text-neutral-600">
               기본 지원서의 활동 지역과 장르가 먼저 적용돼요. <br />
-              파트와 실력대를 추가로 선택하면 더 정확하게 찾을 수 있어요.
+              원하는 조건이 있다면 필터에서 자유롭게 변경할 수 있어요.
             </p>
 
             <button
