@@ -12,11 +12,58 @@ B:Scene은 인디 밴드와 팬, 밴드와 세션을 연결하는 음악 특화 
 
 ## 팀원 및 프론트엔드 역할 분담
 
+## B:Scene Member
+
+<table align="center">
+  <tr align="center">
+    <td style="min-width: 150px;">
+      <a href="https://github.com/kinjaebeom">
+        <img width="160" height="160" alt="재범 프로필" src="https://github.com/kinjaebeom.png" />
+        <br />
+        <b>재범</b>
+        <br />
+        <sub>@kinjaebeom</sub>
+      </a>
+    </td>
+    
+  <td style="min-width: 150px;">
+      <a href="https://github.com/yangyangeeee">
+        <img width="160" height="160" alt="서윤 프로필" src="https://github.com/yangyangeeee.png" />
+        <br />
+        <b>서윤</b>
+        <br />
+        <sub>@yangyangeeee</sub>
+      </a>
+    </td>
+
+   <td style="min-width: 150px;">
+      <a href="https://github.com/Hyobee02">
+        <img width="160" height="160" alt="효비 프로필" src="https://github.com/Hyobee02.png" />
+        <br />
+        <b>효비</b>
+        <br />
+        <sub>@Hyobee02</sub>
+      </a>
+    </td>
+
+   <td style="min-width: 150px;">
+      <a href="https://github.com/ysys3535">
+        <img width="160" height="160" alt="윤서 프로필" src="https://github.com/ysys3535.png" />
+        <br />
+        <b>윤서</b>
+        <br />
+        <sub>@ysys3535</sub>
+      </a>
+    </td>
+
+  </tr>
+</table>
+
 | 역할 | 담당 영역 |
 | --- | --- |
+| 재범 | 밴드모드 라이브, 세션 모집 비즈니스 로직 |
 | 효비 | 디자인 토큰, 로그인 및 온보딩, 팬모드 라이브 |
 | 윤서 | 공통 컴포넌트, 팬모드 홈, 탐색, 마이페이지 |
-| 재범 | 밴드모드 라이브, 세션 모집 비즈니스 로직 |
 | 서윤 | 공통 레이아웃, 밴드모드 홈, 밴드 마이페이지, 공연 관련 화면 |
 
 ## 기술 스택
