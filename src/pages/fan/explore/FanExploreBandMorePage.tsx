@@ -370,7 +370,7 @@ const FanExploreBandMorePage = () => {
                     });
                   }}
                   onToggleFollow={() => void followBand(band)}
-                  className="!h-[86px] !w-[348px] !gap-[16px]"
+                  className="!h-[86px] !w-full !gap-[16px]"
                   contentClassName="!h-auto flex-1 shrink !w-auto"
                   descriptionClassName="line-clamp-2 text-primary-300"
                   descriptionMultiline
