@@ -162,11 +162,7 @@ pnpm install
 
 ## 환경변수 설정
 
-프로젝트 루트에 `.env` 파일을 생성하고 아래 값을 설정합니다. Vite에서 클라이언트 환경변수로 사용하려면 변수명은 반드시 `VITE_`로 시작해야 합니다.
-
-```bash
-cp .env.example .env
-```
+프로젝트 루트에 `.env` 파일을 직접 생성하고 아래 값을 설정합니다. Vite에서 클라이언트 환경변수로 사용하려면 변수명은 반드시 `VITE_`로 시작해야 합니다.
 
 ```env
 VITE_API_BASE_URL=http://localhost:8080
