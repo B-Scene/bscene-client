@@ -18,7 +18,10 @@ import {
   useFanPerformanceDetailQuery,
   useSetPerformanceAlarm,
 } from "@/hooks/api/fan/useFanHome";
-import { isAlreadyInterestedPerformanceError } from "@/api/fan/home";
+import {
+  isAlreadyInterestedPerformanceError,
+  isAlreadySetPerformanceAlarmError,
+} from "@/api/fan/home";
 import type { FanPerformanceDetailResponse } from "@/types/fan/home";
 
 const TABS = ["공연정보", "공연소개", "캐스팅"] as const;
@@ -388,14 +391,18 @@ const getDetailTags = (detail?: FanPerformanceDetailResponse) => {
 const getPerformanceAlarmEnabled = (
   detail?: FanPerformanceDetailResponse,
 ) => {
-  return (
+  const explicitAlarmState =
     detail?.isAlarmSet ??
     detail?.alarmSet ??
     detail?.notificationEnabled ??
     detail?.isAlarmEnabled ??
-    detail?.alarmEnabled ??
-    false
-  );
+    detail?.alarmEnabled;
+
+  if (explicitAlarmState !== undefined) {
+    return explicitAlarmState;
+  }
+
+  return detail?.participationStatus === "SCHEDULED";
 };
 
 const ConcertDetailPage = () => {
@@ -407,9 +414,10 @@ const ConcertDetailPage = () => {
   const castingRef = useRef<HTMLElement | null>(null);
   const queryClient = useQueryClient();
   const [selectedTab, setSelectedTab] = useState<ConcertDetailTab>("공연정보");
-  const [notificationOverride, setNotificationOverride] = useState<
-    boolean | null
-  >(null);
+  const [notificationOverride, setNotificationOverride] = useState<{
+    performanceId: number;
+    value: boolean;
+  } | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isShareSheetOpen, setIsShareSheetOpen] = useState(false);
   const [isInterestSyncing, setIsInterestSyncing] = useState(false);
@@ -423,7 +431,9 @@ const ConcertDetailPage = () => {
   const isLiked = detail?.isInterested ?? false;
   const interestCount = detail?.interestCount ?? 0;
   const isNotificationEnabled =
-    notificationOverride ?? getPerformanceAlarmEnabled(detail);
+    notificationOverride?.performanceId === performanceId
+      ? notificationOverride.value
+      : getPerformanceAlarmEnabled(detail);
   const showNotificationHint =
     Boolean(detail) && !isNotificationEnabled && !isNotificationHintDismissed;
   const title = getDetailTitle(detail);
@@ -522,12 +532,28 @@ const ConcertDetailPage = () => {
       return;
     }
 
+    const refetchAlarmEnabled = async () => {
+      setNotificationOverride(null);
+      const result = await detailQuery.refetch();
+
+      return getPerformanceAlarmEnabled(result.data);
+    };
+
     if (isNotificationEnabled) {
       try {
         await deletePerformanceAlarmMutation.mutateAsync(performanceId);
-        setNotificationOverride(false);
+
+        const isStillNotificationEnabled = await refetchAlarmEnabled();
+
+        if (isStillNotificationEnabled) {
+          setToastMessage("공연 알림 해제에 실패했어요");
+          return;
+        }
+
+        setNotificationOverride({ performanceId, value: false });
         setToastMessage("공연 알림을 해제했어요");
       } catch {
+        setNotificationOverride(null);
         setToastMessage("공연 알림 해제에 실패했어요");
       }
       return;
@@ -535,10 +561,32 @@ const ConcertDetailPage = () => {
 
     try {
       await setPerformanceAlarmMutation.mutateAsync(performanceId);
-      setNotificationOverride(true);
+
+      const isUpdatedNotificationEnabled = await refetchAlarmEnabled();
+
+      if (!isUpdatedNotificationEnabled) {
+        setToastMessage("공연 알림 설정에 실패했어요");
+        return;
+      }
+
+      setNotificationOverride({ performanceId, value: true });
       setIsNotificationHintDismissed(true);
       setIsNotificationModalOpen(true);
-    } catch {
+    } catch (error) {
+      if (isAlreadySetPerformanceAlarmError(error)) {
+        try {
+          const isUpdatedNotificationEnabled = await refetchAlarmEnabled();
+
+          if (isUpdatedNotificationEnabled) {
+            setToastMessage("이미 공연 알림이 설정되어 있어요");
+            return;
+          }
+        } catch {
+          setNotificationOverride(null);
+        }
+      }
+
+      setNotificationOverride(null);
       setToastMessage("공연 알림 설정에 실패했어요");
     }
   };
