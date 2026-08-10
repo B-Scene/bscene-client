@@ -50,6 +50,8 @@ const SESSION_ACTIVE_TAB_STORAGE_KEY = "bscene:session:active-tab";
 const SESSION_RECRUITMENT_FILTER_STORAGE_KEY =
   "bscene:session:recruitment-filter";
 const SESSION_FIND_FILTER_STORAGE_KEY = "bscene:session:find-filter";
+const SESSION_FIND_FILTER_TOUCHED_STORAGE_KEY =
+  "bscene:session:find-filter-touched";
 
 const SESSION_TAB_IDS: SessionTabId[] = [
   "recruitment",
@@ -96,12 +98,33 @@ const readStoredFilterValues = (
   }
 };
 
+const readStoredFindFilterTouched = () => {
+  try {
+    return window.sessionStorage.getItem(SESSION_FIND_FILTER_TOUCHED_STORAGE_KEY) === "true";
+  } catch {
+    return false;
+  }
+};
+
 const writeStoredFilterValues = (
   storageKey: string,
   values: SessionFilterValues,
 ) => {
   try {
     window.sessionStorage.setItem(storageKey, JSON.stringify(values));
+  } catch {
+    // sessionStorage 접근이 제한된 환경에서는 저장하지 않음
+  }
+};
+
+const writeStoredFindFilterTouched = (isTouched: boolean) => {
+  try {
+    if (isTouched) {
+      window.sessionStorage.setItem(SESSION_FIND_FILTER_TOUCHED_STORAGE_KEY, "true");
+      return;
+    }
+
+    window.sessionStorage.removeItem(SESSION_FIND_FILTER_TOUCHED_STORAGE_KEY);
   } catch {
     // sessionStorage 접근이 제한된 환경에서는 저장하지 않음
   }
@@ -226,6 +249,10 @@ export const RecruitmentNoticeScreen = () => {
         INITIAL_SESSION_FILTERS,
     );
 
+  const [hasUserChangedFindFilters, setHasUserChangedFindFilters] = useState(
+    () => readStoredFindFilterTouched(),
+  );
+
   const [sort, setSort] = useState<SessionRecruitmentSort>("LATEST");
 
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -287,21 +314,12 @@ export const RecruitmentNoticeScreen = () => {
     [],
   );
 
-  const handleApplyFindFilters = useCallback(
-    (nextValues: SessionFilterValues) => {
-      const summary = myApplicationSummaryQuery.data;
-
-      const syncedValues = {
-        ...nextValues,
-        genre: summary?.genre || INITIAL_SESSION_FILTERS.genre,
-        region: summary?.region || INITIAL_SESSION_FILTERS.region,
-      };
-
-      setFindFilterValues(syncedValues);
-      writeStoredFilterValues(SESSION_FIND_FILTER_STORAGE_KEY, syncedValues);
-    },
-    [myApplicationSummaryQuery.data],
-  );
+  const handleApplyFindFilters = useCallback((nextValues: SessionFilterValues) => {
+    setFindFilterValues(nextValues);
+    writeStoredFilterValues(SESSION_FIND_FILTER_STORAGE_KEY, nextValues);
+    setHasUserChangedFindFilters(true);
+    writeStoredFindFilterTouched(true);
+  }, []);
 
   const handleRefreshPage = useCallback(async () => {
     writeStoredActiveTab(activeTab);
@@ -355,7 +373,7 @@ export const RecruitmentNoticeScreen = () => {
   useEffect(() => {
     const summary = myApplicationSummaryQuery.data;
 
-    if (!summary) {
+    if (!summary || hasUserChangedFindFilters) {
       return;
     }
 
@@ -378,7 +396,7 @@ export const RecruitmentNoticeScreen = () => {
 
       return nextValues;
     });
-  }, [myApplicationSummaryQuery.data]);
+  }, [hasUserChangedFindFilters, myApplicationSummaryQuery.data]);
 
   const posts = useMemo(() => {
     const apiPosts =
@@ -592,6 +610,8 @@ export const RecruitmentNoticeScreen = () => {
       <SessionBasicProfileEditScreen
         onBack={() => {
           setIsBasicProfileEditOpen(false);
+          setHasUserChangedFindFilters(false);
+          writeStoredFindFilterTouched(false);
           void myApplicationSummaryQuery.refetch();
         }}
       />
