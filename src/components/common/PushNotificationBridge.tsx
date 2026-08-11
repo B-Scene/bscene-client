@@ -4,6 +4,7 @@ import { getNotifications, markNotificationAsRead } from "@/api/notification";
 import {
   getWebPushDebugInfo,
   onForegroundPushMessage,
+  registerFirebaseMessagingServiceWorker,
 } from "@/utils/webPushNotifications";
 import { fanHomeKeys } from "@/hooks/api/fan/useFanHome";
 import {
@@ -330,6 +331,12 @@ export const PushNotificationBridge = () => {
     let isProcessingStoredPendingReads = false;
 
     window.__bscenePushDebug = getWebPushDebugInfo;
+
+    if (Notification.permission === "granted") {
+      void registerFirebaseMessagingServiceWorker().catch((error) => {
+        console.error("[BScene Push] failed to refresh service worker", error);
+      });
+    }
 
     const markPushNotificationIdAsRead = (
       notificationId: number,

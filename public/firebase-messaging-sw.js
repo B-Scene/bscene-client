@@ -243,6 +243,21 @@ const shouldUseCoHostInviteActions = (data, notification) => {
   return isCoHostInviteType(type) || isLiveReferenceType(type);
 };
 
+const getPushPayload = (event) => {
+  if (!event.data) return {};
+
+  try {
+    return event.data.json();
+  } catch {
+    return {
+      data: {
+        title: "B:Scene",
+        body: event.data.text(),
+      },
+    };
+  }
+};
+
 const getBaseDeepLinkFromPayload = (payload) => {
   const data = payload.data || {};
   const type = getNotificationType(data);
@@ -266,6 +281,86 @@ const getBaseDeepLinkFromPayload = (payload) => {
   );
 };
 
+const showPushNotificationFromPayload = (payload) => {
+  if ("BroadcastChannel" in self) {
+    const channel = new BroadcastChannel("bscene-push");
+    channel.postMessage(payload);
+    channel.close();
+  }
+
+  console.info("[BScene Push SW] background message", payload);
+
+  const notification = payload.notification || {};
+  const data = payload.data || {};
+  const title = notification.title || data.title || "B:Scene";
+  const baseDeepLink = getBaseDeepLinkFromPayload(payload);
+  const notificationId = getNotificationIdFromData(data);
+  const pushClickContext = {
+    notificationId,
+    title,
+    body: notification.body || data.body || "",
+    type: getNotificationType(data),
+    referenceId:
+      data.referenceId ||
+      data.liveId ||
+      data.targetId ||
+      data.resourceId ||
+      "",
+    deepLink: baseDeepLink,
+  };
+  const trackedDeepLink = appendPushClickContext(
+    baseDeepLink,
+    pushClickContext,
+  );
+  const shouldShowActions = shouldUseCoHostInviteActions(data, notification);
+
+  const options = {
+    body: notification.body || data.body,
+    icon: notification.icon || "/favicon/favicon-96x96.png",
+    badge: "/favicon/favicon-96x96.png",
+    data: {
+      deepLink: trackedDeepLink,
+      acceptDeepLink: appendQueryParam(trackedDeepLink, "action", "accept"),
+      notificationId: notificationId || null,
+      title,
+      body: notification.body || data.body || null,
+      type: getNotificationType(data) || null,
+      liveId: getLiveIdFromData(data) || null,
+      referenceId: data.referenceId || null,
+      originalDeepLink: baseDeepLink,
+    },
+  };
+
+  if (shouldShowActions) {
+    options.actions = [
+      {
+        action: "accept",
+        title: "수락",
+      },
+      {
+        action: "later",
+        title: "나중에",
+      },
+    ];
+  }
+
+  return self.registration.showNotification(title, options);
+};
+
+const showFallbackPushNotification = (error) => {
+  console.error("[BScene Push SW] failed to show notification", error);
+
+  return self.registration.showNotification("B:Scene", {
+    body: "새 알림이 도착했습니다.",
+    icon: "/favicon/favicon-96x96.png",
+    badge: "/favicon/favicon-96x96.png",
+    data: {
+      deepLink: "/",
+      originalDeepLink: "/",
+    },
+  });
+};
+
 const getTargetDeepLinkFromNotification = (notification) => {
   const rawData = notification.data || {};
   const data = getClickData(rawData);
@@ -281,6 +376,15 @@ const getTargetDeepLinkFromNotification = (notification) => {
     "/"
   );
 };
+
+self.addEventListener("push", (event) => {
+  event.stopImmediatePropagation();
+  event.waitUntil(
+    showPushNotificationFromPayload(getPushPayload(event)).catch(
+      showFallbackPushNotification,
+    ),
+  );
+});
 
 if (
   firebaseConfig.apiKey &&
@@ -300,69 +404,9 @@ if (
   const messaging = firebase.messaging();
 
   messaging.onBackgroundMessage((payload) => {
-    if ("BroadcastChannel" in self) {
-      const channel = new BroadcastChannel("bscene-push");
-      channel.postMessage(payload);
-      channel.close();
-    }
-
-    console.info("[BScene Push SW] background message", payload);
-
-    const notification = payload.notification || {};
-    const data = payload.data || {};
-    const title = notification.title || data.title || "B:Scene";
-    const baseDeepLink = getBaseDeepLinkFromPayload(payload);
-    const notificationId = getNotificationIdFromData(data);
-    const pushClickContext = {
-      notificationId,
-      title,
-      body: notification.body || data.body || "",
-      type: getNotificationType(data),
-      referenceId:
-        data.referenceId ||
-        data.liveId ||
-        data.targetId ||
-        data.resourceId ||
-        "",
-      deepLink: baseDeepLink,
-    };
-    const trackedDeepLink = appendPushClickContext(
-      baseDeepLink,
-      pushClickContext,
+    return showPushNotificationFromPayload(payload).catch(
+      showFallbackPushNotification,
     );
-    const shouldShowActions = shouldUseCoHostInviteActions(data, notification);
-
-    const options = {
-      body: notification.body || data.body,
-      icon: notification.icon || "/favicon/favicon-96x96.png",
-      badge: "/favicon/favicon-96x96.png",
-      data: {
-        deepLink: trackedDeepLink,
-        acceptDeepLink: appendQueryParam(trackedDeepLink, "action", "accept"),
-        notificationId: notificationId || null,
-        title,
-        body: notification.body || data.body || null,
-        type: getNotificationType(data) || null,
-        liveId: getLiveIdFromData(data) || null,
-        referenceId: data.referenceId || null,
-        originalDeepLink: baseDeepLink,
-      },
-    };
-
-    if (shouldShowActions) {
-      options.actions = [
-        {
-          action: "accept",
-          title: "수락",
-        },
-        {
-          action: "later",
-          title: "나중에",
-        },
-      ];
-    }
-
-    return self.registration.showNotification(title, options);
   });
 }
 

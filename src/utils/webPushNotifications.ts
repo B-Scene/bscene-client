@@ -15,6 +15,7 @@ import {
 const FCM_TOKEN_STORAGE_KEY = "fcmRegistrationToken";
 const FIREBASE_MESSAGING_SW_PATH = "/firebase-messaging-sw.js";
 const FIREBASE_MESSAGING_SW_SCOPE = "/";
+const LEGACY_FIREBASE_MESSAGING_SW_SCOPE = "/firebase-cloud-messaging-push-scope";
 
 type PushPermissionResult = NotificationPermission | "unsupported";
 
@@ -29,6 +30,49 @@ const getFirebaseMessagingServiceWorkerUrl = () => {
   });
 
   return `${FIREBASE_MESSAGING_SW_PATH}?${params.toString()}`;
+};
+
+const getRegistrationScriptPath = (registration: ServiceWorkerRegistration) => {
+  const scriptURL =
+    registration.active?.scriptURL ??
+    registration.waiting?.scriptURL ??
+    registration.installing?.scriptURL;
+
+  if (!scriptURL) return null;
+
+  try {
+    return new URL(scriptURL).pathname;
+  } catch {
+    return null;
+  }
+};
+
+const unregisterStaleServiceWorkers = async () => {
+  const registrations = await navigator.serviceWorker.getRegistrations();
+  const legacyFirebaseScope = new URL(
+    LEGACY_FIREBASE_MESSAGING_SW_SCOPE,
+    window.location.origin,
+  ).href;
+
+  await Promise.all(
+    registrations.map((registration) => {
+      const scriptPath = getRegistrationScriptPath(registration);
+      const shouldUnregisterLegacyFirebaseWorker =
+        scriptPath === FIREBASE_MESSAGING_SW_PATH &&
+        registration.scope === legacyFirebaseScope;
+      const shouldUnregisterDevPwaWorker =
+        import.meta.env.DEV && scriptPath === "/sw.js";
+
+      if (
+        !shouldUnregisterLegacyFirebaseWorker &&
+        !shouldUnregisterDevPwaWorker
+      ) {
+        return Promise.resolve(false);
+      }
+
+      return registration.unregister();
+    }),
+  );
 };
 
 export const isWebPushAvailable = () =>
@@ -50,6 +94,8 @@ export const requestWebPushPermission =
 
 export const registerFirebaseMessagingServiceWorker = async () => {
   if (!isWebPushAvailable()) return null;
+
+  await unregisterStaleServiceWorkers();
 
   const registration = await navigator.serviceWorker.register(getFirebaseMessagingServiceWorkerUrl(), {
     scope: FIREBASE_MESSAGING_SW_SCOPE,
