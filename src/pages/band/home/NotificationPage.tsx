@@ -30,6 +30,7 @@ import {
   getPendingPushNotificationReads,
   removePendingPushNotificationReads,
 } from "@/utils/pushNotificationReadTracking";
+import { consumePushNotificationBackTarget } from "@/utils/pushNotificationBackNavigation";
 import { getGenreLabel, getRegionLabel } from "@/utils/bandLabels";
 import { getApiErrorMessage } from "@/utils/getApiErrorMessage";
 import type { BandMemberPart } from "@/types/band/bandMember";
@@ -228,6 +229,21 @@ const NotificationPage = () => {
   const isInviteActionPending =
     acceptBandInvite.isPending || rejectBandInvite.isPending;
 
+  const handleBack = () => {
+    const pushBackTarget = consumePushNotificationBackTarget();
+
+    if (pushBackTarget) {
+      if (window.history.length > 1) {
+        navigate(-1);
+      } else {
+        navigate(pushBackTarget, { replace: true });
+      }
+      return;
+    }
+
+    navigate(-1);
+  };
+
   const openRoleModal = (action: PendingRoleAction) => {
     setPendingRoleAction(action);
     setActivityName(activeMemberProfile?.nickname ?? "");
@@ -318,7 +334,7 @@ const NotificationPage = () => {
         <button
           type="button"
           aria-label="뒤로가기"
-          onClick={() => navigate(-1)}
+          onClick={handleBack}
           className="flex size-6 items-center justify-center"
         >
           <img src={ArrowLeftIcon} alt="" className="size-6" />

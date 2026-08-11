@@ -319,6 +319,16 @@ self.addEventListener("notificationclick", (event) => {
     deepLink: notificationData.originalDeepLink || baseTargetDeepLink,
     targetDeepLink,
   };
+  const trackedTargetDeepLink = appendPushClickContext(targetDeepLink, {
+    notificationId,
+    title: pushClickMessage.title,
+    body: pushClickMessage.body,
+    type: pushClickMessage.notificationType,
+    referenceId: pushClickMessage.referenceId,
+    deepLink: pushClickMessage.deepLink,
+  });
+
+  pushClickMessage.targetDeepLink = trackedTargetDeepLink;
 
   event.waitUntil(
     self.clients
@@ -337,15 +347,11 @@ self.addEventListener("notificationclick", (event) => {
 
         if (existingClient) {
           existingClient.postMessage(pushClickMessage);
-
           existingClient.focus();
-          return existingClient
-            .navigate(new URL(targetDeepLink, self.location.origin).href)
-            .catch(() => undefined);
         }
 
         return self.clients.openWindow(
-          new URL(targetDeepLink, self.location.origin).href,
+          new URL(trackedTargetDeepLink, self.location.origin).href,
         );
       }),
   );

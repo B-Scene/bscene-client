@@ -20,6 +20,7 @@ import {
   removePendingPushNotificationReads,
   savePendingPushNotificationRead,
 } from "@/utils/pushNotificationReadTracking";
+import { markPushNotificationEntry } from "@/utils/pushNotificationBackNavigation";
 import type {
   NotificationItem,
   NotificationSettingsMode,
@@ -221,20 +222,20 @@ const navigateToPushTarget = (targetDeepLink: string) => {
 
   try {
     const url = new URL(targetDeepLink, window.location.origin);
+    const nextUrl =
+      url.origin === window.location.origin
+        ? `${url.pathname}${url.search}${url.hash}`
+        : targetDeepLink;
 
-    if (url.origin !== window.location.origin) {
-      window.location.assign(targetDeepLink);
+    if (
+      url.origin === window.location.origin &&
+      nextUrl ===
+        `${window.location.pathname}${window.location.search}${window.location.hash}`
+    ) {
       return;
     }
 
-    const nextPath = `${url.pathname}${url.search}${url.hash}`;
-
-    if (nextPath === `${window.location.pathname}${window.location.search}${window.location.hash}`) {
-      return;
-    }
-
-    window.history.pushState(window.history.state, "", nextPath);
-    window.dispatchEvent(new PopStateEvent("popstate", { state: window.history.state }));
+    window.location.assign(nextUrl);
   } catch {
     window.location.assign(targetDeepLink);
   }
@@ -355,7 +356,10 @@ export const PushNotificationBridge = () => {
 
     const markClickedPushNotificationAsRead = (
       clickedNotification: ClickedPushNotification,
+      targetDeepLink = "",
     ) => {
+      markPushNotificationEntry(targetDeepLink || window.location.href, currentMode);
+
       const pendingRead = savePendingPushNotificationRead(clickedNotification);
 
       if (clickedNotification.notificationId !== null) {
@@ -397,7 +401,10 @@ export const PushNotificationBridge = () => {
       if (!clickedNotificationFromUrl) return;
 
       removePushClickContextFromCurrentUrl();
-      markClickedPushNotificationAsRead(clickedNotificationFromUrl);
+      markClickedPushNotificationAsRead(
+        clickedNotificationFromUrl,
+        window.location.href,
+      );
     };
 
     processCurrentUrlPushClick();
@@ -423,7 +430,10 @@ export const PushNotificationBridge = () => {
 
       if (clickedNotification === null) return;
 
-      markClickedPushNotificationAsRead(clickedNotification);
+      markClickedPushNotificationAsRead(
+        clickedNotification,
+        clickedNotification.targetDeepLink,
+      );
       navigateToPushTarget(clickedNotification.targetDeepLink);
     };
 
