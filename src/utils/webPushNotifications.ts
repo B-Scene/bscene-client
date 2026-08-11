@@ -14,7 +14,7 @@ import {
 
 const FCM_TOKEN_STORAGE_KEY = "fcmRegistrationToken";
 const FIREBASE_MESSAGING_SW_PATH = "/firebase-messaging-sw.js";
-const FIREBASE_MESSAGING_SW_SCOPE = "/firebase-cloud-messaging-push-scope";
+const FIREBASE_MESSAGING_SW_SCOPE = "/";
 
 type PushPermissionResult = NotificationPermission | "unsupported";
 
@@ -51,10 +51,14 @@ export const requestWebPushPermission =
 export const registerFirebaseMessagingServiceWorker = async () => {
   if (!isWebPushAvailable()) return null;
 
-  return navigator.serviceWorker.register(getFirebaseMessagingServiceWorkerUrl(), {
+  const registration = await navigator.serviceWorker.register(getFirebaseMessagingServiceWorkerUrl(), {
     scope: FIREBASE_MESSAGING_SW_SCOPE,
     updateViaCache: "none",
   });
+
+  await navigator.serviceWorker.ready;
+
+  return registration;
 };
 
 export const requestAndRegisterWebPushToken = async () => {

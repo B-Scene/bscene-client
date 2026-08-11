@@ -4,6 +4,14 @@ const firebaseConfig = Object.fromEntries(
   new URL(self.location.href).searchParams.entries(),
 );
 
+self.addEventListener("install", () => {
+  self.skipWaiting();
+});
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil(self.clients.claim());
+});
+
 const PUSH_READ_DB_NAME = "bscenePushNotificationReads";
 const PUSH_READ_DB_VERSION = 1;
 const PUSH_READ_STORE_NAME = "pendingReads";
