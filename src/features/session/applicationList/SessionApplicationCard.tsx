@@ -8,23 +8,27 @@ interface SessionApplicationCardProps {
   application: ApplicationCardItem;
   visibilityDisabled?: boolean;
 
-  onView: (
-    application: ApplicationCardItem,
-  ) => void;
+  onView: (application: ApplicationCardItem) => void;
 
-  onEdit: (
-    application: ApplicationCardItem,
-  ) => void;
+  onEdit: (application: ApplicationCardItem) => void;
 
-  onDelete: (
-    application: ApplicationCardItem,
-  ) => void;
+  onDelete: (application: ApplicationCardItem) => void;
 
   onToggleVisibility: (
     application: ApplicationCardItem,
     checked: boolean,
   ) => void;
 }
+
+const isDefaultApplication = (application: ApplicationCardItem) => {
+  const purpose = application.purpose.trim();
+
+  return (
+    purpose === "기본" ||
+    purpose.toUpperCase() === "DEFAULT" ||
+    purpose.toUpperCase() === "BASIC"
+  );
+};
 
 export const SessionApplicationCard = ({
   application,
@@ -34,43 +38,40 @@ export const SessionApplicationCard = ({
   onDelete,
   onToggleVisibility,
 }: SessionApplicationCardProps) => {
+  const shouldShowVisibilityToggle = isDefaultApplication(application);
+
   return (
     <article className="flex w-full flex-col gap-[10px] rounded-[12px] bg-neutral-0 px-6 py-3 shadow-[0_0_8px_rgba(0,0,0,0.10)]">
       <div className="flex min-h-6 items-center justify-between gap-4">
         <p className="min-w-0 truncate text-caption3 text-neutral-500">
-          {formatDisplayDate(
-            application.displayDate,
-          )}
+          {formatDisplayDate(application.displayDate)}
         </p>
 
-        <div className="flex shrink-0 items-center gap-3">
-          <span className="text-caption3 text-neutral-700">
-            이력서 공개
-          </span>
+        {shouldShowVisibilityToggle ? (
+          <div className="flex shrink-0 items-center gap-3">
+            <span className="text-caption3 text-neutral-700">
+              이력서 공개
+            </span>
 
-          <div
-            className={
-              visibilityDisabled
-                ? "pointer-events-none opacity-50"
-                : ""
-            }
-          >
-            <ToggleSwitch
-              checked={application.isPublic}
-              label={
-                application.isPublic
-                  ? "이력서 공개 끄기"
-                  : "이력서 공개 켜기"
+            <div
+              className={
+                visibilityDisabled ? "pointer-events-none opacity-50" : ""
               }
-              onChange={(checked) =>
-                onToggleVisibility(
-                  application,
-                  checked,
-                )
-              }
-            />
+            >
+              <ToggleSwitch
+                checked={application.isPublic}
+                label={
+                  application.isPublic
+                    ? "이력서 공개 끄기"
+                    : "이력서 공개 켜기"
+                }
+                onChange={(checked) =>
+                  onToggleVisibility(application, checked)
+                }
+              />
+            </div>
           </div>
-        </div>
+        ) : null}
       </div>
 
       <button
@@ -98,9 +99,7 @@ export const SessionApplicationCard = ({
 
         <button
           type="button"
-          onClick={() =>
-            onDelete(application)
-          }
+          onClick={() => onDelete(application)}
           className="flex h-8 min-w-0 flex-1 items-center justify-center rounded-[5px] bg-neutral-300 text-caption3 text-neutral-600"
         >
           삭제
@@ -110,17 +109,12 @@ export const SessionApplicationCard = ({
   );
 };
 
-const formatDisplayDate = (
-  value: string,
-) => {
+const formatDisplayDate = (value: string) => {
   if (!value) {
     return "";
   }
 
-  if (
-    value.includes("작성") ||
-    value.includes("수정")
-  ) {
+  if (value.includes("작성") || value.includes("수정")) {
     return value;
   }
 

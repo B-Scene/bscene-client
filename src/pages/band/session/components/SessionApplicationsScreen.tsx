@@ -492,15 +492,15 @@ export const SessionApplicationsScreen = ({
           {hasApplications ? (
             <div className="mt-6 flex flex-col gap-3">
               {applications.map((application) => (
-                <SessionApplicationCard
-                  key={application.sessionApplicationId}
-                  application={application}
-                  visibilityDisabled={visibilityMutation.isPending}
-                  onView={handleViewApplication}
-                  onEdit={handleEditApplication}
-                  onDelete={handleDeleteApplication}
-                  onToggleVisibility={handleToggleVisibility}
-                />
+            <SessionApplicationCard
+              key={application.sessionApplicationId}
+              application={application}
+              visibilityDisabled={visibilityMutation.isPending}
+              onView={handleViewApplication}
+              onEdit={handleEditApplication}
+              onDelete={handleDeleteApplication}
+              onToggleVisibility={handleToggleVisibility}
+            />
               ))}
             </div>
           ) : (
