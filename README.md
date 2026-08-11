@@ -196,66 +196,111 @@ pnpm lint
 
 ## 폴더 구조
 
+프로젝트에서 사용하는 도메인 중심 폴더 구조입니다.</br>
+API, 기능, 페이지 및 타입을 도메인별로 분리해 관리하며 공통 UI와 전역 설정은 별도의 공통 디렉터리에서 관리합니다.
+
 ```text
 src/
-  app/
-
-  pages/
-    auth/
-    onboarding/
-
-    fan/
-      home/
-      explore/
-      live/
-      my/
-
-    band/
-      home/
-      live/
-      session/
-      my/
-
-    not-found/
-
-  components/
-    common/
-      Button/
-      Input/
-      Modal/
-      Select/
-      Toast/
-      EmptyState/
-      Loading/
-
-    layout/
-      MobileLayout/
-      BottomNavBar/
-      Header/
-      PageContainer/
-
-  features/
-    auth/
-    user/
-    band/
-    live/
-    session/
-    performance/
-    follow/
-    notification/
-
-  api/
-  hooks/
-  stores/
-  types/
-  constants/
-
-  assets/
-    icons/
-    images/
-
-  styles/
-  utils/
+├── api/                         # 도메인별 API 요청 함수
+│   ├── auth/                    # 인증 API
+│   ├── band/                    # 밴드 관련 API
+│   ├── fan/                     # 팬 관련 API
+│   ├── live/                    # 라이브 관련 API
+│   ├── media/                   # 미디어 업로드 API
+│   ├── onboarding/              # 온보딩 API
+│   ├── session/                 # 세션 및 모집 관련 API
+│   └── user/                    # 사용자 관련 API
+│
+├── app/                         # 앱 전역 설정 및 초기화
+│
+├── assets/                      # 이미지, 아이콘 등 정적 리소스
+│   ├── icons/
+│   │   ├── band/                # 밴드 모드 아이콘
+│   │   └── fan/                 # 팬 모드 아이콘
+│   └── images/                  # 이미지 리소스
+│
+├── components/                  # 공통 및 도메인별 UI 컴포넌트
+│   ├── band/
+│   │   ├── home/                # 밴드 홈 컴포넌트
+│   │   └── my/                  # 밴드 마이페이지 컴포넌트
+│   ├── common/                  # 공통 UI 컴포넌트
+│   │   ├── Button/
+│   │   ├── Card/
+│   │   ├── EmptyState/
+│   │   ├── Header/
+│   │   ├── Input/
+│   │   ├── Loading/
+│   │   ├── Modal/
+│   │   ├── Select/
+│   │   └── Toast/
+│   ├── fan/
+│   │   ├── home/                # 팬 홈 컴포넌트
+│   │   └── my/                  # 팬 마이페이지 컴포넌트
+│   ├── layout/                  # 공통 레이아웃 컴포넌트
+│   │   ├── BottomNavBar/
+│   │   ├── Header/
+│   │   ├── MobileLayout/
+│   │   └── PageContainer/
+│   └── Modal/                   # 모달 컴포넌트
+│
+├── constants/                   # 공통 상수
+│
+├── features/                    # 도메인 단위 기능 모듈
+│   ├── band/                    # 밴드 관련 기능
+│   ├── follow/                  # 팔로우 기능
+│   ├── live/                    # 라이브 기능
+│   ├── notification/            # 알림 기능
+│   ├── onboarding/              # 온보딩 기능
+│   ├── performance/             # 공연 관련 기능
+│   ├── session/                 # 세션 및 모집 관련 기능
+│   └── user/                    # 사용자 관련 기능
+│
+├── hooks/                       # 커스텀 훅
+│   └── api/                     # TanStack Query 기반 API 훅
+│       ├── auth/
+│       ├── band/
+│       ├── fan/
+│       ├── live/
+│       ├── media/
+│       ├── onboarding/
+│       ├── session/
+│       └── user/
+│
+├── lib/                         # 외부 라이브러리 설정 및 공통 인스턴스
+│
+├── pages/                       # 라우트 단위 페이지
+│   ├── auth/                    # 인증 페이지
+│   ├── band/
+│   │   ├── home/                # 밴드 홈
+│   │   ├── live/                # 밴드 라이브
+│   │   ├── my/                  # 밴드 마이페이지
+│   │   └── session/             # 밴드 세션
+│   ├── fan/
+│   │   ├── explore/             # 팬 탐색
+│   │   ├── home/                # 팬 홈
+│   │   ├── live/                # 팬 라이브
+│   │   └── my/                  # 팬 마이페이지
+│   ├── not-found/               # 404 페이지
+│   └── onboarding/              # 온보딩 페이지
+│
+├── routes/                      # 라우터 및 접근 제어 설정
+│
+├── stores/                      # 전역 상태 관리
+│
+├── styles/                      # 전역 스타일
+│   └── tokens/                  # 디자인 토큰
+│
+├── types/                       # 도메인별 TypeScript 타입
+│   ├── auth/
+│   ├── band/
+│   ├── fan/
+│   ├── live/
+│   ├── media/
+│   ├── onboarding/
+│   ├── session/
+│   └── user/
+│
+└── utils/                       # 공통 유틸리티 함수
 ```
 
 ## 브랜치, 커밋, PR 컨벤션
