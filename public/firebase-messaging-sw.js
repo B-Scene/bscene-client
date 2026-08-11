@@ -10,6 +10,14 @@ const getStringValue = (value) => {
   return "";
 };
 
+const getNotificationIdFromData = (data) => {
+  return (
+    getStringValue(data.notificationId) ||
+    getStringValue(data.notification_id) ||
+    getStringValue(data.id)
+  );
+};
+
 const isCoHostInviteType = (value) => {
   const type = getStringValue(value).toUpperCase();
 
@@ -78,6 +86,8 @@ const createCoHostUpgradeApprovalDeepLink = (liveId) => {
 const appendQueryParam = (deepLink, key, value) => {
   try {
     const url = new URL(deepLink, self.location.origin);
+
+    if (url.origin !== self.location.origin) return deepLink;
 
     url.searchParams.set(key, value);
 
@@ -165,6 +175,10 @@ if (
     const data = payload.data || {};
     const title = notification.title || data.title || "B:Scene";
     const baseDeepLink = getBaseDeepLinkFromPayload(payload);
+    const notificationId = getNotificationIdFromData(data);
+    const trackedDeepLink = notificationId
+      ? appendQueryParam(baseDeepLink, "notificationId", notificationId)
+      : baseDeepLink;
     const shouldShowActions = shouldUseCoHostInviteActions(data, notification);
 
     const options = {
@@ -172,8 +186,9 @@ if (
       icon: notification.icon || "/favicon/favicon-96x96.png",
       badge: "/favicon/favicon-96x96.png",
       data: {
-        deepLink: baseDeepLink,
-        acceptDeepLink: appendQueryParam(baseDeepLink, "action", "accept"),
+        deepLink: trackedDeepLink,
+        acceptDeepLink: appendQueryParam(trackedDeepLink, "action", "accept"),
+        notificationId: notificationId || null,
         type: getNotificationType(data) || null,
         liveId: getLiveIdFromData(data) || null,
         referenceId: data.referenceId || null,
