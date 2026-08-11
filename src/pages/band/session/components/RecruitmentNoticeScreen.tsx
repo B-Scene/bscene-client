@@ -618,15 +618,25 @@ export const RecruitmentNoticeScreen = () => {
     );
   }
 
-  if (isSearchOpen) {
-    return (
-      <SessionSearchScreen
-        values={recruitmentFilterValues}
-        onBack={() => setIsSearchOpen(false)}
-        onApplyFilters={handleApplyRecruitmentFilters}
-      />
-    );
-  }
+ if (isSearchOpen) {
+  const isFindSearch = activeTab === "find";
+
+  return (
+    <SessionSearchScreen
+      mode={isFindSearch ? "find" : "recruitment"}
+      values={isFindSearch ? findFilterValues : recruitmentFilterValues}
+      onBack={() => setIsSearchOpen(false)}
+      onApplyFilters={
+        isFindSearch ? handleApplyFindFilters : handleApplyRecruitmentFilters
+      }
+      onSelectRecruitment={(post) => {
+        setIsSearchOpen(false);
+        setSelectedPostOverride(post);
+        setSelectedPostId(post.id);
+      }}
+    />
+  );
+}
 
   if (selectedApplicationId) {
     return (
@@ -672,6 +682,7 @@ export const RecruitmentNoticeScreen = () => {
       ) : null}
 
       <SessionPageHeader
+        showSearch={activeTab !== "applications"}
         onSearch={() => setIsSearchOpen(true)}
         onMessages={() => navigate("/band/session/messages")}
       />
