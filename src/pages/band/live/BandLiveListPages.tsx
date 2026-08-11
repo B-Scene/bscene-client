@@ -164,7 +164,11 @@ export function BandLiveNowListPage({
     await refetch();
   }, [refetch]);
 
-  const liveNowPullToRefresh = usePullToRefresh<HTMLElement>({
+  const {
+    containerRef: liveNowContainerRef,
+    pullDistance: liveNowPullDistance,
+    isRefreshing: liveNowIsRefreshing,
+  } = usePullToRefresh<HTMLElement>({
     enabled: !isLoading && !isFetchingNextPage && !isEnterPending,
     onRefresh: handleRefreshLiveNowList,
   });
@@ -232,12 +236,12 @@ export function BandLiveNowListPage({
       <HeaderBackButton onClick={() => go("home")} />
 
       <PullToRefreshIndicator
-        pullDistance={liveNowPullToRefresh.pullDistance}
-        isRefreshing={liveNowPullToRefresh.isRefreshing}
+        pullDistance={liveNowPullDistance}
+        isRefreshing={liveNowIsRefreshing}
       />
 
       <section
-        ref={liveNowPullToRefresh.containerRef}
+        ref={liveNowContainerRef}
         className="h-[calc(100%_-_52px)] overflow-y-auto overscroll-y-contain px-5 pb-8"
       >
         {isLoading ? (
@@ -357,7 +361,11 @@ export function BandLiveScheduledListPage({
     await Promise.all([refetch(), refetchLiveHome()]);
   }, [refetch, refetchLiveHome]);
 
-  const scheduledPullToRefresh = usePullToRefresh<HTMLElement>({
+  const {
+    containerRef: scheduledContainerRef,
+    pullDistance: scheduledPullDistance,
+    isRefreshing: scheduledIsRefreshing,
+  } = usePullToRefresh<HTMLElement>({
     enabled: !isLoading && !isFetchingNextPage && !enterLiveMutation.isPending,
     onRefresh: handleRefreshScheduledList,
   });
@@ -403,12 +411,12 @@ export function BandLiveScheduledListPage({
       <HeaderBackButton onClick={() => go("home")} />
 
       <PullToRefreshIndicator
-        pullDistance={scheduledPullToRefresh.pullDistance}
-        isRefreshing={scheduledPullToRefresh.isRefreshing}
+        pullDistance={scheduledPullDistance}
+        isRefreshing={scheduledIsRefreshing}
       />
 
       <section
-        ref={scheduledPullToRefresh.containerRef}
+        ref={scheduledContainerRef}
         className="h-[calc(100%_-_52px)] overflow-y-auto overscroll-y-contain px-5 pb-8"
       >
         {isLoading ? (

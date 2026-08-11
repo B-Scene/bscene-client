@@ -299,7 +299,11 @@ export function BandLiveHome({
     await Promise.all([refetchHome(), refetchScheduled()]);
   }, [refetchHome, refetchScheduled]);
 
-  const liveHomePullToRefresh = usePullToRefresh<HTMLElement>({
+  const {
+    containerRef: liveHomeContainerRef,
+    pullDistance: liveHomePullDistance,
+    isRefreshing: liveHomeIsRefreshing,
+  } = usePullToRefresh<HTMLElement>({
     enabled: !isLoading && !isEnterPending,
     onRefresh: handleRefreshLiveHome,
   });
@@ -378,12 +382,12 @@ export function BandLiveHome({
 
   return (
     <main
-      ref={liveHomePullToRefresh.containerRef}
+      ref={liveHomeContainerRef}
       className="relative min-h-dvh overscroll-y-contain bg-neutral-0 pb-[calc(var(--bottom-nav-height)+24px)] text-neutral-900"
     >
       <PullToRefreshIndicator
-        pullDistance={liveHomePullToRefresh.pullDistance}
-        isRefreshing={liveHomePullToRefresh.isRefreshing}
+        pullDistance={liveHomePullDistance}
+        isRefreshing={liveHomeIsRefreshing}
       />
 
       <Header title="라이브" showBack={false} variant="main" />
