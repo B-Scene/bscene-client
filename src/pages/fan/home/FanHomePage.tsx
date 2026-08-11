@@ -332,7 +332,7 @@ const mapNewsItem = (
     meta:
       compactMeta([item.genre, item.region, postedAgo]) ||
       "장르 · 지역",
-    title: item.title ?? item.content ?? "새로운 소식이 도착했어요",
+    title: item.content ?? item.title ?? "새로운 소식이 도착했어요",
     tags: item.tags ?? [],
     createdAt: item.createdAt,
   };
