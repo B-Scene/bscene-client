@@ -2,6 +2,9 @@ import type { NotificationItem } from "@/types/notification";
 
 const STORAGE_KEY = "bscenePendingPushNotificationReads";
 const MAX_PENDING_READS = 10;
+const DB_NAME = "bscenePushNotificationReads";
+const DB_VERSION = 1;
+const STORE_NAME = "pendingReads";
 
 export type PendingPushNotificationRead = {
   key: string;
@@ -61,6 +64,73 @@ export const getPendingPushNotificationReads = () => {
   }
 };
 
+const openPendingReadDb = () =>
+  new Promise<IDBDatabase>((resolve, reject) => {
+    if (!("indexedDB" in window)) {
+      reject(new Error("IndexedDB is not available"));
+      return;
+    }
+
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+    request.onupgradeneeded = () => {
+      const db = request.result;
+
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME, { keyPath: "key" });
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+
+export const getIndexedDbPendingPushNotificationReads = async () => {
+  try {
+    const db = await openPendingReadDb();
+
+    return await new Promise<PendingPushNotificationRead[]>((resolve, reject) => {
+      const transaction = db.transaction(STORE_NAME, "readonly");
+      const store = transaction.objectStore(STORE_NAME);
+      const request = store.getAll();
+
+      request.onsuccess = () => {
+        resolve(
+          Array.isArray(request.result)
+            ? request.result
+                .map(normalizePendingRead)
+                .filter((item) => item !== null)
+            : [],
+        );
+      };
+      request.onerror = () => reject(request.error);
+      transaction.oncomplete = () => db.close();
+    });
+  } catch {
+    return [];
+  }
+};
+
+export const getAllPendingPushNotificationReads = async () => {
+  const pendingReads = [
+    ...getPendingPushNotificationReads(),
+    ...(await getIndexedDbPendingPushNotificationReads()),
+  ];
+  const seenKeys = new Set<string>();
+  const seenNotificationIds = new Set<number>();
+
+  return pendingReads.filter((item) => {
+    if (seenKeys.has(item.key)) return false;
+
+    if (item.notificationId !== null) {
+      if (seenNotificationIds.has(item.notificationId)) return false;
+      seenNotificationIds.add(item.notificationId);
+    }
+
+    seenKeys.add(item.key);
+    return true;
+  });
+};
+
 export const savePendingPushNotificationRead = (
   context: PushNotificationReadContext,
 ) => {
@@ -86,6 +156,29 @@ export const savePendingPushNotificationRead = (
   return pendingRead;
 };
 
+export const saveIndexedDbPendingPushNotificationRead = async (
+  pendingRead: PendingPushNotificationRead,
+) => {
+  try {
+    const db = await openPendingReadDb();
+
+    await new Promise<void>((resolve, reject) => {
+      const transaction = db.transaction(STORE_NAME, "readwrite");
+      const store = transaction.objectStore(STORE_NAME);
+      const request = store.put(pendingRead);
+
+      request.onerror = () => reject(request.error);
+      transaction.oncomplete = () => {
+        db.close();
+        resolve();
+      };
+      transaction.onerror = () => reject(transaction.error);
+    });
+  } catch {
+    // localStorage fallback above is enough when IndexedDB is unavailable.
+  }
+};
+
 export const removePendingPushNotificationReads = (keys: readonly string[]) => {
   if (keys.length === 0) return;
 
@@ -102,7 +195,59 @@ export const removePendingPushNotificationReads = (keys: readonly string[]) => {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(nextPendingReads));
 };
 
-const normalizeText = (value: string) => value.trim();
+export const removeIndexedDbPendingPushNotificationReads = async (
+  keys: readonly string[],
+) => {
+  if (keys.length === 0) return;
+
+  try {
+    const db = await openPendingReadDb();
+
+    await new Promise<void>((resolve, reject) => {
+      const transaction = db.transaction(STORE_NAME, "readwrite");
+      const store = transaction.objectStore(STORE_NAME);
+
+      keys.forEach((key) => store.delete(key));
+
+      transaction.oncomplete = () => {
+        db.close();
+        resolve();
+      };
+      transaction.onerror = () => reject(transaction.error);
+    });
+  } catch {
+    // Nothing to clean up if IndexedDB is unavailable.
+  }
+};
+
+export const removeAllPendingPushNotificationReads = (keys: readonly string[]) => {
+  removePendingPushNotificationReads(keys);
+  void removeIndexedDbPendingPushNotificationReads(keys);
+};
+
+const normalizeText = (value: string) => value.trim().replace(/\s+/g, " ");
+
+const normalizeDeepLink = (value: string | null | undefined) => {
+  if (!value) return "";
+
+  try {
+    const url = new URL(value, window.location.origin);
+
+    [
+      "pushNotificationClicked",
+      "notificationId",
+      "pushTitle",
+      "pushBody",
+      "pushType",
+      "pushReferenceId",
+      "pushDeepLink",
+    ].forEach((key) => url.searchParams.delete(key));
+
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return value.trim();
+  }
+};
 
 const getNotificationMatchScore = (
   notification: NotificationItem,
@@ -140,7 +285,8 @@ const getNotificationMatchScore = (
 
   if (
     pendingRead.deepLink &&
-    notification.deepLink?.trim() === pendingRead.deepLink.trim()
+    normalizeDeepLink(notification.deepLink) ===
+      normalizeDeepLink(pendingRead.deepLink)
   ) {
     score += 2;
   }
@@ -174,8 +320,8 @@ export const findNotificationForPendingPushRead = (
       notification,
       score: getNotificationMatchScore(notification, pendingRead),
     }))
-    .filter(({ score }) => score > 0)
+    .filter(({ score }) => score >= 6)
     .sort((a, b) => b.score - a.score);
 
-  return scoredMatches[0]?.notification ?? unreadNotifications[0] ?? null;
+  return scoredMatches[0]?.notification ?? null;
 };

@@ -17,8 +17,8 @@ import {
 } from "@/utils/notificationDeepLink";
 import {
   findNotificationForPendingPushRead,
-  getPendingPushNotificationReads,
-  removePendingPushNotificationReads,
+  getAllPendingPushNotificationReads,
+  removeAllPendingPushNotificationReads,
 } from "@/utils/pushNotificationReadTracking";
 import type { NotificationItem } from "@/types/notification";
 
@@ -172,45 +172,53 @@ const NotificationPage = () => {
   useEffect(() => {
     if (isLoading || isError || markPendingNotificationAsRead.isPending) return;
 
-    const pendingReads = getPendingPushNotificationReads();
-    const processedPendingKeys: string[] = [];
+    let isCancelled = false;
 
-    let hasUnmatchedPendingRead = false;
+    void getAllPendingPushNotificationReads().then((pendingReads) => {
+      if (isCancelled) return;
 
-    pendingReads.forEach((pendingRead) => {
-      const matchedNotification = findNotificationForPendingPushRead(
-        allNotifications,
-        pendingRead,
-      );
+      const processedPendingKeys: string[] = [];
+      let hasUnmatchedPendingRead = false;
 
-      if (!matchedNotification) {
-        hasUnmatchedPendingRead = true;
-        return;
+      pendingReads.forEach((pendingRead) => {
+        const matchedNotification = findNotificationForPendingPushRead(
+          allNotifications,
+          pendingRead,
+        );
+
+        if (!matchedNotification) {
+          hasUnmatchedPendingRead = true;
+          return;
+        }
+
+        if (matchedNotification.isRead) {
+          processedPendingKeys.push(pendingRead.key);
+          return;
+        }
+
+        markPendingNotificationAsRead.mutate(
+          matchedNotification.notificationId,
+          {
+            onSuccess: () =>
+              removeAllPendingPushNotificationReads([pendingRead.key]),
+          },
+        );
+      });
+
+      removeAllPendingPushNotificationReads(processedPendingKeys);
+
+      if (
+        hasUnmatchedPendingRead &&
+        hasNextPage &&
+        !isFetchingNextPage
+      ) {
+        void fetchNextPage();
       }
-
-      if (matchedNotification.isRead) {
-        processedPendingKeys.push(pendingRead.key);
-        return;
-      }
-
-      markPendingNotificationAsRead.mutate(
-        matchedNotification.notificationId,
-        {
-          onSuccess: () =>
-            removePendingPushNotificationReads([pendingRead.key]),
-        },
-      );
     });
 
-    removePendingPushNotificationReads(processedPendingKeys);
-
-    if (
-      hasUnmatchedPendingRead &&
-      hasNextPage &&
-      !isFetchingNextPage
-    ) {
-      void fetchNextPage();
-    }
+    return () => {
+      isCancelled = true;
+    };
   }, [
     allNotifications,
     fetchNextPage,

@@ -17,8 +17,10 @@ import {
 } from "@/utils/notificationDeepLink";
 import {
   findNotificationForPendingPushRead,
-  removePendingPushNotificationReads,
+  getAllPendingPushNotificationReads,
+  removeAllPendingPushNotificationReads,
   savePendingPushNotificationRead,
+  saveIndexedDbPendingPushNotificationRead,
 } from "@/utils/pushNotificationReadTracking";
 import { markPushNotificationEntry } from "@/utils/pushNotificationBackNavigation";
 import type {
@@ -60,9 +62,9 @@ const getPayloadNotificationId = (data?: Record<string, string>) => {
       data?.notification_id ??
       data?.["notification-id"] ??
       data?.pushNotificationId ??
-      data?.notificationSeq ??
+      data?.id ??
       data?.alarmId ??
-      data?.id,
+      data?.notificationSeq,
   );
 
   return Number.isFinite(notificationId) && notificationId > 0
@@ -325,6 +327,7 @@ export const PushNotificationBridge = () => {
       "BroadcastChannel" in window
         ? new BroadcastChannel("bscene-push")
         : null;
+    let isProcessingStoredPendingReads = false;
 
     window.__bscenePushDebug = getWebPushDebugInfo;
 
@@ -346,11 +349,56 @@ export const PushNotificationBridge = () => {
         )
         .then(() => {
           if (pendingReadKey) {
-            removePendingPushNotificationReads([pendingReadKey]);
+            removeAllPendingPushNotificationReads([pendingReadKey]);
           }
         })
         .catch((error) => {
+          processedPushNotificationIds.delete(notificationId);
           console.error("[BScene Push] failed to mark notification as read", error);
+        });
+    };
+
+    const processStoredPendingPushReads = () => {
+      if (isProcessingStoredPendingReads) return;
+
+      isProcessingStoredPendingReads = true;
+
+      void getAllPendingPushNotificationReads()
+        .then(async (pendingReads) => {
+          if (pendingReads.length === 0) return;
+
+          const notificationsPage = await getNotifications({ size: 50 });
+          const readPendingKeys: string[] = [];
+
+          pendingReads.forEach((pendingRead) => {
+            const matchedNotification = findNotificationForPendingPushRead(
+              notificationsPage.items,
+              pendingRead,
+            );
+
+            if (!matchedNotification) return;
+
+            if (matchedNotification.isRead) {
+              readPendingKeys.push(pendingRead.key);
+              return;
+            }
+
+            markPushNotificationIdAsRead(
+              matchedNotification.notificationId,
+              pendingRead.key,
+            );
+          });
+
+          removeAllPendingPushNotificationReads(readPendingKeys);
+        })
+        .catch((error) => {
+          console.error(
+            "[BScene Push] failed to process pending notification reads",
+            error,
+          );
+        })
+        .finally(() => {
+          isProcessingStoredPendingReads = false;
         });
     };
 
@@ -362,13 +410,9 @@ export const PushNotificationBridge = () => {
 
       const pendingRead = savePendingPushNotificationRead(clickedNotification);
 
-      if (clickedNotification.notificationId !== null) {
-        markPushNotificationIdAsRead(
-          clickedNotification.notificationId,
-          pendingRead.key,
-        );
-        return;
-      }
+      void saveIndexedDbPendingPushNotificationRead(pendingRead).finally(() => {
+        processStoredPendingPushReads();
+      });
 
       void getNotifications({ size: 50 })
         .then((notificationsPage) => {
@@ -380,7 +424,7 @@ export const PushNotificationBridge = () => {
           if (!matchedNotification) return;
 
           if (matchedNotification.isRead) {
-            removePendingPushNotificationReads([pendingRead.key]);
+            removeAllPendingPushNotificationReads([pendingRead.key]);
             return;
           }
 
@@ -408,14 +452,21 @@ export const PushNotificationBridge = () => {
     };
 
     processCurrentUrlPushClick();
+    processStoredPendingPushReads();
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
         processCurrentUrlPushClick();
+        processStoredPendingPushReads();
       }
     };
 
-    window.addEventListener("focus", processCurrentUrlPushClick);
+    const handleFocus = () => {
+      processCurrentUrlPushClick();
+      processStoredPendingPushReads();
+    };
+
+    window.addEventListener("focus", handleFocus);
     window.addEventListener("popstate", processCurrentUrlPushClick);
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
@@ -515,7 +566,7 @@ export const PushNotificationBridge = () => {
     return () => {
       unsubscribe?.();
       window.clearInterval(urlCheckIntervalId);
-      window.removeEventListener("focus", processCurrentUrlPushClick);
+      window.removeEventListener("focus", handleFocus);
       window.removeEventListener("popstate", processCurrentUrlPushClick);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       navigator.serviceWorker?.removeEventListener(

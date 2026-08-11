@@ -4,6 +4,10 @@ const firebaseConfig = Object.fromEntries(
   new URL(self.location.href).searchParams.entries(),
 );
 
+const PUSH_READ_DB_NAME = "bscenePushNotificationReads";
+const PUSH_READ_DB_VERSION = 1;
+const PUSH_READ_STORE_NAME = "pendingReads";
+
 const getStringValue = (value) => {
   if (typeof value === "string") return value.trim();
   if (typeof value === "number") return String(value);
@@ -16,10 +20,77 @@ const getNotificationIdFromData = (data) => {
     getStringValue(data.notification_id) ||
     getStringValue(data["notification-id"]) ||
     getStringValue(data.pushNotificationId) ||
-    getStringValue(data.notificationSeq) ||
+    getStringValue(data.id) ||
     getStringValue(data.alarmId) ||
-    getStringValue(data.id)
+    getStringValue(data.notificationSeq)
   );
+};
+
+const toPositiveNumberOrNull = (value) => {
+  const numberValue = Number(value);
+
+  return Number.isFinite(numberValue) && numberValue > 0 ? numberValue : null;
+};
+
+const createPendingPushRead = ({
+  notificationId,
+  title,
+  body,
+  type,
+  referenceId,
+  deepLink,
+}) => {
+  const normalizedNotificationId = toPositiveNumberOrNull(notificationId);
+
+  return {
+    key:
+      normalizedNotificationId !== null
+        ? `id:${normalizedNotificationId}`
+        : `push:${Date.now()}:${Math.random().toString(36).slice(2)}`,
+    notificationId: normalizedNotificationId,
+    title: getStringValue(title),
+    body: getStringValue(body),
+    type: getStringValue(type),
+    referenceId: toPositiveNumberOrNull(referenceId),
+    deepLink: getStringValue(deepLink),
+    createdAt: Date.now(),
+  };
+};
+
+const openPendingPushReadDb = () =>
+  new Promise((resolve, reject) => {
+    const request = indexedDB.open(PUSH_READ_DB_NAME, PUSH_READ_DB_VERSION);
+
+    request.onupgradeneeded = () => {
+      const db = request.result;
+
+      if (!db.objectStoreNames.contains(PUSH_READ_STORE_NAME)) {
+        db.createObjectStore(PUSH_READ_STORE_NAME, { keyPath: "key" });
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+
+const savePendingPushRead = async (pendingRead) => {
+  try {
+    const db = await openPendingPushReadDb();
+
+    await new Promise((resolve, reject) => {
+      const transaction = db.transaction(PUSH_READ_STORE_NAME, "readwrite");
+      const store = transaction.objectStore(PUSH_READ_STORE_NAME);
+      const request = store.put(pendingRead);
+
+      request.onerror = () => reject(request.error);
+      transaction.oncomplete = () => {
+        db.close();
+        resolve();
+      };
+      transaction.onerror = () => reject(transaction.error);
+    });
+  } catch (error) {
+    console.error("[BScene Push SW] failed to save pending read", error);
+  }
 };
 
 const getNestedMessageData = (data) => {
@@ -327,32 +398,49 @@ self.addEventListener("notificationclick", (event) => {
     referenceId: pushClickMessage.referenceId,
     deepLink: pushClickMessage.deepLink,
   });
+  const pendingPushRead = createPendingPushRead({
+    notificationId,
+    title: pushClickMessage.title,
+    body: pushClickMessage.body,
+    type: pushClickMessage.notificationType,
+    referenceId: pushClickMessage.referenceId,
+    deepLink: pushClickMessage.deepLink,
+  });
 
   pushClickMessage.targetDeepLink = trackedTargetDeepLink;
 
   event.waitUntil(
-    self.clients
-      .matchAll({
-        type: "window",
-        includeUncontrolled: true,
-      })
-      .then((clientList) => {
-        const existingClient = clientList.find((client) => {
-          try {
-            return new URL(client.url).origin === self.location.origin;
-          } catch {
-            return false;
+    Promise.all([
+      savePendingPushRead(pendingPushRead),
+      self.clients
+        .matchAll({
+          type: "window",
+          includeUncontrolled: true,
+        })
+        .then((clientList) => {
+          const existingClient = clientList.find((client) => {
+            try {
+              return new URL(client.url).origin === self.location.origin;
+            } catch {
+              return false;
+            }
+          });
+
+          const targetUrl = new URL(
+            trackedTargetDeepLink,
+            self.location.origin,
+          ).href;
+
+          if (existingClient) {
+            existingClient.postMessage(pushClickMessage);
+            return existingClient
+              .navigate(targetUrl)
+              .then((client) => (client ? client.focus() : existingClient.focus()))
+              .catch(() => existingClient.focus());
           }
-        });
 
-        if (existingClient) {
-          existingClient.postMessage(pushClickMessage);
-          existingClient.focus();
-        }
-
-        return self.clients.openWindow(
-          new URL(trackedTargetDeepLink, self.location.origin).href,
-        );
-      }),
+          return self.clients.openWindow(targetUrl);
+        }),
+    ]),
   );
 });
