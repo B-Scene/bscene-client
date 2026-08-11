@@ -15,6 +15,11 @@ import {
   isNotificationWithinRetention,
   isNotificationForMode,
 } from "@/utils/notificationDeepLink";
+import {
+  findNotificationForPendingPushRead,
+  getPendingPushNotificationReads,
+  removePendingPushNotificationReads,
+} from "@/utils/pushNotificationReadTracking";
 import type { NotificationItem } from "@/types/notification";
 
 const NOTIFICATION_PAGE_SIZE = 20;
@@ -112,18 +117,21 @@ const NotificationPage = () => {
     isLoading,
     refetch,
   } = useNotificationsInfiniteQuery(NOTIFICATION_PAGE_SIZE);
+  const markPendingNotificationAsRead = useMarkNotificationAsReadMutation();
   const [retentionNow, setRetentionNow] = useState(() => Date.now());
+  const allNotifications = useMemo(
+    () => data?.pages.flatMap((page) => page.items) ?? [],
+    [data],
+  );
   const notifications = useMemo(
     () =>
-      data?.pages
-        .flatMap((page) => page.items)
+      allNotifications
         .filter(
           (notification) =>
             isNotificationWithinRetention(notification, retentionNow) &&
             isNotificationForMode(notification, "FAN"),
-        ) ??
-      [],
-    [data, retentionNow],
+        ),
+    [allNotifications, retentionNow],
   );
   const hasNotifications = notifications.length > 0;
   const sentinelRef = useInfiniteScrollObserver({
@@ -159,6 +167,58 @@ const NotificationPage = () => {
     isError,
     isFetchingNextPage,
     isLoading,
+  ]);
+
+  useEffect(() => {
+    if (isLoading || isError || markPendingNotificationAsRead.isPending) return;
+
+    const pendingReads = getPendingPushNotificationReads();
+    const processedPendingKeys: string[] = [];
+
+    let hasUnmatchedPendingRead = false;
+
+    pendingReads.forEach((pendingRead) => {
+      const matchedNotification = findNotificationForPendingPushRead(
+        allNotifications,
+        pendingRead,
+      );
+
+      if (!matchedNotification) {
+        hasUnmatchedPendingRead = true;
+        return;
+      }
+
+      if (matchedNotification.isRead) {
+        processedPendingKeys.push(pendingRead.key);
+        return;
+      }
+
+      markPendingNotificationAsRead.mutate(
+        matchedNotification.notificationId,
+        {
+          onSuccess: () =>
+            removePendingPushNotificationReads([pendingRead.key]),
+        },
+      );
+    });
+
+    removePendingPushNotificationReads(processedPendingKeys);
+
+    if (
+      hasUnmatchedPendingRead &&
+      hasNextPage &&
+      !isFetchingNextPage
+    ) {
+      void fetchNextPage();
+    }
+  }, [
+    allNotifications,
+    fetchNextPage,
+    hasNextPage,
+    isError,
+    isFetchingNextPage,
+    isLoading,
+    markPendingNotificationAsRead,
   ]);
 
   return (

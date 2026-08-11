@@ -15,6 +15,11 @@ import {
   getLiveReferencePath,
   getNotificationMode,
 } from "@/utils/notificationDeepLink";
+import {
+  findNotificationForPendingPushRead,
+  removePendingPushNotificationReads,
+  savePendingPushNotificationRead,
+} from "@/utils/pushNotificationReadTracking";
 import type {
   NotificationItem,
   NotificationSettingsMode,
@@ -42,6 +47,10 @@ type ClickedPushNotification = {
   type: string;
   referenceId: number | null;
   deepLink: string;
+};
+
+type PushNotificationClickMessage = ClickedPushNotification & {
+  targetDeepLink: string;
 };
 
 const getPayloadNotificationId = (data?: Record<string, string>) => {
@@ -176,7 +185,7 @@ const removePushClickContextFromCurrentUrl = () => {
 
 const getClickedPushNotificationFromMessage = (
   data: unknown,
-): ClickedPushNotification | null => {
+): PushNotificationClickMessage | null => {
   if (typeof data !== "object" || data === null) return null;
 
   const message = data as {
@@ -187,6 +196,7 @@ const getClickedPushNotificationFromMessage = (
     notificationType?: unknown;
     referenceId?: unknown;
     deepLink?: unknown;
+    targetDeepLink?: unknown;
   };
 
   if (message.type !== "BSCENE_PUSH_NOTIFICATION_CLICK") return null;
@@ -201,75 +211,33 @@ const getClickedPushNotificationFromMessage = (
         : "",
     referenceId: toPositiveNumberOrNull(String(message.referenceId ?? "")),
     deepLink: typeof message.deepLink === "string" ? message.deepLink : "",
+    targetDeepLink:
+      typeof message.targetDeepLink === "string" ? message.targetDeepLink : "",
   };
 };
 
-const normalizeText = (value: string) => value.trim();
+const navigateToPushTarget = (targetDeepLink: string) => {
+  if (!targetDeepLink) return;
 
-const getNotificationMatchScore = (
-  notification: NotificationItem,
-  clickedNotification: ClickedPushNotification,
-) => {
-  let score = 0;
+  try {
+    const url = new URL(targetDeepLink, window.location.origin);
 
-  if (
-    clickedNotification.title &&
-    normalizeText(notification.title) === normalizeText(clickedNotification.title)
-  ) {
-    score += 4;
+    if (url.origin !== window.location.origin) {
+      window.location.assign(targetDeepLink);
+      return;
+    }
+
+    const nextPath = `${url.pathname}${url.search}${url.hash}`;
+
+    if (nextPath === `${window.location.pathname}${window.location.search}${window.location.hash}`) {
+      return;
+    }
+
+    window.history.pushState(window.history.state, "", nextPath);
+    window.dispatchEvent(new PopStateEvent("popstate", { state: window.history.state }));
+  } catch {
+    window.location.assign(targetDeepLink);
   }
-
-  if (
-    clickedNotification.body &&
-    normalizeText(notification.body) === normalizeText(clickedNotification.body)
-  ) {
-    score += 4;
-  }
-
-  if (
-    clickedNotification.type &&
-    notification.type.toUpperCase() === clickedNotification.type.toUpperCase()
-  ) {
-    score += 2;
-  }
-
-  if (
-    clickedNotification.referenceId !== null &&
-    notification.referenceId === clickedNotification.referenceId
-  ) {
-    score += 2;
-  }
-
-  if (
-    clickedNotification.deepLink &&
-    notification.deepLink?.trim() === clickedNotification.deepLink.trim()
-  ) {
-    score += 2;
-  }
-
-  return score;
-};
-
-const findClickedNotification = (
-  notifications: NotificationItem[],
-  clickedNotification: ClickedPushNotification,
-) => {
-  const unreadNotifications = notifications
-    .filter((notification) => !notification.isRead)
-    .sort(
-      (a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-    );
-
-  const scoredMatches = unreadNotifications
-    .map((notification) => ({
-      notification,
-      score: getNotificationMatchScore(notification, clickedNotification),
-    }))
-    .filter(({ score }) => score > 0)
-    .sort((a, b) => b.score - a.score);
-
-  return scoredMatches[0]?.notification ?? unreadNotifications[0] ?? null;
 };
 
 const getPayloadDeepLink = ({
@@ -359,7 +327,10 @@ export const PushNotificationBridge = () => {
 
     window.__bscenePushDebug = getWebPushDebugInfo;
 
-    const markPushNotificationIdAsRead = (notificationId: number) => {
+    const markPushNotificationIdAsRead = (
+      notificationId: number,
+      pendingReadKey?: string,
+    ) => {
       if (processedPushNotificationIds.has(notificationId)) return;
 
       processedPushNotificationIds.add(notificationId);
@@ -372,6 +343,11 @@ export const PushNotificationBridge = () => {
             queryClient.invalidateQueries({ queryKey: notificationKeys.all }),
           ]),
         )
+        .then(() => {
+          if (pendingReadKey) {
+            removePendingPushNotificationReads([pendingReadKey]);
+          }
+        })
         .catch((error) => {
           console.error("[BScene Push] failed to mark notification as read", error);
         });
@@ -380,34 +356,66 @@ export const PushNotificationBridge = () => {
     const markClickedPushNotificationAsRead = (
       clickedNotification: ClickedPushNotification,
     ) => {
+      const pendingRead = savePendingPushNotificationRead(clickedNotification);
+
       if (clickedNotification.notificationId !== null) {
-        markPushNotificationIdAsRead(clickedNotification.notificationId);
+        markPushNotificationIdAsRead(
+          clickedNotification.notificationId,
+          pendingRead.key,
+        );
         return;
       }
 
       void getNotifications({ size: 50 })
         .then((notificationsPage) => {
-          const matchedNotification = findClickedNotification(
+          const matchedNotification = findNotificationForPendingPushRead(
             notificationsPage.items,
             clickedNotification,
           );
 
           if (!matchedNotification) return;
 
-          markPushNotificationIdAsRead(matchedNotification.notificationId);
+          if (matchedNotification.isRead) {
+            removePendingPushNotificationReads([pendingRead.key]);
+            return;
+          }
+
+          markPushNotificationIdAsRead(
+            matchedNotification.notificationId,
+            pendingRead.key,
+          );
         })
         .catch((error) => {
           console.error("[BScene Push] failed to find clicked notification", error);
         });
     };
 
-    const clickedNotificationFromUrl =
-      getClickedPushNotificationFromCurrentUrl();
+    const processCurrentUrlPushClick = () => {
+      const clickedNotificationFromUrl =
+        getClickedPushNotificationFromCurrentUrl();
 
-    if (clickedNotificationFromUrl) {
+      if (!clickedNotificationFromUrl) return;
+
       removePushClickContextFromCurrentUrl();
       markClickedPushNotificationAsRead(clickedNotificationFromUrl);
-    }
+    };
+
+    processCurrentUrlPushClick();
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        processCurrentUrlPushClick();
+      }
+    };
+
+    window.addEventListener("focus", processCurrentUrlPushClick);
+    window.addEventListener("popstate", processCurrentUrlPushClick);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    const urlCheckIntervalId = window.setInterval(
+      processCurrentUrlPushClick,
+      1000,
+    );
 
     const handleServiceWorkerMessage = (event: MessageEvent) => {
       const clickedNotification =
@@ -416,6 +424,7 @@ export const PushNotificationBridge = () => {
       if (clickedNotification === null) return;
 
       markClickedPushNotificationAsRead(clickedNotification);
+      navigateToPushTarget(clickedNotification.targetDeepLink);
     };
 
     navigator.serviceWorker?.addEventListener(
@@ -495,6 +504,10 @@ export const PushNotificationBridge = () => {
 
     return () => {
       unsubscribe?.();
+      window.clearInterval(urlCheckIntervalId);
+      window.removeEventListener("focus", processCurrentUrlPushClick);
+      window.removeEventListener("popstate", processCurrentUrlPushClick);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
       navigator.serviceWorker?.removeEventListener(
         "message",
         handleServiceWorkerMessage,

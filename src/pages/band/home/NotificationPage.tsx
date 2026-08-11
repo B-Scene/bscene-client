@@ -25,6 +25,11 @@ import {
   isNotificationWithinRetention,
   isPostRegistrationNotification,
 } from "@/utils/notificationDeepLink";
+import {
+  findNotificationForPendingPushRead,
+  getPendingPushNotificationReads,
+  removePendingPushNotificationReads,
+} from "@/utils/pushNotificationReadTracking";
 import { getGenreLabel, getRegionLabel } from "@/utils/bandLabels";
 import { getApiErrorMessage } from "@/utils/getApiErrorMessage";
 import type { BandMemberPart } from "@/types/band/bandMember";
@@ -114,18 +119,20 @@ const NotificationPage = () => {
   const rejectBandInvite = useRejectBandInviteMutation();
   const { data: activeMemberProfile } = useActiveBandMemberProfileQuery();
   const [retentionNow, setRetentionNow] = useState(() => Date.now());
+  const allNotifications = useMemo(
+    () => data?.pages.flatMap((page) => page.items) ?? [],
+    [data],
+  );
   const notifications = useMemo(
     () =>
-      data?.pages
-        .flatMap((page) => page.items)
+      allNotifications
         .filter(
           (notification) =>
             isNotificationWithinRetention(notification, retentionNow) &&
             isNotificationForMode(notification, "BAND") &&
             !isPostRegistrationNotification(notification),
-        ) ??
-      [],
-    [data, retentionNow],
+        ),
+    [allNotifications, retentionNow],
   );
   const hasNotifications = notifications.length > 0;
   const sentinelRef = useInfiniteScrollObserver({
@@ -161,6 +168,54 @@ const NotificationPage = () => {
     isError,
     isFetchingNextPage,
     isLoading,
+  ]);
+
+  useEffect(() => {
+    if (isLoading || isError || markNotificationAsRead.isPending) return;
+
+    const pendingReads = getPendingPushNotificationReads();
+    const processedPendingKeys: string[] = [];
+
+    let hasUnmatchedPendingRead = false;
+
+    pendingReads.forEach((pendingRead) => {
+      const matchedNotification = findNotificationForPendingPushRead(
+        allNotifications,
+        pendingRead,
+      );
+
+      if (!matchedNotification) {
+        hasUnmatchedPendingRead = true;
+        return;
+      }
+
+      if (matchedNotification.isRead) {
+        processedPendingKeys.push(pendingRead.key);
+        return;
+      }
+
+      markNotificationAsRead.mutate(matchedNotification.notificationId, {
+        onSuccess: () => removePendingPushNotificationReads([pendingRead.key]),
+      });
+    });
+
+    removePendingPushNotificationReads(processedPendingKeys);
+
+    if (
+      hasUnmatchedPendingRead &&
+      hasNextPage &&
+      !isFetchingNextPage
+    ) {
+      void fetchNextPage();
+    }
+  }, [
+    allNotifications,
+    fetchNextPage,
+    hasNextPage,
+    isError,
+    isFetchingNextPage,
+    isLoading,
+    markNotificationAsRead,
   ]);
 
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);

@@ -22,6 +22,17 @@ const getNotificationIdFromData = (data) => {
   );
 };
 
+const getNestedMessageData = (data) => {
+  return data?.FCM_MSG?.data || data?.["firebase-messaging-msg-data"]?.data || {};
+};
+
+const getClickData = (notificationData) => {
+  return {
+    ...getNestedMessageData(notificationData),
+    ...(notificationData || {}),
+  };
+};
+
 const isCoHostInviteType = (value) => {
   const type = getStringValue(value).toUpperCase();
 
@@ -176,6 +187,22 @@ const getBaseDeepLinkFromPayload = (payload) => {
   );
 };
 
+const getTargetDeepLinkFromNotification = (notification) => {
+  const rawData = notification.data || {};
+  const data = getClickData(rawData);
+  const fcmMessage = rawData.FCM_MSG || rawData["firebase-messaging-msg-data"];
+
+  return (
+    data.deepLink ||
+    data.link ||
+    fcmMessage?.fcmOptions?.link ||
+    fcmMessage?.webpush?.fcmOptions?.link ||
+    rawData.deepLink ||
+    rawData.link ||
+    "/"
+  );
+};
+
 if (
   firebaseConfig.apiKey &&
   firebaseConfig.projectId &&
@@ -267,24 +294,30 @@ self.addEventListener("notificationclick", (event) => {
     return;
   }
 
+  const notificationData = event.notification.data || {};
+  const clickData = getClickData(notificationData);
+  const baseTargetDeepLink = getTargetDeepLinkFromNotification(event.notification);
   const deepLink =
     event.action === "accept"
-      ? event.notification.data?.acceptDeepLink
-      : event.notification.data?.deepLink;
+      ? notificationData.acceptDeepLink
+      : baseTargetDeepLink;
 
   const targetDeepLink = deepLink || "/";
-  const notificationId = getStringValue(event.notification.data?.notificationId);
+  const notificationId = getNotificationIdFromData(clickData);
   const pushClickMessage = {
     type: "BSCENE_PUSH_NOTIFICATION_CLICK",
     notificationId,
-    title: event.notification.title || event.notification.data?.title || "",
-    body: event.notification.body || event.notification.data?.body || "",
-    notificationType: event.notification.data?.type || "",
+    title: event.notification.title || clickData.title || "",
+    body: event.notification.body || clickData.body || "",
+    notificationType: getNotificationType(clickData),
     referenceId:
-      event.notification.data?.referenceId ||
-      event.notification.data?.liveId ||
+      clickData.referenceId ||
+      clickData.liveId ||
+      clickData.targetId ||
+      clickData.resourceId ||
       "",
-    deepLink: event.notification.data?.originalDeepLink || targetDeepLink,
+    deepLink: notificationData.originalDeepLink || baseTargetDeepLink,
+    targetDeepLink,
   };
 
   event.waitUntil(
@@ -306,10 +339,14 @@ self.addEventListener("notificationclick", (event) => {
           existingClient.postMessage(pushClickMessage);
 
           existingClient.focus();
-          return existingClient.navigate(targetDeepLink);
+          return existingClient
+            .navigate(new URL(targetDeepLink, self.location.origin).href)
+            .catch(() => undefined);
         }
 
-        return self.clients.openWindow(targetDeepLink);
+        return self.clients.openWindow(
+          new URL(targetDeepLink, self.location.origin).href,
+        );
       }),
   );
 });
