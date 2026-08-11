@@ -154,7 +154,7 @@ const ConcertCard = ({
   );
 
   return (
-    <article className="mx-auto box-border flex h-[86px] w-full max-w-[348px] items-center justify-between gap-4 rounded-xl bg-neutral-0 px-4 py-3 shadow-[0_0_8px_0_rgba(0,0,0,0.10)]">
+    <article className="box-border flex h-[86px] w-full items-center justify-between gap-4 rounded-xl bg-neutral-0 px-4 py-3 shadow-[0_0_8px_0_rgba(0,0,0,0.10)]">
       {onClick ? (
         <button
           type="button"

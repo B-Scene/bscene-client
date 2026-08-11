@@ -434,7 +434,7 @@ export const ExploreFilterSheet = ({
         aria-label="필터"
         onTransitionEnd={handleTransitionEnd}
         className={[
-          "relative z-10 flex h-[506px] w-[393px] max-w-full flex-col overflow-hidden rounded-t-[24px] bg-neutral-0 pt-[8px] pb-[8px] transition-transform duration-300 ease-out",
+          "relative z-10 flex h-[506px] w-full flex-col overflow-hidden rounded-t-[24px] bg-neutral-0 pt-[8px] pb-[8px] transition-transform duration-300 ease-out",
           isVisible ? "translate-y-0" : "translate-y-full",
         ].join(" ")}
       >
@@ -624,7 +624,7 @@ const RecommendationSection = ({
 
               void followBand(band);
             }}
-            className="!h-[86px] !w-[348px] !gap-[16px]"
+            className="!h-[86px] !gap-[16px]"
             contentClassName="!h-auto flex-1 shrink !w-auto"
             descriptionClassName="line-clamp-2 text-primary-300"
             descriptionMultiline

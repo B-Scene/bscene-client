@@ -612,7 +612,7 @@ export function LiveChatProfileActionSheet({
         aria-modal="true"
         aria-label="사용자 관리"
         onTransitionEnd={handleTransitionEnd}
-        className={`relative z-10 h-[268px] w-full max-w-[393px] rounded-t-[24px] bg-neutral-0 px-5 pt-12 pb-12 shadow-[0_-8px_24px_rgba(20,20,20,0.16)] transition-transform duration-300 ease-out ${
+        className={`relative z-10 h-[268px] w-full rounded-t-[24px] bg-neutral-0 px-5 pt-12 pb-12 shadow-[0_-8px_24px_rgba(20,20,20,0.16)] transition-transform duration-300 ease-out ${
           isVisible ? "translate-y-0" : "translate-y-full"
         }`}
       >
