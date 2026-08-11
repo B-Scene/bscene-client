@@ -31,7 +31,13 @@ const processedPushNotificationIds = new Set<number>();
 
 const getPayloadNotificationId = (data?: Record<string, string>) => {
   const notificationId = Number(
-    data?.notificationId ?? data?.notification_id ?? data?.id,
+    data?.notificationId ??
+      data?.notification_id ??
+      data?.["notification-id"] ??
+      data?.pushNotificationId ??
+      data?.notificationSeq ??
+      data?.alarmId ??
+      data?.id,
   );
 
   return Number.isFinite(notificationId) && notificationId > 0
@@ -86,6 +92,23 @@ const removeNotificationIdFromCurrentUrl = () => {
     "",
     `${url.pathname}${url.search}${url.hash}`,
   );
+};
+
+const getNotificationIdFromMessage = (data: unknown) => {
+  if (typeof data !== "object" || data === null) return null;
+
+  const message = data as {
+    type?: unknown;
+    notificationId?: unknown;
+  };
+
+  if (message.type !== "BSCENE_PUSH_NOTIFICATION_CLICK") return null;
+
+  const notificationId = Number(message.notificationId);
+
+  return Number.isFinite(notificationId) && notificationId > 0
+    ? notificationId
+    : null;
 };
 
 const getPayloadDeepLink = ({
@@ -175,17 +198,13 @@ export const PushNotificationBridge = () => {
 
     window.__bscenePushDebug = getWebPushDebugInfo;
 
-    const readNotificationId = getNotificationIdFromCurrentUrl();
+    const markPushNotificationAsRead = (notificationId: number) => {
+      if (processedPushNotificationIds.has(notificationId)) return;
 
-    if (
-      readNotificationId !== null &&
-      !processedPushNotificationIds.has(readNotificationId)
-    ) {
-      processedPushNotificationIds.add(readNotificationId);
-      removeNotificationIdFromCurrentUrl();
-      markNotificationReadInCache(queryClient, readNotificationId);
+      processedPushNotificationIds.add(notificationId);
+      markNotificationReadInCache(queryClient, notificationId);
 
-      void markNotificationAsRead(readNotificationId)
+      void markNotificationAsRead(notificationId)
         .then(() =>
           Promise.all([
             queryClient.invalidateQueries({ queryKey: fanHomeKeys.main() }),
@@ -195,7 +214,27 @@ export const PushNotificationBridge = () => {
         .catch((error) => {
           console.error("[BScene Push] failed to mark notification as read", error);
         });
+    };
+
+    const readNotificationId = getNotificationIdFromCurrentUrl();
+
+    if (readNotificationId !== null) {
+      removeNotificationIdFromCurrentUrl();
+      markPushNotificationAsRead(readNotificationId);
     }
+
+    const handleServiceWorkerMessage = (event: MessageEvent) => {
+      const clickedNotificationId = getNotificationIdFromMessage(event.data);
+
+      if (clickedNotificationId === null) return;
+
+      markPushNotificationAsRead(clickedNotificationId);
+    };
+
+    navigator.serviceWorker?.addEventListener(
+      "message",
+      handleServiceWorkerMessage,
+    );
 
     broadcastChannel?.addEventListener("message", (event) => {
       console.info("[BScene Push] background message", event.data);
@@ -250,6 +289,10 @@ export const PushNotificationBridge = () => {
 
     return () => {
       unsubscribe?.();
+      navigator.serviceWorker?.removeEventListener(
+        "message",
+        handleServiceWorkerMessage,
+      );
       broadcastChannel?.close();
       delete window.__bscenePushDebug;
     };

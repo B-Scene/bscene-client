@@ -14,6 +14,10 @@ const getNotificationIdFromData = (data) => {
   return (
     getStringValue(data.notificationId) ||
     getStringValue(data.notification_id) ||
+    getStringValue(data["notification-id"]) ||
+    getStringValue(data.pushNotificationId) ||
+    getStringValue(data.notificationSeq) ||
+    getStringValue(data.alarmId) ||
     getStringValue(data.id)
   );
 };
@@ -225,6 +229,7 @@ self.addEventListener("notificationclick", (event) => {
       : event.notification.data?.deepLink;
 
   const targetDeepLink = deepLink || "/";
+  const notificationId = getStringValue(event.notification.data?.notificationId);
 
   event.waitUntil(
     self.clients
@@ -242,6 +247,13 @@ self.addEventListener("notificationclick", (event) => {
         });
 
         if (existingClient) {
+          if (notificationId) {
+            existingClient.postMessage({
+              type: "BSCENE_PUSH_NOTIFICATION_CLICK",
+              notificationId,
+            });
+          }
+
           existingClient.focus();
           return existingClient.navigate(targetDeepLink);
         }
