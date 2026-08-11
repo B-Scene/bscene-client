@@ -12,9 +12,13 @@ import { bandMemberProfileKeys } from "@/hooks/api/band/useBandMemberProfile";
 import { fanMyPageKeys } from "@/hooks/api/user/useFanMyPage";
 import { bandMyPageKeys } from "@/hooks/api/user/useBandMyPage";
 
+export const onboardingStatusKeys = {
+  all: ["onboarding", "status"] as const,
+};
+
 export const useOnboardingStatus = () => {
   return useQuery({
-    queryKey: ["onboarding", "status"],
+    queryKey: onboardingStatusKeys.all,
     queryFn: getOnboardingStatus,
   });
 };
@@ -31,7 +35,7 @@ export const useSaveOnboarding = () => {
   return useMutation({
     mutationFn: (body: SaveOnboardingRequest) => saveOnboarding(body),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["onboarding", "status"] });
+      queryClient.invalidateQueries({ queryKey: onboardingStatusKeys.all });
       queryClient.invalidateQueries({ queryKey: myProfilesKeys.all });
       queryClient.invalidateQueries({ queryKey: bandMemberProfileKeys.all });
       queryClient.invalidateQueries({ queryKey: fanMyPageKeys.all });
