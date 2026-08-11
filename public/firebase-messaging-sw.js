@@ -105,6 +105,33 @@ const appendQueryParam = (deepLink, key, value) => {
   }
 };
 
+const appendPushClickContext = (deepLink, context) => {
+  try {
+    const url = new URL(deepLink, self.location.origin);
+
+    if (url.origin !== self.location.origin) return deepLink;
+
+    url.searchParams.set("pushNotificationClicked", "1");
+
+    Object.entries({
+      notificationId: context.notificationId,
+      pushTitle: context.title,
+      pushBody: context.body,
+      pushType: context.type,
+      pushReferenceId: context.referenceId,
+      pushDeepLink: context.deepLink,
+    }).forEach(([key, value]) => {
+      if (value) url.searchParams.set(key, value);
+    });
+
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return context.notificationId
+      ? appendQueryParam(deepLink, "notificationId", context.notificationId)
+      : deepLink;
+  }
+};
+
 const getNotificationType = (data) => {
   return (
     data.type ||
@@ -180,9 +207,23 @@ if (
     const title = notification.title || data.title || "B:Scene";
     const baseDeepLink = getBaseDeepLinkFromPayload(payload);
     const notificationId = getNotificationIdFromData(data);
-    const trackedDeepLink = notificationId
-      ? appendQueryParam(baseDeepLink, "notificationId", notificationId)
-      : baseDeepLink;
+    const pushClickContext = {
+      notificationId,
+      title,
+      body: notification.body || data.body || "",
+      type: getNotificationType(data),
+      referenceId:
+        data.referenceId ||
+        data.liveId ||
+        data.targetId ||
+        data.resourceId ||
+        "",
+      deepLink: baseDeepLink,
+    };
+    const trackedDeepLink = appendPushClickContext(
+      baseDeepLink,
+      pushClickContext,
+    );
     const shouldShowActions = shouldUseCoHostInviteActions(data, notification);
 
     const options = {
@@ -193,9 +234,12 @@ if (
         deepLink: trackedDeepLink,
         acceptDeepLink: appendQueryParam(trackedDeepLink, "action", "accept"),
         notificationId: notificationId || null,
+        title,
+        body: notification.body || data.body || null,
         type: getNotificationType(data) || null,
         liveId: getLiveIdFromData(data) || null,
         referenceId: data.referenceId || null,
+        originalDeepLink: baseDeepLink,
       },
     };
 
@@ -230,6 +274,18 @@ self.addEventListener("notificationclick", (event) => {
 
   const targetDeepLink = deepLink || "/";
   const notificationId = getStringValue(event.notification.data?.notificationId);
+  const pushClickMessage = {
+    type: "BSCENE_PUSH_NOTIFICATION_CLICK",
+    notificationId,
+    title: event.notification.title || event.notification.data?.title || "",
+    body: event.notification.body || event.notification.data?.body || "",
+    notificationType: event.notification.data?.type || "",
+    referenceId:
+      event.notification.data?.referenceId ||
+      event.notification.data?.liveId ||
+      "",
+    deepLink: event.notification.data?.originalDeepLink || targetDeepLink,
+  };
 
   event.waitUntil(
     self.clients
@@ -247,12 +303,7 @@ self.addEventListener("notificationclick", (event) => {
         });
 
         if (existingClient) {
-          if (notificationId) {
-            existingClient.postMessage({
-              type: "BSCENE_PUSH_NOTIFICATION_CLICK",
-              notificationId,
-            });
-          }
+          existingClient.postMessage(pushClickMessage);
 
           existingClient.focus();
           return existingClient.navigate(targetDeepLink);

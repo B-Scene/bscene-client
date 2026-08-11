@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { markNotificationAsRead } from "@/api/notification";
+import { getNotifications, markNotificationAsRead } from "@/api/notification";
 import {
   getWebPushDebugInfo,
   onForegroundPushMessage,
@@ -27,7 +27,22 @@ declare global {
 }
 
 const PUSH_NOTIFICATION_ID_QUERY_KEY = "notificationId";
+const PUSH_CLICKED_QUERY_KEY = "pushNotificationClicked";
+const PUSH_TITLE_QUERY_KEY = "pushTitle";
+const PUSH_BODY_QUERY_KEY = "pushBody";
+const PUSH_TYPE_QUERY_KEY = "pushType";
+const PUSH_REFERENCE_ID_QUERY_KEY = "pushReferenceId";
+const PUSH_DEEP_LINK_QUERY_KEY = "pushDeepLink";
 const processedPushNotificationIds = new Set<number>();
+
+type ClickedPushNotification = {
+  notificationId: number | null;
+  title: string;
+  body: string;
+  type: string;
+  referenceId: number | null;
+  deepLink: string;
+};
 
 const getPayloadNotificationId = (data?: Record<string, string>) => {
   const notificationId = Number(
@@ -69,24 +84,89 @@ const appendNotificationIdToDeepLink = (
   }
 };
 
-const getNotificationIdFromCurrentUrl = () => {
-  const notificationId = Number(
-    new URLSearchParams(window.location.search).get(
-      PUSH_NOTIFICATION_ID_QUERY_KEY,
-    ),
-  );
+const appendPushClickContextToDeepLink = (
+  deepLink: string,
+  context: ClickedPushNotification,
+) => {
+  try {
+    const url = new URL(deepLink, window.location.origin);
 
-  return Number.isFinite(notificationId) && notificationId > 0
-    ? notificationId
-    : null;
+    if (url.origin !== window.location.origin) return deepLink;
+
+    url.searchParams.set(PUSH_CLICKED_QUERY_KEY, "1");
+
+    if (context.notificationId !== null) {
+      url.searchParams.set(
+        PUSH_NOTIFICATION_ID_QUERY_KEY,
+        String(context.notificationId),
+      );
+    }
+
+    if (context.title) url.searchParams.set(PUSH_TITLE_QUERY_KEY, context.title);
+    if (context.body) url.searchParams.set(PUSH_BODY_QUERY_KEY, context.body);
+    if (context.type) url.searchParams.set(PUSH_TYPE_QUERY_KEY, context.type);
+    if (context.referenceId !== null) {
+      url.searchParams.set(
+        PUSH_REFERENCE_ID_QUERY_KEY,
+        String(context.referenceId),
+      );
+    }
+    if (context.deepLink) {
+      url.searchParams.set(PUSH_DEEP_LINK_QUERY_KEY, context.deepLink);
+    }
+
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return appendNotificationIdToDeepLink(deepLink, context.notificationId);
+  }
 };
 
-const removeNotificationIdFromCurrentUrl = () => {
+const toPositiveNumberOrNull = (value: string | null) => {
+  const numberValue = Number(value);
+
+  return Number.isFinite(numberValue) && numberValue > 0 ? numberValue : null;
+};
+
+const getClickedPushNotificationFromCurrentUrl =
+  (): ClickedPushNotification | null => {
+    const params = new URLSearchParams(window.location.search);
+    const notificationId = toPositiveNumberOrNull(
+      params.get(PUSH_NOTIFICATION_ID_QUERY_KEY),
+    );
+
+    if (!params.has(PUSH_CLICKED_QUERY_KEY) && notificationId === null) {
+      return null;
+    }
+
+    return {
+      notificationId,
+      title: params.get(PUSH_TITLE_QUERY_KEY) ?? "",
+      body: params.get(PUSH_BODY_QUERY_KEY) ?? "",
+      type: params.get(PUSH_TYPE_QUERY_KEY) ?? "",
+      referenceId: toPositiveNumberOrNull(
+        params.get(PUSH_REFERENCE_ID_QUERY_KEY),
+      ),
+      deepLink: params.get(PUSH_DEEP_LINK_QUERY_KEY) ?? "",
+    };
+  };
+
+const removePushClickContextFromCurrentUrl = () => {
   const url = new URL(window.location.href);
 
-  if (!url.searchParams.has(PUSH_NOTIFICATION_ID_QUERY_KEY)) return;
+  if (
+    !url.searchParams.has(PUSH_CLICKED_QUERY_KEY) &&
+    !url.searchParams.has(PUSH_NOTIFICATION_ID_QUERY_KEY)
+  ) {
+    return;
+  }
 
+  url.searchParams.delete(PUSH_CLICKED_QUERY_KEY);
   url.searchParams.delete(PUSH_NOTIFICATION_ID_QUERY_KEY);
+  url.searchParams.delete(PUSH_TITLE_QUERY_KEY);
+  url.searchParams.delete(PUSH_BODY_QUERY_KEY);
+  url.searchParams.delete(PUSH_TYPE_QUERY_KEY);
+  url.searchParams.delete(PUSH_REFERENCE_ID_QUERY_KEY);
+  url.searchParams.delete(PUSH_DEEP_LINK_QUERY_KEY);
   window.history.replaceState(
     window.history.state,
     "",
@@ -94,21 +174,102 @@ const removeNotificationIdFromCurrentUrl = () => {
   );
 };
 
-const getNotificationIdFromMessage = (data: unknown) => {
+const getClickedPushNotificationFromMessage = (
+  data: unknown,
+): ClickedPushNotification | null => {
   if (typeof data !== "object" || data === null) return null;
 
   const message = data as {
     type?: unknown;
     notificationId?: unknown;
+    title?: unknown;
+    body?: unknown;
+    notificationType?: unknown;
+    referenceId?: unknown;
+    deepLink?: unknown;
   };
 
   if (message.type !== "BSCENE_PUSH_NOTIFICATION_CLICK") return null;
 
-  const notificationId = Number(message.notificationId);
+  return {
+    notificationId: toPositiveNumberOrNull(String(message.notificationId ?? "")),
+    title: typeof message.title === "string" ? message.title : "",
+    body: typeof message.body === "string" ? message.body : "",
+    type:
+      typeof message.notificationType === "string"
+        ? message.notificationType
+        : "",
+    referenceId: toPositiveNumberOrNull(String(message.referenceId ?? "")),
+    deepLink: typeof message.deepLink === "string" ? message.deepLink : "",
+  };
+};
 
-  return Number.isFinite(notificationId) && notificationId > 0
-    ? notificationId
-    : null;
+const normalizeText = (value: string) => value.trim();
+
+const getNotificationMatchScore = (
+  notification: NotificationItem,
+  clickedNotification: ClickedPushNotification,
+) => {
+  let score = 0;
+
+  if (
+    clickedNotification.title &&
+    normalizeText(notification.title) === normalizeText(clickedNotification.title)
+  ) {
+    score += 4;
+  }
+
+  if (
+    clickedNotification.body &&
+    normalizeText(notification.body) === normalizeText(clickedNotification.body)
+  ) {
+    score += 4;
+  }
+
+  if (
+    clickedNotification.type &&
+    notification.type.toUpperCase() === clickedNotification.type.toUpperCase()
+  ) {
+    score += 2;
+  }
+
+  if (
+    clickedNotification.referenceId !== null &&
+    notification.referenceId === clickedNotification.referenceId
+  ) {
+    score += 2;
+  }
+
+  if (
+    clickedNotification.deepLink &&
+    notification.deepLink?.trim() === clickedNotification.deepLink.trim()
+  ) {
+    score += 2;
+  }
+
+  return score;
+};
+
+const findClickedNotification = (
+  notifications: NotificationItem[],
+  clickedNotification: ClickedPushNotification,
+) => {
+  const unreadNotifications = notifications
+    .filter((notification) => !notification.isRead)
+    .sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
+
+  const scoredMatches = unreadNotifications
+    .map((notification) => ({
+      notification,
+      score: getNotificationMatchScore(notification, clickedNotification),
+    }))
+    .filter(({ score }) => score > 0)
+    .sort((a, b) => b.score - a.score);
+
+  return scoredMatches[0]?.notification ?? unreadNotifications[0] ?? null;
 };
 
 const getPayloadDeepLink = ({
@@ -198,7 +359,7 @@ export const PushNotificationBridge = () => {
 
     window.__bscenePushDebug = getWebPushDebugInfo;
 
-    const markPushNotificationAsRead = (notificationId: number) => {
+    const markPushNotificationIdAsRead = (notificationId: number) => {
       if (processedPushNotificationIds.has(notificationId)) return;
 
       processedPushNotificationIds.add(notificationId);
@@ -216,19 +377,45 @@ export const PushNotificationBridge = () => {
         });
     };
 
-    const readNotificationId = getNotificationIdFromCurrentUrl();
+    const markClickedPushNotificationAsRead = (
+      clickedNotification: ClickedPushNotification,
+    ) => {
+      if (clickedNotification.notificationId !== null) {
+        markPushNotificationIdAsRead(clickedNotification.notificationId);
+        return;
+      }
 
-    if (readNotificationId !== null) {
-      removeNotificationIdFromCurrentUrl();
-      markPushNotificationAsRead(readNotificationId);
+      void getNotifications({ size: 50 })
+        .then((notificationsPage) => {
+          const matchedNotification = findClickedNotification(
+            notificationsPage.items,
+            clickedNotification,
+          );
+
+          if (!matchedNotification) return;
+
+          markPushNotificationIdAsRead(matchedNotification.notificationId);
+        })
+        .catch((error) => {
+          console.error("[BScene Push] failed to find clicked notification", error);
+        });
+    };
+
+    const clickedNotificationFromUrl =
+      getClickedPushNotificationFromCurrentUrl();
+
+    if (clickedNotificationFromUrl) {
+      removePushClickContextFromCurrentUrl();
+      markClickedPushNotificationAsRead(clickedNotificationFromUrl);
     }
 
     const handleServiceWorkerMessage = (event: MessageEvent) => {
-      const clickedNotificationId = getNotificationIdFromMessage(event.data);
+      const clickedNotification =
+        getClickedPushNotificationFromMessage(event.data);
 
-      if (clickedNotificationId === null) return;
+      if (clickedNotification === null) return;
 
-      markPushNotificationAsRead(clickedNotificationId);
+      markClickedPushNotificationAsRead(clickedNotification);
     };
 
     navigator.serviceWorker?.addEventListener(
@@ -254,9 +441,28 @@ export const PushNotificationBridge = () => {
         body: body ?? "",
       });
       const notificationId = getPayloadNotificationId(payload.data);
-      const trackedDeepLink = appendNotificationIdToDeepLink(
-        deepLink,
+      const referenceId = toPositiveNumberOrNull(
+        payload.data?.liveId ??
+          payload.data?.referenceId ??
+          payload.data?.targetId ??
+          payload.data?.resourceId ??
+          null,
+      );
+      const clickedNotification: ClickedPushNotification = {
         notificationId,
+        title,
+        body: body ?? "",
+        type:
+          payload.data?.type ??
+          payload.data?.notificationType ??
+          payload.data?.eventType ??
+          "",
+        referenceId,
+        deepLink,
+      };
+      const trackedDeepLink = appendPushClickContextToDeepLink(
+        deepLink,
+        clickedNotification,
       );
       const payloadMode = getPayloadMode({
         data: payload.data,
