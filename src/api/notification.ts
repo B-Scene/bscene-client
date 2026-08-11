@@ -215,6 +215,8 @@ const getSettingItemKey = (item: RawRecord): string | null => {
   const key =
     toStringOrNull(item.key) ??
     toStringOrNull(item.settingKey) ??
+    toStringOrNull(item.settingType) ??
+    toStringOrNull(item.notificationSettingType) ??
     toStringOrNull(item.type) ??
     toStringOrNull(item.name) ??
     toStringOrNull(item.id);
@@ -300,26 +302,12 @@ export const getNotificationSettings = async ({
 };
 
 export const updateNotificationSetting = async ({
-  mode,
   settingType,
   enabled,
 }: UpdateNotificationSettingParams) => {
-  const body = { mode, settingType, enabled, isEnabled: enabled };
-  const requestWithSettingTypePath = () =>
-    axiosInstance.patch<ApiResponse<unknown>>(
-      `/users/me/notification-settings/${settingType}`,
-      body,
-      { params: { mode } },
-    );
-  const requestWithCollectionPath = () =>
-    axiosInstance.patch<ApiResponse<unknown>>(
-      "/users/me/notification-settings",
-      body,
-      { params: { mode } },
-    );
-
-  const { data } = await requestWithSettingTypePath().catch(() =>
-    requestWithCollectionPath(),
+  const { data } = await axiosInstance.patch<ApiResponse<unknown>>(
+    `/users/me/notification-settings/${settingType}`,
+    { enabled },
   );
 
   if (data.isSuccess === false) {
