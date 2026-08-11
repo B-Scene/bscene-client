@@ -162,7 +162,7 @@ const NotificationPage = () => {
   ]);
 
   return (
-    <main className="mx-auto min-h-dvh w-full max-w-[393px] bg-primary-0">
+    <main className="min-h-dvh w-full bg-primary-0">
       <Header title="알림" align="betweenCompact" />
 
       {isLoading ? (

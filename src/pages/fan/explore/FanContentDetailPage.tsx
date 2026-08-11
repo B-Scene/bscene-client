@@ -869,7 +869,7 @@ const FanContentDetailPage = () => {
 
       <div aria-hidden="true" className="h-[86px] bg-primary-0" />
 
-      <div className="fixed inset-x-0 bottom-0 z-40 mx-auto flex h-[86px] w-full max-w-[393px] items-center justify-between bg-neutral-0 px-[25px] py-[12px] shadow-[0_-5px_20px_0_rgba(0,0,0,0.03)]">
+      <div className="fixed inset-x-0 bottom-0 z-40 flex h-[86px] w-full items-center justify-between bg-neutral-0 px-[25px] py-[12px] shadow-[0_-5px_20px_0_rgba(0,0,0,0.03)]">
         <button
           type="button"
           aria-label={isLiked ? "좋아요 취소" : "좋아요"}

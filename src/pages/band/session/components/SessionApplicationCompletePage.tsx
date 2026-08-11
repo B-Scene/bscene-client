@@ -20,7 +20,7 @@ export const SessionApplicationCompletePage = ({
   onGoToSessionHome,
 }: SessionApplicationCompletePageProps) => {
   return (
-    <main className="mx-auto flex h-dvh w-full max-w-[393px] flex-col overflow-hidden bg-neutral-0 pb-[var(--bottom-nav-height)]">
+    <main className="flex h-dvh w-full flex-col overflow-hidden bg-neutral-0 pb-[var(--bottom-nav-height)]">
       <section className="flex min-h-0 flex-1 flex-col items-center justify-center px-5 pb-10">
         <img
           src={CheckCircleCompleteIcon}

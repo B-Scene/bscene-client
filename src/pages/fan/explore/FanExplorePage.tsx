@@ -263,7 +263,7 @@ export const ExploreFilterBar = ({
   const sortChipWidthClass = appliedSort === "정확도순" ? "w-[73px]" : "w-[62px]";
 
   return (
-    <div className="sticky top-0 z-10 flex h-[48px] w-full max-w-[393px] items-center justify-between border-b border-neutral-400 bg-neutral-0 py-[11px] pl-[22px] pr-[26px]">
+    <div className="sticky top-0 z-10 flex h-[48px] w-full items-center justify-between border-b border-neutral-400 bg-neutral-0 py-[11px] pl-[22px] pr-[26px]">
       <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto pr-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <button
           type="button"

@@ -202,7 +202,7 @@ const SessionBasicProfileEditForm = ({
         </button>
       </section>
 
-      <section className="mx-auto w-[330px] pt-[56px]">
+      <section className="w-full px-8 pt-[56px]">
         <div className="flex flex-col gap-5">
           <ProfileField label="이름">
             <ProfileInput value={values.name} readOnly muted />

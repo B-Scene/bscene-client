@@ -578,7 +578,7 @@ const FanExploreSearchResultPage = () => {
         )}
       </section>
 
-      <div aria-hidden="true" className="mt-[16px] h-[16px] w-full max-w-[393px] bg-primary-0" />
+      <div aria-hidden="true" className="mt-[16px] h-[16px] w-full bg-primary-0" />
 
       <section className="bg-neutral-0 px-[23px] py-[16px]">
         <SectionTitle
@@ -650,7 +650,7 @@ const FanExploreSearchResultPage = () => {
         </div>
       </section>
 
-      <div aria-hidden="true" className="h-[16px] w-full max-w-[393px] bg-primary-0" />
+      <div aria-hidden="true" className="h-[16px] w-full bg-primary-0" />
 
       <section className="px-[23px] py-[16px]">
         <SectionTitle

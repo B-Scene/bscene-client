@@ -143,7 +143,7 @@ export default function SessionMailboxPage() {
   };
 
   return (
-    <main className="mx-auto flex h-dvh w-full max-w-[393px] flex-col overflow-hidden bg-neutral-0">
+    <main className="flex h-dvh w-full flex-col overflow-hidden bg-neutral-0">
       <MailboxHeader
         onBack={() => navigate(-1)}
       />

@@ -196,7 +196,7 @@ export const SessionApplicationDetailScreen = ({
   return (
     <main
       ref={scrollContainerRef}
-      className="fixed inset-0 z-50 mx-auto w-full max-w-[393px] overflow-y-auto bg-neutral-0 pb-[92px]"
+      className="fixed inset-0 z-50 w-full overflow-y-auto bg-neutral-0 pb-[92px]"
     >
       <header className="flex h-12 w-full items-center bg-neutral-0 px-[15px] py-[5px]">
         <button
@@ -491,7 +491,7 @@ export const SessionApplicationDetailScreen = ({
       ) : null}
 
       {detail && !isOwnApplication ? (
-        <div className="fixed inset-x-0 bottom-0 z-10 mx-auto w-full max-w-[393px] bg-neutral-0 px-5 py-4 shadow-[0_-5px_20px_rgba(0,0,0,0.03)]">
+        <div className="fixed inset-x-0 bottom-0 z-10 w-full bg-neutral-0 px-5 py-4 shadow-[0_-5px_20px_rgba(0,0,0,0.03)]">
           <Button
             tone="orange"
             className="w-full"

@@ -258,7 +258,7 @@ const NotificationPage = () => {
   };
 
   return (
-    <main className="mx-auto min-h-dvh w-full max-w-[393px] bg-secondary-0">
+    <main className="min-h-dvh w-full bg-secondary-0">
       <header className="flex h-[60px] items-center justify-between bg-neutral-0 px-[15px]">
         <button
           type="button"

@@ -42,6 +42,18 @@
   }
 }
 
+/* Same width rule as .phone-frame, for content portaled to document.body
+   (e.g. via createPortal) that can't inherit .phone-frame's width because
+   it renders outside it in the DOM. Keep the breakpoint/width in sync with
+   .phone-frame above. */
+.frame-width {
+  width: 100%;
+
+  @media (min-width: 768px), (hover: hover) and (pointer: fine) {
+    width: min(393px, 100vw);
+  }
+}
+
 .phone-frame-scroll {
   height: 100%;
   overflow-y: scroll;

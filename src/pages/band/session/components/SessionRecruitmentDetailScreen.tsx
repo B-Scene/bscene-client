@@ -58,7 +58,7 @@ export const SessionRecruitmentDetailScreen = ({
   }
 
   return (
-    <main className="mx-auto flex h-[calc(100dvh-var(--bottom-nav-height))] w-full max-w-[393px] flex-col overflow-hidden bg-neutral-0">
+    <main className="flex h-[calc(100dvh-var(--bottom-nav-height))] w-full flex-col overflow-hidden bg-neutral-0">
       <SessionRecruitmentDetailHeader onBack={onBack} />
 
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
