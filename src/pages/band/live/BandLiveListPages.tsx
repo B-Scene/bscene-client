@@ -1,19 +1,20 @@
 import { useCallback, useEffect, useMemo } from "react";
 import { useQueries } from "@tanstack/react-query";
 import type { AxiosError } from "axios";
+
 import { Header } from "@/components/common/Header/Header";
 import { getLiveMembers, getLiveReservation } from "@/api/live/live";
 import {
   useEnterLiveMutation,
   useLiveHomeQuery,
   useLiveNowQuery,
-  useRespondCoHostInvitationMutation,
   useScheduledLiveQuery,
 } from "@/hooks/api/live/useLive";
 import { useActiveBandId } from "@/hooks/api/user/useMyProfiles";
 import { useInfiniteScrollObserver } from "@/hooks/useInfiniteScrollObserver";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import type { EnterLiveResponse, LiveApiResponse } from "@/types/live/live";
+
 import type {
   ActiveLive,
   GoLiveScreen,
@@ -40,6 +41,7 @@ interface BandLiveListPageProps {
 
 interface BandLiveNowListPageProps extends BandLiveListPageProps {
   onEnterLive: (live: ActiveLive) => void;
+  onRequestCoHostUpgrade: (liveId: number) => void;
 }
 
 interface BandLiveScheduledListPageProps extends BandLiveListPageProps {
@@ -214,19 +216,18 @@ const isLiveEnterForbiddenError = (error: unknown) => {
   const status = getApiStatus(error);
   const code = getApiErrorBody(error)?.code ?? "";
 
-  return status === 403 || code.startsWith("LIVE403");
-};
-
-const isAlreadyProcessedInvitationError = (error: unknown) => {
-  const status = getApiStatus(error);
-  const code = getApiErrorBody(error)?.code ?? "";
-
-  return status === 409 || code.startsWith("LIVE409");
+  return (
+    status === 403 ||
+    status === 404 ||
+    code.startsWith("LIVE403") ||
+    code.startsWith("LIVE404")
+  );
 };
 
 export function BandLiveNowListPage({
   go,
   onEnterLive,
+  onRequestCoHostUpgrade,
 }: BandLiveNowListPageProps) {
   const activeBandId = useActiveBandId();
 
@@ -241,7 +242,6 @@ export function BandLiveNowListPage({
   } = useLiveNowQuery("all");
 
   const enterLiveMutation = useEnterLiveMutation();
-  const respondCoHostInvitationMutation = useRespondCoHostInvitationMutation();
 
   const liveNowCandidates = useMemo<LiveNowCandidateCard[]>(
     () =>
@@ -314,8 +314,7 @@ export function BandLiveNowListPage({
     liveCards.length === 0 &&
     liveNowAccessQueries.some((query) => query.isLoading || query.isFetching);
 
-  const isEnterPending =
-    enterLiveMutation.isPending || respondCoHostInvitationMutation.isPending;
+  const isEnterPending = enterLiveMutation.isPending;
 
   const loadMore = useCallback(() => {
     if (!hasNextPage || isFetchingNextPage) return;
@@ -354,47 +353,12 @@ export function BandLiveNowListPage({
 
       enterAndMoveRoom(enteredLive);
     } catch (error) {
-      if (!isLiveEnterForbiddenError(error)) {
-        alert(getApiMessage(error, "라이브방에 입장하지 못했어요."));
+      if (isLiveEnterForbiddenError(error)) {
+        onRequestCoHostUpgrade(liveId);
         return;
       }
 
-      try {
-        await respondCoHostInvitationMutation.mutateAsync({
-          liveId,
-          request: {
-            isAccepted: true,
-          },
-        });
-
-        const enteredLive = await enterLiveMutation.mutateAsync(liveId);
-
-        enterAndMoveRoom(enteredLive);
-      } catch (coHostError) {
-        if (isAlreadyProcessedInvitationError(coHostError)) {
-          try {
-            const enteredLive = await enterLiveMutation.mutateAsync(liveId);
-
-            enterAndMoveRoom(enteredLive);
-            return;
-          } catch (retryError) {
-            alert(
-              getApiMessage(
-                retryError,
-                "공동 진행자 수락 후에도 라이브방에 입장하지 못했어요.",
-              ),
-            );
-            return;
-          }
-        }
-
-        alert(
-          getApiMessage(
-            coHostError,
-            "공동 진행자 초대 수락에 실패했어요. 알림 또는 초대 상태를 확인해주세요.",
-          ),
-        );
-      }
+      alert(getApiMessage(error, "라이브방에 입장하지 못했어요."));
     }
   };
 
@@ -423,7 +387,9 @@ export function BandLiveNowListPage({
         ) : null}
 
         {isCheckingLiveNowAccess ? (
-          <ListMessage>현재 밴드의 진행 중인 라이브를 확인하는 중이에요.</ListMessage>
+          <ListMessage>
+            현재 밴드의 진행 중인 라이브를 확인하는 중이에요.
+          </ListMessage>
         ) : null}
 
         {!isLoading &&
@@ -480,8 +446,7 @@ export function BandLiveScheduledListPage({
   const enterLiveMutation = useEnterLiveMutation();
 
   const previewScheduledByLiveId = useMemo(
-    () =>
-      new Map((liveHome?.scheduled ?? []).map((live) => [live.liveId, live])),
+    () => new Map((liveHome?.scheduled ?? []).map((live) => [live.liveId, live])),
     [liveHome?.scheduled],
   );
 
@@ -532,7 +497,10 @@ export function BandLiveScheduledListPage({
           return null;
         }
       },
-      enabled: Boolean(activeBandId) && Boolean(live.id),
+      enabled:
+        Boolean(activeBandId) &&
+        Boolean(live.id) &&
+        live.relationState !== "same",
       staleTime: 0,
       refetchOnMount: "always" as const,
       refetchOnWindowFocus: true,
@@ -661,7 +629,9 @@ export function BandLiveScheduledListPage({
         ) : null}
 
         {isCheckingScheduledAccess ? (
-          <ListMessage>현재 밴드의 예정된 라이브를 확인하는 중이에요.</ListMessage>
+          <ListMessage>
+            현재 밴드의 예정된 라이브를 확인하는 중이에요.
+          </ListMessage>
         ) : null}
 
         {!isLoading &&

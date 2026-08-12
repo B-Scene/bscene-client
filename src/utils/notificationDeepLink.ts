@@ -72,7 +72,7 @@ export const normalizeDeepLink = (deepLink: string) => {
 export const getRouteSuffix = (path: string) =>
   path.match(/[?#].*$/)?.[0] ?? "";
 
-export const isCoHostInviteNotificationType = (type: string) => {
+const isCoHostInviteNotificationType = (type: string) => {
   const normalizedType = type.toUpperCase();
 
   return (
@@ -87,16 +87,36 @@ const isLiveReferenceNotificationType = (type: string) => {
   return type.toUpperCase() === "LIVE";
 };
 
-export const isCoHostInviteNotification = (notification: NotificationItem) => {
-  if (isCoHostInviteNotificationType(notification.type)) return true;
+/**
+ * type이 단순 LIVE인 알림은 예약/시작/종료 등 여러 용도로 올 수 있기 때문에
+ * LIVE라는 이유만으로 공동 진행 초대로 취급하면 안 됩니다.
+ *
+ * generic LIVE 알림 중 실제 문구에
+ * "공동 진행/공동 송출" + "초대" 의미가 함께 있을 때만 초대로 판단합니다.
+ */
+const isGenericLiveCoHostInviteNotification = (
+  notification: NotificationItem,
+) => {
+  if (!isLiveReferenceNotificationType(notification.type)) {
+    return false;
+  }
 
-  if (!isLiveReferenceNotificationType(notification.type)) return false;
+  const normalizedContent = `${notification.title} ${notification.body}`
+    .trim()
+    .toUpperCase();
 
-  const titleAndBody = `${notification.title} ${notification.body}`;
+  const hasCoHostKeyword =
+    normalizedContent.includes("CO_HOST") ||
+    normalizedContent.includes("COHOST") ||
+    normalizedContent.includes("공동 진행") ||
+    normalizedContent.includes("공동 송출");
 
-  return (
-    titleAndBody.includes("공동 진행자") && titleAndBody.includes("초대")
-  );
+  const hasInviteKeyword =
+    normalizedContent.includes("INVITE") ||
+    normalizedContent.includes("INVITATION") ||
+    normalizedContent.includes("초대");
+
+  return hasCoHostKeyword && hasInviteKeyword;
 };
 
 export const isCoHostUpgradeRequestNotification = (
@@ -156,19 +176,6 @@ const getLiveIdFromDeepLink = (deepLink?: string | null) => {
   return path.match(/\/lives?\/(\d+)(?=[/?#]|$)/i)?.[1] ?? null;
 };
 
-export const getCoHostInviteLiveId = (
-  notification: NotificationItem,
-): number | null => {
-  const rawLiveId =
-    getLiveIdFromDeepLink(notification.deepLink) ?? notification.referenceId;
-
-  if (rawLiveId == null) return null;
-
-  const liveId = Number(rawLiveId);
-
-  return Number.isFinite(liveId) ? liveId : null;
-};
-
 const getCoHostInvitePath = (liveId: string | number) =>
   `/band/live?type=LIVE&liveId=${encodeURIComponent(
     String(liveId),
@@ -216,10 +223,20 @@ export const getLiveReferencePath = (notification: NotificationItem) => {
         );
   }
 
-  if (
-    !isCoHostInviteNotificationType(type) &&
-    !isLiveReferenceNotificationType(type)
-  ) {
+  /**
+   * 기존에는 type === "LIVE"인 알림을 전부 공동 진행 초대로 처리해서
+   * 예약 라이브 알림이나 일반 라이브 상태 알림까지 action=accept로
+   * 이동할 수 있었습니다.
+   *
+   * 이제는 명시적인 CO_HOST INVITE 타입이거나,
+   * generic LIVE 알림 중 실제 문구가 공동 진행 초대인 경우에만
+   * 공동 진행 초대 수락 경로로 이동합니다.
+   */
+  const isCoHostInvite =
+    isCoHostInviteNotificationType(type) ||
+    isGenericLiveCoHostInviteNotification(notification);
+
+  if (!isCoHostInvite) {
     return null;
   }
 

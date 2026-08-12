@@ -36,8 +36,153 @@ interface SubscribeViewerCountParams {
     userId: number;
     whepUrl: string;
   }) => void;
+  onCoHostUpgradeRequested?: (requester?: { userId: number }) => void;
+  onCoHostUpgradeAccepted?: () => void;
   signal?: AbortSignal;
 }
+
+const PENDING_CO_HOST_REQUESTER_STORAGE_PREFIX =
+  "bscene:live:pending-co-host-requester:";
+
+const pendingCoHostRequesterUserIds = new Map<number, number>();
+
+const isValidPositiveId = (value: unknown): value is number => {
+  return typeof value === "number" && Number.isFinite(value) && value > 0;
+};
+
+const getPendingCoHostRequesterStorageKey = (liveId: number) => {
+  return `${PENDING_CO_HOST_REQUESTER_STORAGE_PREFIX}${liveId}`;
+};
+
+const rememberPendingCoHostRequesterUserId = (liveId: number, userId: number) => {
+  if (!isValidPositiveId(liveId) || !isValidPositiveId(userId)) return;
+
+  pendingCoHostRequesterUserIds.set(liveId, userId);
+
+  try {
+    window.sessionStorage.setItem(
+      getPendingCoHostRequesterStorageKey(liveId),
+      String(userId),
+    );
+  } catch {
+    // 메모리 캐시는 유지되므로 sessionStorage 실패는 무시합니다.
+  }
+};
+
+const forgetPendingCoHostRequesterUserId = (liveId: number) => {
+  pendingCoHostRequesterUserIds.delete(liveId);
+
+  try {
+    window.sessionStorage.removeItem(getPendingCoHostRequesterStorageKey(liveId));
+  } catch {
+    // sessionStorage 접근이 제한된 환경에서는 무시합니다.
+  }
+};
+
+const readStoredPendingCoHostRequesterUserId = (liveId: number) => {
+  const inMemoryUserId = pendingCoHostRequesterUserIds.get(liveId);
+
+  if (isValidPositiveId(inMemoryUserId)) {
+    return inMemoryUserId;
+  }
+
+  try {
+    const storedValue = window.sessionStorage.getItem(
+      getPendingCoHostRequesterStorageKey(liveId),
+    );
+    const storedUserId = Number(storedValue);
+
+    return isValidPositiveId(storedUserId) ? storedUserId : null;
+  } catch {
+    return null;
+  }
+};
+
+const getCoHostRequesterUserIdFromCurrentUrl = (liveId: number) => {
+  try {
+    const searchParams = new URLSearchParams(window.location.search);
+    const queryLiveId = Number(
+      searchParams.get("liveId") ?? searchParams.get("referenceId"),
+    );
+
+    if (isValidPositiveId(queryLiveId) && queryLiveId !== liveId) {
+      return null;
+    }
+
+    const userId = Number(
+      searchParams.get("coHostRequesterUserId") ??
+        searchParams.get("requesterUserId") ??
+        searchParams.get("userId"),
+    );
+
+    return isValidPositiveId(userId) ? userId : null;
+  } catch {
+    return null;
+  }
+};
+
+const getPendingCoHostRequesterUserId = (liveId: number) => {
+  return (
+    getCoHostRequesterUserIdFromCurrentUrl(liveId) ??
+    readStoredPendingCoHostRequesterUserId(liveId)
+  );
+};
+
+const parseCoHostRequesterUserId = (rawData: string) => {
+  const trimmedData = rawData.trim();
+
+  if (!trimmedData) return null;
+
+  const directUserId = Number(trimmedData);
+
+  if (isValidPositiveId(directUserId)) {
+    return directUserId;
+  }
+
+  try {
+    const parsed = JSON.parse(trimmedData) as unknown;
+
+    if (isValidPositiveId(parsed)) {
+      return parsed;
+    }
+
+    if (!parsed || typeof parsed !== "object") {
+      return null;
+    }
+
+    const record = parsed as Record<string, unknown>;
+    const nestedRequester =
+      record.requester && typeof record.requester === "object"
+        ? (record.requester as Record<string, unknown>)
+        : null;
+    const nestedData =
+      record.data && typeof record.data === "object"
+        ? (record.data as Record<string, unknown>)
+        : null;
+
+    const candidates = [
+      record.userId,
+      record.requesterUserId,
+      record.targetUserId,
+      record.memberUserId,
+      nestedRequester?.userId,
+      nestedData?.userId,
+      nestedData?.requesterUserId,
+    ];
+
+    for (const candidate of candidates) {
+      const userId = Number(candidate);
+
+      if (isValidPositiveId(userId)) {
+        return userId;
+      }
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+};
 
 type MaybePaginatedResponse<T> =
   | {
@@ -791,24 +936,35 @@ export const requestCoHostUpgrade = async (
 ): Promise<RequestCoHostUpgradeResponse> => {
   const response = await axiosInstance.post<
     LiveApiResponse<RequestCoHostUpgradeResponse>
-  >(`/lives/${liveId}/co-host`, {});
+  >(`/lives/${liveId}/co-host`);
 
   return unwrapResult(response.data);
 };
 
 export const acceptCoHostUpgrade = async ({
   liveId,
-  userId,
+  userId: requestedUserId,
 }: {
   liveId: number;
   userId?: number;
 }): Promise<AcceptCoHostUpgradeResponse> => {
+  const userId = isValidPositiveId(requestedUserId)
+    ? requestedUserId
+    : getPendingCoHostRequesterUserId(liveId);
+
+  if (!userId) {
+    throw new Error(
+      "승인할 공동 송출 요청자의 userId를 확인할 수 없어요. 요청 알림 또는 라이브 요청을 다시 받아주세요.",
+    );
+  }
+
   const response = await axiosInstance.post<
     LiveApiResponse<AcceptCoHostUpgradeResponse>
-  >(
-    `/lives/${liveId}/co-host/acceptance`,
-    Number.isFinite(userId) ? { userId } : {},
-  );
+  >(`/lives/${liveId}/co-host/acceptance`, {
+    userId,
+  });
+
+  forgetPendingCoHostRequesterUserId(liveId);
 
   return unwrapResult(response.data);
 };
@@ -895,6 +1051,8 @@ export const subscribeViewerCount = async ({
   watchOnly = false,
   onViewerCount,
   onCoPublisherJoined,
+  onCoHostUpgradeRequested,
+  onCoHostUpgradeAccepted,
   signal,
 }: SubscribeViewerCountParams): Promise<void> => {
   const requestUrl = resolveLiveApiUrl(
@@ -963,6 +1121,23 @@ export const subscribeViewerCount = async ({
           dataLines.length > 0
         ) {
           parseViewerCount(dataLines.join("\n"));
+        }
+
+        if (eventName === "coHostUpgradeRequested") {
+          const requesterUserId = parseCoHostRequesterUserId(
+            dataLines.join("\n"),
+          );
+
+          if (requesterUserId) {
+            rememberPendingCoHostRequesterUserId(liveId, requesterUserId);
+            onCoHostUpgradeRequested?.({ userId: requesterUserId });
+          } else {
+            onCoHostUpgradeRequested?.();
+          }
+        }
+
+        if (eventName === "coHostUpgradeAccepted") {
+          onCoHostUpgradeAccepted?.();
         }
 
         if (eventName === "coPublisherJoined" && dataLines.length > 0) {
