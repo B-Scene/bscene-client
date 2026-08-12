@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { ModalOverlay } from "@/components/common/Modal/ModalOverlay";
+import Modal from "@/components/Modal/Modal";
 import { enterLive, requestCoHostUpgrade } from "@/api/live/live";
 import { getBandMembers } from "@/api/band/bandMember";
 import {
@@ -246,9 +248,7 @@ export function BandLivePage() {
   const [liveMessages, setLiveMessages] =
     useState<ChatMessage[]>(initialChatMessages);
   const [isHandlingCoHostInvite, setIsHandlingCoHostInvite] = useState(false);
-  const [confirmedCoHostInviteLiveId, setConfirmedCoHostInviteLiveId] = useState<
-    number | null
-  >(null);
+  const [isLiveEndedModalOpen, setIsLiveEndedModalOpen] = useState(false);
   const [pendingCoHostUpgradeLiveId, setPendingCoHostUpgradeLiveId] = useState<
     number | null
   >(null);
@@ -296,7 +296,6 @@ export function BandLivePage() {
     nextParams.delete("coHostRequesterUserId");
     nextParams.delete("coHostRequesterNickname");
 
-    setConfirmedCoHostInviteLiveId(null);
     setSearchParams(nextParams, { replace: true });
   }, [searchParams, setSearchParams]);
 
@@ -406,7 +405,6 @@ export function BandLivePage() {
 
   useEffect(() => {
     if (!coHostInviteLiveId) return;
-    if (confirmedCoHostInviteLiveId !== coHostInviteLiveId) return;
     if (handledCoHostInviteLiveIdRef.current === coHostInviteLiveId) return;
     if (isCoHostInviteProcessingRef.current) return;
 
@@ -459,12 +457,16 @@ export function BandLivePage() {
 
         setPendingCoHostUpgradeLiveId(coHostInviteLiveId);
       } catch (error) {
-        alert(
-          getErrorMessage(
-            error,
-            "공동 진행 초대를 처리하지 못했어요. 오너가 예약 라이브를 시작했는지 확인해주세요.",
-          ),
-        );
+        if (isNotFoundError(error)) {
+          setIsLiveEndedModalOpen(true);
+        } else {
+          alert(
+            getErrorMessage(
+              error,
+              "공동 진행 초대를 처리하지 못했어요. 오너가 예약 라이브를 시작했는지 확인해주세요.",
+            ),
+          );
+        }
         clearCoHostInviteSearchParams();
       } finally {
         setIsHandlingCoHostInvite(false);
@@ -476,7 +478,6 @@ export function BandLivePage() {
   }, [
     clearCoHostInviteSearchParams,
     coHostInviteLiveId,
-    confirmedCoHostInviteLiveId,
     enterLiveMutation,
     handleEnterLive,
     requestCoHostUpgradeMutation,
@@ -646,47 +647,6 @@ export function BandLivePage() {
     pendingCoHostUpgradeLiveId,
   ]);
 
-  if (
-    coHostInviteLiveId &&
-    confirmedCoHostInviteLiveId !== coHostInviteLiveId &&
-    !isHandlingCoHostInvite &&
-    !pendingCoHostUpgradeLiveId
-  ) {
-    return (
-      <main className="flex min-h-dvh items-center justify-center bg-neutral-0 px-6 text-center text-neutral-900">
-        <div className="w-full max-w-sm rounded-2xl bg-neutral-0 px-6 py-8 shadow-[0_4px_20px_rgba(20,20,20,0.12)]">
-          <p className="text-body1 font-semibold">
-            공동 진행자로 초대받았어요
-          </p>
-          <p className="mt-2 text-body3 text-neutral-500">
-            초대를 수락하고 라이브에 참여하시겠어요?
-          </p>
-          <div className="mt-6 grid grid-cols-2 gap-3">
-            <button
-              type="button"
-              onClick={() => {
-                clearCoHostInviteSearchParams();
-                setScreen("home");
-              }}
-              className="rounded-lg border border-neutral-300 px-4 py-3 text-body3 text-neutral-700"
-            >
-              나중에
-            </button>
-            <button
-              type="button"
-              onClick={() =>
-                setConfirmedCoHostInviteLiveId(coHostInviteLiveId)
-              }
-              className="rounded-lg bg-secondary-500 px-4 py-3 text-body3 font-semibold text-neutral-0"
-            >
-              수락
-            </button>
-          </div>
-        </div>
-      </main>
-    );
-  }
-
   if (pendingCoHostUpgradeLiveId) {
     return (
       <main className="flex min-h-dvh items-center justify-center bg-neutral-0 px-6 text-center text-neutral-900">
@@ -839,11 +799,27 @@ export function BandLivePage() {
   }
 
   return (
-    <BandLiveHome
-      go={handleGo}
-      onEnterLive={handleEnterLive}
-      onEditReservation={handleEditReservation}
-    />
+    <>
+      <BandLiveHome
+        go={handleGo}
+        onEnterLive={handleEnterLive}
+        onEditReservation={handleEditReservation}
+      />
+
+      <ModalOverlay
+        open={isLiveEndedModalOpen}
+        onClose={() => setIsLiveEndedModalOpen(false)}
+      >
+        <Modal
+          tone="orange"
+          title="라이브가 이미 종료되었어요"
+          description="종료된 라이브에는 참여할 수 없어요"
+          showCancel={false}
+          confirmLabel="확인"
+          onConfirm={() => setIsLiveEndedModalOpen(false)}
+        />
+      </ModalOverlay>
+    </>
   );
 }
 
