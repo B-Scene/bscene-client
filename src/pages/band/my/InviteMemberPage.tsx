@@ -29,10 +29,17 @@ interface MemberRowProps {
   member: BandMemberListItem;
   isSelf: boolean;
   isOwner: boolean;
+  canRemove: boolean;
   onRemoveClick: (userId: number) => void;
 }
 
-const MemberRow = ({ member, isSelf, isOwner, onRemoveClick }: MemberRowProps) => {
+const MemberRow = ({
+  member,
+  isSelf,
+  isOwner,
+  canRemove,
+  onRemoveClick,
+}: MemberRowProps) => {
   const name = member.profileNickname ?? "닉네임 없음";
   const roleLabel = member.part
     ? `${MEMBER_TYPE_LABELS[member.memberType]} · ${getPartLabel(member.part)}`
@@ -62,7 +69,7 @@ const MemberRow = ({ member, isSelf, isOwner, onRemoveClick }: MemberRowProps) =
         <span className="shrink-0 rounded-full border border-secondary-500 px-3 py-1 text-caption3 text-secondary-500">
           운영자
         </span>
-      ) : (
+      ) : canRemove ? (
         <button
           type="button"
           onClick={() => onRemoveClick(member.userId)}
@@ -70,7 +77,7 @@ const MemberRow = ({ member, isSelf, isOwner, onRemoveClick }: MemberRowProps) =
         >
           내보내기
         </button>
-      )}
+      ) : null}
     </div>
   );
 };
@@ -90,6 +97,9 @@ const InviteMemberPage = () => {
   const activeMembers = members.filter((member) => member.status !== "INVITED");
   const pendingMembers = members.filter(
     (member) => member.status === "INVITED",
+  );
+  const viewerIsOwner = members.some(
+    (member) => member.userId === myUserId && member.owner,
   );
 
   const [removeTargetId, setRemoveTargetId] = useState<number | null>(null);
@@ -132,6 +142,7 @@ const InviteMemberPage = () => {
                 member={member}
                 isSelf={member.userId === myUserId}
                 isOwner={member.owner}
+                canRemove={viewerIsOwner}
                 onRemoveClick={setRemoveTargetId}
               />
             ))}
@@ -170,13 +181,15 @@ const InviteMemberPage = () => {
                       </div>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => removeMember.mutate(member.userId)}
-                      className="shrink-0 text-right text-caption3 text-error"
-                    >
-                      취소
-                    </button>
+                    {viewerIsOwner ? (
+                      <button
+                        type="button"
+                        onClick={() => removeMember.mutate(member.userId)}
+                        className="shrink-0 text-right text-caption3 text-error"
+                      >
+                        취소
+                      </button>
+                    ) : null}
                   </div>
                 ))}
               </div>
