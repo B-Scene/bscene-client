@@ -16,7 +16,11 @@ import {
   useReportLiveUserMutation,
   useUnblockLiveUserMutation,
 } from "@/hooks/api/live/useLive";
-import type { LiveMemberItem, ReportLiveUserRequest } from "@/types/live/live";
+import type {
+  LiveCoPublisher,
+  LiveMemberItem,
+  ReportLiveUserRequest,
+} from "@/types/live/live";
 import { getApiErrorMessage } from "@/utils/getApiErrorMessage";
 
 import type { ActiveLive, ChatMessage, GoLiveScreen } from "./types";
@@ -170,7 +174,16 @@ export function LiveRoom({
   );
   const [joinedCoPublisherUserIds, setJoinedCoPublisherUserIds] = useState<
     Set<number>
-  >(() => new Set());
+  >(
+    () =>
+      new Set(
+        (live?.coPublishers ?? [])
+          .map((publisher) => publisher.userId)
+          .filter((userId) => Number.isFinite(userId)),
+      ),
+  );
+  const [hasCoPublishersSnapshot, setHasCoPublishersSnapshot] =
+    useState(false);
   const [approvedCoHostCount, setApprovedCoHostCount] = useState(0);
 
   const selectedUserId = reportTarget?.targetUserId;
@@ -196,50 +209,37 @@ export function LiveRoom({
       return 0;
     }
 
+    /**
+     * coPublishersChanged payload는 항상 "나를 제외한 현재 송출자 전체 목록"입니다.
+     * 따라서 snapshot을 한 번이라도 받은 뒤에는 이 값이 가장 정확합니다.
+     */
+    if (hasCoPublishersSnapshot) {
+      return 1 + joinedCoPublisherUserIds.size;
+    }
+
     const speakerCountFromMembers = liveMembers.filter(
       (member) => member.isOwner || member.isCoHost,
     ).length;
 
     /**
-     * members API 값이 있으면 이 값을 가장 우선합니다.
-     * 일반 청취자는 제외되고 OWNER/CO_HOST만 세므로
-     * 방장 + 공동진행자 = 2, 한 명만 남으면 = 1이 됩니다.
+     * 최초 SSE snapshot을 받기 전에는 입장 API의 coPublishers와
+     * 승인 직후 optimistic count, members API를 함께 이용해 보정합니다.
      */
-    if (speakerCountFromMembers > 0) {
-      return speakerCountFromMembers;
-    }
+    const speakerCountFromInitialCoPublishers =
+      1 + joinedCoPublisherUserIds.size;
+    const speakerCountFromApproval = 1 + approvedCoHostCount;
 
-    /**
-     * members API가 아직 갱신되기 전에는
-     * 실시간 공동 송출자 이벤트/승인 상태/enterLive payload로 보정합니다.
-     */
-    const liveWithPublishers = live as
-      | (NonNullable<ActiveLive> & {
-          coPublishers?: Array<{
-            userId?: number | null;
-            whepUrl?: string | null;
-          }>;
-        })
-      | null;
-
-    const coPublisherCountFromLivePayload =
-      liveWithPublishers?.coPublishers?.filter((publisher) =>
-        Number.isFinite(publisher.userId),
-      ).length ?? 0;
-
-    const otherPublisherCount = Math.max(
-      joinedCoPublisherUserIds.size,
-      approvedCoHostCount,
-      coPublisherCountFromLivePayload,
+    return Math.max(
+      1,
+      speakerCountFromMembers,
+      speakerCountFromInitialCoPublishers,
+      speakerCountFromApproval,
     );
-
-    // 현재 자신도 송출자이므로 최소 1명은 존재합니다.
-    return 1 + otherPublisherCount;
   }, [
     approvedCoHostCount,
     canBroadcast,
+    hasCoPublishersSnapshot,
     joinedCoPublisherUserIds,
-    live,
     liveMembers,
   ]);
 
@@ -267,7 +267,7 @@ export function LiveRoom({
   const micGainNodeRef = useRef<GainNode | null>(null);
 
   const {
-    handleCoPublisherJoined,
+    handleCoPublishersChanged,
     isBroadcasterMonitorPlayback,
     isListenerPlayback,
     listenerAudioMessage,
@@ -298,14 +298,6 @@ export function LiveRoom({
 
       setLiveMembers(response.members);
 
-      const speakerCount = response.members.filter(
-        (member) => member.isOwner || member.isCoHost,
-      ).length;
-
-      if (speakerCount <= 1) {
-        setJoinedCoPublisherUserIds(new Set());
-        setApprovedCoHostCount(0);
-      }
     } catch {
       // 멤버 갱신 실패는 실시간 라이브 자체를 끊지 않습니다.
     }
@@ -330,19 +322,30 @@ export function LiveRoom({
     [canAcceptCoHostUpgrade, refreshLiveMembers],
   );
 
-  const handleCoPublisherJoinedEvent = useCallback(
-    (publisher: { userId: number; whepUrl: string }) => {
-      handleCoPublisherJoined(publisher);
+  /**
+   * 새 SSE coPublishersChanged는 단건 join 이벤트가 아니라
+   * "현재 내가 구독해야 할 상대 송출자 전체 목록"을 내려줍니다.
+   * WHEP 연결 Map과 헤더의 송출자 수를 동일한 snapshot으로 맞춥니다.
+   */
+  const handleCoPublishersChangedEvent = useCallback(
+    (publishers: LiveCoPublisher[]) => {
+      handleCoPublishersChanged(publishers);
 
-      setJoinedCoPublisherUserIds((currentUserIds) => {
-        const nextUserIds = new Set(currentUserIds);
-        nextUserIds.add(publisher.userId);
-        return nextUserIds;
-      });
+      setJoinedCoPublisherUserIds(
+        new Set(
+          publishers
+            .map((publisher) => publisher.userId)
+            .filter((userId) => Number.isFinite(userId)),
+        ),
+      );
+      setHasCoPublishersSnapshot(true);
+
+      // snapshot이 도착한 뒤에는 optimistic 승인 카운트가 필요 없습니다.
+      setApprovedCoHostCount(0);
 
       void refreshLiveMembers();
     },
-    [handleCoPublisherJoined, refreshLiveMembers],
+    [handleCoPublishersChanged, refreshLiveMembers],
   );
 
   /**
@@ -780,7 +783,14 @@ export function LiveRoom({
 
   useEffect(() => {
     setLiveMembers([]);
-    setJoinedCoPublisherUserIds(new Set());
+    setJoinedCoPublisherUserIds(
+      new Set(
+        (live?.coPublishers ?? [])
+          .map((publisher) => publisher.userId)
+          .filter((userId) => Number.isFinite(userId)),
+      ),
+    );
+    setHasCoPublishersSnapshot(false);
     setApprovedCoHostCount(0);
     setHasPendingCoHostUpgradeRequest(false);
     setPendingCoHostRequesterUserId(null);
@@ -859,8 +869,8 @@ export function LiveRoom({
             // 누군가 입/퇴장하면 송출자 목록도 즉시 다시 확인합니다.
             void refreshLiveMembers();
           },
-          onCoPublisherJoined: canBroadcast
-            ? handleCoPublisherJoinedEvent
+          onCoPublishersChanged: canBroadcast
+            ? handleCoPublishersChangedEvent
             : undefined,
           onCoHostUpgradeRequested: canAcceptCoHostUpgrade
             ? handleCoHostUpgradeRequested
@@ -889,7 +899,7 @@ export function LiveRoom({
     canAcceptCoHostUpgrade,
     canBroadcast,
     handleCoHostUpgradeRequested,
-    handleCoPublisherJoinedEvent,
+    handleCoPublishersChangedEvent,
     live?.liveId,
     refreshLiveMembers,
   ]);
