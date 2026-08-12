@@ -333,15 +333,9 @@ export function BandLiveNowListPage({
   }, [refetch]);
 
   const {
-<<<<<<< HEAD
-    containerRef: liveNowContainerRef,
-    pullDistance: liveNowPullDistance,
-    isRefreshing: liveNowIsRefreshing,
-=======
     containerRef: liveNowRefreshRef,
     pullDistance: liveNowPullDistance,
     isRefreshing: isLiveNowRefreshing,
->>>>>>> develop
   } = usePullToRefresh<HTMLElement>({
     enabled: !isLoading && !isFetchingNextPage && !isEnterPending,
     onRefresh: handleRefreshLiveNowList,
@@ -411,19 +405,11 @@ export function BandLiveNowListPage({
 
       <PullToRefreshIndicator
         pullDistance={liveNowPullDistance}
-<<<<<<< HEAD
-        isRefreshing={liveNowIsRefreshing}
-      />
-
-      <section
-        ref={liveNowContainerRef}
-=======
         isRefreshing={isLiveNowRefreshing}
       />
 
       <section
         ref={liveNowRefreshRef}
->>>>>>> develop
         className="h-[calc(100%_-_52px)] overflow-y-auto overscroll-y-contain px-5 pb-8"
       >
         {isLoading ? (
@@ -607,15 +593,9 @@ export function BandLiveScheduledListPage({
   }, [refetch, refetchLiveHome]);
 
   const {
-<<<<<<< HEAD
-    containerRef: scheduledContainerRef,
-    pullDistance: scheduledPullDistance,
-    isRefreshing: scheduledIsRefreshing,
-=======
     containerRef: scheduledRefreshRef,
     pullDistance: scheduledPullDistance,
     isRefreshing: isScheduledRefreshing,
->>>>>>> develop
   } = usePullToRefresh<HTMLElement>({
     enabled: !isLoading && !isFetchingNextPage && !enterLiveMutation.isPending,
     onRefresh: handleRefreshScheduledList,
@@ -663,19 +643,11 @@ export function BandLiveScheduledListPage({
 
       <PullToRefreshIndicator
         pullDistance={scheduledPullDistance}
-<<<<<<< HEAD
-        isRefreshing={scheduledIsRefreshing}
-      />
-
-      <section
-        ref={scheduledContainerRef}
-=======
         isRefreshing={isScheduledRefreshing}
       />
 
       <section
         ref={scheduledRefreshRef}
->>>>>>> develop
         className="h-[calc(100%_-_52px)] overflow-y-auto overscroll-y-contain px-5 pb-8"
       >
         {isLoading ? (

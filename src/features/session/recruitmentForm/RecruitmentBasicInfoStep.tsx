@@ -31,16 +31,6 @@ interface RecruitmentBasicInfoStepProps {
   onNext: () => void;
 }
 
-const normalizeRecruitmentDisplayValue = (value: string) => {
-  const trimmedValue = value.trim();
-
-  if (trimmedValue.toLowerCase() === "etc.") {
-    return "etc";
-  }
-
-  return trimmedValue;
-};
-
 export const RecruitmentBasicInfoStep = ({
   values,
   errors,
@@ -124,22 +114,15 @@ export const RecruitmentBasicInfoStep = ({
           <RecruitmentFieldLabel required>모집 파트</RecruitmentFieldLabel>
 
           <div className="mt-2 flex flex-wrap gap-2">
-            {RECRUITMENT_PART_OPTIONS.map((part) => {
-              const normalizedPart = normalizeRecruitmentDisplayValue(part);
-
-              return (
-                <RecruitmentOptionChip
-                  key={part}
-                  selected={
-                    normalizeRecruitmentDisplayValue(values.part) ===
-                    normalizedPart
-                  }
-                  onClick={() => onPartClick(normalizedPart)}
-                >
-                  {normalizedPart}
-                </RecruitmentOptionChip>
-              );
-            })}
+            {RECRUITMENT_PART_OPTIONS.map((part) => (
+              <RecruitmentOptionChip
+                key={part}
+                selected={values.part === part}
+                onClick={() => onPartClick(part)}
+              >
+                {part}
+              </RecruitmentOptionChip>
+            ))}
           </div>
 
           {errors.part ? (
@@ -167,7 +150,7 @@ export const RecruitmentBasicInfoStep = ({
           <RecruitmentFieldLabel required>장르</RecruitmentFieldLabel>
 
           <RecruitmentSelectButton
-            value={normalizeRecruitmentDisplayValue(values.genre)}
+            value={values.genre}
             placeholder="장르 선택"
             error={Boolean(errors.genre)}
             onClick={onOpenGenreSelect}

@@ -109,15 +109,8 @@ export default function SessionMailboxPage() {
   };
 
   return (
-<<<<<<< HEAD
-    <main className="flex h-dvh w-full flex-col overflow-hidden bg-neutral-0">
-      <MailboxHeader
-        onBack={() => navigate(-1)}
-      />
-=======
     <main className="mx-auto flex h-dvh w-full max-w-[393px] flex-col overflow-hidden bg-neutral-0">
       <MailboxHeader onBack={() => navigate(-1)} />
->>>>>>> develop
 
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
         <MailboxTabBar selectedTab={selectedTab} onChange={setSelectedTab} />

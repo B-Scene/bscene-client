@@ -1,632 +1,701 @@
-import { useState, type ChangeEvent } from "react";
+import { useCallback, useEffect, useMemo } from "react";
+import { useQueries } from "@tanstack/react-query";
 import type { AxiosError } from "axios";
-
-import Modal from "@/components/Modal/Modal";
-import { ModalOverlay } from "@/components/common/Modal/ModalOverlay";
+import { Header } from "@/components/common/Header/Header";
+import { getLiveMembers, getLiveReservation } from "@/api/live/live";
 import {
-  DEFAULT_RECRUITMENT_BASIC_VALUES,
-  DEFAULT_RECRUITMENT_DETAIL_VALUES,
-} from "@/features/session/recruitmentForm/sessionRecruitmentForm.constants";
+  useEnterLiveMutation,
+  useLiveHomeQuery,
+  useLiveNowQuery,
+  useRespondCoHostInvitationMutation,
+  useScheduledLiveQuery,
+} from "@/hooks/api/live/useLive";
+import { useActiveBandId } from "@/hooks/api/user/useMyProfiles";
+import { useInfiniteScrollObserver } from "@/hooks/useInfiniteScrollObserver";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
+import type { EnterLiveResponse, LiveApiResponse } from "@/types/live/live";
 import type {
-  BasicFormValues,
-  DetailFormValues,
-  FormErrors,
-  FormMode,
-  FormStep,
-} from "@/features/session/recruitmentForm/sessionRecruitmentForm.types";
+  ActiveLive,
+  GoLiveScreen,
+  LiveCard,
+  ScheduledLiveCardData,
+} from "./types";
 import {
-  isFutureRecruitmentDeadline,
-  splitRecruitmentDeadlineAt,
-  toRecruitmentDeadlineAt,
-} from "@/features/session/recruitmentForm/sessionRecruitmentForm.utils";
+  HomeLiveCard,
+  PullToRefreshIndicator,
+  ScheduledLiveCard,
+} from "./BandLiveHome";
 import {
-  RecruitmentFormTopBar,
-  RecruitmentStepIndicator,
-} from "@/features/session/recruitmentForm/RecruitmentFormChrome";
-import { RecruitmentBasicInfoStep } from "@/features/session/recruitmentForm/RecruitmentBasicInfoStep";
-import { RecruitmentDetailInfoStep } from "@/features/session/recruitmentForm/RecruitmentDetailInfoStep";
-import { useActiveBandMemberId } from "@/hooks/api/band/useBandMember";
+  cacheScheduledCoHostUserIds,
+  removeCachedOwnedScheduledLive,
+} from "./scheduledLiveCache";
 import {
-  useCreateSessionRecruitment,
-  useSessionRecruitmentEditInfoQuery,
-  useUpdateSessionRecruitment,
-} from "@/hooks/api/session/useSessionRecruitment";
-import type {
-  CreateSessionRecruitmentResponse,
-  SessionApiResponse,
-} from "@/types/session/sessionRecruitment";
-import { SessionRecruitmentCompleteScreen } from "./SessionRecruitmentCompleteScreen";
+  isScheduledLiveStartable,
+  useScheduledLiveNow,
+} from "./scheduledLiveTime";
 
-interface SessionRecruitmentFormScreenProps {
-  onBack: () => void;
-  onClose: () => void;
-  onViewCreatedPost?: (sessionRecruitmentId?: number) => void;
-  editSessionRecruitmentId?: number;
-  onSaved?: () => void;
+interface BandLiveListPageProps {
+  go: GoLiveScreen;
 }
 
-const normalizeRecruitmentEnumValue = (value: string) => {
-  const trimmedValue = value.trim();
+interface BandLiveNowListPageProps extends BandLiveListPageProps {
+  onEnterLive: (live: ActiveLive) => void;
+}
 
-  if (trimmedValue.toLowerCase() === "etc.") {
-    return "etc";
-  }
+interface BandLiveScheduledListPageProps extends BandLiveListPageProps {
+  onEnterLive: (live: ActiveLive) => void;
+  onEditReservation: (liveId: number) => void;
+}
 
-  return trimmedValue;
+type LiveWithImageFields = {
+  bandProfileImageUrl?: string | null;
 };
 
-const normalizeBasicValues = (
-  values: BasicFormValues,
-): BasicFormValues => {
-  return {
-    ...values,
-    part: normalizeRecruitmentEnumValue(values.part),
-    skill: normalizeRecruitmentEnumValue(values.skill),
-    genre: normalizeRecruitmentEnumValue(values.genre),
+type LiveBandRelationFields = {
+  bandId?: number | null;
+  myBandId?: number | null;
+  bandProfileId?: number | null;
+  bandMemberProfileId?: number | null;
+  bandCode?: string | null;
+  isMine?: boolean;
+  isMyBand?: boolean;
+  isBandMember?: boolean;
+  isRelatedBand?: boolean;
+};
+
+type LiveListItemWithFields = LiveWithImageFields &
+  LiveBandRelationFields & {
+    liveId: number;
+    bandName: string;
+    title: string;
+    viewerCount?: number;
+    viewCount?: number;
+    scheduledAt?: string;
+    coHosts?: { userId?: number | null }[];
+    coHostList?: { userId?: number | null }[];
   };
+
+type RelationState = "same" | "different" | "unknown";
+
+type LiveNowCandidateCard = LiveCard & {
+  relationState: RelationState;
 };
 
-const normalizeDetailValues = (
-  values: DetailFormValues,
-): DetailFormValues => {
-  return {
-    ...values,
-    region: normalizeRecruitmentEnumValue(values.region),
-  };
+type ScheduledCandidateCard = ScheduledLiveCardData & {
+  relationState: RelationState;
 };
 
-export const SessionRecruitmentFormScreen = ({
-  onBack,
-  onClose,
-  onViewCreatedPost,
-  editSessionRecruitmentId,
-  onSaved,
-}: SessionRecruitmentFormScreenProps) => {
-  if (!editSessionRecruitmentId) {
-    return (
-      <SessionRecruitmentFormBody
-        mode="create"
-        initialBasicValues={normalizeBasicValues(
-          DEFAULT_RECRUITMENT_BASIC_VALUES,
-        )}
-        initialDetailValues={normalizeDetailValues(
-          DEFAULT_RECRUITMENT_DETAIL_VALUES,
-        )}
-        onBack={onBack}
-        onClose={onClose}
-        onViewCreatedPost={onViewCreatedPost}
-      />
-    );
-  }
-
+function HeaderBackButton({ onClick }: { onClick: () => void }) {
   return (
-    <SessionRecruitmentEditLoader
-      sessionRecruitmentId={editSessionRecruitmentId}
-      onBack={onBack}
-      onClose={onClose}
-      onSaved={onSaved}
-    />
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="뒤로가기"
+      className="absolute top-0 left-5 z-20 flex h-[52px] w-10 items-center justify-center"
+    >
+      <span className="block h-[18px] w-[18px] rotate-45 border-b-[2.5px] border-l-[2.5px] border-neutral-900" />
+    </button>
   );
-};
-
-interface SessionRecruitmentEditLoaderProps {
-  sessionRecruitmentId: number;
-  onBack: () => void;
-  onClose: () => void;
-  onSaved?: () => void;
 }
 
-const SessionRecruitmentEditLoader = ({
-  sessionRecruitmentId,
-  onBack,
-  onClose,
-  onSaved,
-}: SessionRecruitmentEditLoaderProps) => {
-  const editInfoQuery = useSessionRecruitmentEditInfoQuery(sessionRecruitmentId);
+function ListMessage({
+  children,
+  onRetry,
+}: {
+  children: string;
+  onRetry?: () => void;
+}) {
+  return (
+    <div className="py-12 text-center">
+      <p className="text-caption2 text-neutral-500">{children}</p>
 
-  if (editInfoQuery.isError) {
-    return (
-      <main className="flex min-h-dvh flex-col items-center justify-center gap-3 bg-secondary-0 px-6 text-center">
-        <p className="text-caption1 text-neutral-500">
-          모집 공고 정보를 불러오지 못했어요
-        </p>
-
+      {onRetry ? (
         <button
           type="button"
-          onClick={onBack}
-          className="rounded-[8px] bg-secondary-500 px-4 py-2 text-caption2 text-neutral-0"
+          onClick={onRetry}
+          className="mt-3 rounded-lg bg-secondary-500 px-4 py-2 text-caption3 text-neutral-0"
         >
-          뒤로가기
+          다시 불러오기
         </button>
-      </main>
-    );
+      ) : null}
+    </div>
+  );
+}
+
+const getFirstImageUrl = (...urls: Array<string | null | undefined>) => {
+  for (const url of urls) {
+    if (typeof url !== "string") continue;
+
+    const trimmedUrl = url.trim();
+
+    if (trimmedUrl.length > 0) {
+      return trimmedUrl;
+    }
   }
 
-  if (!editInfoQuery.data) {
-    return (
-      <main className="flex min-h-dvh items-center justify-center bg-secondary-0">
-        <p className="text-caption1 text-neutral-500">
-          모집 공고 정보를 불러오고 있어요
-        </p>
-      </main>
-    );
-  }
+  return null;
+};
 
-  const detail = editInfoQuery.data;
-  const deadline = splitRecruitmentDeadlineAt(detail.deadlineAt);
+const getBandProfileImageUrl = (
+  ...lives: Array<LiveWithImageFields | null | undefined>
+) => {
+  return getFirstImageUrl(...lives.map((live) => live?.bandProfileImageUrl));
+};
 
+const hasBandRelationField = (live: LiveBandRelationFields) => {
   return (
-    <SessionRecruitmentFormBody
-      mode="edit"
-      sessionRecruitmentId={sessionRecruitmentId}
-      initialBasicValues={normalizeBasicValues({
-        title: detail.recruitmentTitle,
-        summary: detail.summary,
-        detail: detail.content,
-        part: detail.part,
-        skill: detail.skillLevel,
-        genre: detail.genre,
-      })}
-      initialDetailValues={normalizeDetailValues({
-        region: detail.region,
-        practiceSchedule: detail.practiceSchedule,
-        practiceLocation: detail.practicePlace,
-        deadlineDate: deadline.deadlineDate,
-        deadlineTime: deadline.deadlineTime,
-        qualification: detail.qualification,
-      })}
-      onBack={onBack}
-      onClose={onClose}
-      onSaved={onSaved}
-    />
+    live.isMine !== undefined ||
+    live.isMyBand !== undefined ||
+    live.isBandMember !== undefined ||
+    live.isRelatedBand !== undefined ||
+    live.bandId !== undefined ||
+    live.myBandId !== undefined ||
+    live.bandProfileId !== undefined ||
+    live.bandMemberProfileId !== undefined ||
+    live.bandCode !== undefined
   );
 };
 
-interface SessionRecruitmentFormBodyProps {
-  mode: FormMode;
-  sessionRecruitmentId?: number;
-  initialBasicValues: BasicFormValues;
-  initialDetailValues: DetailFormValues;
-  onBack: () => void;
-  onClose: () => void;
-  onViewCreatedPost?: (sessionRecruitmentId?: number) => void;
-  onSaved?: () => void;
-}
+const getBandRelationState = (
+  live: LiveBandRelationFields,
+  activeBandId: number | null | undefined,
+): RelationState => {
+  if (live.isMine) {
+    return "same";
+  }
 
-const SessionRecruitmentFormBody = ({
-  mode,
-  sessionRecruitmentId,
-  initialBasicValues,
-  initialDetailValues,
-  onBack,
-  onClose,
-  onViewCreatedPost,
-  onSaved,
-}: SessionRecruitmentFormBodyProps) => {
-  const createRecruitmentMutation = useCreateSessionRecruitment();
-  const updateRecruitmentMutation = useUpdateSessionRecruitment();
-  const activeBandMemberId = useActiveBandMemberId();
+  if (live.isMyBand || live.isBandMember || live.isRelatedBand) {
+    return "same";
+  }
 
-  const [currentStep, setCurrentStep] = useState<FormStep>(1);
-  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
-  const [isCompleteScreenOpen, setIsCompleteScreenOpen] = useState(false);
-  const [createdRecruitment, setCreatedRecruitment] =
-    useState<CreateSessionRecruitmentResponse | null>(null);
-  const [submitErrorMessage, setSubmitErrorMessage] = useState("");
+  if (!hasBandRelationField(live)) {
+    return "unknown";
+  }
 
-  const [basicValues, setBasicValues] = useState<BasicFormValues>(() =>
-    normalizeBasicValues(initialBasicValues),
+  if (!activeBandId) {
+    return "unknown";
+  }
+
+  const candidateBandIds = [
+    live.bandId,
+    live.myBandId,
+    live.bandProfileId,
+    live.bandMemberProfileId,
+  ]
+    .map((value) => Number(value))
+    .filter((value) => Number.isFinite(value));
+
+  if (candidateBandIds.length === 0) {
+    return "unknown";
+  }
+
+  return candidateBandIds.some(
+    (candidateBandId) => candidateBandId === Number(activeBandId),
+  )
+    ? "same"
+    : "different";
+};
+
+const getApiErrorBody = (error: unknown) => {
+  return (error as AxiosError<LiveApiResponse<null>>).response?.data;
+};
+
+const getApiStatus = (error: unknown) => {
+  const axiosError = error as AxiosError<LiveApiResponse<null>>;
+
+  return axiosError.response?.status ?? axiosError.response?.data?.status;
+};
+
+const getApiMessage = (error: unknown, fallbackMessage: string) => {
+  return getApiErrorBody(error)?.message ?? fallbackMessage;
+};
+
+const isLiveEnterForbiddenError = (error: unknown) => {
+  const status = getApiStatus(error);
+  const code = getApiErrorBody(error)?.code ?? "";
+
+  return status === 403 || code.startsWith("LIVE403");
+};
+
+const isAlreadyProcessedInvitationError = (error: unknown) => {
+  const status = getApiStatus(error);
+  const code = getApiErrorBody(error)?.code ?? "";
+
+  return status === 409 || code.startsWith("LIVE409");
+};
+
+export function BandLiveNowListPage({
+  go,
+  onEnterLive,
+}: BandLiveNowListPageProps) {
+  const activeBandId = useActiveBandId();
+
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isError,
+    isFetchingNextPage,
+    isLoading,
+    refetch,
+  } = useLiveNowQuery("all");
+
+  const enterLiveMutation = useEnterLiveMutation();
+  const respondCoHostInvitationMutation = useRespondCoHostInvitationMutation();
+
+  const liveNowCandidates = useMemo<LiveNowCandidateCard[]>(
+    () =>
+      data?.pages.flatMap((page) =>
+        page.items.map((live) => {
+          const typedLive = live as LiveListItemWithFields;
+
+          return {
+            id: typedLive.liveId,
+            title: typedLive.isMine ? "내 라이브 진행 중" : typedLive.bandName,
+            subtitle: typedLive.title,
+            listeners: `${
+              typedLive.viewerCount ?? typedLive.viewCount ?? 0
+            }명 청취 중`,
+            imageUrl: getBandProfileImageUrl(typedLive),
+            isMine: typedLive.isMine,
+            relationState: getBandRelationState(typedLive, activeBandId),
+          };
+        }),
+      ) ?? [],
+    [activeBandId, data],
   );
 
-  const [detailValues, setDetailValues] = useState<DetailFormValues>(() =>
-    normalizeDetailValues(initialDetailValues),
-  );
+  const liveNowAccessQueries = useQueries({
+    queries: liveNowCandidates.map((live) => ({
+      queryKey: ["live", "members-access", activeBandId, live.id],
+      queryFn: async () => {
+        try {
+          return await getLiveMembers(live.id);
+        } catch {
+          return null;
+        }
+      },
+      enabled:
+        Boolean(activeBandId) &&
+        Boolean(live.id) &&
+        live.relationState !== "same",
+      staleTime: 0,
+      refetchOnMount: "always" as const,
+      refetchOnWindowFocus: true,
+      retry: false,
+    })),
+  });
 
-  const [errors, setErrors] = useState<FormErrors>({});
+  const liveCards = useMemo<LiveCard[]>(() => {
+    return liveNowCandidates.flatMap((live, index) => {
+      const accessQuery = liveNowAccessQueries[index];
+      const isAccessChecking = accessQuery?.isLoading || accessQuery?.isFetching;
 
-  const isBasicComplete =
-    basicValues.title.trim().length > 0 &&
-    basicValues.summary.trim().length > 0 &&
-    basicValues.detail.trim().length > 0 &&
-    basicValues.part.length > 0 &&
-    basicValues.skill.length > 0 &&
-    basicValues.genre.length > 0;
-
-  const isDetailComplete =
-    detailValues.region.length > 0 &&
-    detailValues.practiceSchedule.trim().length > 0 &&
-    detailValues.practiceLocation.trim().length > 0 &&
-    detailValues.deadlineDate.length > 0 &&
-    detailValues.deadlineTime.length > 0 &&
-    detailValues.qualification.trim().length > 0;
-
-  const handleBasicFieldChange =
-    (field: keyof Pick<BasicFormValues, "title" | "summary" | "detail">) =>
-    (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-      setBasicValues((currentValues) => ({
-        ...currentValues,
-        [field]: event.target.value,
-      }));
-      setErrors((currentErrors) => ({
-        ...currentErrors,
-        [field]: undefined,
-      }));
-      setSubmitErrorMessage("");
-    };
-
-  const handleDetailFieldChange =
-    (
-      field: keyof Pick<
-        DetailFormValues,
-        "practiceSchedule" | "practiceLocation" | "qualification"
-      >,
-    ) =>
-    (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-      setDetailValues((currentValues) => ({
-        ...currentValues,
-        [field]: event.target.value,
-      }));
-      setErrors((currentErrors) => ({
-        ...currentErrors,
-        [field]: undefined,
-      }));
-      setSubmitErrorMessage("");
-    };
-
-  const handlePartClick = (part: string) => {
-    setBasicValues((currentValues) => ({
-      ...currentValues,
-      part: normalizeRecruitmentEnumValue(part),
-    }));
-    setErrors((currentErrors) => ({ ...currentErrors, part: undefined }));
-    setSubmitErrorMessage("");
-  };
-
-  const handleSkillClick = (skill: string) => {
-    setBasicValues((currentValues) => ({
-      ...currentValues,
-      skill: normalizeRecruitmentEnumValue(skill),
-    }));
-    setSubmitErrorMessage("");
-  };
-
-  const handleGenreSelect = (genre: string) => {
-    setBasicValues((currentValues) => ({
-      ...currentValues,
-      genre: normalizeRecruitmentEnumValue(genre),
-    }));
-    setErrors((currentErrors) => ({ ...currentErrors, genre: undefined }));
-    setSubmitErrorMessage("");
-  };
-
-  const handleRegionSelect = (region: string) => {
-    setDetailValues((currentValues) => ({
-      ...currentValues,
-      region: normalizeRecruitmentEnumValue(region),
-    }));
-    setErrors((currentErrors) => ({ ...currentErrors, region: undefined }));
-    setSubmitErrorMessage("");
-  };
-
-  const handleDeadlineDateChange = (date: string) => {
-    setDetailValues((currentValues) => ({
-      ...currentValues,
-      deadlineDate: date,
-    }));
-    setErrors((currentErrors) => ({
-      ...currentErrors,
-      deadlineDate: undefined,
-      deadlineTime: undefined,
-    }));
-    setSubmitErrorMessage("");
-  };
-
-  const handleDeadlineTimeChange = (time: string) => {
-    setDetailValues((currentValues) => ({
-      ...currentValues,
-      deadlineTime: time,
-    }));
-    setErrors((currentErrors) => ({
-      ...currentErrors,
-      deadlineDate: undefined,
-      deadlineTime: undefined,
-    }));
-    setSubmitErrorMessage("");
-  };
-
-  const validateBasicForm = () => {
-    const nextErrors: FormErrors = {};
-
-    if (!basicValues.title.trim()) {
-      nextErrors.title = "공고명은 필수 항목이에요";
-    }
-
-    if (!basicValues.summary.trim()) {
-      nextErrors.summary = "공고 한줄 소개는 필수 항목이에요";
-    }
-
-    if (!basicValues.detail.trim()) {
-      nextErrors.detail = "공고 상세 소개는 필수 항목이에요";
-    }
-
-    if (!basicValues.part) {
-      nextErrors.part = "파트를 선택해주세요";
-    }
-
-    if (!basicValues.genre) {
-      nextErrors.genre = "장르를 선택해주세요";
-    }
-
-    setErrors(nextErrors);
-    return Object.keys(nextErrors).length === 0 && isBasicComplete;
-  };
-
-  const validateDetailForm = () => {
-    const nextErrors: FormErrors = {};
-
-    if (!detailValues.region) {
-      nextErrors.region = "활동 지역을 선택해주세요";
-    }
-
-    if (!detailValues.practiceSchedule.trim()) {
-      nextErrors.practiceSchedule = "연습 일정은 필수 항목이에요";
-    }
-
-    if (!detailValues.practiceLocation.trim()) {
-      nextErrors.practiceLocation = "연습 장소는 필수 항목이에요";
-    }
-
-    if (!detailValues.deadlineDate) {
-      nextErrors.deadlineDate = "모집 마감 날짜를 선택해주세요";
-    }
-
-    if (!detailValues.deadlineTime) {
-      nextErrors.deadlineTime = "모집 마감 시간을 선택해주세요";
-    }
-
-    if (
-      detailValues.deadlineDate &&
-      detailValues.deadlineTime &&
-      !isFutureRecruitmentDeadline(
-        detailValues.deadlineDate,
-        detailValues.deadlineTime,
-      )
-    ) {
-      nextErrors.deadlineTime = "모집 마감일은 현재 시간 이후여야 해요";
-    }
-
-    if (!detailValues.qualification.trim()) {
-      nextErrors.qualification = "지원 자격은 필수 항목이에요";
-    }
-
-    setErrors(nextErrors);
-    return Object.keys(nextErrors).length === 0 && isDetailComplete;
-  };
-
-  const handleNext = () => {
-    if (validateBasicForm()) {
-      setErrors({});
-      setCurrentStep(2);
-    }
-  };
-
-  const handleSubmit = async () => {
-    if (!validateDetailForm()) return;
-
-    setSubmitErrorMessage("");
-
-    const normalizedPart = normalizeRecruitmentEnumValue(basicValues.part);
-    const normalizedSkill = normalizeRecruitmentEnumValue(basicValues.skill);
-    const normalizedGenre = normalizeRecruitmentEnumValue(basicValues.genre);
-    const normalizedRegion = normalizeRecruitmentEnumValue(detailValues.region);
-
-    if (mode === "edit") {
-      if (!sessionRecruitmentId) return;
-
-      const body = {
-        recruitmentTitle: basicValues.title.trim(),
-        summary: basicValues.summary.trim(),
-        content: basicValues.detail.trim(),
-        part: normalizedPart,
-        skillLevel: normalizedSkill,
-        genre: normalizedGenre,
-        region: normalizedRegion,
-        practiceSchedule: detailValues.practiceSchedule.trim(),
-        practicePlace: detailValues.practiceLocation.trim(),
-        deadlineAt: toRecruitmentDeadlineAt(
-          detailValues.deadlineDate,
-          detailValues.deadlineTime,
-        ),
-        qualification: detailValues.qualification.trim(),
-      };
-
-      try {
-        await updateRecruitmentMutation.mutateAsync({
-          sessionRecruitmentId,
-          body,
-        });
-        onSaved?.();
-      } catch (error) {
-        const apiMessage = (error as AxiosError<SessionApiResponse<null>>)
-          .response?.data?.message;
-
-        setSubmitErrorMessage(
-          apiMessage ?? "모집 공고 수정에 실패했어요. 잠시 후 다시 시도해주세요.",
-        );
+      if (live.relationState === "same") {
+        return [live];
       }
 
-      return;
-    }
+      if (isAccessChecking) {
+        return [];
+      }
 
-    const bandMemberId = activeBandMemberId;
+      if (accessQuery?.data) {
+        return [live];
+      }
 
-    if (!bandMemberId) {
-      setSubmitErrorMessage(
-        "밴드 정보를 찾을 수 없어요. 밴드 오너 계정으로 로그인했는지 확인해주세요.",
-      );
-      return;
-    }
+      return [];
+    });
+  }, [liveNowAccessQueries, liveNowCandidates]);
 
-    const requestBody = {
-      bandMemberId,
-      recruitmentTitle: basicValues.title.trim(),
-      summary: basicValues.summary.trim(),
-      content: basicValues.detail.trim(),
-      part: normalizedPart,
-      skillLevel: normalizedSkill,
-      genre: normalizedGenre,
-      region: normalizedRegion,
-      practiceSchedule: detailValues.practiceSchedule.trim(),
-      practicePlace: detailValues.practiceLocation.trim(),
-      deadlineAt: toRecruitmentDeadlineAt(
-        detailValues.deadlineDate,
-        detailValues.deadlineTime,
-      ),
-      qualification: detailValues.qualification.trim(),
-    };
+  const isCheckingLiveNowAccess =
+    !isLoading &&
+    !isError &&
+    liveNowCandidates.length > 0 &&
+    liveCards.length === 0 &&
+    liveNowAccessQueries.some((query) => query.isLoading || query.isFetching);
+
+  const isEnterPending =
+    enterLiveMutation.isPending || respondCoHostInvitationMutation.isPending;
+
+  const loadMore = useCallback(() => {
+    if (!hasNextPage || isFetchingNextPage) return;
+
+    void fetchNextPage();
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
+
+  const loadMoreRef = useInfiniteScrollObserver({
+    enabled: Boolean(hasNextPage) && !isFetchingNextPage,
+    onIntersect: loadMore,
+  });
+
+  const handleRefreshLiveNowList = useCallback(async () => {
+    await refetch();
+  }, [refetch]);
+
+  const {
+    containerRef: liveNowRefreshRef,
+    pullDistance: liveNowPullDistance,
+    isRefreshing: isLiveNowRefreshing,
+  } = usePullToRefresh<HTMLElement>({
+    enabled: !isLoading && !isFetchingNextPage && !isEnterPending,
+    onRefresh: handleRefreshLiveNowList,
+  });
+
+  const enterAndMoveRoom = (enteredLive: EnterLiveResponse) => {
+    onEnterLive(enteredLive);
+    go("room");
+  };
+
+  const handleEnterLive = async (liveId: number) => {
+    if (isEnterPending) return;
 
     try {
-      const result = await createRecruitmentMutation.mutateAsync(requestBody);
+      const enteredLive = await enterLiveMutation.mutateAsync(liveId);
 
-      setCreatedRecruitment(result);
-      setIsCompleteScreenOpen(true);
+      enterAndMoveRoom(enteredLive);
     } catch (error) {
-      const errorResponse = (error as AxiosError<SessionApiResponse<null>>)
-        .response;
-      const apiMessage = errorResponse?.data?.message;
-
-      if (errorResponse?.status === 403) {
-        setSubmitErrorMessage(
-          apiMessage ??
-            "밴드 오너 계정만 세션 모집 공고를 등록할 수 있어요. 현재 선택된 밴드 정보를 확인해주세요.",
-        );
+      if (!isLiveEnterForbiddenError(error)) {
+        alert(getApiMessage(error, "라이브방에 입장하지 못했어요."));
         return;
       }
 
-      setSubmitErrorMessage(
-        apiMessage ?? "모집 공고 등록에 실패했어요. 잠시 후 다시 시도해주세요.",
+      try {
+        await respondCoHostInvitationMutation.mutateAsync({
+          liveId,
+          request: {
+            isAccepted: true,
+          },
+        });
+
+        const enteredLive = await enterLiveMutation.mutateAsync(liveId);
+
+        enterAndMoveRoom(enteredLive);
+      } catch (coHostError) {
+        if (isAlreadyProcessedInvitationError(coHostError)) {
+          try {
+            const enteredLive = await enterLiveMutation.mutateAsync(liveId);
+
+            enterAndMoveRoom(enteredLive);
+            return;
+          } catch (retryError) {
+            alert(
+              getApiMessage(
+                retryError,
+                "공동 진행자 수락 후에도 라이브방에 입장하지 못했어요.",
+              ),
+            );
+            return;
+          }
+        }
+
+        alert(
+          getApiMessage(
+            coHostError,
+            "공동 진행자 초대 수락에 실패했어요. 알림 또는 초대 상태를 확인해주세요.",
+          ),
+        );
+      }
+    }
+  };
+
+  return (
+    <main className="relative h-dvh overflow-hidden bg-neutral-0 text-neutral-900">
+      <Header title="진행 중인 라이브" showBack={false} variant="main" />
+      <HeaderBackButton onClick={() => go("home")} />
+
+      <PullToRefreshIndicator
+        pullDistance={liveNowPullDistance}
+        isRefreshing={isLiveNowRefreshing}
+      />
+
+      <section
+        ref={liveNowRefreshRef}
+        className="h-[calc(100%_-_52px)] overflow-y-auto overscroll-y-contain px-5 pb-8"
+      >
+        {isLoading ? (
+          <ListMessage>라이브 목록을 불러오는 중이에요.</ListMessage>
+        ) : null}
+
+        {isError ? (
+          <ListMessage onRetry={() => void refetch()}>
+            라이브 목록을 불러오지 못했어요.
+          </ListMessage>
+        ) : null}
+
+        {isCheckingLiveNowAccess ? (
+          <ListMessage>현재 밴드의 진행 중인 라이브를 확인하는 중이에요.</ListMessage>
+        ) : null}
+
+        {!isLoading &&
+        !isError &&
+        !isCheckingLiveNowAccess &&
+        liveCards.length === 0 ? (
+          <ListMessage>현재 진행 중인 라이브가 없어요.</ListMessage>
+        ) : null}
+
+        {!isLoading && !isError && liveCards.length > 0 ? (
+          <div className="grid gap-3 pt-5">
+            {liveCards.map((live) => (
+              <HomeLiveCard
+                key={live.id}
+                disabled={isEnterPending}
+                live={live}
+                onEnter={() => void handleEnterLive(live.id)}
+              />
+            ))}
+
+            <div ref={loadMoreRef} className="h-1" />
+
+            {isFetchingNextPage ? (
+              <p className="py-3 text-center text-caption2 text-neutral-500">
+                라이브를 더 불러오는 중이에요.
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+      </section>
+    </main>
+  );
+}
+
+export function BandLiveScheduledListPage({
+  go,
+  onEnterLive,
+  onEditReservation,
+}: BandLiveScheduledListPageProps) {
+  const activeBandId = useActiveBandId();
+  const now = useScheduledLiveNow();
+
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isError,
+    isFetchingNextPage,
+    isLoading,
+    refetch,
+  } = useScheduledLiveQuery(false);
+
+  const { data: liveHome, refetch: refetchLiveHome } = useLiveHomeQuery();
+  const enterLiveMutation = useEnterLiveMutation();
+
+  const previewScheduledByLiveId = useMemo(
+    () =>
+      new Map((liveHome?.scheduled ?? []).map((live) => [live.liveId, live])),
+    [liveHome?.scheduled],
+  );
+
+  const scheduledCandidates = useMemo<ScheduledCandidateCard[]>(() => {
+    return (
+      data?.pages.flatMap((page) =>
+        page.items.map((live) => {
+          const typedLive = live as LiveListItemWithFields;
+          const previewLive = previewScheduledByLiveId.get(
+            typedLive.liveId,
+          ) as LiveListItemWithFields | undefined;
+
+          const mergedLive = {
+            ...previewLive,
+            ...typedLive,
+          };
+
+          return {
+            id: typedLive.liveId,
+            bandName: typedLive.bandName,
+            title: typedLive.title,
+            scheduledAt: previewLive?.scheduledAt ?? typedLive.scheduledAt ?? "",
+            isMine: Boolean(typedLive.isMine ?? previewLive?.isMine),
+            imageUrl: getBandProfileImageUrl(typedLive, previewLive),
+            coHostUserIds: (
+              typedLive.coHosts ??
+              typedLive.coHostList ??
+              previewLive?.coHosts ??
+              previewLive?.coHostList ??
+              []
+            )
+              .map((coHost) => coHost.userId)
+              .filter((userId): userId is number => Number.isFinite(userId)),
+            relationState: getBandRelationState(mergedLive, activeBandId),
+          };
+        }),
+      ) ?? []
+    );
+  }, [activeBandId, data, previewScheduledByLiveId]);
+
+  const scheduledReservationQueries = useQueries({
+    queries: scheduledCandidates.map((live) => ({
+      queryKey: ["live", "reservation-access", activeBandId, live.id],
+      queryFn: async () => {
+        try {
+          return await getLiveReservation(live.id);
+        } catch {
+          return null;
+        }
+      },
+      enabled: Boolean(activeBandId) && Boolean(live.id),
+      staleTime: 0,
+      refetchOnMount: "always" as const,
+      refetchOnWindowFocus: true,
+      retry: false,
+    })),
+  });
+
+  const displayScheduledCards = useMemo<ScheduledLiveCardData[]>(() => {
+    return scheduledCandidates.flatMap((live, index) => {
+      const reservationQuery = scheduledReservationQueries[index];
+      const isReservationChecking =
+        reservationQuery?.isLoading || reservationQuery?.isFetching;
+
+      if (live.relationState === "same") {
+        return [live];
+      }
+
+      if (isReservationChecking) {
+        return [];
+      }
+
+      if (reservationQuery?.data) {
+        return [live];
+      }
+
+      return [];
+    });
+  }, [scheduledCandidates, scheduledReservationQueries]);
+
+  const isCheckingScheduledAccess =
+    !isLoading &&
+    !isError &&
+    scheduledCandidates.length > 0 &&
+    displayScheduledCards.length === 0 &&
+    scheduledReservationQueries.some(
+      (query) => query.isLoading || query.isFetching,
+    );
+
+  useEffect(() => {
+    displayScheduledCards.forEach((live) => {
+      cacheScheduledCoHostUserIds(live.id, live.coHostUserIds ?? []);
+    });
+  }, [displayScheduledCards]);
+
+  const loadMore = useCallback(() => {
+    if (!hasNextPage || isFetchingNextPage) return;
+
+    void fetchNextPage();
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
+
+  const loadMoreRef = useInfiniteScrollObserver({
+    enabled: Boolean(hasNextPage) && !isFetchingNextPage,
+    onIntersect: loadMore,
+  });
+
+  const handleRefreshScheduledList = useCallback(async () => {
+    await Promise.all([refetch(), refetchLiveHome()]);
+  }, [refetch, refetchLiveHome]);
+
+  const {
+    containerRef: scheduledRefreshRef,
+    pullDistance: scheduledPullDistance,
+    isRefreshing: isScheduledRefreshing,
+  } = usePullToRefresh<HTMLElement>({
+    enabled: !isLoading && !isFetchingNextPage && !enterLiveMutation.isPending,
+    onRefresh: handleRefreshScheduledList,
+  });
+
+  const enterAndMoveRoom = (enteredLive: EnterLiveResponse) => {
+    removeCachedOwnedScheduledLive(Number(enteredLive.liveId));
+    onEnterLive(enteredLive);
+    go("room");
+  };
+
+  const handleScheduledLiveAction = async (live: ScheduledLiveCardData) => {
+    if (enterLiveMutation.isPending) return;
+
+    const canStartLive = isScheduledLiveStartable(live.scheduledAt, now);
+
+    if (!canStartLive) {
+      if (live.isMine) {
+        onEditReservation(live.id);
+        return;
+      }
+
+      alert("아직 예약 시간이 되지 않은 라이브예요.");
+      return;
+    }
+
+    try {
+      const enteredLive = await enterLiveMutation.mutateAsync(live.id);
+
+      enterAndMoveRoom(enteredLive);
+    } catch (error) {
+      alert(
+        getApiMessage(
+          error,
+          "예약 라이브를 시작하거나 입장하지 못했어요. 예약 시간과 권한을 확인해주세요.",
+        ),
       );
     }
   };
 
-  const handleBack = () => {
-    setIsCancelModalOpen(true);
-  };
-
-  const handleCancelModalClose = () => {
-    setIsCancelModalOpen(false);
-  };
-
-  const handleCancelConfirm = () => {
-    setIsCancelModalOpen(false);
-    onBack();
-  };
-
-  const handleConfirmPost = () => {
-    if (onViewCreatedPost) {
-      onViewCreatedPost(createdRecruitment?.sessionRecruitmentId);
-      return;
-    }
-
-    onClose();
-  };
-
-  const deadlineSummary = splitRecruitmentDeadlineAt(
-    createdRecruitment?.deadlineAt,
-  );
-
-  const completionSummary = {
-    title: createdRecruitment?.recruitmentTitle ?? basicValues.title.trim(),
-    part: normalizeRecruitmentEnumValue(
-      createdRecruitment?.part ?? basicValues.part,
-    ),
-    skill: normalizeRecruitmentEnumValue(
-      createdRecruitment?.skillLevel ?? basicValues.skill,
-    ),
-    genre: normalizeRecruitmentEnumValue(
-      createdRecruitment?.genre ?? basicValues.genre,
-    ),
-    region: normalizeRecruitmentEnumValue(
-      createdRecruitment?.region ?? detailValues.region,
-    ),
-    deadlineDate: deadlineSummary.deadlineDate || detailValues.deadlineDate,
-    deadlineTime: deadlineSummary.deadlineTime || detailValues.deadlineTime,
-  };
-
-  if (isCompleteScreenOpen) {
-    return (
-      <SessionRecruitmentCompleteScreen
-        summary={completionSummary}
-        onBackToSession={onClose}
-        onConfirmPost={handleConfirmPost}
-      />
-    );
-  }
-
-  const isSubmitting =
-    mode === "edit"
-      ? updateRecruitmentMutation.isPending
-      : createRecruitmentMutation.isPending;
-
   return (
-    <main className="min-h-dvh bg-secondary-0 pb-[calc(var(--bottom-nav-height)+24px)]">
-      <RecruitmentFormTopBar
-        title={mode === "edit" ? "세션 모집 공고 수정" : "세션 모집 공고 등록"}
-        onBack={handleBack}
-        onClose={onClose}
+    <main className="relative h-dvh overflow-hidden bg-neutral-0 text-neutral-900">
+      <Header title="예정된 라이브" showBack={false} variant="main" />
+      <HeaderBackButton onClick={() => go("home")} />
+
+      <PullToRefreshIndicator
+        pullDistance={scheduledPullDistance}
+        isRefreshing={isScheduledRefreshing}
       />
 
-      <RecruitmentStepIndicator currentStep={currentStep} />
+      <section
+        ref={scheduledRefreshRef}
+        className="h-[calc(100%_-_52px)] overflow-y-auto overscroll-y-contain px-5 pb-8"
+      >
+        {isLoading ? (
+          <ListMessage>예정된 라이브를 불러오는 중이에요.</ListMessage>
+        ) : null}
 
-      {currentStep === 1 ? (
-        <RecruitmentBasicInfoStep
-          values={basicValues}
-          errors={errors}
-          isComplete={isBasicComplete}
-          onFieldChange={handleBasicFieldChange}
-          onPartClick={handlePartClick}
-          onSkillClick={handleSkillClick}
-          onGenreChange={handleGenreSelect}
-          onNext={handleNext}
-        />
-      ) : (
-        <RecruitmentDetailInfoStep
-          values={detailValues}
-          errors={errors}
-          isComplete={isDetailComplete}
-          submitErrorMessage={submitErrorMessage}
-          isSubmitting={isSubmitting}
-          submitLabel={mode === "edit" ? "수정하기" : "모집 공고 등록"}
-          submittingLabel={mode === "edit" ? "수정 중" : "등록 중"}
-          onFieldChange={handleDetailFieldChange}
-          onRegionChange={handleRegionSelect}
-          onDeadlineDateChange={handleDeadlineDateChange}
-          onDeadlineTimeChange={handleDeadlineTimeChange}
-          onSubmit={handleSubmit}
-        />
-      )}
+        {isError ? (
+          <ListMessage onRetry={() => void refetch()}>
+            예정된 라이브를 불러오지 못했어요.
+          </ListMessage>
+        ) : null}
 
-      <ModalOverlay open={isCancelModalOpen} onClose={handleCancelModalClose}>
-        <Modal
-          tone="orange"
-          title={
-            mode === "edit"
-              ? "모집 공고 수정을 취소할까요?"
-              : "모집 공고 등록을 취소할까요?"
-          }
-          description={
-            <>
-              입력한 내용은 저장되지 않고
-              <br />
-              사라집니다.
-            </>
-          }
-          cancelLabel="취소"
-          confirmLabel="확인"
-          onCancel={handleCancelModalClose}
-          onConfirm={handleCancelConfirm}
-        />
-      </ModalOverlay>
+        {isCheckingScheduledAccess ? (
+          <ListMessage>현재 밴드의 예정된 라이브를 확인하는 중이에요.</ListMessage>
+        ) : null}
+
+        {!isLoading &&
+        !isError &&
+        !isCheckingScheduledAccess &&
+        displayScheduledCards.length === 0 ? (
+          <ListMessage>예정된 라이브가 없어요.</ListMessage>
+        ) : null}
+
+        {!isLoading && !isError && displayScheduledCards.length > 0 ? (
+          <div className="grid gap-3 pt-5">
+            {displayScheduledCards.map((live) => (
+              <ScheduledLiveCard
+                key={live.id}
+                live={live}
+                actionLabel={
+                  isScheduledLiveStartable(live.scheduledAt, now)
+                    ? "라이브 시작"
+                    : "수정"
+                }
+                onEdit={() => void handleScheduledLiveAction(live)}
+              />
+            ))}
+
+            <div ref={loadMoreRef} className="h-1" />
+
+            {isFetchingNextPage ? (
+              <p className="py-3 text-center text-caption2 text-neutral-500">
+                라이브를 더 불러오는 중이에요.
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+      </section>
     </main>
   );
-};
+}
