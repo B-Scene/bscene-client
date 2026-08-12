@@ -5,7 +5,6 @@ import { enterLive, requestCoHostUpgrade } from "@/api/live/live";
 import {
   useAcceptCoHostUpgradeMutation,
   useEnterLiveMutation,
-  useRequestCoHostUpgradeMutation,
   useRespondCoHostInvitationMutation,
 } from "@/hooks/api/live/useLive";
 import { useLiveChatSocket } from "@/hooks/api/live/useLiveChatSocket";
