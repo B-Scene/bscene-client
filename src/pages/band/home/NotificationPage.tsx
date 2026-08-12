@@ -104,6 +104,9 @@ const getBandInviteImage = (bandInvite: NotificationBandInvite | null) =>
 const getBandInviteBandId = (notification: NotificationItem) =>
   getNumberField(notification.bandInvite, "bandId");
 
+const getBandInviteBandName = (notification: NotificationItem) =>
+  getStringField(notification.bandInvite, "bandName") ?? "밴드";
+
 const NotificationPage = () => {
   const navigate = useNavigate();
   const {
@@ -229,6 +232,7 @@ const NotificationPage = () => {
 
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
   const [isCompleteModalOpen, setIsCompleteModalOpen] = useState(false);
+  const [completedBandName, setCompletedBandName] = useState("");
   const [pendingRoleAction, setPendingRoleAction] =
     useState<PendingRoleAction | null>(null);
   const [activityName, setActivityName] = useState("");
@@ -330,6 +334,7 @@ const NotificationPage = () => {
 
     void refetch();
     setIsRoleModalOpen(false);
+    setCompletedBandName(getBandInviteBandName(notification));
     setIsCompleteModalOpen(true);
     setPendingRoleAction(null);
     setActivityName("");
@@ -400,8 +405,7 @@ const NotificationPage = () => {
 
             if (isBandInvite) {
               const bandInvite = notification.bandInvite;
-              const bandName =
-                getStringField(bandInvite, "bandName") ?? "밴드";
+              const bandName = getBandInviteBandName(notification);
               const position =
                 getStringField(bandInvite, "position") ??
                 getStringField(bandInvite, "part");
@@ -664,7 +668,7 @@ const NotificationPage = () => {
               초대가 완료되었습니다
             </h3>
             <p className="m-0 font-body text-caption2 text-neutral-600">
-              이제 WAVY의 멤버로 활동할 수 있어요.
+              이제 {completedBandName}의 멤버로 활동할 수 있어요.
               <br />내 밴드와 밴드 프로필 관리에서 확인해 주세요.
             </p>
           </div>
