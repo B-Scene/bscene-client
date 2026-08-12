@@ -17,22 +17,14 @@ import {
   useSessionRecruitmentsQuery,
   useSessionSearchHistoryQuery,
 } from "@/hooks/api/session/useSessionRecruitment";
-import { useSessionApplicationsSearchInfiniteQuery } from "@/hooks/api/session/useSessionApplication";
-import { useInfiniteScrollObserver } from "@/hooks/useInfiniteScrollObserver";
 import type {
   SessionRecruitmentListItem,
   SessionRecruitmentSort,
 } from "@/types/session/sessionRecruitment";
-import type { SessionApplicationSearchItem } from "@/types/session/sessionApplication";
 import type { SessionFilterValues, SessionRecruitmentPost } from "../types";
 import { RecruitmentPostCard } from "./RecruitmentPostCard";
 import { SessionFilterBar } from "./SessionFilterBar";
 import { SessionFilterBottomSheet } from "./SessionFilterBottomSheet";
-import {
-  SessionCandidateCard,
-  type SessionCandidateCardData,
-} from "./SessionCandidateCard";
-import { SessionApplicationDetailScreen } from "./SessionApplicationDetailScreen";
 
 interface SessionSearchScreenProps {
   mode?: "recruitment" | "find";
@@ -42,12 +34,41 @@ interface SessionSearchScreenProps {
   onSelectRecruitment?: (post: SessionRecruitmentPost) => void;
 }
 
-const SESSION_FIND_PAGE_SIZE = 20;
+interface SearchHistoryItem {
+  keywordId: number;
+  keyword: string;
+}
+
+const RECENT_KEYWORD_LIMIT = 10;
 
 const toDeadlineLabel = (dDay: number) => {
   if (dDay < 0) return "마감";
   if (dDay === 0) return "오늘 마감";
+
   return `D-${dDay}`;
+};
+
+const normalizeKeyword = (value: string) => value.trim();
+
+const normalizeSessionEnumValue = (value: string) => {
+  const trimmedValue = value.trim();
+
+  if (trimmedValue.toLowerCase() === "etc.") {
+    return "etc";
+  }
+
+  return trimmedValue;
+};
+
+const normalizePost = (
+  post: SessionRecruitmentPost,
+): SessionRecruitmentPost => {
+  return {
+    ...post,
+    genre: normalizeSessionEnumValue(post.genre),
+    location: normalizeSessionEnumValue(post.location),
+    tags: post.tags.map(normalizeSessionEnumValue),
+  };
 };
 
 const mapRecruitmentToPost = (
@@ -59,38 +80,14 @@ const mapRecruitmentToPost = (
     deadline: toDeadlineLabel(recruitment.dDay),
     title: recruitment.recruitmentTitle,
     bandName: recruitment.bandName,
-    genre: recruitment.bandGenre,
-    location: recruitment.bandRegion,
+    genre: normalizeSessionEnumValue(recruitment.bandGenre),
+    location: normalizeSessionEnumValue(recruitment.bandRegion),
     description: recruitment.summary,
-    tags: [recruitment.part, recruitment.skillLevel].filter(Boolean),
+    tags: [recruitment.part, recruitment.skillLevel]
+      .filter(Boolean)
+      .map(normalizeSessionEnumValue),
     bookmarked: recruitment.isInterested,
   };
-};
-
-const mapApplicationToCandidate = (
-  application: SessionApplicationSearchItem,
-): SessionCandidateCardData => {
-  return {
-    id: application.sessionApplicationId,
-    name: application.nickname,
-    profileImageUrl: application.profileImageUrl,
-    skill: application.skillLevel,
-    part: application.part,
-    genre: application.genre,
-    location: application.region,
-    applicationTitle: application.title,
-    summary: application.oneLineIntro,
-  };
-};
-
-const getFilterParam = (value: string) => {
-  return value === "전체" ? undefined : value;
-};
-
-const includesKeyword = (target: string | undefined, keyword: string) => {
-  if (!target) return false;
-
-  return target.toLowerCase().includes(keyword.toLowerCase());
 };
 
 export const SessionSearchScreen = ({
@@ -101,6 +98,7 @@ export const SessionSearchScreen = ({
   onSelectRecruitment,
 }: SessionSearchScreenProps) => {
   const inputRef = useRef<HTMLInputElement>(null);
+  const lastSyncedHistoryKeywordRef = useRef("");
 
   const [keyword, setKeyword] = useState("");
   const [submittedKeyword, setSubmittedKeyword] = useState("");
@@ -109,47 +107,87 @@ export const SessionSearchScreen = ({
   const [bookmarkOverrides, setBookmarkOverrides] = useState<
     Record<number, boolean>
   >({});
-  const [selectedApplicationId, setSelectedApplicationId] = useState<
-    number | null
-  >(null);
+  const [optimisticRecentKeywords, setOptimisticRecentKeywords] = useState<
+    SearchHistoryItem[]
+  >([]);
 
   const searchHistoryQuery = useSessionSearchHistoryQuery();
   const deleteSearchHistoryMutation = useDeleteSessionSearchHistory();
   const addInterestMutation = useAddSessionRecruitmentInterest();
   const removeInterestMutation = useRemoveSessionRecruitmentInterest();
 
-  const trimmedKeyword = keyword.trim();
+  const trimmedKeyword = normalizeKeyword(keyword);
   const isSearching = trimmedKeyword.length > 0;
   const isResultMode = submittedKeyword.length > 0;
+  const isFindMode = mode === "find";
 
-  const recruitmentSearchResultQuery = useSessionRecruitmentsQuery(
+  const normalizedValues = useMemo<SessionFilterValues>(() => {
+    return {
+      part: normalizeSessionEnumValue(values.part),
+      skill: normalizeSessionEnumValue(values.skill),
+      genre: normalizeSessionEnumValue(values.genre),
+      region: normalizeSessionEnumValue(values.region),
+    };
+  }, [values]);
+
+  const searchResultQuery = useSessionRecruitmentsQuery(
     {
       keyword: submittedKeyword,
       sort,
       size: 20,
     },
-    mode === "recruitment" && isResultMode,
+    isResultMode,
   );
 
-  const applicationSearchParams = useMemo(
-    () => ({
-      part: getFilterParam(values.part),
-      skillLevel: getFilterParam(values.skill),
-      genre: getFilterParam(values.genre),
-      region: getFilterParam(values.region),
-      size: SESSION_FIND_PAGE_SIZE,
-    }),
-    [values.part, values.skill, values.genre, values.region],
-  );
+  const addOptimisticRecentKeyword = useCallback((nextKeyword: string) => {
+    const normalizedKeyword = normalizeKeyword(nextKeyword);
 
-  const applicationSearchResultQuery = useSessionApplicationsSearchInfiniteQuery(
-    applicationSearchParams,
-  );
+    if (!normalizedKeyword) {
+      return;
+    }
+
+    setOptimisticRecentKeywords((currentKeywords) => {
+      const filteredKeywords = currentKeywords.filter(
+        (recentKeyword) =>
+          normalizeKeyword(recentKeyword.keyword) !== normalizedKeyword,
+      );
+
+      return [
+        {
+          keywordId: -Date.now(),
+          keyword: normalizedKeyword,
+        },
+        ...filteredKeywords,
+      ].slice(0, RECENT_KEYWORD_LIMIT);
+    });
+  }, []);
+
+  const recentKeywords = useMemo<SearchHistoryItem[]>(() => {
+    const serverKeywords =
+      (searchHistoryQuery.data ?? []) as SearchHistoryItem[];
+
+    const seenKeywordSet = new Set<string>();
+    const mergedKeywords: SearchHistoryItem[] = [];
+
+    [...optimisticRecentKeywords, ...serverKeywords].forEach(
+      (recentKeyword) => {
+        const normalizedKeyword = normalizeKeyword(recentKeyword.keyword);
+
+        if (!normalizedKeyword || seenKeywordSet.has(normalizedKeyword)) {
+          return;
+        }
+
+        seenKeywordSet.add(normalizedKeyword);
+        mergedKeywords.push(recentKeyword);
+      },
+    );
+
+    return mergedKeywords.slice(0, RECENT_KEYWORD_LIMIT);
+  }, [optimisticRecentKeywords, searchHistoryQuery.data]);
 
   const searchedPosts = useMemo(() => {
     const apiPosts =
-      recruitmentSearchResultQuery.data?.content.map(mapRecruitmentToPost) ??
-      [];
+      searchResultQuery.data?.content.map(mapRecruitmentToPost) ?? [];
 
     return apiPosts
       .map((post) => ({
@@ -157,96 +195,80 @@ export const SessionSearchScreen = ({
         bookmarked: bookmarkOverrides[post.id] ?? post.bookmarked,
       }))
       .filter((post) => {
+        const normalizedPost = normalizePost(post);
+        const normalizedTags = normalizedPost.tags;
+
         const matchesPart =
-          values.part === "전체" || post.tags.includes(values.part);
+          normalizedValues.part === "전체" ||
+          normalizedTags.includes(normalizedValues.part);
 
         const matchesSkill =
-          values.skill === "전체" || post.tags.includes(values.skill);
+          normalizedValues.skill === "전체" ||
+          normalizedTags.includes(normalizedValues.skill);
 
         const matchesGenre =
-          values.genre === "전체" || post.genre.includes(values.genre);
+          normalizedValues.genre === "전체" ||
+          normalizedPost.genre.includes(normalizedValues.genre);
 
         const matchesRegion =
-          values.region === "전체" || post.location.includes(values.region);
+          normalizedValues.region === "전체" ||
+          normalizedPost.location.includes(normalizedValues.region);
 
         return matchesPart && matchesSkill && matchesGenre && matchesRegion;
       });
-  }, [bookmarkOverrides, recruitmentSearchResultQuery.data, values]);
-
-  const searchedCandidates = useMemo(() => {
-    const apiCandidates =
-      applicationSearchResultQuery.data?.pages.flatMap((page) =>
-        page.content.map(mapApplicationToCandidate),
-      ) ?? [];
-
-    return apiCandidates.filter((candidate) => {
-      const matchesPart =
-        values.part === "전체" || candidate.part.includes(values.part);
-
-      const matchesSkill =
-        values.skill === "전체" || candidate.skill.includes(values.skill);
-
-      const matchesGenre =
-        values.genre === "전체" || candidate.genre.includes(values.genre);
-
-      const matchesRegion =
-        values.region === "전체" || candidate.location.includes(values.region);
-
-      const matchesKeyword =
-        !submittedKeyword ||
-        includesKeyword(candidate.name, submittedKeyword) ||
-        includesKeyword(candidate.applicationTitle, submittedKeyword) ||
-        includesKeyword(candidate.summary, submittedKeyword) ||
-        includesKeyword(candidate.part, submittedKeyword) ||
-        includesKeyword(candidate.skill, submittedKeyword) ||
-        includesKeyword(candidate.genre, submittedKeyword) ||
-        includesKeyword(candidate.location, submittedKeyword);
-
-      return (
-        matchesPart &&
-        matchesSkill &&
-        matchesGenre &&
-        matchesRegion &&
-        matchesKeyword
-      );
-    });
-  }, [
-    applicationSearchResultQuery.data,
-    submittedKeyword,
-    values.part,
-    values.skill,
-    values.genre,
-    values.region,
-  ]);
-
-  const loadMoreCandidates = useCallback(() => {
-    if (
-      !applicationSearchResultQuery.hasNextPage ||
-      applicationSearchResultQuery.isFetchingNextPage
-    ) {
-      return;
-    }
-
-    void applicationSearchResultQuery.fetchNextPage();
-  }, [applicationSearchResultQuery]);
-
-  const loadMoreCandidatesRef = useInfiniteScrollObserver({
-    enabled:
-      mode === "find" &&
-      isResultMode &&
-      Boolean(applicationSearchResultQuery.hasNextPage) &&
-      !applicationSearchResultQuery.isFetchingNextPage &&
-      !applicationSearchResultQuery.isLoading &&
-      !applicationSearchResultQuery.isError,
-    onIntersect: loadMoreCandidates,
-  });
+  }, [bookmarkOverrides, normalizedValues, searchResultQuery.data]);
 
   useEffect(() => {
     inputRef.current?.focus();
   }, [isResultMode]);
 
+  useEffect(() => {
+    const serverKeywordSet = new Set(
+      ((searchHistoryQuery.data ?? []) as SearchHistoryItem[])
+        .map((recentKeyword) => normalizeKeyword(recentKeyword.keyword))
+        .filter(Boolean),
+    );
+
+    if (serverKeywordSet.size === 0) {
+      return;
+    }
+
+    setOptimisticRecentKeywords((currentKeywords) =>
+      currentKeywords.filter(
+        (recentKeyword) =>
+          !serverKeywordSet.has(normalizeKeyword(recentKeyword.keyword)),
+      ),
+    );
+  }, [searchHistoryQuery.data]);
+
+  useEffect(() => {
+    if (!isResultMode || !submittedKeyword || !searchResultQuery.isSuccess) {
+      return;
+    }
+
+    if (lastSyncedHistoryKeywordRef.current === submittedKeyword) {
+      return;
+    }
+
+    lastSyncedHistoryKeywordRef.current = submittedKeyword;
+    void searchHistoryQuery.refetch();
+  }, [
+    isResultMode,
+    searchHistoryQuery,
+    searchResultQuery.isSuccess,
+    submittedKeyword,
+  ]);
+
   const handleSearchKeyword = () => {
     if (!trimmedKeyword) return;
+
+    addOptimisticRecentKeyword(trimmedKeyword);
+
+    if (trimmedKeyword === submittedKeyword) {
+      void searchResultQuery.refetch();
+      void searchHistoryQuery.refetch();
+      return;
+    }
 
     setSubmittedKeyword(trimmedKeyword);
   };
@@ -259,24 +281,51 @@ export const SessionSearchScreen = ({
   const handleClearKeyword = () => {
     setKeyword("");
     setSubmittedKeyword("");
-    inputRef.current?.focus();
+    void searchHistoryQuery.refetch();
+
+    window.setTimeout(() => {
+      inputRef.current?.focus();
+    }, 0);
   };
 
   const handleRemoveKeyword = (keywordId: number) => {
-    deleteSearchHistoryMutation.mutate(keywordId);
+    setOptimisticRecentKeywords((currentKeywords) =>
+      currentKeywords.filter(
+        (recentKeyword) => recentKeyword.keywordId !== keywordId,
+      ),
+    );
+
+    if (keywordId < 0) {
+      return;
+    }
+
+    deleteSearchHistoryMutation.mutate(keywordId, {
+      onSuccess: () => {
+        void searchHistoryQuery.refetch();
+      },
+    });
   };
 
   const handleRecentKeywordClick = (recentKeyword: string) => {
-    setKeyword(recentKeyword);
-    setSubmittedKeyword(recentKeyword);
+    const normalizedKeyword = normalizeKeyword(recentKeyword);
+
+    if (!normalizedKeyword) {
+      return;
+    }
+
+    setKeyword(normalizedKeyword);
+    setSubmittedKeyword(normalizedKeyword);
+    addOptimisticRecentKeyword(normalizedKeyword);
+  };
+
+  const handleSelectPost = (post: SessionRecruitmentPost) => {
+    onSelectRecruitment?.(normalizePost(post));
   };
 
   const handleToggleBookmark = (postId: number) => {
     const currentPost = searchedPosts.find((post) => post.id === postId);
-
     const currentBookmarked =
       bookmarkOverrides[postId] ?? currentPost?.bookmarked ?? false;
-
     const nextBookmarked = !currentBookmarked;
 
     setBookmarkOverrides((currentOverrides) => ({
@@ -298,15 +347,6 @@ export const SessionSearchScreen = ({
     });
   };
 
-  if (selectedApplicationId) {
-    return (
-      <SessionApplicationDetailScreen
-        sessionApplicationId={selectedApplicationId}
-        onBack={() => setSelectedApplicationId(null)}
-      />
-    );
-  }
-
   if (isResultMode) {
     return (
       <main className="min-h-dvh bg-neutral-0 pb-[calc(var(--bottom-nav-height)+24px)]">
@@ -321,6 +361,11 @@ export const SessionSearchScreen = ({
               ref={inputRef}
               keyword={keyword}
               isSearching={isSearching}
+              ariaLabel={
+                isFindMode
+                  ? "세션 지원서 검색"
+                  : "세션 모집 공고 검색"
+              }
               onChange={setKeyword}
               onClear={handleClearKeyword}
               onSearch={handleSearchKeyword}
@@ -329,7 +374,7 @@ export const SessionSearchScreen = ({
         </header>
 
         <SessionFilterBar
-          values={values}
+          values={normalizedValues}
           sort={sort}
           onSortChange={setSort}
           showSelectedValues={false}
@@ -337,60 +382,47 @@ export const SessionSearchScreen = ({
         />
 
         <section className="flex flex-col gap-4 px-[22px] pt-4">
-          {mode === "recruitment" ? (
-            recruitmentSearchResultQuery.isLoading ? (
-              <SearchLoadingMessage />
-            ) : recruitmentSearchResultQuery.isError ? (
-              <SearchErrorMessage
-                onRetry={() => recruitmentSearchResultQuery.refetch()}
+          {searchResultQuery.isLoading ? (
+            <div className="flex min-h-[220px] items-center justify-center rounded-[14px] bg-neutral-0 px-6 text-center text-caption1 text-neutral-500 shadow-[0_0_12px_rgba(0,0,0,0.08)]">
+              검색 결과를 불러오고 있어요
+            </div>
+          ) : searchResultQuery.isError ? (
+            <div className="flex min-h-[220px] flex-col items-center justify-center rounded-[14px] bg-neutral-0 px-6 text-center shadow-[0_0_12px_rgba(0,0,0,0.08)]">
+              <p className="text-caption1 text-neutral-500">
+                검색 결과를 불러오지 못했어요
+              </p>
+
+              <button
+                type="button"
+                onClick={() => searchResultQuery.refetch()}
+                className="mt-3 rounded-[8px] bg-secondary-500 px-4 py-2 text-caption2 text-neutral-0"
+              >
+                다시 시도
+              </button>
+            </div>
+          ) : searchedPosts.length > 0 ? (
+            searchedPosts.map((post) => (
+              <RecruitmentPostCard
+                key={post.id}
+                post={post}
+                onToggleBookmark={handleToggleBookmark}
+                onSelect={
+                  onSelectRecruitment
+                    ? () => handleSelectPost(post)
+                    : undefined
+                }
               />
-            ) : searchedPosts.length > 0 ? (
-              searchedPosts.map((post) => (
-                <RecruitmentPostCard
-                  key={post.id}
-                  post={post}
-                  onToggleBookmark={handleToggleBookmark}
-                  onSelect={() => {
-                    onSelectRecruitment?.(post);
-                  }}
-                />
-              ))
-            ) : (
-              <SearchEmptyMessage />
-            )
-          ) : applicationSearchResultQuery.isLoading ? (
-            <SearchLoadingMessage message="세션 뮤지션을 불러오고 있어요" />
-          ) : applicationSearchResultQuery.isError ? (
-            <SearchErrorMessage
-              message="세션 뮤지션을 불러오지 못했어요"
-              onRetry={() => applicationSearchResultQuery.refetch()}
-            />
-          ) : searchedCandidates.length > 0 ? (
-            <>
-              {searchedCandidates.map((candidate) => (
-                <SessionCandidateCard
-                  key={candidate.id}
-                  candidate={candidate}
-                  onSelect={setSelectedApplicationId}
-                />
-              ))}
-
-              <div ref={loadMoreCandidatesRef} className="h-1" />
-
-              {applicationSearchResultQuery.isFetchingNextPage ? (
-                <p className="py-3 text-center text-caption2 text-neutral-500">
-                  세션 뮤지션을 더 불러오는 중이에요
-                </p>
-              ) : null}
-            </>
+            ))
           ) : (
-            <SearchEmptyMessage message="검색 결과가 없어요" />
+            <div className="flex min-h-[220px] items-center justify-center rounded-[14px] bg-neutral-0 px-6 text-center text-caption1 text-neutral-500 shadow-[0_0_12px_rgba(0,0,0,0.08)]">
+              검색 결과가 없어요
+            </div>
           )}
         </section>
 
         {isFilterOpen ? (
           <SessionFilterBottomSheet
-            values={values}
+            values={normalizedValues}
             onApply={onApplyFilters}
             onClose={() => setIsFilterOpen(false)}
           />
@@ -413,6 +445,9 @@ export const SessionSearchScreen = ({
           ref={inputRef}
           keyword={keyword}
           isSearching={isSearching}
+          ariaLabel={
+            isFindMode ? "세션 지원서 검색" : "세션 모집 공고 검색"
+          }
           onChange={setKeyword}
           onClear={handleClearKeyword}
           onSearch={handleSearchKeyword}
@@ -430,18 +465,16 @@ export const SessionSearchScreen = ({
           <p className="mt-4 text-caption2 text-neutral-600">
             최근 검색어를 불러오지 못했어요
           </p>
-        ) : searchHistoryQuery.data && searchHistoryQuery.data.length > 0 ? (
+        ) : recentKeywords.length > 0 ? (
           <div className="mt-3 flex flex-wrap gap-2">
-            {searchHistoryQuery.data.map((recentKeyword) => (
+            {recentKeywords.map((recentKeyword) => (
               <span
-                key={recentKeyword.keywordId}
+                key={`${recentKeyword.keywordId}-${recentKeyword.keyword}`}
                 className="flex h-6 items-center gap-1 rounded-full border border-neutral-300 bg-neutral-0 px-2 text-caption2 text-neutral-600"
               >
                 <button
                   type="button"
-                  onClick={() =>
-                    handleRecentKeywordClick(recentKeyword.keyword)
-                  }
+                  onClick={() => handleRecentKeywordClick(recentKeyword.keyword)}
                 >
                   {recentKeyword.keyword}
                 </button>
@@ -487,13 +520,24 @@ const BackButton = ({ onBack }: BackButtonProps) => {
 interface SearchFieldProps {
   keyword: string;
   isSearching: boolean;
+  ariaLabel: string;
   onChange: (keyword: string) => void;
   onClear: () => void;
   onSearch: () => void;
 }
 
 const SearchField = forwardRef<HTMLInputElement, SearchFieldProps>(
-  ({ keyword, isSearching, onChange, onClear, onSearch }, ref) => {
+  (
+    {
+      keyword,
+      isSearching,
+      ariaLabel,
+      onChange,
+      onClear,
+      onSearch,
+    },
+    ref,
+  ) => {
     return (
       <div
         className={[
@@ -516,7 +560,7 @@ const SearchField = forwardRef<HTMLInputElement, SearchFieldProps>(
           type="text"
           role="searchbox"
           inputMode="search"
-          aria-label="파트, 장르, 지역 검색"
+          aria-label={ariaLabel}
           value={keyword}
           onChange={(event) => onChange(event.target.value)}
           onKeyDown={(event) => {
@@ -552,12 +596,7 @@ SearchField.displayName = "SearchField";
 
 const SearchLensIcon = ({ className }: { className?: string }) => {
   return (
-    <svg
-      className={className}
-      viewBox="0 0 20 20"
-      fill="none"
-      aria-hidden="true"
-    >
+    <svg className={className} viewBox="0 0 20 20" fill="none" aria-hidden="true">
       <circle cx="9" cy="9" r="6" stroke="currentColor" strokeWidth="1.8" />
       <path
         d="m13.5 13.5 3 3"
@@ -566,51 +605,5 @@ const SearchLensIcon = ({ className }: { className?: string }) => {
         strokeLinecap="round"
       />
     </svg>
-  );
-};
-
-const SearchLoadingMessage = ({
-  message = "검색 결과를 불러오고 있어요",
-}: {
-  message?: string;
-}) => {
-  return (
-    <div className="flex min-h-[220px] items-center justify-center rounded-[14px] bg-neutral-0 px-6 text-center text-caption1 text-neutral-500 shadow-[0_0_12px_rgba(0,0,0,0.08)]">
-      {message}
-    </div>
-  );
-};
-
-const SearchErrorMessage = ({
-  message = "검색 결과를 불러오지 못했어요",
-  onRetry,
-}: {
-  message?: string;
-  onRetry: () => void;
-}) => {
-  return (
-    <div className="flex min-h-[220px] flex-col items-center justify-center rounded-[14px] bg-neutral-0 px-6 text-center shadow-[0_0_12px_rgba(0,0,0,0.08)]">
-      <p className="text-caption1 text-neutral-500">{message}</p>
-
-      <button
-        type="button"
-        onClick={onRetry}
-        className="mt-3 rounded-[8px] bg-secondary-500 px-4 py-2 text-caption2 text-neutral-0"
-      >
-        다시 시도
-      </button>
-    </div>
-  );
-};
-
-const SearchEmptyMessage = ({
-  message = "검색 결과가 없어요",
-}: {
-  message?: string;
-}) => {
-  return (
-    <div className="flex min-h-[220px] items-center justify-center rounded-[14px] bg-neutral-0 px-6 text-center text-caption1 text-neutral-500 shadow-[0_0_12px_rgba(0,0,0,0.08)]">
-      {message}
-    </div>
   );
 };

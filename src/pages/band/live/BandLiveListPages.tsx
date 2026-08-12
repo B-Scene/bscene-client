@@ -48,12 +48,6 @@ interface BandLiveScheduledListPageProps extends BandLiveListPageProps {
 }
 
 type LiveWithImageFields = {
-  thumbnailUrl?: string | null;
-  thumbnailImage?: string | null;
-  thumbnailImageUrl?: string | null;
-  liveThumbnailUrl?: string | null;
-  liveThumbnailImageUrl?: string | null;
-  imageUrl?: string | null;
   bandProfileImageUrl?: string | null;
 };
 
@@ -80,14 +74,6 @@ type LiveListItemWithFields = LiveWithImageFields &
     coHosts?: { userId?: number | null }[];
     coHostList?: { userId?: number | null }[];
   };
-
-type ReservationThumbnailResponse = {
-  thumbnailImageUrl?: string | null;
-  thumbnailUrl?: string | null;
-  liveThumbnailImageUrl?: string | null;
-  liveThumbnailUrl?: string | null;
-  imageUrl?: string | null;
-};
 
 type RelationState = "same" | "different" | "unknown";
 
@@ -150,54 +136,10 @@ const getFirstImageUrl = (...urls: Array<string | null | undefined>) => {
   return null;
 };
 
-const getThumbnailImageUrl = (
+const getBandProfileImageUrl = (
   ...lives: Array<LiveWithImageFields | null | undefined>
 ) => {
-  return getFirstImageUrl(
-    ...lives.flatMap((live) =>
-      live
-        ? [
-            live.thumbnailImageUrl,
-            live.thumbnailUrl,
-            live.liveThumbnailImageUrl,
-            live.liveThumbnailUrl,
-            live.thumbnailImage,
-            live.imageUrl,
-          ]
-        : [],
-    ),
-  );
-};
-
-const getLiveCardImageUrl = (
-  ...lives: Array<LiveWithImageFields | null | undefined>
-) => {
-  return (
-    getThumbnailImageUrl(...lives) ??
-    getFirstImageUrl(...lives.map((live) => live?.bandProfileImageUrl))
-  );
-};
-
-const getScheduledCardImageUrl = (
-  ...lives: Array<LiveWithImageFields | null | undefined>
-) => {
-  return getThumbnailImageUrl(...lives);
-};
-
-const getReservationThumbnailUrl = (
-  reservation: ReservationThumbnailResponse | null | undefined,
-) => {
-  if (!reservation) {
-    return null;
-  }
-
-  return getFirstImageUrl(
-    reservation.thumbnailImageUrl,
-    reservation.thumbnailUrl,
-    reservation.liveThumbnailImageUrl,
-    reservation.liveThumbnailUrl,
-    reservation.imageUrl,
-  );
+  return getFirstImageUrl(...lives.map((live) => live?.bandProfileImageUrl));
 };
 
 const hasBandRelationField = (live: LiveBandRelationFields) => {
@@ -314,7 +256,7 @@ export function BandLiveNowListPage({
             listeners: `${
               typedLive.viewerCount ?? typedLive.viewCount ?? 0
             }명 청취 중`,
-            imageUrl: getLiveCardImageUrl(typedLive),
+            imageUrl: getBandProfileImageUrl(typedLive),
             isMine: typedLive.isMine,
             relationState: getBandRelationState(typedLive, activeBandId),
           };
@@ -563,7 +505,7 @@ export function BandLiveScheduledListPage({
             title: typedLive.title,
             scheduledAt: previewLive?.scheduledAt ?? typedLive.scheduledAt ?? "",
             isMine: Boolean(typedLive.isMine ?? previewLive?.isMine),
-            imageUrl: getScheduledCardImageUrl(typedLive, previewLive),
+            imageUrl: getBandProfileImageUrl(typedLive, previewLive),
             coHostUserIds: (
               typedLive.coHosts ??
               typedLive.coHostList ??
@@ -601,33 +543,19 @@ export function BandLiveScheduledListPage({
   const displayScheduledCards = useMemo<ScheduledLiveCardData[]>(() => {
     return scheduledCandidates.flatMap((live, index) => {
       const reservationQuery = scheduledReservationQueries[index];
-      const reservationData = reservationQuery?.data;
       const isReservationChecking =
         reservationQuery?.isLoading || reservationQuery?.isFetching;
-      const reservationThumbnailUrl = getReservationThumbnailUrl(
-        reservationData,
-      );
 
       if (live.relationState === "same") {
-        return [
-          {
-            ...live,
-            imageUrl: reservationThumbnailUrl ?? live.imageUrl,
-          },
-        ];
+        return [live];
       }
 
       if (isReservationChecking) {
         return [];
       }
 
-      if (reservationData) {
-        return [
-          {
-            ...live,
-            imageUrl: reservationThumbnailUrl ?? live.imageUrl,
-          },
-        ];
+      if (reservationQuery?.data) {
+        return [live];
       }
 
       return [];

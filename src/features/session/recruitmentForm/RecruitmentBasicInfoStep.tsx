@@ -47,6 +47,7 @@ export const RecruitmentBasicInfoStep = ({
         <RecruitmentFieldLabel htmlFor="session-recruitment-title" required>
           공고 제목
         </RecruitmentFieldLabel>
+
         <RecruitmentTextInput
           id="session-recruitment-title"
           value={values.title}
@@ -55,6 +56,7 @@ export const RecruitmentBasicInfoStep = ({
           error={Boolean(errors.title)}
           onChange={onFieldChange("title")}
         />
+
         {errors.title ? (
           <RecruitmentErrorMessage>{errors.title}</RecruitmentErrorMessage>
         ) : null}
@@ -63,6 +65,7 @@ export const RecruitmentBasicInfoStep = ({
           <RecruitmentFieldLabel htmlFor="session-recruitment-summary" required>
             공고 한줄 소개
           </RecruitmentFieldLabel>
+
           <RecruitmentTextInput
             id="session-recruitment-summary"
             value={values.summary}
@@ -71,6 +74,7 @@ export const RecruitmentBasicInfoStep = ({
             error={Boolean(errors.summary)}
             onChange={onFieldChange("summary")}
           />
+
           {errors.summary ? (
             <RecruitmentErrorMessage>{errors.summary}</RecruitmentErrorMessage>
           ) : null}
@@ -80,6 +84,7 @@ export const RecruitmentBasicInfoStep = ({
           <RecruitmentFieldLabel htmlFor="session-recruitment-detail" required>
             공고 상세 소개
           </RecruitmentFieldLabel>
+
           <div className="relative">
             <textarea
               id="session-recruitment-detail"
@@ -94,10 +99,12 @@ export const RecruitmentBasicInfoStep = ({
                   : "border-neutral-400 focus:border-secondary-500",
               )}
             />
+
             <span className="absolute right-[13px] bottom-2 text-caption4 text-neutral-500">
               {values.detail.length}/500
             </span>
           </div>
+
           {errors.detail ? (
             <RecruitmentErrorMessage>{errors.detail}</RecruitmentErrorMessage>
           ) : null}
@@ -105,6 +112,7 @@ export const RecruitmentBasicInfoStep = ({
 
         <div className="mt-3">
           <RecruitmentFieldLabel required>모집 파트</RecruitmentFieldLabel>
+
           <div className="mt-2 flex flex-wrap gap-2">
             {RECRUITMENT_PART_OPTIONS.map((part) => (
               <RecruitmentOptionChip
@@ -112,10 +120,11 @@ export const RecruitmentBasicInfoStep = ({
                 selected={values.part === part}
                 onClick={() => onPartClick(part)}
               >
-                {part === "etc" ? "etc." : part}
+                {part}
               </RecruitmentOptionChip>
             ))}
           </div>
+
           {errors.part ? (
             <RecruitmentErrorMessage>{errors.part}</RecruitmentErrorMessage>
           ) : null}
@@ -123,6 +132,7 @@ export const RecruitmentBasicInfoStep = ({
 
         <div className="mt-3">
           <RecruitmentFieldLabel required>실력대</RecruitmentFieldLabel>
+
           <div className="mt-2 flex gap-2">
             {RECRUITMENT_SKILL_OPTIONS.map((skill) => (
               <RecruitmentOptionChip
@@ -138,12 +148,14 @@ export const RecruitmentBasicInfoStep = ({
 
         <div className="mt-3">
           <RecruitmentFieldLabel required>장르</RecruitmentFieldLabel>
+
           <RecruitmentSelectButton
-            value={values.genre === "etc" ? "etc." : values.genre}
+            value={values.genre}
             placeholder="장르 선택"
             error={Boolean(errors.genre)}
             onClick={onOpenGenreSelect}
           />
+
           {errors.genre ? (
             <RecruitmentErrorMessage>{errors.genre}</RecruitmentErrorMessage>
           ) : null}

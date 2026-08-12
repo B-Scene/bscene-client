@@ -1,5 +1,6 @@
 import { useState, type ChangeEvent } from "react";
 import type { AxiosError } from "axios";
+
 import Modal from "@/components/Modal/Modal";
 import { ModalOverlay } from "@/components/common/Modal/ModalOverlay";
 import {
@@ -48,6 +49,36 @@ interface SessionRecruitmentFormScreenProps {
   onSaved?: () => void;
 }
 
+const normalizeRecruitmentEnumValue = (value: string) => {
+  const trimmedValue = value.trim();
+
+  if (trimmedValue.toLowerCase() === "etc.") {
+    return "etc";
+  }
+
+  return trimmedValue;
+};
+
+const normalizeBasicValues = (
+  values: BasicFormValues,
+): BasicFormValues => {
+  return {
+    ...values,
+    part: normalizeRecruitmentEnumValue(values.part),
+    skill: normalizeRecruitmentEnumValue(values.skill),
+    genre: normalizeRecruitmentEnumValue(values.genre),
+  };
+};
+
+const normalizeDetailValues = (
+  values: DetailFormValues,
+): DetailFormValues => {
+  return {
+    ...values,
+    region: normalizeRecruitmentEnumValue(values.region),
+  };
+};
+
 export const SessionRecruitmentFormScreen = ({
   onBack,
   onClose,
@@ -59,8 +90,12 @@ export const SessionRecruitmentFormScreen = ({
     return (
       <SessionRecruitmentFormBody
         mode="create"
-        initialBasicValues={DEFAULT_RECRUITMENT_BASIC_VALUES}
-        initialDetailValues={DEFAULT_RECRUITMENT_DETAIL_VALUES}
+        initialBasicValues={normalizeBasicValues(
+          DEFAULT_RECRUITMENT_BASIC_VALUES,
+        )}
+        initialDetailValues={normalizeDetailValues(
+          DEFAULT_RECRUITMENT_DETAIL_VALUES,
+        )}
         onBack={onBack}
         onClose={onClose}
         onViewCreatedPost={onViewCreatedPost}
@@ -99,6 +134,7 @@ const SessionRecruitmentEditLoader = ({
         <p className="text-caption1 text-neutral-500">
           모집 공고 정보를 불러오지 못했어요
         </p>
+
         <button
           type="button"
           onClick={onBack}
@@ -127,22 +163,22 @@ const SessionRecruitmentEditLoader = ({
     <SessionRecruitmentFormBody
       mode="edit"
       sessionRecruitmentId={sessionRecruitmentId}
-      initialBasicValues={{
+      initialBasicValues={normalizeBasicValues({
         title: detail.recruitmentTitle,
         summary: detail.summary,
         detail: detail.content,
         part: detail.part,
         skill: detail.skillLevel,
         genre: detail.genre,
-      }}
-      initialDetailValues={{
+      })}
+      initialDetailValues={normalizeDetailValues({
         region: detail.region,
         practiceSchedule: detail.practiceSchedule,
         practiceLocation: detail.practicePlace,
         deadlineDate: deadline.deadlineDate,
         deadlineTime: deadline.deadlineTime,
         qualification: detail.qualification,
-      }}
+      })}
       onBack={onBack}
       onClose={onClose}
       onSaved={onSaved}
@@ -174,6 +210,7 @@ const SessionRecruitmentFormBody = ({
   const createRecruitmentMutation = useCreateSessionRecruitment();
   const updateRecruitmentMutation = useUpdateSessionRecruitment();
   const activeBandMemberId = useActiveBandMemberId();
+
   const [currentStep, setCurrentStep] = useState<FormStep>(1);
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [isCompleteScreenOpen, setIsCompleteScreenOpen] = useState(false);
@@ -183,11 +220,13 @@ const SessionRecruitmentFormBody = ({
     useState<CreateSessionRecruitmentResponse | null>(null);
   const [submitErrorMessage, setSubmitErrorMessage] = useState("");
 
-  const [basicValues, setBasicValues] =
-    useState<BasicFormValues>(initialBasicValues);
+  const [basicValues, setBasicValues] = useState<BasicFormValues>(() =>
+    normalizeBasicValues(initialBasicValues),
+  );
 
-  const [detailValues, setDetailValues] =
-    useState<DetailFormValues>(initialDetailValues);
+  const [detailValues, setDetailValues] = useState<DetailFormValues>(() =>
+    normalizeDetailValues(initialDetailValues),
+  );
 
   const [errors, setErrors] = useState<FormErrors>({});
 
@@ -243,21 +282,24 @@ const SessionRecruitmentFormBody = ({
   const handlePartClick = (part: string) => {
     setBasicValues((currentValues) => ({
       ...currentValues,
-      part,
+      part: normalizeRecruitmentEnumValue(part),
     }));
     setErrors((currentErrors) => ({ ...currentErrors, part: undefined }));
     setSubmitErrorMessage("");
   };
 
   const handleSkillClick = (skill: string) => {
-    setBasicValues((currentValues) => ({ ...currentValues, skill }));
+    setBasicValues((currentValues) => ({
+      ...currentValues,
+      skill: normalizeRecruitmentEnumValue(skill),
+    }));
     setSubmitErrorMessage("");
   };
 
   const handleGenreSelect = (genre: string) => {
     setBasicValues((currentValues) => ({
       ...currentValues,
-      genre,
+      genre: normalizeRecruitmentEnumValue(genre),
     }));
     setErrors((currentErrors) => ({ ...currentErrors, genre: undefined }));
     setSubmitErrorMessage("");
@@ -267,7 +309,7 @@ const SessionRecruitmentFormBody = ({
   const handleRegionSelect = (region: string) => {
     setDetailValues((currentValues) => ({
       ...currentValues,
-      region,
+      region: normalizeRecruitmentEnumValue(region),
     }));
     setErrors((currentErrors) => ({ ...currentErrors, region: undefined }));
     setSubmitErrorMessage("");
@@ -381,6 +423,11 @@ const SessionRecruitmentFormBody = ({
 
     setSubmitErrorMessage("");
 
+    const normalizedPart = normalizeRecruitmentEnumValue(basicValues.part);
+    const normalizedSkill = normalizeRecruitmentEnumValue(basicValues.skill);
+    const normalizedGenre = normalizeRecruitmentEnumValue(basicValues.genre);
+    const normalizedRegion = normalizeRecruitmentEnumValue(detailValues.region);
+
     if (mode === "edit") {
       if (!sessionRecruitmentId) return;
 
@@ -388,10 +435,10 @@ const SessionRecruitmentFormBody = ({
         recruitmentTitle: basicValues.title.trim(),
         summary: basicValues.summary.trim(),
         content: basicValues.detail.trim(),
-        part: basicValues.part,
-        skillLevel: basicValues.skill,
-        genre: basicValues.genre,
-        region: detailValues.region,
+        part: normalizedPart,
+        skillLevel: normalizedSkill,
+        genre: normalizedGenre,
+        region: normalizedRegion,
         practiceSchedule: detailValues.practiceSchedule.trim(),
         practicePlace: detailValues.practiceLocation.trim(),
         deadlineAt: toRecruitmentDeadlineAt(
@@ -433,10 +480,10 @@ const SessionRecruitmentFormBody = ({
       recruitmentTitle: basicValues.title.trim(),
       summary: basicValues.summary.trim(),
       content: basicValues.detail.trim(),
-      part: basicValues.part,
-      skillLevel: basicValues.skill,
-      genre: basicValues.genre,
-      region: detailValues.region,
+      part: normalizedPart,
+      skillLevel: normalizedSkill,
+      genre: normalizedGenre,
+      region: normalizedRegion,
       practiceSchedule: detailValues.practiceSchedule.trim(),
       practicePlace: detailValues.practiceLocation.trim(),
       deadlineAt: toRecruitmentDeadlineAt(
@@ -495,12 +542,21 @@ const SessionRecruitmentFormBody = ({
   const deadlineSummary = splitRecruitmentDeadlineAt(
     createdRecruitment?.deadlineAt,
   );
+
   const completionSummary = {
     title: createdRecruitment?.recruitmentTitle ?? basicValues.title.trim(),
-    part: createdRecruitment?.part ?? basicValues.part,
-    skill: createdRecruitment?.skillLevel ?? basicValues.skill,
-    genre: createdRecruitment?.genre ?? basicValues.genre,
-    region: createdRecruitment?.region ?? detailValues.region,
+    part: normalizeRecruitmentEnumValue(
+      createdRecruitment?.part ?? basicValues.part,
+    ),
+    skill: normalizeRecruitmentEnumValue(
+      createdRecruitment?.skillLevel ?? basicValues.skill,
+    ),
+    genre: normalizeRecruitmentEnumValue(
+      createdRecruitment?.genre ?? basicValues.genre,
+    ),
+    region: normalizeRecruitmentEnumValue(
+      createdRecruitment?.region ?? detailValues.region,
+    ),
     deadlineDate: deadlineSummary.deadlineDate || detailValues.deadlineDate,
     deadlineTime: deadlineSummary.deadlineTime || detailValues.deadlineTime,
   };
@@ -527,6 +583,7 @@ const SessionRecruitmentFormBody = ({
         onBack={handleBack}
         onClose={onClose}
       />
+
       <RecruitmentStepIndicator currentStep={currentStep} />
 
       {currentStep === 1 ? (
