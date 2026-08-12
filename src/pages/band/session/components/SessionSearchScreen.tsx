@@ -95,6 +95,7 @@ const mapRecruitmentToPost = (
     bandName: recruitment.bandName,
     genre: normalizeSessionEnumValue(recruitment.bandGenre),
     location: normalizeSessionEnumValue(recruitment.bandRegion),
+    postedAgo: recruitment.postedAgo,
     description: recruitment.summary,
     tags: [recruitment.part, recruitment.skillLevel]
       .filter(Boolean)

@@ -9,11 +9,25 @@ interface RecruitmentPostCardProps {
   onSelect?: (postId: number) => void;
 }
 
+const getPostedAgoLabel = (postedAgo?: number) => {
+  if (typeof postedAgo !== "number" || !Number.isFinite(postedAgo)) {
+    return "";
+  }
+
+  if (postedAgo <= 0) {
+    return "오늘";
+  }
+
+  return `${postedAgo}일 전`;
+};
+
 export const RecruitmentPostCard = ({
   post,
   onToggleBookmark,
   onSelect,
 }: RecruitmentPostCardProps) => {
+  const postedAgoLabel = getPostedAgoLabel(post.postedAgo);
+
   const handleBookmarkClick = (event: MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
     onToggleBookmark(post.id);
@@ -57,11 +71,22 @@ export const RecruitmentPostCard = ({
 
       <h2 className="mt-3.5 text-label1 text-neutral-900">{post.title}</h2>
 
-      <p className="mt-1 text-caption3 text-neutral-600">
-        {post.bandName} · {post.genre} · {post.location}
-      </p>
+      <div className="mt-1 flex min-w-0 items-center gap-2 text-caption3 text-neutral-600">
+        <p className="min-w-0 truncate">
+          {post.bandName} · {post.genre} · {post.location}
+        </p>
 
-      <p className="mt-2 max-w-[300px] text-caption2 text-neutral-800">
+        {postedAgoLabel ? (
+          <>
+            <span className="h-4 w-px shrink-0 bg-neutral-300" />
+            <span className="shrink-0 text-secondary-500">
+              {postedAgoLabel}
+            </span>
+          </>
+        ) : null}
+      </div>
+
+      <p className="mt-2 max-w-[300px] text-caption2 leading-[22px] text-neutral-800">
         {post.description}
       </p>
 
