@@ -66,6 +66,17 @@ type LiveThumbnailFieldAliases = {
   liveThumbnailUrl?: string | null;
   imageUrl?: string | null;
   bandProfileImageUrl?: string | null;
+  profileImageUrl?: string | null;
+  bandImageUrl?: string | null;
+  bandProfileUrl?: string | null;
+  bandLogoUrl?: string | null;
+  band?: {
+    bandProfileImageUrl?: string | null;
+    profileImageUrl?: string | null;
+    bandImageUrl?: string | null;
+    bandProfileUrl?: string | null;
+    imageUrl?: string | null;
+  } | null;
 };
 
 const normalizeToken = (value: string) => {
@@ -356,14 +367,32 @@ const getThumbnailImageUrl = (value: LiveThumbnailFieldAliases) => {
   );
 };
 
+const getBandProfileImageUrl = (value: LiveThumbnailFieldAliases) => {
+  return getFirstNonEmptyString(
+    value.bandProfileImageUrl,
+    value.profileImageUrl,
+    value.bandImageUrl,
+    value.bandProfileUrl,
+    value.bandLogoUrl,
+    value.band?.bandProfileImageUrl,
+    value.band?.profileImageUrl,
+    value.band?.bandImageUrl,
+    value.band?.bandProfileUrl,
+    value.band?.imageUrl,
+  );
+};
+
 const normalizeLiveThumbnailFields = <T extends LiveThumbnailFieldAliases>(
   value: T,
 ): T => {
   const thumbnailImageUrl = getThumbnailImageUrl(value);
+  const bandProfileImageUrl = getBandProfileImageUrl(value);
 
   return {
     ...value,
     thumbnailImageUrl: thumbnailImageUrl ?? value.thumbnailImageUrl ?? null,
+    bandProfileImageUrl:
+      bandProfileImageUrl ?? value.bandProfileImageUrl ?? null,
   };
 };
 

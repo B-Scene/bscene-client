@@ -9,6 +9,7 @@ import {
   useEnterLiveMutation,
   useLiveHomeQuery,
   useReplayListQuery,
+  useScheduledLiveQuery,
   useToggleLiveAlarmMutation,
 } from "@/hooks/api/live/useLive";
 import type { LiveApiResponse } from "@/types/live/live";
@@ -35,6 +36,7 @@ export function FanLiveHomePage() {
   const navigate = useNavigate();
   const { data, isLoading, isError, refetch } = useLiveHomeQuery();
   const { data: replayListData } = useReplayListQuery("all", "LATEST");
+  const { data: scheduledListData } = useScheduledLiveQuery(true);
   const enterLiveMutation = useEnterLiveMutation();
   const toggleAlarmMutation = useToggleLiveAlarmMutation();
   const [notificationOverrides, setNotificationOverrides] = useState<
@@ -50,6 +52,13 @@ export function FanLiveHomePage() {
       ),
     );
   }, [replayListData]);
+  const scheduledBandProfileImages = useMemo(() => {
+    return new Map(
+      (scheduledListData?.pages.flatMap((page) => page.items) ?? []).map(
+        (live) => [live.liveId, live.bandProfileImageUrl],
+      ),
+    );
+  }, [scheduledListData]);
 
   const toggleNotification = async (liveId: number) => {
     if (toggleAlarmMutation.isPending) return;
@@ -189,7 +198,11 @@ export function FanLiveHomePage() {
                   return (
                     <BandLiveCard
                       key={live.liveId}
-                      imageSrc={BandImage}
+                      imageSrc={
+                        live.bandProfileImageUrl ||
+                        scheduledBandProfileImages.get(live.liveId) ||
+                        BandImage
+                      }
                       imageAlt={`${live.bandName} 예정 라이브 이미지`}
                       title={live.title}
                       bandName={live.bandName}
