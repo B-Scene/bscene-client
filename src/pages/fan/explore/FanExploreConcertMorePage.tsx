@@ -4,10 +4,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import TimesCircleIcon from "@/assets/icons/ic_Times Circle.svg";
 import ConcertCard from "@/components/common/Card/ConcertCard";
 import { Header } from "@/components/common/Header/Header";
-import {
-  useFanExplorePerformanceSearchQuery,
-  useFanExploreSearchQuery,
-} from "@/hooks/api/fan/useFanExplore";
+import { useFanExplorePerformanceSearchQuery } from "@/hooks/api/fan/useFanExplore";
 import { useInfiniteScrollObserver } from "@/hooks/useInfiniteScrollObserver";
 import {
   ExploreFilterBar,
@@ -130,25 +127,6 @@ const formatDday = (date: Date | null, status?: string | null) => {
 const getPerformanceId = (performance: FanExplorePerformance) =>
   performance.performanceId ?? performance.concertId ?? performance.id;
 
-const mergePerformances = (
-  primaryPerformances: FanExplorePerformance[],
-  fallbackPerformances: FanExplorePerformance[],
-) => {
-  const seenIds = new Set<string>();
-
-  return [...primaryPerformances, ...fallbackPerformances].filter(
-    (performance, index) => {
-      const key = String(
-        getPerformanceId(performance) ?? `${performance.title ?? ""}-${index}`,
-      );
-
-      if (seenIds.has(key)) return false;
-      seenIds.add(key);
-      return true;
-    },
-  );
-};
-
 const ConcertMoreTopBar = ({ initialKeyword }: { initialKeyword: string }) => {
   const navigate = useNavigate();
   const [keyword, setKeyword] = useState(initialKeyword);
@@ -221,13 +199,6 @@ const FanExploreConcertMorePage = () => {
     region: getRegionFilterParam(appliedFilters.region),
     size: 30,
   });
-  const allSearchQuery = useFanExploreSearchQuery({
-    keyword,
-    type: "ALL",
-    sort,
-    genre: getGenreFilterParam(appliedFilters.genre),
-    region: getRegionFilterParam(appliedFilters.region),
-  });
   const {
     data,
     fetchNextPage,
@@ -240,19 +211,14 @@ const FanExploreConcertMorePage = () => {
     () => data?.pages.flatMap((page) => page.items) ?? [],
     [data],
   );
-  const concerts = useMemo(
-    () => mergePerformances(pagedConcerts, allSearchQuery.data?.performances ?? []),
-    [allSearchQuery.data?.performances, pagedConcerts],
-  );
+  const concerts = pagedConcerts;
   const totalCount = concerts.length;
   const sentinelRef = useInfiniteScrollObserver({
     enabled: Boolean(hasNextPage) && !isFetchingNextPage,
     onIntersect: fetchNextPage,
   });
-  const isInitialLoading =
-    isLoading && allSearchQuery.isLoading && concerts.length === 0;
-  const isPerformanceError =
-    isError && allSearchQuery.isError && concerts.length === 0;
+  const isInitialLoading = isLoading && concerts.length === 0;
+  const isPerformanceError = isError && concerts.length === 0;
 
   const applySort = (nextSortOption: SearchResultSortOption) => {
     const nextSort = SEARCH_SORT_TO_API[nextSortOption];
@@ -316,7 +282,6 @@ const FanExploreConcertMorePage = () => {
               type="button"
               onClick={() => {
                 void performancesQuery.refetch();
-                void allSearchQuery.refetch();
               }}
               className="font-body text-caption2 text-primary-400"
             >

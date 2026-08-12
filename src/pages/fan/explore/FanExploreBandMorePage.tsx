@@ -10,7 +10,6 @@ import { Toast } from "@/components/common/Toast/Toast";
 import Modal from "@/components/Modal/Modal";
 import {
   useFanExploreBandSearchQuery,
-  useFanExploreSearchQuery,
   useFollowExploreBand,
   useUnfollowExploreBand,
 } from "@/hooks/api/fan/useFanExplore";
@@ -71,24 +70,6 @@ const getBandId = (band: FanExploreBand) => {
     : typeof bandInfo.id === "number"
       ? bandInfo.id
       : null;
-};
-
-const mergeBands = (
-  primaryBands: FanExploreBand[],
-  fallbackBands: FanExploreBand[],
-) => {
-  const seenIds = new Set<string>();
-
-  return [...primaryBands, ...fallbackBands].filter((band, index) => {
-    const bandInfo = getBandInfo(band);
-    const key = String(
-      getBandId(band) ?? `${bandInfo.name ?? bandInfo.bandName ?? ""}-${index}`,
-    );
-
-    if (seenIds.has(key)) return false;
-    seenIds.add(key);
-    return true;
-  });
 };
 
 const BandMoreTopBar = ({ initialKeyword }: { initialKeyword: string }) => {
@@ -161,13 +142,6 @@ const FanExploreBandMorePage = () => {
     region: getRegionFilterParam(appliedFilters.region),
     size: 30,
   });
-  const allSearchQuery = useFanExploreSearchQuery({
-    keyword,
-    type: "ALL",
-    sort,
-    genre: getGenreFilterParam(appliedFilters.genre),
-    region: getRegionFilterParam(appliedFilters.region),
-  });
   const {
     data,
     fetchNextPage,
@@ -180,10 +154,7 @@ const FanExploreBandMorePage = () => {
     () => data?.pages.flatMap((page) => page.items) ?? [],
     [data],
   );
-  const bands = useMemo(
-    () => mergeBands(pagedBands, allSearchQuery.data?.bands ?? []),
-    [allSearchQuery.data?.bands, pagedBands],
-  );
+  const bands = pagedBands;
   const totalCount = bands.length;
   const [unfollowTargetBandId, setUnfollowTargetBandId] = useState<number | null>(
     null,
@@ -198,9 +169,8 @@ const FanExploreBandMorePage = () => {
     enabled: Boolean(hasNextPage) && !isFetchingNextPage,
     onIntersect: fetchNextPage,
   });
-  const isInitialLoading =
-    isLoading && allSearchQuery.isLoading && bands.length === 0;
-  const isBandError = isError && allSearchQuery.isError && bands.length === 0;
+  const isInitialLoading = isLoading && bands.length === 0;
+  const isBandError = isError && bands.length === 0;
 
   useEffect(() => {
     if (!toastMessage) return;
@@ -314,7 +284,6 @@ const FanExploreBandMorePage = () => {
               type="button"
               onClick={() => {
                 void bandsQuery.refetch();
-                void allSearchQuery.refetch();
               }}
               className="font-body text-caption2 text-primary-400"
             >
