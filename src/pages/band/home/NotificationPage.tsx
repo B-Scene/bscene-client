@@ -17,12 +17,14 @@ import {
 } from "@/hooks/api/band/useBandMember";
 import { useActiveBandMemberProfileQuery } from "@/hooks/api/band/useBandMemberProfile";
 import { useFinalizeApplicationSubmissionMutation } from "@/hooks/api/session/useSessionApplication";
+import { useRespondCoHostInvitationMutation } from "@/hooks/api/live/useLive";
 import { useInfiniteScrollObserver } from "@/hooks/useInfiniteScrollObserver";
 import {
   BAND_NOTIFICATION_ROUTES,
   formatNotificationTime,
+  getCoHostInviteLiveId,
   getNotificationTargetPath,
-  isCoHostInviteNotificationType,
+  isCoHostInviteNotification,
   isNotificationForMode,
   isNotificationWithinRetention,
   isPostRegistrationNotification,
@@ -126,6 +128,7 @@ const NotificationPage = () => {
   const acceptBandInvite = useAcceptBandInviteMutation();
   const rejectBandInvite = useRejectBandInviteMutation();
   const finalizeApplication = useFinalizeApplicationSubmissionMutation();
+  const respondCoHostInvitation = useRespondCoHostInvitationMutation();
   const { data: activeMemberProfile } = useActiveBandMemberProfileQuery();
   const [retentionNow, setRetentionNow] = useState(() => Date.now());
   const allNotifications = useMemo(
@@ -248,7 +251,8 @@ const NotificationPage = () => {
   const isInviteActionPending =
     acceptBandInvite.isPending ||
     rejectBandInvite.isPending ||
-    finalizeApplication.isPending;
+    finalizeApplication.isPending ||
+    respondCoHostInvitation.isPending;
 
   const handleBack = () => {
     const pushBackTarget = consumePushNotificationBackTarget();
@@ -305,6 +309,31 @@ const NotificationPage = () => {
 
     await rejectBandInvite.mutateAsync({ bandId });
     void refetch();
+  };
+
+  const handleRejectCoHostInvite = async (notification: NotificationItem) => {
+    const liveId = getCoHostInviteLiveId(notification);
+
+    if (liveId == null || respondCoHostInvitation.isPending) return;
+
+    if (!notification.isRead) {
+      markNotificationAsRead.mutate(notification.notificationId);
+    }
+
+    try {
+      await respondCoHostInvitation.mutateAsync({
+        liveId,
+        request: { isAccepted: false },
+      });
+      void refetch();
+    } catch (error) {
+      window.alert(
+        getApiErrorMessage(
+          error,
+          "거절 처리에 실패했어요. 잠시 후 다시 시도해주세요.",
+        ),
+      );
+    }
   };
 
   const handleFinalizeSessionApplication = async (
@@ -580,18 +609,15 @@ const NotificationPage = () => {
               );
             }
 
-            const isCoHostInvite = isCoHostInviteNotificationType(
-              notification.type,
-            );
+            const isCoHostInvite = isCoHostInviteNotification(notification);
 
             if (isCoHostInvite) {
               return (
                 <article
                   key={notification.notificationId}
                   className={`flex w-full flex-col gap-3 self-stretch rounded-xl bg-neutral-0 px-4 py-4 shadow-[0_0_8px_0_rgba(0,0,0,0.10)] ${
-                    targetPath ? "cursor-pointer" : ""
-                  } ${notification.isRead ? "opacity-80" : ""}`}
-                  onClick={() => handleNotificationClick(notification)}
+                    notification.isRead ? "opacity-80" : ""
+                  }`}
                 >
                   <div className="flex items-start gap-3">
                     <img
@@ -625,31 +651,29 @@ const NotificationPage = () => {
                     </div>
                   </div>
 
-                  {notification.actionable ? (
+                  {!notification.isRead ? (
                     <div className="flex gap-3">
                       <button
                         type="button"
+                        disabled={isInviteActionPending}
                         onClick={(event) => {
                           event.stopPropagation();
 
-                          if (!notification.isRead) {
-                            markNotificationAsRead.mutate(
-                              notification.notificationId,
-                            );
-                          }
+                          void handleRejectCoHostInvite(notification);
                         }}
-                        className="flex h-7.5 flex-1 items-center justify-center rounded-md border border-secondary-500 bg-neutral-0 text-caption3 text-secondary-500"
+                        className="flex h-7.5 flex-1 items-center justify-center rounded-md border border-secondary-500 bg-neutral-0 text-caption3 text-secondary-500 disabled:opacity-60"
                       >
                         거절
                       </button>
                       <button
                         type="button"
+                        disabled={isInviteActionPending}
                         onClick={(event) => {
                           event.stopPropagation();
 
                           handleNotificationClick(notification);
                         }}
-                        className="flex h-7.5 flex-1 items-center justify-center rounded-md bg-secondary-500 text-caption3 text-neutral-0"
+                        className="flex h-7.5 flex-1 items-center justify-center rounded-md bg-secondary-500 text-caption3 text-neutral-0 disabled:opacity-60"
                       >
                         수락
                       </button>

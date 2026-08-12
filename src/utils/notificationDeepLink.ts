@@ -87,6 +87,18 @@ const isLiveReferenceNotificationType = (type: string) => {
   return type.toUpperCase() === "LIVE";
 };
 
+export const isCoHostInviteNotification = (notification: NotificationItem) => {
+  if (isCoHostInviteNotificationType(notification.type)) return true;
+
+  if (!isLiveReferenceNotificationType(notification.type)) return false;
+
+  const titleAndBody = `${notification.title} ${notification.body}`;
+
+  return (
+    titleAndBody.includes("공동 진행자") && titleAndBody.includes("초대")
+  );
+};
+
 export const isCoHostUpgradeRequestNotification = (
   notification: NotificationItem,
 ) => {
@@ -142,6 +154,19 @@ const getLiveIdFromDeepLink = (deepLink?: string | null) => {
   }
 
   return path.match(/\/lives?\/(\d+)(?=[/?#]|$)/i)?.[1] ?? null;
+};
+
+export const getCoHostInviteLiveId = (
+  notification: NotificationItem,
+): number | null => {
+  const rawLiveId =
+    getLiveIdFromDeepLink(notification.deepLink) ?? notification.referenceId;
+
+  if (rawLiveId == null) return null;
+
+  const liveId = Number(rawLiveId);
+
+  return Number.isFinite(liveId) ? liveId : null;
 };
 
 const getCoHostInvitePath = (liveId: string | number) =>
