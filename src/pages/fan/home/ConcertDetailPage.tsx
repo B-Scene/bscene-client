@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { isAxiosError } from "axios";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
 import Modal from "@/components/Modal/Modal";
@@ -388,6 +389,24 @@ const getDetailTags = (detail?: FanPerformanceDetailResponse) => {
   return detail?.tags?.length ? detail.tags : [getDetailTitle(detail)];
 };
 
+const isNotFoundDetailError = (error: unknown) => {
+  if (!isAxiosError(error)) return false;
+
+  const data = error.response?.data as
+    | { code?: unknown; message?: unknown }
+    | undefined;
+  const code = String(error.code ?? data?.code ?? "");
+  const message = String(error.message ?? data?.message ?? "");
+
+  return (
+    error.response?.status === 404 ||
+    code.includes("404") ||
+    message.includes("찾을 수") ||
+    message.includes("존재하지") ||
+    message.includes("삭제")
+  );
+};
+
 const getPerformanceAlarmEnabled = (
   detail?: FanPerformanceDetailResponse,
 ) => {
@@ -474,6 +493,34 @@ const ConcertDetailPage = () => {
 
     return () => window.clearTimeout(timerId);
   }, [toastMessage]);
+
+  const isDeletedPerformance =
+    !detailQuery.isLoading &&
+    detailQuery.isError &&
+    isNotFoundDetailError(detailQuery.error);
+
+  if (isDeletedPerformance) {
+    return (
+      <main className="min-h-dvh bg-neutral-0">
+        <Header title="" align="betweenCompact" />
+        <section className="flex min-h-[420px] flex-col items-center justify-center px-[25px] text-center">
+          <h1 className="m-0 font-body text-label1 text-neutral-900">
+            공연 정보가 삭제되었어요
+          </h1>
+          <p className="m-0 mt-[8px] font-body text-caption2 text-neutral-600">
+            삭제된 공연 정보는 열 수 없어요
+          </p>
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            className="mt-[20px] flex h-[38px] items-center justify-center rounded-[8px] bg-primary-400 px-[20px] font-body text-body1 text-neutral-0"
+          >
+            돌아가기
+          </button>
+        </section>
+      </main>
+    );
+  }
 
   const handleLikeClick = async () => {
     if (!Number.isFinite(performanceId) || performanceId <= 0) {

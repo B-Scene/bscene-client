@@ -151,6 +151,21 @@ const getCommentMutationErrorMessage = (
   return getApiErrorMessage(error, fallbackMessage);
 };
 
+const isNotFoundDetailError = (error: unknown) => {
+  if (!isAxiosError(error)) return false;
+
+  const code = String(error.code ?? error.response?.data?.code ?? "");
+  const message = String(error.message ?? error.response?.data?.message ?? "");
+
+  return (
+    error.response?.status === 404 ||
+    code.includes("404") ||
+    message.includes("찾을 수") ||
+    message.includes("존재하지") ||
+    message.includes("삭제")
+  );
+};
+
 const ContentDetailHeader = ({ onBack }: { onBack: () => void }) => {
   return <Header title="" onBack={onBack} />;
 };
@@ -304,7 +319,8 @@ const FanContentDetailPage = () => {
   const postId = Number(contentId);
   const validPostId = Number.isFinite(postId) ? postId : undefined;
   const postDetailQuery = useFanExplorePostDetailQuery(validPostId);
-  const commentsQuery = useFanExplorePostCommentsQuery(validPostId, {
+  const postDetail = postDetailQuery.data;
+  const commentsQuery = useFanExplorePostCommentsQuery(postDetail ? validPostId : undefined, {
     size: COMMENT_PAGE_SIZE,
   });
   const likePostMutation = useLikeFanExplorePost();
@@ -312,7 +328,6 @@ const FanContentDetailPage = () => {
   const createCommentMutation = useCreateFanExplorePostComment();
   const updateCommentMutation = useUpdateFanExplorePostComment();
   const deleteCommentMutation = useDeleteFanExplorePostComment();
-  const postDetail = postDetailQuery.data;
   const bandId =
     toNumericId(postDetail?.band?.bandId) ??
     toNumericId(postDetail?.band?.id) ??
@@ -343,22 +358,31 @@ const FanContentDetailPage = () => {
   }
 
   if (postDetailQuery.isError || !postDetail) {
+    const isDeletedContent =
+      postDetailQuery.isError && isNotFoundDetailError(postDetailQuery.error);
+
     return (
       <main className="min-h-dvh bg-neutral-0">
         <ContentDetailHeader onBack={() => navigate(-1)} />
         <section className="flex min-h-[420px] flex-col items-center justify-center px-[25px] text-center">
           <h1 className="m-0 font-body text-label1 text-neutral-900">
-            콘텐츠를 불러오지 못했어요
+            {isDeletedContent
+              ? "콘텐츠가 삭제되었어요"
+              : "콘텐츠를 불러오지 못했어요"}
           </h1>
           <p className="m-0 mt-[8px] font-body text-caption2 text-neutral-600">
-            잠시 후 다시 시도해주세요
+            {isDeletedContent
+              ? "삭제된 콘텐츠는 열 수 없어요"
+              : "잠시 후 다시 시도해주세요"}
           </p>
           <button
             type="button"
-            onClick={() => void postDetailQuery.refetch()}
+            onClick={() =>
+              isDeletedContent ? navigate(-1) : void postDetailQuery.refetch()
+            }
             className="mt-[20px] flex h-[38px] items-center justify-center rounded-[8px] bg-primary-400 px-[20px] font-body text-body1 text-neutral-0"
           >
-            다시 시도
+            {isDeletedContent ? "돌아가기" : "다시 시도"}
           </button>
         </section>
       </main>
