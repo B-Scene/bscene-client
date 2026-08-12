@@ -1,5 +1,7 @@
 import type { ChangeEvent } from "react";
 
+import ArrowDownGrayIcon from "@/assets/icons/band/arrow-down-gray.svg";
+
 import {
   RECRUITMENT_PART_OPTIONS,
   RECRUITMENT_SKILL_OPTIONS,
@@ -14,7 +16,6 @@ import {
   RecruitmentErrorMessage,
   RecruitmentFieldLabel,
   RecruitmentOptionChip,
-  RecruitmentSelectButton,
   RecruitmentTextInput,
 } from "./RecruitmentFormFields";
 
@@ -30,6 +31,33 @@ interface RecruitmentBasicInfoStepProps {
   onOpenGenreSelect: () => void;
   onNext: () => void;
 }
+
+const GenreSelectButton = ({
+  value,
+  placeholder,
+  error = false,
+  onClick,
+}: {
+  value: string;
+  placeholder: string;
+  error?: boolean;
+  onClick: () => void;
+}) => {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={joinClassNames(
+        "flex h-[30px] w-full items-center justify-between rounded-[5px] border bg-neutral-0 px-4 text-caption2",
+        error ? "border-error" : "border-neutral-400",
+        value ? "text-neutral-900" : "text-neutral-500",
+      )}
+    >
+      <span>{value || placeholder}</span>
+      <img src={ArrowDownGrayIcon} alt="" className="h-[7px] w-3" />
+    </button>
+  );
+};
 
 export const RecruitmentBasicInfoStep = ({
   values,
@@ -149,7 +177,7 @@ export const RecruitmentBasicInfoStep = ({
         <div className="mt-3">
           <RecruitmentFieldLabel required>장르</RecruitmentFieldLabel>
 
-          <RecruitmentSelectButton
+          <GenreSelectButton
             value={values.genre}
             placeholder="장르 선택"
             error={Boolean(errors.genre)}
