@@ -196,6 +196,12 @@ export function LiveRoom({
     audioConnected: audioStatus === "connected",
   });
 
+  const hasTopNotice =
+    Boolean(audioErrorMessage) ||
+    Boolean(micInfoMessage) ||
+    ((isListenerPlayback || isBroadcasterMonitorPlayback) &&
+      showListenerPlayButton);
+
   const handleSubmitReport = async (
     request: Omit<ReportLiveUserRequest, "targetUserId" | "chatMessage">,
   ) => {
@@ -220,17 +226,18 @@ export function LiveRoom({
     }
   };
 
-    const handleOpenProfileAction = (chat: ChatMessage) => {
-      if (chat.pending) {
-        return;
-      }
+  const handleOpenProfileAction = (chat: ChatMessage) => {
+    if (chat.pending) {
+      return;
+    }
 
-      setReportTarget({
-        targetUserId: chat.senderId,
-        chatMessage: chat.message,
-      });
-      setIsProfileActionSheetOpen(true);
-    };
+    setReportTarget({
+      targetUserId: chat.senderId,
+      chatMessage: chat.message,
+    });
+    setIsProfileActionSheetOpen(true);
+  };
+
   const handleConfirmBlock = async () => {
     if (!live?.liveId || !selectedUserId || blockLiveUserMutation.isPending) {
       return;
@@ -761,7 +768,11 @@ export function LiveRoom({
       />
 
       {canCloseLive ? (
-        <div className="absolute top-[58px] right-5 z-30 flex max-w-[calc(100%-40px)] flex-col items-end gap-2">
+        <div
+          className={`absolute right-5 z-30 flex max-w-[calc(100%-40px)] flex-col items-end gap-2 transition-[top] duration-200 ${
+            hasTopNotice ? "top-[108px]" : "top-[58px]"
+          }`}
+        >
           <button
             type="button"
             onClick={() => void handleAcceptCoHostUpgrade()}
