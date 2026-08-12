@@ -48,14 +48,82 @@ type KakaoShareApi = {
   sendDefault: (payload: KakaoSharePayload) => void;
 };
 
+type KakaoGlobal = {
+  Share?: KakaoShareApi;
+  Link?: KakaoShareApi;
+  init: (javaScriptKey: string) => void;
+  isInitialized?: () => boolean;
+};
+
 declare global {
   interface Window {
-    Kakao?: {
-      Share?: KakaoShareApi;
-      Link?: KakaoShareApi;
-    };
+    Kakao?: KakaoGlobal;
   }
 }
+
+const KAKAO_SDK_SCRIPT_ID = "kakao-js-sdk";
+const KAKAO_SDK_URL = "https://t1.kakaocdn.net/kakao_js_sdk/2.7.5/kakao.min.js";
+const KAKAO_JAVASCRIPT_KEY = import.meta.env.VITE_KAKAO_JAVASCRIPT_KEY as
+  | string
+  | undefined;
+
+let kakaoSdkPromise: Promise<KakaoGlobal> | null = null;
+
+const loadKakaoSdk = () => {
+  if (window.Kakao) return Promise.resolve(window.Kakao);
+  if (kakaoSdkPromise) return kakaoSdkPromise;
+
+  kakaoSdkPromise = new Promise<KakaoGlobal>((resolve, reject) => {
+    const existingScript = document.getElementById(
+      KAKAO_SDK_SCRIPT_ID,
+    ) as HTMLScriptElement | null;
+
+    const handleLoad = () => {
+      if (window.Kakao) {
+        resolve(window.Kakao);
+        return;
+      }
+
+      reject(new Error("Kakao SDK was not loaded"));
+    };
+    const handleError = () => reject(new Error("Failed to load Kakao SDK"));
+
+    if (existingScript) {
+      existingScript.addEventListener("load", handleLoad, { once: true });
+      existingScript.addEventListener("error", handleError, { once: true });
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.id = KAKAO_SDK_SCRIPT_ID;
+    script.src = KAKAO_SDK_URL;
+    script.async = true;
+    script.addEventListener("load", handleLoad, { once: true });
+    script.addEventListener("error", handleError, { once: true });
+    document.head.appendChild(script);
+  });
+
+  return kakaoSdkPromise;
+};
+
+const getKakaoShareApi = async () => {
+  if (!KAKAO_JAVASCRIPT_KEY) {
+    throw new Error("Missing Kakao JavaScript key");
+  }
+
+  const Kakao = await loadKakaoSdk();
+
+  if (!Kakao.isInitialized?.()) {
+    Kakao.init(KAKAO_JAVASCRIPT_KEY);
+  }
+
+  const kakaoShareApi = Kakao.Share ?? Kakao.Link;
+  if (!kakaoShareApi) {
+    throw new Error("Kakao Share API is unavailable");
+  }
+
+  return kakaoShareApi;
+};
 
 const ImagePlaceholderIcon = () => (
   <svg
@@ -646,43 +714,31 @@ const ConcertDetailPage = () => {
     window.open(detail.ticketLink, "_blank", "noopener,noreferrer");
   };
 
-  const handleKakaoShareClick = () => {
+  const handleKakaoShareClick = async () => {
     const concertLink = getConcertLink();
-    const kakaoShareApi = window.Kakao?.Share ?? window.Kakao?.Link;
 
-    if (kakaoShareApi) {
-      try {
-        kakaoShareApi.sendDefault({
-          objectType: "text",
-          text: title,
-          link: {
-            mobileWebUrl: concertLink,
-            webUrl: concertLink,
-          },
-          buttonTitle: "공연 보러가기",
-        });
-        setIsShareSheetOpen(false);
-        setToastMessage("카카오톡 공유 화면을 열었어요");
-      } catch {
-        setToastMessage("카카오톡 공유를 시작하지 못했어요");
+    try {
+      const kakaoShareApi = await getKakaoShareApi();
+      kakaoShareApi.sendDefault({
+        objectType: "text",
+        text: title,
+        link: {
+          mobileWebUrl: concertLink,
+          webUrl: concertLink,
+        },
+        buttonTitle: "공연 보러가기",
+      });
+      setIsShareSheetOpen(false);
+      setToastMessage("카카오톡 공유 화면을 열었어요");
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("JavaScript key")) {
+        setToastMessage("카카오톡 공유 설정이 필요해요");
+        return;
       }
 
-      return;
-    }
-
-    const shareUrl = `https://sharer.kakao.com/talk/friends/picker/link?url=${encodeURIComponent(
-      concertLink,
-    )}&text=${encodeURIComponent(title)}`;
-    const shareWindow = window.open(shareUrl, "_blank");
-
-    if (!shareWindow) {
       setToastMessage("카카오톡 공유를 시작하지 못했어요");
       return;
     }
-
-    shareWindow.opener = null;
-    setIsShareSheetOpen(false);
-    setToastMessage("카카오톡 공유 화면을 열었어요");
   };
 
   const handleCopyLinkClick = async () => {
