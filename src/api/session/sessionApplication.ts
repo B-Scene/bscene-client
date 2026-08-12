@@ -10,6 +10,7 @@ import type {
   CreateSessionApplicationResponse,
   DeleteSessionApplicationResponse,
   FinalizeApplicationSubmissionRequest,
+  FinalizeApplicationSubmissionResponse,
   MySessionApplicationDetailResponse,
   SessionApiResponse,
   SessionApplicationDetailResponse,

@@ -45,6 +45,7 @@ export const ApplicationHistoryCard = ({
   onViewApplication,
   onCancelApplication,
   onMessage,
+  onFinalizeApplication,
 }: ApplicationHistoryCardProps) => {
   const status = STATUS_STYLE[application.status];
 
