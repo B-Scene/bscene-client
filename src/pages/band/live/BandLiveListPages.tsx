@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo } from "react";
+import { useQueries } from "@tanstack/react-query";
 import type { AxiosError } from "axios";
 import { Header } from "@/components/common/Header/Header";
+import { getLiveMembers, getLiveReservation } from "@/api/live/live";
 import {
   useEnterLiveMutation,
   useLiveHomeQuery,
@@ -8,6 +10,7 @@ import {
   useRespondCoHostInvitationMutation,
   useScheduledLiveQuery,
 } from "@/hooks/api/live/useLive";
+import { useActiveBandId } from "@/hooks/api/user/useMyProfiles";
 import { useInfiniteScrollObserver } from "@/hooks/useInfiniteScrollObserver";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import type { EnterLiveResponse, LiveApiResponse } from "@/types/live/live";
@@ -23,11 +26,8 @@ import {
   ScheduledLiveCard,
 } from "./BandLiveHome";
 import {
-  cacheOwnedScheduledLives,
   cacheScheduledCoHostUserIds,
-  getCachedOwnedScheduledLives,
   removeCachedOwnedScheduledLive,
-  useRetainedScheduledLiveCards,
 } from "./scheduledLiveCache";
 import {
   isScheduledLiveStartable,
@@ -47,6 +47,58 @@ interface BandLiveScheduledListPageProps extends BandLiveListPageProps {
   onEditReservation: (liveId: number) => void;
 }
 
+type LiveWithImageFields = {
+  thumbnailUrl?: string | null;
+  thumbnailImage?: string | null;
+  thumbnailImageUrl?: string | null;
+  liveThumbnailUrl?: string | null;
+  liveThumbnailImageUrl?: string | null;
+  imageUrl?: string | null;
+  bandProfileImageUrl?: string | null;
+};
+
+type LiveBandRelationFields = {
+  bandId?: number | null;
+  myBandId?: number | null;
+  bandProfileId?: number | null;
+  bandMemberProfileId?: number | null;
+  bandCode?: string | null;
+  isMine?: boolean;
+  isMyBand?: boolean;
+  isBandMember?: boolean;
+  isRelatedBand?: boolean;
+};
+
+type LiveListItemWithFields = LiveWithImageFields &
+  LiveBandRelationFields & {
+    liveId: number;
+    bandName: string;
+    title: string;
+    viewerCount?: number;
+    viewCount?: number;
+    scheduledAt?: string;
+    coHosts?: { userId?: number | null }[];
+    coHostList?: { userId?: number | null }[];
+  };
+
+type ReservationThumbnailResponse = {
+  thumbnailImageUrl?: string | null;
+  thumbnailUrl?: string | null;
+  liveThumbnailImageUrl?: string | null;
+  liveThumbnailUrl?: string | null;
+  imageUrl?: string | null;
+};
+
+type RelationState = "same" | "different" | "unknown";
+
+type LiveNowCandidateCard = LiveCard & {
+  relationState: RelationState;
+};
+
+type ScheduledCandidateCard = ScheduledLiveCardData & {
+  relationState: RelationState;
+};
+
 function HeaderBackButton({ onClick }: { onClick: () => void }) {
   return (
     <button
@@ -55,7 +107,7 @@ function HeaderBackButton({ onClick }: { onClick: () => void }) {
       aria-label="뒤로가기"
       className="absolute top-0 left-5 z-20 flex h-[52px] w-10 items-center justify-center"
     >
-      <span className="block h-[18px] w-[18px] rotate-45 border-b-[2.5px] border-l-[2.5px] border-[#1D1A1A]" />
+      <span className="block h-[18px] w-[18px] rotate-45 border-b-[2.5px] border-l-[2.5px] border-neutral-900" />
     </button>
   );
 }
@@ -83,6 +135,124 @@ function ListMessage({
     </div>
   );
 }
+
+const getFirstImageUrl = (...urls: Array<string | null | undefined>) => {
+  for (const url of urls) {
+    if (typeof url !== "string") continue;
+
+    const trimmedUrl = url.trim();
+
+    if (trimmedUrl.length > 0) {
+      return trimmedUrl;
+    }
+  }
+
+  return null;
+};
+
+const getThumbnailImageUrl = (
+  ...lives: Array<LiveWithImageFields | null | undefined>
+) => {
+  return getFirstImageUrl(
+    ...lives.flatMap((live) =>
+      live
+        ? [
+            live.thumbnailImageUrl,
+            live.thumbnailUrl,
+            live.liveThumbnailImageUrl,
+            live.liveThumbnailUrl,
+            live.thumbnailImage,
+            live.imageUrl,
+          ]
+        : [],
+    ),
+  );
+};
+
+const getLiveCardImageUrl = (
+  ...lives: Array<LiveWithImageFields | null | undefined>
+) => {
+  return (
+    getThumbnailImageUrl(...lives) ??
+    getFirstImageUrl(...lives.map((live) => live?.bandProfileImageUrl))
+  );
+};
+
+const getScheduledCardImageUrl = (
+  ...lives: Array<LiveWithImageFields | null | undefined>
+) => {
+  return getThumbnailImageUrl(...lives);
+};
+
+const getReservationThumbnailUrl = (
+  reservation: ReservationThumbnailResponse | null | undefined,
+) => {
+  if (!reservation) {
+    return null;
+  }
+
+  return getFirstImageUrl(
+    reservation.thumbnailImageUrl,
+    reservation.thumbnailUrl,
+    reservation.liveThumbnailImageUrl,
+    reservation.liveThumbnailUrl,
+    reservation.imageUrl,
+  );
+};
+
+const hasBandRelationField = (live: LiveBandRelationFields) => {
+  return (
+    live.isMine !== undefined ||
+    live.isMyBand !== undefined ||
+    live.isBandMember !== undefined ||
+    live.isRelatedBand !== undefined ||
+    live.bandId !== undefined ||
+    live.myBandId !== undefined ||
+    live.bandProfileId !== undefined ||
+    live.bandMemberProfileId !== undefined ||
+    live.bandCode !== undefined
+  );
+};
+
+const getBandRelationState = (
+  live: LiveBandRelationFields,
+  activeBandId: number | null | undefined,
+): RelationState => {
+  if (live.isMine) {
+    return "same";
+  }
+
+  if (live.isMyBand || live.isBandMember || live.isRelatedBand) {
+    return "same";
+  }
+
+  if (!hasBandRelationField(live)) {
+    return "unknown";
+  }
+
+  if (!activeBandId) {
+    return "unknown";
+  }
+
+  const candidateBandIds = [
+    live.bandId,
+    live.myBandId,
+    live.bandProfileId,
+    live.bandMemberProfileId,
+  ]
+    .map((value) => Number(value))
+    .filter((value) => Number.isFinite(value));
+
+  if (candidateBandIds.length === 0) {
+    return "unknown";
+  }
+
+  return candidateBandIds.some(
+    (candidateBandId) => candidateBandId === Number(activeBandId),
+  )
+    ? "same"
+    : "different";
+};
 
 const getApiErrorBody = (error: unknown) => {
   return (error as AxiosError<LiveApiResponse<null>>).response?.data;
@@ -116,6 +286,8 @@ export function BandLiveNowListPage({
   go,
   onEnterLive,
 }: BandLiveNowListPageProps) {
+  const activeBandId = useActiveBandId();
+
   const {
     data,
     fetchNextPage,
@@ -129,22 +301,76 @@ export function BandLiveNowListPage({
   const enterLiveMutation = useEnterLiveMutation();
   const respondCoHostInvitationMutation = useRespondCoHostInvitationMutation();
 
-  const liveCards = useMemo<LiveCard[]>(
+  const liveNowCandidates = useMemo<LiveNowCandidateCard[]>(
     () =>
       data?.pages.flatMap((page) =>
-        page.items.map((live) => ({
-          id: live.liveId,
-          title: live.isMine ? "내 라이브 진행 중" : live.bandName,
-          subtitle: live.title,
-          listeners: `${
-            live.viewerCount ?? live.viewCount ?? 0
-          }명 청취 중`,
-          imageUrl: live.bandProfileImageUrl ?? live.thumbnailImageUrl ?? null,
-          isMine: live.isMine,
-        })),
+        page.items.map((live) => {
+          const typedLive = live as LiveListItemWithFields;
+
+          return {
+            id: typedLive.liveId,
+            title: typedLive.isMine ? "내 라이브 진행 중" : typedLive.bandName,
+            subtitle: typedLive.title,
+            listeners: `${
+              typedLive.viewerCount ?? typedLive.viewCount ?? 0
+            }명 청취 중`,
+            imageUrl: getLiveCardImageUrl(typedLive),
+            isMine: typedLive.isMine,
+            relationState: getBandRelationState(typedLive, activeBandId),
+          };
+        }),
       ) ?? [],
-    [data],
+    [activeBandId, data],
   );
+
+  const liveNowAccessQueries = useQueries({
+    queries: liveNowCandidates.map((live) => ({
+      queryKey: ["live", "members-access", activeBandId, live.id],
+      queryFn: async () => {
+        try {
+          return await getLiveMembers(live.id);
+        } catch {
+          return null;
+        }
+      },
+      enabled:
+        Boolean(activeBandId) &&
+        Boolean(live.id) &&
+        live.relationState !== "same",
+      staleTime: 0,
+      refetchOnMount: "always" as const,
+      refetchOnWindowFocus: true,
+      retry: false,
+    })),
+  });
+
+  const liveCards = useMemo<LiveCard[]>(() => {
+    return liveNowCandidates.flatMap((live, index) => {
+      const accessQuery = liveNowAccessQueries[index];
+      const isAccessChecking = accessQuery?.isLoading || accessQuery?.isFetching;
+
+      if (live.relationState === "same") {
+        return [live];
+      }
+
+      if (isAccessChecking) {
+        return [];
+      }
+
+      if (accessQuery?.data) {
+        return [live];
+      }
+
+      return [];
+    });
+  }, [liveNowAccessQueries, liveNowCandidates]);
+
+  const isCheckingLiveNowAccess =
+    !isLoading &&
+    !isError &&
+    liveNowCandidates.length > 0 &&
+    liveCards.length === 0 &&
+    liveNowAccessQueries.some((query) => query.isLoading || query.isFetching);
 
   const isEnterPending =
     enterLiveMutation.isPending || respondCoHostInvitationMutation.isPending;
@@ -164,7 +390,11 @@ export function BandLiveNowListPage({
     await refetch();
   }, [refetch]);
 
-  const liveNowPullToRefresh = usePullToRefresh<HTMLElement>({
+  const {
+    containerRef: liveNowRefreshRef,
+    pullDistance: liveNowPullDistance,
+    isRefreshing: isLiveNowRefreshing,
+  } = usePullToRefresh<HTMLElement>({
     enabled: !isLoading && !isFetchingNextPage && !isEnterPending,
     onRefresh: handleRefreshLiveNowList,
   });
@@ -232,12 +462,12 @@ export function BandLiveNowListPage({
       <HeaderBackButton onClick={() => go("home")} />
 
       <PullToRefreshIndicator
-        pullDistance={liveNowPullToRefresh.pullDistance}
-        isRefreshing={liveNowPullToRefresh.isRefreshing}
+        pullDistance={liveNowPullDistance}
+        isRefreshing={isLiveNowRefreshing}
       />
 
       <section
-        ref={liveNowPullToRefresh.containerRef}
+        ref={liveNowRefreshRef}
         className="h-[calc(100%_-_52px)] overflow-y-auto overscroll-y-contain px-5 pb-8"
       >
         {isLoading ? (
@@ -250,7 +480,14 @@ export function BandLiveNowListPage({
           </ListMessage>
         ) : null}
 
-        {!isLoading && !isError && liveCards.length === 0 ? (
+        {isCheckingLiveNowAccess ? (
+          <ListMessage>현재 밴드의 진행 중인 라이브를 확인하는 중이에요.</ListMessage>
+        ) : null}
+
+        {!isLoading &&
+        !isError &&
+        !isCheckingLiveNowAccess &&
+        liveCards.length === 0 ? (
           <ListMessage>현재 진행 중인 라이브가 없어요.</ListMessage>
         ) : null}
 
@@ -284,7 +521,9 @@ export function BandLiveScheduledListPage({
   onEnterLive,
   onEditReservation,
 }: BandLiveScheduledListPageProps) {
+  const activeBandId = useActiveBandId();
   const now = useScheduledLiveNow();
+
   const {
     data,
     fetchNextPage,
@@ -298,49 +537,117 @@ export function BandLiveScheduledListPage({
   const { data: liveHome, refetch: refetchLiveHome } = useLiveHomeQuery();
   const enterLiveMutation = useEnterLiveMutation();
 
-  const previewScheduleByLiveId = useMemo(
+  const previewScheduledByLiveId = useMemo(
     () =>
-      new Map(
-        (liveHome?.scheduled ?? []).map((live) => [
-          live.liveId,
-          live.scheduledAt,
-        ]),
-      ),
+      new Map((liveHome?.scheduled ?? []).map((live) => [live.liveId, live])),
     [liveHome?.scheduled],
   );
 
-  const scheduledCards = useMemo<ScheduledLiveCardData[]>(() => {
-    const fetchedCards =
+  const scheduledCandidates = useMemo<ScheduledCandidateCard[]>(() => {
+    return (
       data?.pages.flatMap((page) =>
-        page.items.map((live) => ({
-          id: live.liveId,
-          bandName: live.bandName,
-          title: live.title,
-          scheduledAt:
-            previewScheduleByLiveId.get(live.liveId) ?? live.scheduledAt,
-          isMine: Boolean(live.isMine),
-          imageUrl: live.bandProfileImageUrl ?? live.thumbnailImageUrl ?? null,
-          coHostUserIds: (live.coHosts ?? live.coHostList ?? [])
-            .map((coHost) => coHost.userId)
-            .filter((userId): userId is number => Number.isFinite(userId)),
-        })),
-      ) ?? [];
-    const mergedCards = new Map(
-      getCachedOwnedScheduledLives().map((live) => [live.id, live]),
+        page.items.map((live) => {
+          const typedLive = live as LiveListItemWithFields;
+          const previewLive = previewScheduledByLiveId.get(
+            typedLive.liveId,
+          ) as LiveListItemWithFields | undefined;
+
+          const mergedLive = {
+            ...previewLive,
+            ...typedLive,
+          };
+
+          return {
+            id: typedLive.liveId,
+            bandName: typedLive.bandName,
+            title: typedLive.title,
+            scheduledAt: previewLive?.scheduledAt ?? typedLive.scheduledAt ?? "",
+            isMine: Boolean(typedLive.isMine ?? previewLive?.isMine),
+            imageUrl: getScheduledCardImageUrl(typedLive, previewLive),
+            coHostUserIds: (
+              typedLive.coHosts ??
+              typedLive.coHostList ??
+              previewLive?.coHosts ??
+              previewLive?.coHostList ??
+              []
+            )
+              .map((coHost) => coHost.userId)
+              .filter((userId): userId is number => Number.isFinite(userId)),
+            relationState: getBandRelationState(mergedLive, activeBandId),
+          };
+        }),
+      ) ?? []
+    );
+  }, [activeBandId, data, previewScheduledByLiveId]);
+
+  const scheduledReservationQueries = useQueries({
+    queries: scheduledCandidates.map((live) => ({
+      queryKey: ["live", "reservation-access", activeBandId, live.id],
+      queryFn: async () => {
+        try {
+          return await getLiveReservation(live.id);
+        } catch {
+          return null;
+        }
+      },
+      enabled: Boolean(activeBandId) && Boolean(live.id),
+      staleTime: 0,
+      refetchOnMount: "always" as const,
+      refetchOnWindowFocus: true,
+      retry: false,
+    })),
+  });
+
+  const displayScheduledCards = useMemo<ScheduledLiveCardData[]>(() => {
+    return scheduledCandidates.flatMap((live, index) => {
+      const reservationQuery = scheduledReservationQueries[index];
+      const reservationData = reservationQuery?.data;
+      const isReservationChecking =
+        reservationQuery?.isLoading || reservationQuery?.isFetching;
+      const reservationThumbnailUrl = getReservationThumbnailUrl(
+        reservationData,
+      );
+
+      if (live.relationState === "same") {
+        return [
+          {
+            ...live,
+            imageUrl: reservationThumbnailUrl ?? live.imageUrl,
+          },
+        ];
+      }
+
+      if (isReservationChecking) {
+        return [];
+      }
+
+      if (reservationData) {
+        return [
+          {
+            ...live,
+            imageUrl: reservationThumbnailUrl ?? live.imageUrl,
+          },
+        ];
+      }
+
+      return [];
+    });
+  }, [scheduledCandidates, scheduledReservationQueries]);
+
+  const isCheckingScheduledAccess =
+    !isLoading &&
+    !isError &&
+    scheduledCandidates.length > 0 &&
+    displayScheduledCards.length === 0 &&
+    scheduledReservationQueries.some(
+      (query) => query.isLoading || query.isFetching,
     );
 
-    fetchedCards.forEach((live) => mergedCards.set(live.id, live));
-
-    return Array.from(mergedCards.values());
-  }, [data, previewScheduleByLiveId]);
-  const retainedScheduledCards = useRetainedScheduledLiveCards(scheduledCards);
-
   useEffect(() => {
-    cacheOwnedScheduledLives(retainedScheduledCards);
-    retainedScheduledCards.forEach((live) => {
+    displayScheduledCards.forEach((live) => {
       cacheScheduledCoHostUserIds(live.id, live.coHostUserIds ?? []);
     });
-  }, [retainedScheduledCards]);
+  }, [displayScheduledCards]);
 
   const loadMore = useCallback(() => {
     if (!hasNextPage || isFetchingNextPage) return;
@@ -357,7 +664,11 @@ export function BandLiveScheduledListPage({
     await Promise.all([refetch(), refetchLiveHome()]);
   }, [refetch, refetchLiveHome]);
 
-  const scheduledPullToRefresh = usePullToRefresh<HTMLElement>({
+  const {
+    containerRef: scheduledRefreshRef,
+    pullDistance: scheduledPullDistance,
+    isRefreshing: isScheduledRefreshing,
+  } = usePullToRefresh<HTMLElement>({
     enabled: !isLoading && !isFetchingNextPage && !enterLiveMutation.isPending,
     onRefresh: handleRefreshScheduledList,
   });
@@ -403,12 +714,12 @@ export function BandLiveScheduledListPage({
       <HeaderBackButton onClick={() => go("home")} />
 
       <PullToRefreshIndicator
-        pullDistance={scheduledPullToRefresh.pullDistance}
-        isRefreshing={scheduledPullToRefresh.isRefreshing}
+        pullDistance={scheduledPullDistance}
+        isRefreshing={isScheduledRefreshing}
       />
 
       <section
-        ref={scheduledPullToRefresh.containerRef}
+        ref={scheduledRefreshRef}
         className="h-[calc(100%_-_52px)] overflow-y-auto overscroll-y-contain px-5 pb-8"
       >
         {isLoading ? (
@@ -421,13 +732,20 @@ export function BandLiveScheduledListPage({
           </ListMessage>
         ) : null}
 
-        {!isLoading && !isError && retainedScheduledCards.length === 0 ? (
+        {isCheckingScheduledAccess ? (
+          <ListMessage>현재 밴드의 예정된 라이브를 확인하는 중이에요.</ListMessage>
+        ) : null}
+
+        {!isLoading &&
+        !isError &&
+        !isCheckingScheduledAccess &&
+        displayScheduledCards.length === 0 ? (
           <ListMessage>예정된 라이브가 없어요.</ListMessage>
         ) : null}
 
-        {!isLoading && !isError && retainedScheduledCards.length > 0 ? (
+        {!isLoading && !isError && displayScheduledCards.length > 0 ? (
           <div className="grid gap-3 pt-5">
-            {retainedScheduledCards.map((live) => (
+            {displayScheduledCards.map((live) => (
               <ScheduledLiveCard
                 key={live.id}
                 live={live}
