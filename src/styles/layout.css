@@ -1,5 +1,17 @@
 :root {
   --bottom-nav-height: 5rem;
+  /* Visible height of the app content area. Equal to --app-height everywhere
+     except inside the boxed desktop/tablet layout (see .phone-frame below),
+     where it's capped to match the frame so pages don't size themselves
+     against the full browser window and end up scrolling inside a shorter
+     box than they think they have. */
+  --frame-height: var(--app-height, 100dvh);
+}
+
+@media (min-width: 768px) {
+  :root {
+    --frame-height: min(852px, var(--app-height, 100dvh));
+  }
 }
 
 /* Samsung Internet / some Galaxy browsers report 100dvh larger than the
@@ -7,11 +19,11 @@
    Route dvh-based height utilities through the corrected --app-height
    (see MobileLayout) instead of the raw dvh unit. */
 .min-h-dvh {
-  min-height: var(--app-height, 100dvh);
+  min-height: var(--frame-height);
 }
 
 .h-dvh {
-  height: var(--app-height, 100dvh);
+  height: var(--frame-height);
 }
 
 .page-frame {
@@ -40,10 +52,7 @@
      dark background peek out above/below the letterboxed content. */
   @media (min-width: 768px) {
     width: min(393px, 100vw);
-
-    @media (min-height: 852px) {
-      height: min(852px, var(--app-height, 100dvh));
-    }
+    height: var(--frame-height);
   }
 }
 
