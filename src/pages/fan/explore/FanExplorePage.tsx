@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import SearchIcon from "@/assets/icons/band/search.svg";
 import ArrowDownIcon from "@/assets/icons/band/arrow-down-gray.svg";
+import CheckActiveIcon from "@/assets/icons/check-active.svg";
 import BandImage from "@/assets/icons/band/band-default-profile.svg";
 import Modal from "@/components/Modal/Modal";
 import BandCard from "@/components/common/Card/BandCard";
@@ -39,6 +40,8 @@ type RecommendedBandItem = {
 };
 
 const DEFAULT_SORT_LABEL = "추천순";
+const EXPLORE_SORT_OPTIONS = ["추천순", "정확도순", "인기순"] as const;
+type ExploreSortOption = (typeof EXPLORE_SORT_OPTIONS)[number];
 
 const DEFAULT_APPLIED_FILTERS: AppliedExploreFilters = {
   genre: "전체",
@@ -214,6 +217,72 @@ const ExploreTopBar = () => {
         </button>
       }
     />
+  );
+};
+
+const ExploreSortSheet = ({
+  open,
+  onClose,
+  selectedSort,
+  onSelect,
+}: {
+  open: boolean;
+  onClose: () => void;
+  selectedSort: ExploreSortOption;
+  onSelect: (sort: ExploreSortOption) => void;
+}) => {
+  const { rendered, isVisible, handleTransitionEnd } = useSlideUpSheet(open);
+
+  if (!rendered) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center">
+      <button
+        type="button"
+        aria-label="정렬 닫기"
+        onClick={onClose}
+        className={`absolute inset-0 bg-neutral-900/75 transition-opacity duration-300 ${
+          isVisible ? "opacity-100" : "opacity-0"
+        }`}
+      />
+
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-label="정렬"
+        onTransitionEnd={handleTransitionEnd}
+        className={[
+          "relative z-10 flex w-[393px] max-w-full flex-col items-start gap-[10px] rounded-t-[20px] bg-neutral-0 px-[15px] pb-[48px] pt-[32px] transition-transform duration-300 ease-out",
+          isVisible ? "translate-y-0" : "translate-y-full",
+        ].join(" ")}
+      >
+        {EXPLORE_SORT_OPTIONS.map((option) => {
+          const isSelected = selectedSort === option;
+
+          return (
+            <button
+              key={option}
+              type="button"
+              onClick={() => {
+                onSelect(option);
+                onClose();
+              }}
+              className={[
+                "box-border flex h-6 w-full items-center justify-between px-3 font-body text-label2",
+                isSelected ? "text-primary-400" : "text-neutral-900",
+              ].join(" ")}
+            >
+              {option}
+              <span className="flex h-5 w-5 items-center justify-center">
+                {isSelected ? (
+                  <img src={CheckActiveIcon} alt="" className="h-5 w-5" />
+                ) : null}
+              </span>
+            </button>
+          );
+        })}
+      </section>
+    </div>
   );
 };
 
@@ -440,7 +509,7 @@ export const ExploreFilterSheet = ({
         aria-label="필터"
         onTransitionEnd={handleTransitionEnd}
         className={[
-          "relative z-10 flex h-[506px] w-full flex-col overflow-hidden rounded-t-[24px] bg-neutral-0 pt-[8px] pb-[8px] transition-transform duration-300 ease-out",
+          "relative z-10 flex max-h-[calc(100dvh-16px)] w-full flex-col rounded-t-[24px] bg-neutral-0 pb-[8px] pt-[8px] transition-transform duration-300 ease-out",
           isVisible ? "translate-y-0" : "translate-y-full",
         ].join(" ")}
       >
@@ -449,7 +518,7 @@ export const ExploreFilterSheet = ({
           필터
         </h2>
 
-        <div className="mt-[16px] ml-[32px] mr-[31px] flex min-h-0 flex-1 flex-col gap-[16px] overflow-y-auto pb-[8px] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="mx-4 mt-[16px] flex flex-col gap-[16px] pb-[8px] min-[390px]:ml-[32px] min-[390px]:mr-[31px]">
           <FilterOptionGroup
             title="장르"
             options={FILTER_OPTIONS.genre}
@@ -485,7 +554,7 @@ export const ExploreFilterSheet = ({
           />
         </div>
 
-        <div className="mt-[24px] px-[34px] shrink-0">
+        <div className="mt-[24px] shrink-0 px-5 min-[390px]:px-[34px]">
           <button
             type="button"
             onClick={() => {
@@ -674,14 +743,17 @@ const RecommendationSection = ({
 };
 
 const FanExplorePage = () => {
+  const [isSortSheetOpen, setIsSortSheetOpen] = useState(false);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
+  const [selectedSort, setSelectedSort] =
+    useState<ExploreSortOption>("추천순");
   const [appliedFilters, setAppliedFilters] = useState(
     DEFAULT_APPLIED_FILTERS,
   );
   const hasAppliedFilter = Object.values(appliedFilters).some(
     (value) => value !== "전체",
   );
-  const appliedSort = hasAppliedFilter ? "정확도순" : null;
+  const appliedSort = selectedSort === "추천순" ? null : selectedSort;
   const recommendedBandsQuery = useRecommendedExploreBandsInfiniteQuery({
     size: 10,
   });
@@ -706,9 +778,17 @@ const FanExplorePage = () => {
         return matchesGenre && matchesRegion;
       });
 
+      if (selectedSort === "인기순") {
+        return [...nextBands].sort((a, b) => b.followers - a.followers);
+      }
+
+      if (selectedSort === "정확도순") {
+        return nextBands;
+      }
+
       return [...nextBands].sort((a, b) => b.score - a.score);
     },
-    [appliedFilters, fetchedBands],
+    [appliedFilters, fetchedBands, selectedSort],
   );
   const sentinelRef = useInfiniteScrollObserver({
     enabled: Boolean(hasNextPage) && !isFetchingNextPage,
@@ -721,8 +801,9 @@ const FanExplorePage = () => {
       <ExploreFilterBar
         appliedFilters={appliedFilters}
         appliedSort={appliedSort}
-        highlightSort={false}
+        highlightSort={selectedSort !== "추천순"}
         disabledFilterIds={["content"]}
+        onSortClick={() => setIsSortSheetOpen(true)}
         onFilterClick={() => setIsFilterSheetOpen(true)}
       />
       <RecommendationSection
@@ -733,6 +814,12 @@ const FanExplorePage = () => {
         onRetry={() => void recommendedBandsQuery.refetch()}
       />
       <div ref={sentinelRef} aria-hidden="true" className="h-px w-full" />
+      <ExploreSortSheet
+        open={isSortSheetOpen}
+        onClose={() => setIsSortSheetOpen(false)}
+        selectedSort={selectedSort}
+        onSelect={setSelectedSort}
+      />
       <ExploreFilterSheet
         open={isFilterSheetOpen}
         onClose={() => setIsFilterSheetOpen(false)}

@@ -51,7 +51,7 @@ const NewsCard = ({
       aria-label={ariaLabel}
       onClick={onClick}
       onKeyDown={isInteractive ? handleKeyDown : undefined}
-      className={`box-border flex h-[196px] w-[200px] shrink-0 flex-col items-start gap-3 rounded-[12px] bg-neutral-0 p-3 text-left shadow-[0_0_4px_0_rgba(0,0,0,0.10)] ${
+      className={`box-border flex h-[196px] w-[200px] shrink-0 flex-col items-start gap-3 rounded-[12px] bg-neutral-0 p-3 text-left shadow-[0_0_10px_1px_rgba(20,20,20,0.12)] ${
         isInteractive
           ? 'cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-400'
           : ''

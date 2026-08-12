@@ -108,7 +108,7 @@ export const FollowedNewsCard = ({
       aria-label={ariaLabel}
       onClick={onClick}
       onKeyDown={isInteractive ? handleKeyDown : undefined}
-      className="box-border flex w-full flex-col rounded-[12px] bg-neutral-0 px-4 py-3 text-left shadow-[0_0_8px_0_rgba(0,0,0,0.10)]"
+      className="box-border flex w-full flex-col rounded-[12px] bg-neutral-0 px-4 py-3 text-left shadow-[0_0_10px_1px_rgba(20,20,20,0.12)]"
     >
       <header className="flex items-center gap-[11px]">
         <img

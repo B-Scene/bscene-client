@@ -604,7 +604,7 @@ const BandRecommendationStrip = ({ bands }: { bands: HomeBandItem[] }) => {
 
   return (
     <>
-      <div className="flex gap-3 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="-mx-5 flex w-[calc(100%+40px)] snap-x snap-mandatory gap-3 overflow-x-auto scroll-px-5 px-5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {bands.map((band) => {
           const isFollowing = followOverrides[band.id] ?? band.isFollowing;
           const isBandPending = isFollowPending && pendingBandId === band.bandId;
@@ -612,7 +612,7 @@ const BandRecommendationStrip = ({ bands }: { bands: HomeBandItem[] }) => {
           return (
             <article
               key={band.id}
-              className="flex w-[calc((100%-36px)/4)] shrink-0 flex-col items-center text-center"
+              className="flex w-[calc((100%-36px)/4)] shrink-0 snap-start flex-col items-center text-center"
             >
               <button
                 type="button"
@@ -751,32 +751,33 @@ const NewsCarousel = ({ items }: { items: HomeNewsCardItem[] }) => {
   return (
     <section>
       <div
-        className="flex gap-3 overflow-x-auto px-1 pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="-mx-5 flex w-[calc(100%+40px)] snap-x snap-mandatory gap-3 overflow-x-auto scroll-px-5 px-5 pb-3 pt-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         onScroll={handleScroll}
       >
         {items.map((item) => (
-          <NewsCard
-            key={item.id}
-            profileImageSrc={item.profileImageSrc}
-            contentImageSrc={item.contentImageSrc}
-            bandName={item.bandName}
-            meta={item.meta}
-            title={item.title}
-            tags={item.tags}
-            onClick={
-              item.detailId == null
-                ? undefined
-                : () =>
-                    navigate(
-                      `/fan/explore/contents/${item.detailId}${
-                        item.createdAt
-                          ? `?createdAt=${encodeURIComponent(item.createdAt)}`
-                          : ""
-                      }`,
-                    )
-            }
-            ariaLabel={`${item.title} 상세보기`}
-          />
+          <div key={item.id} className="shrink-0 snap-start">
+            <NewsCard
+              profileImageSrc={item.profileImageSrc}
+              contentImageSrc={item.contentImageSrc}
+              bandName={item.bandName}
+              meta={item.meta}
+              title={item.title}
+              tags={item.tags}
+              onClick={
+                item.detailId == null
+                  ? undefined
+                  : () =>
+                      navigate(
+                        `/fan/explore/contents/${item.detailId}${
+                          item.createdAt
+                            ? `?createdAt=${encodeURIComponent(item.createdAt)}`
+                            : ""
+                        }`,
+                      )
+              }
+              ariaLabel={`${item.title} 상세보기`}
+            />
+          </div>
         ))}
       </div>
 
