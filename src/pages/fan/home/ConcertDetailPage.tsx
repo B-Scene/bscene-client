@@ -35,13 +35,23 @@ const AGE_RATING_LABELS: Record<string, string> = {
 
 type ConcertDetailTab = (typeof TABS)[number];
 type KakaoSharePayload = {
-  objectType: "text";
-  text: string;
-  link: {
-    mobileWebUrl: string;
-    webUrl: string;
+  objectType: "feed";
+  content: {
+    title: string;
+    description: string;
+    imageUrl?: string;
+    link: {
+      mobileWebUrl: string;
+      webUrl: string;
+    };
   };
-  buttonTitle: string;
+  buttons: Array<{
+    title: string;
+    link: {
+      mobileWebUrl: string;
+      webUrl: string;
+    };
+  }>;
 };
 
 type KakaoShareApi = {
@@ -66,6 +76,10 @@ const KAKAO_SDK_URL = "https://t1.kakaocdn.net/kakao_js_sdk/2.7.5/kakao.min.js";
 const KAKAO_JAVASCRIPT_KEY = import.meta.env.VITE_KAKAO_JAVASCRIPT_KEY as
   | string
   | undefined;
+const normalizeBaseUrl = (url?: string) => url?.replace(/\/+$/, "");
+const PUBLIC_SITE_URL =
+  normalizeBaseUrl(import.meta.env.VITE_PUBLIC_SITE_URL as string | undefined) ??
+  "https://bscene.app";
 
 let kakaoSdkPromise: Promise<KakaoGlobal> | null = null;
 
@@ -706,7 +720,13 @@ const ConcertDetailPage = () => {
     }
   };
 
-  const getConcertLink = () => window.location.href;
+  const getConcertLink = () => {
+    if (Number.isFinite(performanceId) && performanceId > 0) {
+      return `${PUBLIC_SITE_URL}/fan/home/concerts/${performanceId}`;
+    }
+
+    return window.location.href;
+  };
 
   const handleTicketClick = () => {
     if (!detail?.ticketLink) return;
@@ -720,13 +740,25 @@ const ConcertDetailPage = () => {
     try {
       const kakaoShareApi = await getKakaoShareApi();
       kakaoShareApi.sendDefault({
-        objectType: "text",
-        text: title,
-        link: {
-          mobileWebUrl: concertLink,
-          webUrl: concertLink,
+        objectType: "feed",
+        content: {
+          title,
+          description: `${location} · ${dateTime}`,
+          imageUrl: posterImageUrl,
+          link: {
+            mobileWebUrl: concertLink,
+            webUrl: concertLink,
+          },
         },
-        buttonTitle: "공연 보러가기",
+        buttons: [
+          {
+            title: "공연 보러가기",
+            link: {
+              mobileWebUrl: concertLink,
+              webUrl: concertLink,
+            },
+          },
+        ],
       });
       setIsShareSheetOpen(false);
       setToastMessage("카카오톡 공유 화면을 열었어요");
