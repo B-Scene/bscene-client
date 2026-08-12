@@ -339,7 +339,13 @@ export const PushNotificationBridge = () => {
 
     window.__bscenePushDebug = getWebPushDebugInfo;
 
-    if (Notification.permission === "granted") {
+    // Safari (notably iOS Safari outside an installed home-screen PWA) has no
+    // window.Notification at all; touching it unguarded throws and, since
+    // this component sits at the app root with no error boundary, blanks
+    // the entire app on every route, including /login.
+    const isNotificationSupported = "Notification" in window;
+
+    if (isNotificationSupported && Notification.permission === "granted") {
       void registerFirebaseMessagingServiceWorker().catch((error) => {
         console.error("[BScene Push] failed to refresh service worker", error);
       });
@@ -516,7 +522,9 @@ export const PushNotificationBridge = () => {
     void onForegroundPushMessage((payload) => {
       console.info("[BScene Push] foreground message", payload);
 
-      if (Notification.permission !== "granted") return;
+      if (!isNotificationSupported || Notification.permission !== "granted") {
+        return;
+      }
 
       const title =
         payload.notification?.title ?? payload.data?.title ?? "B:Scene";
