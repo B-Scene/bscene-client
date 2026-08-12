@@ -116,11 +116,9 @@ export const SessionFindScreen = ({ values }: SessionFindScreenProps) => {
         <section className="border-b border-neutral-300 bg-neutral-0 px-6 pb-[9px]">
           <div className="relative flex min-h-[86px] w-full items-center justify-center rounded-[12px] border border-[#FBB10E] bg-secondary-0 px-[26px] py-[15px]">
             <p className="text-center text-caption2 leading-[20px] text-neutral-600">
-              기본 지원서의 활동 지역과 장르가
+              필터를 선택하지 않으면 기본 지원서에서 선택한
               <br />
-              먼저 적용돼요. 원하는 조건이 있다면
-              <br />
-              필터에서 자유롭게 변경할 수 있어요.
+              활동 지역, 장르와 같은 세션 뮤지션이 먼저 보여요.
             </p>
 
             <button

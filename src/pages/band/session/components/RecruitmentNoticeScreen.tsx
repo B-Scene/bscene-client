@@ -59,27 +59,6 @@ const SESSION_TAB_IDS: SessionTabId[] = [
   "applications",
 ];
 
-const normalizeSessionEnumValue = (value: string) => {
-  const trimmedValue = value.trim();
-
-  if (trimmedValue.toLowerCase() === "etc.") {
-    return "etc";
-  }
-
-  return trimmedValue;
-};
-
-const normalizeSessionFilterValues = (
-  values: SessionFilterValues,
-): SessionFilterValues => {
-  return {
-    part: normalizeSessionEnumValue(values.part),
-    skill: normalizeSessionEnumValue(values.skill),
-    genre: normalizeSessionEnumValue(values.genre),
-    region: normalizeSessionEnumValue(values.region),
-  };
-};
-
 const isSessionTabId = (value: string | null): value is SessionTabId => {
   return SESSION_TAB_IDS.includes(value as SessionTabId);
 };
@@ -108,12 +87,12 @@ const readStoredFilterValues = (
 
     const parsedValue = JSON.parse(storedValue) as Partial<SessionFilterValues>;
 
-    return normalizeSessionFilterValues({
+    return {
       part: parsedValue.part ?? INITIAL_SESSION_FILTERS.part,
       skill: parsedValue.skill ?? INITIAL_SESSION_FILTERS.skill,
       genre: parsedValue.genre ?? INITIAL_SESSION_FILTERS.genre,
       region: parsedValue.region ?? INITIAL_SESSION_FILTERS.region,
-    });
+    };
   } catch {
     return null;
   }
@@ -121,10 +100,7 @@ const readStoredFilterValues = (
 
 const readStoredFindFilterTouched = () => {
   try {
-    return (
-      window.sessionStorage.getItem(SESSION_FIND_FILTER_TOUCHED_STORAGE_KEY) ===
-      "true"
-    );
+    return window.sessionStorage.getItem(SESSION_FIND_FILTER_TOUCHED_STORAGE_KEY) === "true";
   } catch {
     return false;
   }
@@ -135,10 +111,7 @@ const writeStoredFilterValues = (
   values: SessionFilterValues,
 ) => {
   try {
-    window.sessionStorage.setItem(
-      storageKey,
-      JSON.stringify(normalizeSessionFilterValues(values)),
-    );
+    window.sessionStorage.setItem(storageKey, JSON.stringify(values));
   } catch {
     // sessionStorage 접근이 제한된 환경에서는 저장하지 않음
   }
@@ -147,10 +120,7 @@ const writeStoredFilterValues = (
 const writeStoredFindFilterTouched = (isTouched: boolean) => {
   try {
     if (isTouched) {
-      window.sessionStorage.setItem(
-        SESSION_FIND_FILTER_TOUCHED_STORAGE_KEY,
-        "true",
-      );
+      window.sessionStorage.setItem(SESSION_FIND_FILTER_TOUCHED_STORAGE_KEY, "true");
       return;
     }
 
@@ -183,12 +153,11 @@ const mapRecruitmentToPost = (
     deadline: toDeadlineLabel(recruitment.dDay),
     title: recruitment.recruitmentTitle,
     bandName: recruitment.bandName,
-    genre: normalizeSessionEnumValue(recruitment.bandGenre),
-    location: normalizeSessionEnumValue(recruitment.bandRegion),
+    genre: recruitment.bandGenre,
+    location: recruitment.bandRegion,
+    postedAgo: recruitment.postedAgo,
     description: recruitment.summary,
-    tags: [recruitment.part, recruitment.skillLevel]
-      .filter(Boolean)
-      .map(normalizeSessionEnumValue),
+    tags: [recruitment.part, recruitment.skillLevel].filter(Boolean),
     bookmarked: recruitment.isInterested,
   };
 };
@@ -201,12 +170,10 @@ const mapHistoryRecruitmentToPost = (
     deadline: recruitment.deadlineLabel,
     title: recruitment.title,
     bandName: recruitment.bandName,
-    genre: normalizeSessionEnumValue(recruitment.genre),
-    location: normalizeSessionEnumValue(recruitment.region),
+    genre: recruitment.genre,
+    location: recruitment.region,
     description: recruitment.description,
-    tags: [recruitment.part, recruitment.skillLevel]
-      .filter(Boolean)
-      .map(normalizeSessionEnumValue),
+    tags: [recruitment.part, recruitment.skillLevel].filter(Boolean),
     bookmarked: recruitment.bookmarked,
   };
 };
@@ -339,28 +306,21 @@ export const RecruitmentNoticeScreen = () => {
 
   const handleApplyRecruitmentFilters = useCallback(
     (nextValues: SessionFilterValues) => {
-      const normalizedValues = normalizeSessionFilterValues(nextValues);
-
-      setRecruitmentFilterValues(normalizedValues);
+      setRecruitmentFilterValues(nextValues);
       writeStoredFilterValues(
         SESSION_RECRUITMENT_FILTER_STORAGE_KEY,
-        normalizedValues,
+        nextValues,
       );
     },
     [],
   );
 
-  const handleApplyFindFilters = useCallback(
-    (nextValues: SessionFilterValues) => {
-      const normalizedValues = normalizeSessionFilterValues(nextValues);
-
-      setFindFilterValues(normalizedValues);
-      writeStoredFilterValues(SESSION_FIND_FILTER_STORAGE_KEY, normalizedValues);
-      setHasUserChangedFindFilters(true);
-      writeStoredFindFilterTouched(true);
-    },
-    [],
-  );
+  const handleApplyFindFilters = useCallback((nextValues: SessionFilterValues) => {
+    setFindFilterValues(nextValues);
+    writeStoredFilterValues(SESSION_FIND_FILTER_STORAGE_KEY, nextValues);
+    setHasUserChangedFindFilters(true);
+    writeStoredFindFilterTouched(true);
+  }, []);
 
   const handleRefreshPage = useCallback(async () => {
     writeStoredActiveTab(activeTab);
@@ -419,11 +379,11 @@ export const RecruitmentNoticeScreen = () => {
     }
 
     setFindFilterValues((currentValues) => {
-      const nextValues = normalizeSessionFilterValues({
+      const nextValues = {
         ...currentValues,
         genre: summary.genre || INITIAL_SESSION_FILTERS.genre,
         region: summary.region || INITIAL_SESSION_FILTERS.region,
-      });
+      };
 
       const hasChanged =
         currentValues.genre !== nextValues.genre ||
@@ -452,30 +412,22 @@ export const RecruitmentNoticeScreen = () => {
   }, [bookmarkOverrides, deletedPostIds, sessionRecruitmentsQuery.data]);
 
   const filteredPosts = useMemo(() => {
-    const normalizedRecruitmentFilters = normalizeSessionFilterValues(
-      recruitmentFilterValues,
-    );
-
     return posts.filter((post) => {
-      const normalizedTags = post.tags.map(normalizeSessionEnumValue);
-      const normalizedGenre = normalizeSessionEnumValue(post.genre);
-      const normalizedLocation = normalizeSessionEnumValue(post.location);
-
       const matchesPart =
-        normalizedRecruitmentFilters.part === "전체" ||
-        normalizedTags.includes(normalizedRecruitmentFilters.part);
+        recruitmentFilterValues.part === "전체" ||
+        post.tags.includes(recruitmentFilterValues.part);
 
       const matchesSkill =
-        normalizedRecruitmentFilters.skill === "전체" ||
-        normalizedTags.includes(normalizedRecruitmentFilters.skill);
+        recruitmentFilterValues.skill === "전체" ||
+        post.tags.includes(recruitmentFilterValues.skill);
 
       const matchesGenre =
-        normalizedRecruitmentFilters.genre === "전체" ||
-        normalizedGenre.includes(normalizedRecruitmentFilters.genre);
+        recruitmentFilterValues.genre === "전체" ||
+        post.genre.includes(recruitmentFilterValues.genre);
 
       const matchesRegion =
-        normalizedRecruitmentFilters.region === "전체" ||
-        normalizedLocation.includes(normalizedRecruitmentFilters.region);
+        recruitmentFilterValues.region === "전체" ||
+        post.location.includes(recruitmentFilterValues.region);
 
       return matchesPart && matchesSkill && matchesGenre && matchesRegion;
     });
@@ -667,34 +619,25 @@ export const RecruitmentNoticeScreen = () => {
     );
   }
 
-  if (isSearchOpen) {
-    const isFindSearch = activeTab === "find";
+ if (isSearchOpen) {
+  const isFindSearch = activeTab === "find";
 
-    return (
-      <SessionSearchScreen
-        mode={isFindSearch ? "find" : "recruitment"}
-        values={
-          isFindSearch
-            ? normalizeSessionFilterValues(findFilterValues)
-            : normalizeSessionFilterValues(recruitmentFilterValues)
-        }
-        onBack={() => setIsSearchOpen(false)}
-        onApplyFilters={
-          isFindSearch ? handleApplyFindFilters : handleApplyRecruitmentFilters
-        }
-        onSelectRecruitment={(post) => {
-          setIsSearchOpen(false);
-          setSelectedPostOverride({
-            ...post,
-            genre: normalizeSessionEnumValue(post.genre),
-            location: normalizeSessionEnumValue(post.location),
-            tags: post.tags.map(normalizeSessionEnumValue),
-          });
-          setSelectedPostId(post.id);
-        }}
-      />
-    );
-  }
+  return (
+    <SessionSearchScreen
+      mode={isFindSearch ? "find" : "recruitment"}
+      values={isFindSearch ? findFilterValues : recruitmentFilterValues}
+      onBack={() => setIsSearchOpen(false)}
+      onApplyFilters={
+        isFindSearch ? handleApplyFindFilters : handleApplyRecruitmentFilters
+      }
+      onSelectRecruitment={(post) => {
+        setIsSearchOpen(false);
+        setSelectedPostOverride(post);
+        setSelectedPostId(post.id);
+      }}
+    />
+  );
+}
 
   if (selectedApplicationId) {
     return (
@@ -748,19 +691,22 @@ export const RecruitmentNoticeScreen = () => {
       <SessionTabs activeTab={activeTab} onTabChange={handleTabChange} />
 
       {activeTab !== "applications" ? (
-        <SessionFilterBar
-          values={
-            activeTab === "find"
-              ? normalizeSessionFilterValues(findFilterValues)
-              : normalizeSessionFilterValues(recruitmentFilterValues)
-          }
-          sort={sort}
-          onSortChange={setSort}
-          showBottomBorder={activeTab !== "find"}
-          compactHeight={activeTab === "find"}
-          filterKeys={activeTab === "find" ? [...FIND_FILTER_KEYS] : undefined}
-          onOpenFilter={() => setIsFilterOpen(true)}
-        />
+     <SessionFilterBar
+        values={
+          activeTab === "find"
+            ? findFilterValues
+            : recruitmentFilterValues
+        }
+        sort={activeTab === "find" ? "LATEST" : sort}
+        sortOptions={activeTab === "find" ? ["LATEST"] : ["LATEST", "IMMINENT"]}
+        onSortChange={activeTab === "find" ? () => undefined : setSort}
+        showSort={activeTab === "recruitment" || activeTab === "find"}
+        showSelectedValues={false}
+        showBottomBorder={activeTab !== "find"}
+        compactHeight={activeTab === "find"}
+        filterKeys={activeTab === "find" ? [...FIND_FILTER_KEYS] : undefined}
+        onOpenFilter={() => setIsFilterOpen(true)}
+      />
       ) : null}
 
       {activeTab === "recruitment" ? (
@@ -802,7 +748,7 @@ export const RecruitmentNoticeScreen = () => {
           )}
         </section>
       ) : activeTab === "find" ? (
-        <SessionFindScreen values={normalizeSessionFilterValues(findFilterValues)} />
+        <SessionFindScreen values={findFilterValues} />
       ) : activeTab === "applications" ? (
         <SessionApplicationsScreen
           onEditBasicInfo={() => setIsBasicProfileEditOpen(true)}
@@ -830,8 +776,8 @@ export const RecruitmentNoticeScreen = () => {
         <SessionFilterBottomSheet
           values={
             activeTab === "find"
-              ? normalizeSessionFilterValues(findFilterValues)
-              : normalizeSessionFilterValues(recruitmentFilterValues)
+              ? findFilterValues
+              : recruitmentFilterValues
           }
           onApply={
             activeTab === "find"

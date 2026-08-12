@@ -44,7 +44,8 @@ export type UpdateSessionRecruitmentRequest = Omit<
   "bandMemberId"
 >;
 
-export type UpdateSessionRecruitmentResponse = CreateSessionRecruitmentResponse;
+export type UpdateSessionRecruitmentResponse =
+  CreateSessionRecruitmentResponse;
 
 export interface SessionRecruitmentEditInfoResponse {
   recruitmentTitle: string;
