@@ -57,6 +57,7 @@ export interface UpdatePostRequest {
   description?: string;
   mediaUrls?: string[];
   tags?: string[];
+  thumbnailUrl?: string;
 }
 
 export interface UpdatePostResponse {

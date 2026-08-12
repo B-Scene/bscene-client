@@ -11,6 +11,7 @@ import { Input } from "@/components/common/Input/Input";
 import { useActiveBandId } from "@/hooks/api/user/useMyProfiles";
 import { useCreatePost, usePostQuery, useUpdatePost } from "@/hooks/api/band/usePost";
 import { uploadMediaFile } from "@/utils/uploadMediaFile";
+import { captureVideoThumbnail } from "@/utils/captureVideoThumbnail";
 import { getApiErrorMessage } from "@/utils/getApiErrorMessage";
 import type { PostDetailResponse, PostType } from "@/types/band/post";
 import UploadIcon from "@/assets/icons/band/upload.svg";
@@ -78,6 +79,8 @@ interface VideoFile {
   name: string;
   size: string;
   previewUrl: string;
+  thumbnailFile: File | null;
+  thumbnailPreviewUrl: string | null;
 }
 
 const formatFileSize = (bytes: number) =>
@@ -138,6 +141,11 @@ const ContentRegisterForm = ({
         ? (existingPost.mediaUrls?.[0] ?? null)
         : null,
   );
+  const [existingThumbnailUrl, setExistingThumbnailUrl] = useState<
+    string | null
+  >(() =>
+    existingPost?.type === "VIDEO" ? (existingPost.thumbnailUrl ?? null) : null,
+  );
 
   const [title, setTitle] = useState(() => existingPost?.title ?? "");
   const [description, setDescription] = useState(
@@ -169,15 +177,34 @@ const ContentRegisterForm = ({
     if (isVideo) {
       const file = files[0];
       setVideo((prev) => {
-        if (prev) URL.revokeObjectURL(prev.previewUrl);
+        if (prev) {
+          URL.revokeObjectURL(prev.previewUrl);
+          if (prev.thumbnailPreviewUrl) URL.revokeObjectURL(prev.thumbnailPreviewUrl);
+        }
         return {
           file,
           name: file.name,
           size: formatFileSize(file.size),
           previewUrl: URL.createObjectURL(file),
+          thumbnailFile: null,
+          thumbnailPreviewUrl: null,
         };
       });
       setExistingVideoUrl(null);
+      setExistingThumbnailUrl(null);
+
+      captureVideoThumbnail(file)
+        .then((thumbnailFile) => {
+          const thumbnailPreviewUrl = URL.createObjectURL(thumbnailFile);
+          setVideo((prev) =>
+            prev && prev.file === file
+              ? { ...prev, thumbnailFile, thumbnailPreviewUrl }
+              : prev,
+          );
+        })
+        .catch(() => {
+          // 썸네일 캡처 실패 시 업로드 시점에 재생버튼 아이콘만 노출돼요
+        });
     } else {
       const remainingSlots =
         MAX_IMAGES - existingImageUrls.length - images.length;
@@ -211,9 +238,13 @@ const ContentRegisterForm = ({
   };
 
   const handleRemoveVideo = () => {
-    if (video) URL.revokeObjectURL(video.previewUrl);
+    if (video) {
+      URL.revokeObjectURL(video.previewUrl);
+      if (video.thumbnailPreviewUrl) URL.revokeObjectURL(video.thumbnailPreviewUrl);
+    }
     setVideo(null);
     setExistingVideoUrl(null);
+    setExistingThumbnailUrl(null);
   };
 
   const handleTagInputKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
@@ -242,15 +273,22 @@ const ContentRegisterForm = ({
     setUploadError(null);
 
     let mediaUrls: string[] = [];
+    let thumbnailUrl: string | undefined;
 
     try {
       setIsUploading(true);
 
       if (contentType === "영상") {
         if (video) {
-          mediaUrls = [await uploadMediaFile(video.file, "POST")];
+          const thumbnailFile =
+            video.thumbnailFile ?? (await captureVideoThumbnail(video.file));
+          [mediaUrls, thumbnailUrl] = await Promise.all([
+            uploadMediaFile(video.file, "POST").then((url) => [url]),
+            uploadMediaFile(thumbnailFile, "POST_THUMBNAIL"),
+          ]);
         } else if (existingVideoUrl) {
           mediaUrls = [existingVideoUrl];
+          thumbnailUrl = existingThumbnailUrl ?? undefined;
         }
       } else if (contentType === "사진") {
         const uploadedUrls =
@@ -293,6 +331,7 @@ const ContentRegisterForm = ({
           description: description || undefined,
           mediaUrls,
           tags,
+          thumbnailUrl,
         },
         { onSuccess },
       );
@@ -306,6 +345,7 @@ const ContentRegisterForm = ({
         description: description || undefined,
         mediaUrls: mediaUrls.length > 0 ? mediaUrls : undefined,
         tags: tags.length > 0 ? tags : undefined,
+        thumbnailUrl,
       },
       { onSuccess },
     );
@@ -321,13 +361,13 @@ const ContentRegisterForm = ({
             <div className="flex items-center gap-19.75 rounded-xl border border-neutral-400 bg-neutral-200 px-3 py-3.25">
               <div className="flex min-w-0 flex-1 items-center gap-3">
                 <div className="relative flex h-15 w-27 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-neutral-300">
-                  <video
-                    src={video?.previewUrl ?? existingVideoUrl ?? undefined}
-                    muted
-                    playsInline
-                    preload="metadata"
-                    className="absolute inset-0 size-full object-cover"
-                  />
+                  {video?.thumbnailPreviewUrl || existingThumbnailUrl ? (
+                    <img
+                      src={video?.thumbnailPreviewUrl ?? existingThumbnailUrl ?? undefined}
+                      alt=""
+                      className="absolute inset-0 size-full object-cover"
+                    />
+                  ) : null}
                   <img
                     src={PlayButtonIcon}
                     alt=""

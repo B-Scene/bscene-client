@@ -85,11 +85,9 @@ export const PostCard = ({
         >
           {item.type === "video" ? (
             <>
-              <video
+              <img
                 src={item.url}
-                muted
-                playsInline
-                preload="metadata"
+                alt=""
                 className="absolute inset-0 size-full object-cover"
               />
               <img src={PlayButtonIcon} alt="" className="relative size-9" />
