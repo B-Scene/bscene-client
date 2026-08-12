@@ -11,6 +11,8 @@ interface ApplicationHistoryCardProps {
   onCancelApplication: (applicationId: number) => void;
 
   onMessage: (application: ApplicationHistoryItem) => void;
+
+  onFinalizeApplication?: (application: ApplicationHistoryItem) => void;
 }
 
 const STATUS_STYLE: Record<
@@ -98,7 +100,9 @@ export const ApplicationHistoryCard = ({
         ) : null}
       </div>
 
-      {application.canViewApplication || application.canCancel ? (
+      {application.canViewApplication ||
+      application.canCancel ||
+      application.canFinalize ? (
         <div className="grid grid-cols-2 gap-[18px]">
           {application.canViewApplication ? (
             <button
@@ -107,6 +111,14 @@ export const ApplicationHistoryCard = ({
               className="flex h-[30px] items-center justify-center rounded-[5px] bg-[#FFF6E5] text-caption3 text-neutral-600"
             >
               지원서 보기
+            </button>
+          ) : application.canFinalize ? (
+            <button
+              type="button"
+              onClick={() => onFinalizeApplication?.(application)}
+              className="flex h-[30px] items-center justify-center rounded-[5px] bg-secondary-500 text-caption3 text-neutral-0"
+            >
+              확정하기
             </button>
           ) : (
             <span />

@@ -16,6 +16,7 @@ import {
   useRejectBandInviteMutation,
 } from "@/hooks/api/band/useBandMember";
 import { useActiveBandMemberProfileQuery } from "@/hooks/api/band/useBandMemberProfile";
+import { useFinalizeApplicationSubmissionMutation } from "@/hooks/api/session/useSessionApplication";
 import { useInfiniteScrollObserver } from "@/hooks/useInfiniteScrollObserver";
 import {
   BAND_NOTIFICATION_ROUTES,
@@ -57,7 +58,9 @@ const PART_ENUM_TO_LABEL: Record<string, string> = {
   KEYBOARD: "키보드",
 };
 
-type PendingRoleAction = { notification: NotificationItem };
+type PendingRoleAction =
+  | { kind: "bandInvite"; notification: NotificationItem }
+  | { kind: "sessionFinalize"; notification: NotificationItem };
 
 const getStringField = (
   value: NotificationBandInvite | null,
@@ -122,6 +125,7 @@ const NotificationPage = () => {
   const markNotificationAsRead = useMarkNotificationAsReadMutation();
   const acceptBandInvite = useAcceptBandInviteMutation();
   const rejectBandInvite = useRejectBandInviteMutation();
+  const finalizeApplication = useFinalizeApplicationSubmissionMutation();
   const { data: activeMemberProfile } = useActiveBandMemberProfileQuery();
   const [retentionNow, setRetentionNow] = useState(() => Date.now());
   const allNotifications = useMemo(
@@ -234,13 +238,17 @@ const NotificationPage = () => {
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
   const [isCompleteModalOpen, setIsCompleteModalOpen] = useState(false);
   const [completedBandName, setCompletedBandName] = useState("");
+  const [completedKind, setCompletedKind] =
+    useState<PendingRoleAction["kind"]>("bandInvite");
   const [pendingRoleAction, setPendingRoleAction] =
     useState<PendingRoleAction | null>(null);
   const [activityName, setActivityName] = useState("");
   const [part, setPart] = useState("");
   const canConfirmRole = activityName.trim().length > 0 && part.length > 0;
   const isInviteActionPending =
-    acceptBandInvite.isPending || rejectBandInvite.isPending;
+    acceptBandInvite.isPending ||
+    rejectBandInvite.isPending ||
+    finalizeApplication.isPending;
 
   const handleBack = () => {
     const pushBackTarget = consumePushNotificationBackTarget();
@@ -299,6 +307,36 @@ const NotificationPage = () => {
     void refetch();
   };
 
+  const handleFinalizeSessionApplication = async (
+    notification: NotificationItem,
+    isAccepted: boolean,
+  ) => {
+    const applySubmissionId = notification.referenceId;
+
+    if (applySubmissionId == null || finalizeApplication.isPending) return;
+
+    if (!notification.isRead) {
+      markNotificationAsRead.mutate(notification.notificationId);
+    }
+
+    try {
+      await finalizeApplication.mutateAsync({
+        applySubmissionId,
+        body: { isAccepted },
+      });
+      void refetch();
+    } catch (error) {
+      window.alert(
+        getApiErrorMessage(
+          error,
+          isAccepted
+            ? "최종 확정에 실패했어요. 잠시 후 다시 시도해주세요."
+            : "거절 처리에 실패했어요. 잠시 후 다시 시도해주세요.",
+        ),
+      );
+    }
+  };
+
   const handleRoleModalConfirm = async () => {
     const action = pendingRoleAction;
     const partEnum = PART_LABEL_TO_ENUM[part];
@@ -312,22 +350,39 @@ const NotificationPage = () => {
     }
 
     try {
-      const bandId = getBandInviteBandId(notification);
+      if (action.kind === "bandInvite") {
+        const bandId = getBandInviteBandId(notification);
 
-      if (bandId == null) return;
+        if (bandId == null) return;
 
-      await acceptBandInvite.mutateAsync({
-        bandId,
-        body: {
-          nickname: activityName.trim(),
-          part: partEnum,
-        },
-      });
+        await acceptBandInvite.mutateAsync({
+          bandId,
+          body: {
+            nickname: activityName.trim(),
+            part: partEnum,
+          },
+        });
+      } else {
+        const applySubmissionId = notification.referenceId;
+
+        if (applySubmissionId == null) return;
+
+        await finalizeApplication.mutateAsync({
+          applySubmissionId,
+          body: {
+            isAccepted: true,
+            nickname: activityName.trim(),
+            part: partEnum,
+          },
+        });
+      }
     } catch (error) {
       window.alert(
         getApiErrorMessage(
           error,
-          "초대 수락에 실패했어요. 잠시 후 다시 시도해주세요.",
+          action.kind === "bandInvite"
+            ? "초대 수락에 실패했어요. 잠시 후 다시 시도해주세요."
+            : "최종 확정에 실패했어요. 잠시 후 다시 시도해주세요.",
         ),
       );
       return;
@@ -335,7 +390,10 @@ const NotificationPage = () => {
 
     void refetch();
     setIsRoleModalOpen(false);
-    setCompletedBandName(getBandInviteBandName(notification));
+    setCompletedKind(action.kind);
+    setCompletedBandName(
+      action.kind === "bandInvite" ? getBandInviteBandName(notification) : "",
+    );
     setIsCompleteModalOpen(true);
     setPendingRoleAction(null);
     setActivityName("");
@@ -510,7 +568,7 @@ const NotificationPage = () => {
                             );
                           }
 
-                          openRoleModal({ notification });
+                          openRoleModal({ kind: "bandInvite", notification });
                         }}
                         className="flex h-7.5 w-35 flex-1 items-center justify-center rounded-md bg-secondary-500 text-caption3 text-neutral-0 disabled:opacity-60"
                       >
@@ -592,6 +650,88 @@ const NotificationPage = () => {
                           handleNotificationClick(notification);
                         }}
                         className="flex h-7.5 flex-1 items-center justify-center rounded-md bg-secondary-500 text-caption3 text-neutral-0"
+                      >
+                        수락
+                      </button>
+                    </div>
+                  ) : null}
+                </article>
+              );
+            }
+
+            const isSessionApplicationAccepted =
+              notification.type === "SESSION" &&
+              notification.title === "세션 지원이 수락되었어요";
+
+            if (isSessionApplicationAccepted) {
+              return (
+                <article
+                  key={notification.notificationId}
+                  className={`flex w-full flex-col gap-3 self-stretch rounded-xl bg-neutral-0 px-4 py-4 shadow-[0_0_8px_0_rgba(0,0,0,0.10)] ${
+                    notification.isRead ? "opacity-80" : ""
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <img
+                      src={InviteAlertIcon}
+                      alt=""
+                      className="shrink-0 rounded-full object-cover"
+                    />
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start gap-2">
+                        <h2 className="m-0 line-clamp-2 flex-1 font-body text-body1 text-neutral-900">
+                          {notification.title}
+                        </h2>
+                        {!notification.isRead ? (
+                          <span
+                            aria-label="읽지 않은 알림"
+                            className="mt-1 size-2 shrink-0 rounded-full bg-secondary-500"
+                          />
+                        ) : null}
+                      </div>
+                      {notification.body ? (
+                        <p className="m-0 mt-1 line-clamp-2 font-body text-caption2 text-neutral-700">
+                          {notification.body}
+                        </p>
+                      ) : null}
+                      {time ? (
+                        <p className="m-0 mt-1 font-body text-caption2 text-neutral-600">
+                          {time}
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  {!notification.isRead ? (
+                    <div className="flex gap-3">
+                      <button
+                        type="button"
+                        disabled={isInviteActionPending}
+                        onClick={() =>
+                          void handleFinalizeSessionApplication(
+                            notification,
+                            false,
+                          )
+                        }
+                        className="flex h-7.5 flex-1 items-center justify-center rounded-md border border-secondary-500 bg-neutral-0 text-caption3 text-secondary-500 disabled:opacity-60"
+                      >
+                        거절
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isInviteActionPending}
+                        onClick={() => {
+                          markNotificationAsRead.mutate(
+                            notification.notificationId,
+                          );
+
+                          openRoleModal({
+                            kind: "sessionFinalize",
+                            notification,
+                          });
+                        }}
+                        className="flex h-7.5 flex-1 items-center justify-center rounded-md bg-secondary-500 text-caption3 text-neutral-0 disabled:opacity-60"
                       >
                         수락
                       </button>
@@ -745,10 +885,16 @@ const NotificationPage = () => {
 
           <div className="flex flex-col gap-2">
             <h3 className="m-0 font-body text-label1 text-neutral-900">
-              초대가 완료되었습니다
+              {completedKind === "bandInvite"
+                ? "초대가 완료되었습니다"
+                : "세션 참여가 확정되었습니다"}
             </h3>
             <p className="m-0 font-body text-caption2 text-neutral-600">
-              이제 {completedBandName}의 멤버로 활동할 수 있어요.
+              {completedKind === "bandInvite" ? (
+                <>이제 {completedBandName}의 멤버로 활동할 수 있어요.</>
+              ) : (
+                <>이제 밴드 멤버로 활동할 수 있어요.</>
+              )}
               <br />내 밴드와 밴드 프로필 관리에서 확인해 주세요.
             </p>
           </div>
