@@ -149,7 +149,7 @@ export function FanLiveHomePage() {
               />
               {data?.replays.length ? (
                 <div className="fan-live-home-scroll -mr-5 mt-3 flex gap-3 overflow-x-auto pr-5 pb-1">
-                  {data.replays.map((replay) => (
+                  {data.replays.slice(0, 3).map((replay) => (
                     <ReplayPreviewCard
                       key={replay.liveId}
                       imageSrc={replay.thumbnailImageUrl || BandImage}

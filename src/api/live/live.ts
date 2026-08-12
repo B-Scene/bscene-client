@@ -59,6 +59,15 @@ type MaybePaginatedResponse<T> =
   | null
   | undefined;
 
+type LiveThumbnailFieldAliases = {
+  thumbnailImageUrl?: string | null;
+  thumbnailUrl?: string | null;
+  liveThumbnailImageUrl?: string | null;
+  liveThumbnailUrl?: string | null;
+  imageUrl?: string | null;
+  bandProfileImageUrl?: string | null;
+};
+
 const normalizeToken = (value: string) => {
   return value
     .replace(/^Bearer\s+/i, "")
@@ -327,11 +336,48 @@ const getLiveCoHosts = (
   return [];
 };
 
+const getFirstNonEmptyString = (
+  ...values: Array<string | null | undefined>
+) => {
+  return (
+    values.find(
+      (value) => typeof value === "string" && value.trim().length > 0,
+    ) ?? null
+  );
+};
+
+const getThumbnailImageUrl = (value: LiveThumbnailFieldAliases) => {
+  return getFirstNonEmptyString(
+    value.thumbnailImageUrl,
+    value.thumbnailUrl,
+    value.liveThumbnailImageUrl,
+    value.liveThumbnailUrl,
+    value.imageUrl,
+  );
+};
+
+const normalizeLiveThumbnailFields = <T extends LiveThumbnailFieldAliases>(
+  value: T,
+): T => {
+  const thumbnailImageUrl = getThumbnailImageUrl(value);
+
+  return {
+    ...value,
+    thumbnailImageUrl: thumbnailImageUrl ?? value.thumbnailImageUrl ?? null,
+  };
+};
+
 const normalizeCreateLiveRequest = (request: CreateLiveRequest) => {
+  const thumbnailImageUrl = getFirstNonEmptyString(
+    request.thumbnailImageUrl,
+    request.thumbnailUrl,
+  );
+
   const normalizedRequest: {
     title: string;
     description?: string;
     thumbnailImageUrl?: string;
+    thumbnailUrl?: string;
     scheduledAt?: string;
     coHost: number[];
   } = {
@@ -345,8 +391,9 @@ const normalizeCreateLiveRequest = (request: CreateLiveRequest) => {
     normalizedRequest.description = description;
   }
 
-  if (request.thumbnailImageUrl) {
-    normalizedRequest.thumbnailImageUrl = request.thumbnailImageUrl;
+  if (thumbnailImageUrl) {
+    normalizedRequest.thumbnailImageUrl = thumbnailImageUrl;
+    normalizedRequest.thumbnailUrl = thumbnailImageUrl;
   }
 
   if (request.scheduledAt) {
@@ -359,10 +406,16 @@ const normalizeCreateLiveRequest = (request: CreateLiveRequest) => {
 const normalizeUpdateLiveReservationRequest = (
   request: UpdateLiveReservationRequest,
 ) => {
+  const thumbnailImageUrl = getFirstNonEmptyString(
+    request.thumbnailImageUrl,
+    request.thumbnailUrl,
+  );
+
   const normalizedRequest: {
     title: string;
     description?: string;
     thumbnailImageUrl?: string;
+    thumbnailUrl?: string;
     scheduledAt: string;
     coHost: number[];
   } = {
@@ -377,8 +430,9 @@ const normalizeUpdateLiveReservationRequest = (
     normalizedRequest.description = description;
   }
 
-  if (request.thumbnailImageUrl) {
-    normalizedRequest.thumbnailImageUrl = request.thumbnailImageUrl;
+  if (thumbnailImageUrl) {
+    normalizedRequest.thumbnailImageUrl = thumbnailImageUrl;
+    normalizedRequest.thumbnailUrl = thumbnailImageUrl;
   }
 
   return normalizedRequest;
@@ -415,10 +469,7 @@ const setupAuthenticatedHlsXhr = (
     url.searchParams.has("X-Amz-Algorithm");
 
   if (!hasUrlAuthorization) {
-    xhr.setRequestHeader(
-      "Authorization",
-      getAuthorization(),
-    );
+    xhr.setRequestHeader("Authorization", getAuthorization());
   }
 };
 
@@ -426,22 +477,14 @@ export const setupLivePlaybackXhr = (
   xhr: XMLHttpRequest,
   requestUrl: string,
 ) => {
-  setupAuthenticatedHlsXhr(
-    xhr,
-    requestUrl,
-    getLivePlaybackAuthorization,
-  );
+  setupAuthenticatedHlsXhr(xhr, requestUrl, getLivePlaybackAuthorization);
 };
 
 export const setupLiveReplayXhr = (
   xhr: XMLHttpRequest,
   requestUrl: string,
 ) => {
-  setupAuthenticatedHlsXhr(
-    xhr,
-    requestUrl,
-    getLiveReplayAuthorization,
-  );
+  setupAuthenticatedHlsXhr(xhr, requestUrl, getLiveReplayAuthorization);
 };
 
 const parseErrorMessage = (responseText: string, fallbackMessage: string) => {
@@ -469,13 +512,17 @@ export const getLiveHome = async (): Promise<LiveHomeResponse> => {
   const result = unwrapResult(response.data) ?? {};
 
   return {
-    liveNow: result.liveNow ?? [],
-    replays: (result.replays ?? []).map(normalizeReplayLiveId),
-    scheduled: result.scheduled ?? [],
+    liveNow: (result.liveNow ?? []).map(normalizeLiveThumbnailFields),
+    replays: (result.replays ?? [])
+      .map(normalizeReplayLiveId)
+      .map(normalizeLiveThumbnailFields),
+    scheduled: (result.scheduled ?? []).map(normalizeLiveThumbnailFields),
     myNickname: result.myNickname ?? result.nickname ?? null,
     nickname: result.nickname ?? result.myNickname ?? null,
-    myProfileImageUrl: result.myProfileImageUrl ?? result.profileImageUrl ?? null,
-    profileImageUrl: result.profileImageUrl ?? result.myProfileImageUrl ?? null,
+    myProfileImageUrl:
+      result.myProfileImageUrl ?? result.profileImageUrl ?? null,
+    profileImageUrl:
+      result.profileImageUrl ?? result.myProfileImageUrl ?? null,
     coHosts: result.coHosts ?? result.coHostList ?? [],
     coHostList: result.coHostList ?? result.coHosts ?? [],
   };
@@ -498,7 +545,7 @@ export const getLiveNowList = async ({
   const result = unwrapResult(response.data);
 
   return {
-    items: getPaginatedItems(result),
+    items: getPaginatedItems(result).map(normalizeLiveThumbnailFields),
     pageInfo: getPageInfo(result),
   };
 };
@@ -523,7 +570,7 @@ export const getScheduledLiveList = async ({
   const result = unwrapResult(response.data);
 
   return {
-    items: getPaginatedItems(result),
+    items: getPaginatedItems(result).map(normalizeLiveThumbnailFields),
     pageInfo: getPageInfo(result),
   };
 };
@@ -557,7 +604,9 @@ export const getReplayList = async ({
   const result = unwrapResult(response.data);
 
   return {
-    items: getPaginatedItems(result).map(normalizeReplayLiveId),
+    items: getPaginatedItems(result)
+      .map(normalizeReplayLiveId)
+      .map(normalizeLiveThumbnailFields),
     pageInfo: getPageInfo(result),
   };
 };
@@ -571,7 +620,7 @@ export const getReplayPlayback = async (
     withCredentials: true,
   });
 
-  return unwrapResult(response.data);
+  return normalizeLiveThumbnailFields(unwrapResult(response.data));
 };
 
 export const createLive = async (
@@ -592,7 +641,7 @@ export const enterLive = async (
     `/lives/${liveId}`,
   );
 
-  return unwrapResult(response.data);
+  return normalizeLiveThumbnailFields(unwrapResult(response.data));
 };
 
 export const leaveLive = async (liveId: number): Promise<void> => {
@@ -668,7 +717,7 @@ export const getLiveReservation = async (
     LiveApiResponse<LiveReservationResponse>
   >(`/lives/${liveId}/reservation`);
 
-  return unwrapResult(response.data);
+  return normalizeLiveThumbnailFields(unwrapResult(response.data));
 };
 
 export const updateLiveReservation = async ({
@@ -727,7 +776,8 @@ export const acceptCoHostUpgrade = async ({
 }): Promise<AcceptCoHostUpgradeResponse> => {
   const response = await axiosInstance.post<
     LiveApiResponse<AcceptCoHostUpgradeResponse>
-  >(`/lives/${liveId}/co-host/acceptance`,
+  >(
+    `/lives/${liveId}/co-host/acceptance`,
     Number.isFinite(userId) ? { userId } : {},
   );
 
@@ -930,6 +980,7 @@ export const createWhepSession = async ({
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     signal?.throwIfAborted();
+
     response = await fetch(requestUrl, {
       method: "POST",
       headers: {
@@ -940,10 +991,9 @@ export const createWhepSession = async ({
       body: sdpOffer,
       signal,
     });
+
     responseText = await response.text();
 
-    // coPublisherJoined can arrive just before the media server exposes WHEP.
-    // Keep the exact URL supplied by the backend and wait briefly for it.
     if (response.status !== 404 || attempt === maxAttempts) {
       break;
     }
@@ -953,6 +1003,7 @@ export const createWhepSession = async ({
         signal?.removeEventListener("abort", handleAbort);
         resolve();
       }, 1000);
+
       const handleAbort = () => {
         window.clearTimeout(timeoutId);
         reject(signal?.reason ?? new DOMException("Aborted", "AbortError"));

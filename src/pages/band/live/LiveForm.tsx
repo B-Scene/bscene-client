@@ -26,6 +26,7 @@ import type { BandMemberProfileResponse } from "@/types/band/bandMemberProfile";
 import type {
   LiveApiResponse,
   LiveReservationCoHostCandidate,
+  LiveReservationResponse,
 } from "@/types/live/live";
 import type { ActiveLive, GoLiveScreen, LiveFormMode } from "./types";
 import { ConfirmDialog } from "./components/ConfirmDialog";
@@ -107,6 +108,68 @@ const getErrorMessage = (error: unknown, fallbackMessage: string) => {
   return fallbackMessage;
 };
 
+const getUploadedMediaUrl = (uploadResult: unknown) => {
+  if (typeof uploadResult === "string") {
+    return uploadResult;
+  }
+
+  if (!uploadResult || typeof uploadResult !== "object") {
+    return "";
+  }
+
+  const result = uploadResult as {
+    url?: string;
+    imageUrl?: string;
+    fileUrl?: string;
+    mediaUrl?: string;
+    thumbnailImageUrl?: string;
+    result?:
+      | string
+      | {
+          url?: string;
+          imageUrl?: string;
+          fileUrl?: string;
+          mediaUrl?: string;
+          thumbnailImageUrl?: string;
+        };
+  };
+
+  if (typeof result.result === "string") {
+    return result.result;
+  }
+
+  if (result.result && typeof result.result === "object") {
+    return (
+      result.result.thumbnailImageUrl ??
+      result.result.imageUrl ??
+      result.result.fileUrl ??
+      result.result.mediaUrl ??
+      result.result.url ??
+      ""
+    );
+  }
+
+  return (
+    result.thumbnailImageUrl ??
+    result.imageUrl ??
+    result.fileUrl ??
+    result.mediaUrl ??
+    result.url ??
+    ""
+  );
+};
+
+const getReservationThumbnailUrl = (reservation: LiveReservationResponse) => {
+  return (
+    reservation.thumbnailImageUrl ??
+    reservation.thumbnailUrl ??
+    reservation.liveThumbnailImageUrl ??
+    reservation.liveThumbnailUrl ??
+    reservation.imageUrl ??
+    ""
+  );
+};
+
 const getInitialSelectedCoHostIds = (
   candidates: LiveReservationCoHostCandidate[],
 ) => {
@@ -153,7 +216,8 @@ const mapBandMemberToCoHostCandidate = (
   }
 
   const isOwner =
-    Boolean(activeProfileId) && Number(resolvedProfileId) === Number(activeProfileId);
+    Boolean(activeProfileId) &&
+    Number(resolvedProfileId) === Number(activeProfileId);
 
   return {
     bandMemberId: member.id,
@@ -255,18 +319,14 @@ export function LiveForm({
           (candidate) => candidate.bandMemberId === coHostId,
         ),
       )
-      .filter(
-        (
-          candidate,
-        ): candidate is LiveReservationCoHostCandidate => {
-          if (!candidate) return false;
-          if (candidate.status === "OWNER") return false;
+      .filter((candidate): candidate is LiveReservationCoHostCandidate => {
+        if (!candidate) return false;
+        if (candidate.status === "OWNER") return false;
 
-          const submitId = candidate.userId ?? candidate.bandMemberProfileId;
+        const submitId = candidate.userId ?? candidate.bandMemberProfileId;
 
-          return Number.isFinite(submitId);
-        },
-      )
+        return Number.isFinite(submitId);
+      })
       .map((candidate) => candidate.userId ?? candidate.bandMemberProfileId);
   };
 
@@ -327,10 +387,18 @@ export function LiveForm({
     setIsUploadingThumbnail(true);
 
     try {
-      return await uploadMediaFile({
+      const uploadResult = await uploadMediaFile({
         category: "STREAM_THUMBNAIL",
         file: thumbnailImage,
       });
+
+      const uploadedUrl = getUploadedMediaUrl(uploadResult);
+
+      if (!uploadedUrl) {
+        throw new Error("썸네일 이미지 업로드 URL을 확인할 수 없어요.");
+      }
+
+      return uploadedUrl;
     } finally {
       setIsUploadingThumbnail(false);
     }
@@ -355,6 +423,7 @@ export function LiveForm({
         title: trimmedTitle,
         description: trimmedDescription || undefined,
         thumbnailImageUrl,
+        thumbnailUrl: thumbnailImageUrl,
         scheduledAt: isReserve
           ? toCreateScheduledAt(reservedDate, reservedTime)
           : null,
@@ -412,6 +481,7 @@ export function LiveForm({
           title: trimmedTitle,
           description: trimmedDescription,
           thumbnailImageUrl,
+          thumbnailUrl: thumbnailImageUrl,
           scheduledAt: toUpdateScheduledAt(reservedDate, reservedTime),
           cohosts: hasCoHostSelectionChanged ? submitCoHostIds : null,
         },
@@ -519,9 +589,7 @@ export function LiveForm({
             ),
           )
           .filter(
-            (
-              candidate,
-            ): candidate is LiveReservationCoHostCandidate =>
+            (candidate): candidate is LiveReservationCoHostCandidate =>
               Boolean(candidate),
           );
 
@@ -571,11 +639,12 @@ export function LiveForm({
         const { date, time } = splitScheduledAt(reservation.scheduledAt);
         const candidates = reservation.cohostCandidates ?? [];
         const initialSelectedIds = getInitialSelectedCoHostIds(candidates);
+        const thumbnailImageUrl = getReservationThumbnailUrl(reservation);
 
         setTitle(reservation.title ?? "");
         setDescription(reservation.description ?? "");
-        setSavedThumbnailImageUrl(reservation.thumbnailImageUrl ?? "");
-        setThumbnailPreviewUrl(reservation.thumbnailImageUrl ?? null);
+        setSavedThumbnailImageUrl(thumbnailImageUrl);
+        setThumbnailPreviewUrl(thumbnailImageUrl || null);
         setThumbnailImage(null);
         setReservedDate(date);
         setReservedTime(time);

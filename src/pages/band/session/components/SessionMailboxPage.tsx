@@ -27,9 +27,7 @@ interface MessageItem {
   canSend: boolean;
 }
 
-const formatChatTime = (
-  value: string | null,
-) => {
+const formatChatTime = (value: string | null) => {
   if (!value) return "";
 
   const date = new Date(value);
@@ -38,31 +36,19 @@ const formatChatTime = (
     return value.slice(11, 16);
   }
 
-  return `${String(date.getHours()).padStart(
-    2,
-    "0",
-  )}:${String(date.getMinutes()).padStart(
-    2,
-    "0",
-  )}`;
+  return `${String(date.getHours()).padStart(2, "0")}:${String(
+    date.getMinutes(),
+  ).padStart(2, "0")}`;
 };
 
-const toMessageStatus = (
-  value: string | null,
-): MessageStatus | undefined => {
+const toMessageStatus = (value: string | null): MessageStatus | undefined => {
   if (!value) return undefined;
 
-  if (
-    value.includes("수락") ||
-    value.toUpperCase() === "ACCEPTED"
-  ) {
+  if (value.includes("수락") || value.toUpperCase() === "ACCEPTED") {
     return "accepted";
   }
 
-  if (
-    value.includes("거절") ||
-    value.toUpperCase() === "REJECTED"
-  ) {
+  if (value.includes("거절") || value.toUpperCase() === "REJECTED") {
     return "declined";
   }
 
@@ -75,21 +61,12 @@ const mapChatRoomToMessageItem = (
   return {
     id: room.chatRoomId,
     senderName: room.counterpartName,
-    profileImageUrl:
-      room.counterpartProfileImageUrl ||
-      UserDefaultProfileIcon,
-    preview:
-      room.lastMessage ||
-      "아직 주고받은 쪽지가 없어요.",
+    profileImageUrl: room.counterpartProfileImageUrl || UserDefaultProfileIcon,
+    preview: room.lastMessage || "아직 주고받은 쪽지가 없어요.",
     time: formatChatTime(room.lastMessageAt),
-    unreadCount:
-      room.unreadCount > 0
-        ? room.unreadCount
-        : undefined,
+    unreadCount: room.unreadCount > 0 ? room.unreadCount : undefined,
     showUnreadDot: room.unreadCount > 0,
-    status: toMessageStatus(
-      room.applicationStatus,
-    ),
+    status: toMessageStatus(room.applicationStatus),
     canSend: room.canSend,
   };
 };
@@ -97,19 +74,15 @@ const mapChatRoomToMessageItem = (
 export default function SessionMailboxPage() {
   const navigate = useNavigate();
 
-  const [selectedTab, setSelectedTab] =
-    useState<MailboxTab>("all");
+  const [selectedTab, setSelectedTab] = useState<MailboxTab>("all");
 
   const filter: SessionChatRoomFilter =
-    selectedTab === "unread"
-      ? "UNREAD"
-      : "ALL";
+    selectedTab === "unread" ? "UNREAD" : "ALL";
 
-  const chatRoomsQuery =
-    useSessionChatRoomsQuery({
-      filter,
-      size: 20,
-    });
+  const chatRoomsQuery = useSessionChatRoomsQuery({
+    filter,
+    size: 20,
+  });
 
   useSessionChatRoomListSocket();
 
@@ -118,72 +91,57 @@ export default function SessionMailboxPage() {
       chatRoomsQuery.data?.content
         .filter(
           (room) =>
-            Boolean(room.lastMessage?.trim()) &&
-            Boolean(room.lastMessageAt),
+            Boolean(room.lastMessage?.trim()) && Boolean(room.lastMessageAt),
         )
         .map(mapChatRoomToMessageItem) ?? [],
     [chatRoomsQuery.data],
   );
 
-  const handleMessageClick = (
-    message: MessageItem,
-  ) => {
-    navigate(
-      `/band/session/messages/${message.id}`,
-      {
-        state: {
-          senderName: message.senderName,
-          profileImageUrl:
-            message.profileImageUrl,
-          chatRoomId: message.id,
-          canSend: message.canSend,
-        },
+  const handleMessageClick = (message: MessageItem) => {
+    navigate(`/band/session/messages/${message.id}`, {
+      state: {
+        senderName: message.senderName,
+        profileImageUrl: message.profileImageUrl,
+        chatRoomId: message.id,
+        canSend: message.canSend,
       },
-    );
+    });
   };
 
   return (
+<<<<<<< HEAD
     <main className="flex h-dvh w-full flex-col overflow-hidden bg-neutral-0">
       <MailboxHeader
         onBack={() => navigate(-1)}
       />
+=======
+    <main className="mx-auto flex h-dvh w-full max-w-[393px] flex-col overflow-hidden bg-neutral-0">
+      <MailboxHeader onBack={() => navigate(-1)} />
+>>>>>>> develop
 
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
-        <MailboxTabBar
-          selectedTab={selectedTab}
-          onChange={setSelectedTab}
-        />
+        <MailboxTabBar selectedTab={selectedTab} onChange={setSelectedTab} />
 
         <section
           aria-label={
-            selectedTab === "all"
-              ? "전체 쪽지 목록"
-              : "읽지 않은 쪽지 목록"
+            selectedTab === "all" ? "전체 쪽지 목록" : "읽지 않은 쪽지 목록"
           }
           className="mt-6 flex flex-col gap-3 px-[15px] pb-8"
         >
           {chatRoomsQuery.isLoading ? (
             <MailboxLoading />
           ) : chatRoomsQuery.isError ? (
-            <MailboxError
-              onRetry={() =>
-                chatRoomsQuery.refetch()
-              }
-            />
+            <MailboxError onRetry={() => chatRoomsQuery.refetch()} />
           ) : messages.length > 0 ? (
             messages.map((message) => (
               <MessageCard
                 key={message.id}
                 message={message}
-                onClick={() =>
-                  handleMessageClick(message)
-                }
+                onClick={() => handleMessageClick(message)}
               />
             ))
           ) : (
-            <EmptyMailbox
-              selectedTab={selectedTab}
-            />
+            <EmptyMailbox selectedTab={selectedTab} />
           )}
         </section>
       </div>
@@ -195,9 +153,7 @@ interface MailboxHeaderProps {
   onBack: () => void;
 }
 
-const MailboxHeader = ({
-  onBack,
-}: MailboxHeaderProps) => {
+const MailboxHeader = ({ onBack }: MailboxHeaderProps) => {
   return (
     <header className="relative flex h-[88px] w-full shrink-0 items-end justify-center bg-neutral-0 pb-[23px]">
       <button
@@ -206,11 +162,7 @@ const MailboxHeader = ({
         onClick={onBack}
         className="absolute bottom-[18px] left-[15px] flex size-8 items-center justify-center"
       >
-        <img
-          src={ArrowLeftIcon}
-          alt=""
-          className="size-6"
-        />
+        <img src={ArrowLeftIcon} alt="" className="size-6" />
       </button>
 
       <h1 className="text-[18px] leading-5 font-bold text-neutral-900">
@@ -225,15 +177,12 @@ interface MailboxTabBarProps {
   onChange: (tab: MailboxTab) => void;
 }
 
-const MailboxTabBar = ({
-  selectedTab,
-  onChange,
-}: MailboxTabBarProps) => {
+const MailboxTabBar = ({ selectedTab, onChange }: MailboxTabBarProps) => {
   return (
     <div
       role="tablist"
       aria-label="쪽지함 필터"
-      className="mx-[15px] mt-6 flex h-8 rounded-[6px] bg-secondary-100 p-0.5"
+      className="grid h-10 w-full grid-cols-2 border-b border-neutral-300 bg-neutral-0"
     >
       <MailboxTabButton
         label="전체"
@@ -267,13 +216,17 @@ const MailboxTabButton = ({
       role="tab"
       aria-selected={selected}
       onClick={onClick}
-      className={`flex min-w-0 flex-1 items-center justify-center rounded-[6px] text-[14px] leading-5 font-medium transition ${
-        selected
-          ? "border border-black/5 bg-neutral-0 text-neutral-900 shadow-[0_3px_8px_rgba(0,0,0,0.12),0_1px_3px_rgba(0,0,0,0.08)]"
-          : "bg-transparent text-neutral-900"
+      className={`relative flex min-w-0 items-center justify-center text-[14px] leading-5 font-medium transition ${
+        selected ? "text-secondary-500" : "text-neutral-400"
       }`}
     >
       {label}
+
+      <span
+        className={`absolute right-0 bottom-[-1px] left-0 h-0.5 transition ${
+          selected ? "bg-secondary-500" : "bg-transparent"
+        }`}
+      />
     </button>
   );
 };
@@ -283,12 +236,8 @@ interface MessageCardProps {
   onClick: () => void;
 }
 
-const MessageCard = ({
-  message,
-  onClick,
-}: MessageCardProps) => {
-  const isDeclined =
-    message.status === "declined";
+const MessageCard = ({ message, onClick }: MessageCardProps) => {
+  const isDeclined = message.status === "declined";
 
   return (
     <button
@@ -307,33 +256,25 @@ const MessageCard = ({
           <div className="flex min-w-0 items-center gap-[10px]">
             <strong
               className={`truncate text-[18px] leading-5 font-bold ${
-                isDeclined
-                  ? "text-neutral-400"
-                  : "text-neutral-900"
+                isDeclined ? "text-neutral-400" : "text-neutral-900"
               }`}
             >
               {message.senderName}
             </strong>
 
             {message.unreadCount ? (
-              <UnreadCountBadge
-                count={message.unreadCount}
-              />
+              <UnreadCountBadge count={message.unreadCount} />
             ) : null}
 
             {message.status ? (
-              <MessageStatusBadge
-                status={message.status}
-              />
+              <MessageStatusBadge status={message.status} />
             ) : null}
           </div>
 
           <div className="flex shrink-0 items-center gap-[10px]">
             <time
               className={`text-[10px] leading-3 font-medium ${
-                isDeclined
-                  ? "text-neutral-400"
-                  : "text-neutral-500"
+                isDeclined ? "text-neutral-400" : "text-neutral-500"
               }`}
             >
               {message.time}
@@ -350,9 +291,7 @@ const MessageCard = ({
 
         <p
           className={`mt-2 line-clamp-2 whitespace-pre-line text-[12px] leading-[18px] font-medium ${
-            isDeclined
-              ? "text-neutral-400"
-              : "text-neutral-800"
+            isDeclined ? "text-neutral-400" : "text-neutral-800"
           }`}
         >
           {message.preview}
@@ -366,9 +305,7 @@ interface UnreadCountBadgeProps {
   count: number;
 }
 
-const UnreadCountBadge = ({
-  count,
-}: UnreadCountBadgeProps) => {
+const UnreadCountBadge = ({ count }: UnreadCountBadgeProps) => {
   return (
     <span className="flex size-[18px] shrink-0 items-center justify-center rounded-full bg-secondary-500 px-[5px] text-[10px] leading-none font-medium text-neutral-0">
       {count}
@@ -380,9 +317,7 @@ interface MessageStatusBadgeProps {
   status: MessageStatus;
 }
 
-const MessageStatusBadge = ({
-  status,
-}: MessageStatusBadgeProps) => {
+const MessageStatusBadge = ({ status }: MessageStatusBadgeProps) => {
   const isAccepted = status === "accepted";
 
   return (
@@ -402,9 +337,7 @@ interface EmptyMailboxProps {
   selectedTab: MailboxTab;
 }
 
-const EmptyMailbox = ({
-  selectedTab,
-}: EmptyMailboxProps) => {
+const EmptyMailbox = ({ selectedTab }: EmptyMailboxProps) => {
   return (
     <div className="flex min-h-[320px] items-center justify-center text-center">
       <p className="text-caption1 text-neutral-500">
@@ -424,11 +357,7 @@ const MailboxLoading = () => {
   );
 };
 
-const MailboxError = ({
-  onRetry,
-}: {
-  onRetry: () => void;
-}) => {
+const MailboxError = ({ onRetry }: { onRetry: () => void }) => {
   return (
     <div className="flex min-h-[320px] flex-col items-center justify-center text-center">
       <p className="text-caption1 text-neutral-500">
