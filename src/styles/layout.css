@@ -33,7 +33,12 @@
      anchor to the frame instead of the browser viewport */
   transform: translateZ(0);
 
-  @media (min-width: 768px), (hover: hover) and (pointer: fine) {
+  /* min-width alone (no hover/pointer check): S Pen-capable Galaxy phones
+     report (hover: hover) and (pointer: fine) via the pen's hover sensing
+     even when the user is just touching with a finger, which previously
+     boxed those phones into the desktop-mockup frame and let .page-frame's
+     dark background peek out above/below the letterboxed content. */
+  @media (min-width: 768px) {
     width: min(393px, 100vw);
 
     @media (min-height: 852px) {
@@ -49,7 +54,7 @@
 .frame-width {
   width: 100%;
 
-  @media (min-width: 768px), (hover: hover) and (pointer: fine) {
+  @media (min-width: 768px) {
     width: min(393px, 100vw);
   }
 }
