@@ -225,11 +225,13 @@ const ExploreSortSheet = ({
   onClose,
   selectedSort,
   onSelect,
+  disabledOptions = [],
 }: {
   open: boolean;
   onClose: () => void;
   selectedSort: ExploreSortOption;
   onSelect: (sort: ExploreSortOption) => void;
+  disabledOptions?: ExploreSortOption[];
 }) => {
   const { rendered, isVisible, handleTransitionEnd } = useSlideUpSheet(open);
 
@@ -258,18 +260,24 @@ const ExploreSortSheet = ({
       >
         {EXPLORE_SORT_OPTIONS.map((option) => {
           const isSelected = selectedSort === option;
+          const isDisabled = disabledOptions.includes(option);
 
           return (
             <button
               key={option}
               type="button"
+              disabled={isDisabled}
               onClick={() => {
                 onSelect(option);
                 onClose();
               }}
               className={[
                 "box-border flex h-6 w-full items-center justify-between px-3 font-body text-label2",
-                isSelected ? "text-primary-400" : "text-neutral-900",
+                isDisabled
+                  ? "cursor-not-allowed text-neutral-400"
+                  : isSelected
+                    ? "text-primary-400"
+                    : "text-neutral-900",
               ].join(" ")}
             >
               {option}
@@ -310,6 +318,7 @@ export const ExploreFilterBar = ({
   appliedSort,
   highlightSort = true,
   disabledFilterIds = [],
+  requireFilterForSort = false,
   onSortClick,
   onFilterClick,
 }: {
@@ -317,6 +326,7 @@ export const ExploreFilterBar = ({
   appliedSort?: string | null;
   highlightSort?: boolean;
   disabledFilterIds?: string[];
+  requireFilterForSort?: boolean;
   onSortClick?: () => void;
   onFilterClick?: () => void;
 }) => {
@@ -331,6 +341,7 @@ export const ExploreFilterBar = ({
     : filterChips;
   const isSortApplied = Boolean(appliedSort);
   const shouldHighlightSort = isSortApplied && highlightSort;
+  const isSortDisabled = requireFilterForSort && !hasAppliedFilter;
   const sortChipWidthClass = appliedSort === "정확도순" ? "w-[73px]" : "w-[62px]";
 
   return (
@@ -338,13 +349,16 @@ export const ExploreFilterBar = ({
       <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto pr-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <button
           type="button"
+          disabled={isSortDisabled}
           onClick={onSortClick}
           className={[
             "box-border flex h-[22px] shrink-0 items-center justify-center gap-[4px] whitespace-nowrap rounded-full border px-[15px] py-[7px] text-center font-body text-caption3",
             sortChipWidthClass,
-            shouldHighlightSort
-              ? "border-primary-400 bg-primary-0 text-primary-400"
-              : "border-neutral-400 bg-neutral-0 text-neutral-600",
+            isSortDisabled
+              ? "cursor-not-allowed border-neutral-300 bg-neutral-0 text-neutral-400"
+              : shouldHighlightSort
+                ? "border-primary-400 bg-primary-0 text-primary-400"
+                : "border-neutral-400 bg-neutral-0 text-neutral-600",
           ].join(" ")}
         >
           {appliedSort ?? DEFAULT_SORT_LABEL}
@@ -353,9 +367,11 @@ export const ExploreFilterBar = ({
             alt=""
             className={[
               "h-[7px] w-[12px]",
-              shouldHighlightSort
-                ? "[filter:brightness(0)_saturate(100%)_invert(39%)_sepia(80%)_saturate(2432%)_hue-rotate(319deg)_brightness(96%)_contrast(96%)]"
-                : "[filter:brightness(0)_saturate(100%)_invert(44%)_sepia(0%)_saturate(0%)_hue-rotate(173deg)_brightness(95%)_contrast(92%)]",
+              isSortDisabled
+                ? "opacity-40 [filter:brightness(0)_saturate(100%)_invert(44%)_sepia(0%)_saturate(0%)_hue-rotate(173deg)_brightness(95%)_contrast(92%)]"
+                : shouldHighlightSort
+                  ? "[filter:brightness(0)_saturate(100%)_invert(39%)_sepia(80%)_saturate(2432%)_hue-rotate(319deg)_brightness(96%)_contrast(96%)]"
+                  : "[filter:brightness(0)_saturate(100%)_invert(44%)_sepia(0%)_saturate(0%)_hue-rotate(173deg)_brightness(95%)_contrast(92%)]",
             ].join(" ")}
           />
         </button>
@@ -803,6 +819,7 @@ const FanExplorePage = () => {
         appliedSort={appliedSort}
         highlightSort={selectedSort !== "추천순"}
         disabledFilterIds={["content"]}
+        requireFilterForSort
         onSortClick={() => setIsSortSheetOpen(true)}
         onFilterClick={() => setIsFilterSheetOpen(true)}
       />
@@ -819,6 +836,7 @@ const FanExplorePage = () => {
         onClose={() => setIsSortSheetOpen(false)}
         selectedSort={selectedSort}
         onSelect={setSelectedSort}
+        disabledOptions={hasAppliedFilter ? [] : ["정확도순", "인기순"]}
       />
       <ExploreFilterSheet
         open={isFilterSheetOpen}
