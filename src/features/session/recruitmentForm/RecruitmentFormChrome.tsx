@@ -6,6 +6,16 @@ import CloseIcon from "@/assets/icons/close-header.svg";
 import type { FormStep } from "./sessionRecruitmentForm.types";
 import { joinClassNames } from "./sessionRecruitmentForm.utils";
 
+const normalizeRecruitmentOptionValue = (value: string) => {
+  const trimmedValue = value.trim();
+
+  if (trimmedValue.toLowerCase() === "etc.") {
+    return "etc";
+  }
+
+  return trimmedValue;
+};
+
 export const RecruitmentSelectBottomSheet = ({
   title,
   options,
@@ -19,10 +29,12 @@ export const RecruitmentSelectBottomSheet = ({
   onSelect: (value: string) => void;
   onClose: () => void;
 }) => {
-  const [draftValue, setDraftValue] = useState(selectedValue);
+  const [draftValue, setDraftValue] = useState(() =>
+    normalizeRecruitmentOptionValue(selectedValue),
+  );
 
   useEffect(() => {
-    setDraftValue(selectedValue);
+    setDraftValue(normalizeRecruitmentOptionValue(selectedValue));
   }, [selectedValue]);
 
   const canApply = draftValue.length > 0;
@@ -30,7 +42,7 @@ export const RecruitmentSelectBottomSheet = ({
   const handleApply = () => {
     if (!canApply) return;
 
-    onSelect(draftValue);
+    onSelect(normalizeRecruitmentOptionValue(draftValue));
     onClose();
   };
 
@@ -52,6 +64,7 @@ export const RecruitmentSelectBottomSheet = ({
       >
         <header className="h-[70px] shrink-0 px-6 pt-3">
           <div className="mx-auto h-1.5 w-14 rounded-full bg-neutral-300" />
+
           <h2 className="mt-5 text-center text-h4 text-neutral-900">필터</h2>
         </header>
 
@@ -62,13 +75,15 @@ export const RecruitmentSelectBottomSheet = ({
 
               <div className="mt-2 flex flex-wrap gap-x-1.5 gap-y-1.5">
                 {options.map((option) => {
-                  const isSelected = draftValue === option;
+                  const normalizedOption =
+                    normalizeRecruitmentOptionValue(option);
+                  const isSelected = draftValue === normalizedOption;
 
                   return (
                     <button
                       key={option}
                       type="button"
-                      onClick={() => setDraftValue(option)}
+                      onClick={() => setDraftValue(normalizedOption)}
                       className={joinClassNames(
                         "flex h-[26px] items-center justify-center rounded-full px-3 text-caption3",
                         isSelected
@@ -76,7 +91,7 @@ export const RecruitmentSelectBottomSheet = ({
                           : "bg-neutral-300 text-neutral-600",
                       )}
                     >
-                      {option === "etc" ? "etc." : option}
+                      {normalizedOption}
                     </button>
                   );
                 })}

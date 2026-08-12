@@ -114,10 +114,13 @@ export const SessionFindScreen = ({ values }: SessionFindScreenProps) => {
     <div className="bg-neutral-0">
       {isNoticeVisible ? (
         <section className="border-b border-neutral-300 bg-neutral-0 px-6 pb-[9px]">
-          <div className="relative flex min-h-[68px] w-full items-center justify-center rounded-[12px] border border-[#FBB10E] bg-secondary-0 px-[34px] py-[15px]">
-            <p className="text-center text-caption2 text-neutral-600">
-              기본 지원서의 활동 지역과 장르가 먼저 적용돼요. <br />
-              원하는 조건이 있다면 필터에서 자유롭게 변경할 수 있어요.
+          <div className="relative flex min-h-[86px] w-full items-center justify-center rounded-[12px] border border-[#FBB10E] bg-secondary-0 px-[26px] py-[15px]">
+            <p className="text-center text-caption2 leading-[20px] text-neutral-600">
+              기본 지원서의 활동 지역과 장르가
+              <br />
+              먼저 적용돼요. 원하는 조건이 있다면
+              <br />
+              필터에서 자유롭게 변경할 수 있어요.
             </p>
 
             <button
@@ -134,7 +137,7 @@ export const SessionFindScreen = ({ values }: SessionFindScreenProps) => {
         <div className="border-b border-neutral-300" />
       )}
 
-      <section className="flex flex-col gap-3 px-6 pt-3">
+      <section className="flex flex-col gap-[18px] px-6 pt-[18px]">
         {applicationsQuery.isLoading ? (
           <div className="flex min-h-[220px] items-center justify-center rounded-[12px] bg-neutral-0 px-6 text-center text-caption1 text-neutral-500 shadow-[0_0_8px_rgba(0,0,0,0.08)]">
             세션 뮤지션을 불러오고 있어요

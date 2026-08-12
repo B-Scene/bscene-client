@@ -195,7 +195,7 @@ function ChatProfileImage({
     </div>
   );
 
-  if (!onClick || chat.pending) {
+  if (!onClick || chat.pending || chat.highlighted) {
     return imageElement;
   }
 
@@ -227,46 +227,47 @@ function ChatBubble({
     if (!canOpenProfileAction) return;
     onProfileClick?.(chat);
   };
-if (chat.highlighted) {
-  return (
-    <article className="grid grid-cols-[40px_283px] items-start gap-[15px]">
-      <ChatProfileImage chat={chat} onClick={handleOpenProfileAction} />
 
-      <div
-        role={canOpenProfileAction ? "button" : undefined}
-        tabIndex={canOpenProfileAction ? 0 : undefined}
-        onClick={handleOpenProfileAction}
-        onKeyDown={(event) => {
-          if (!canOpenProfileAction) return;
+  if (chat.highlighted) {
+    return (
+      <article className="grid grid-cols-[40px_283px] items-start gap-[15px]">
+        <ChatProfileImage chat={chat} onClick={handleOpenProfileAction} />
 
-          if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            handleOpenProfileAction();
-          }
-        }}
-        className={`relative min-h-[73px] w-[283px] max-w-full rounded-2xl border border-secondary-300 bg-secondary-0/50 px-[11px] py-[7px] pr-11 ${
-          canOpenProfileAction ? "cursor-pointer" : ""
-        }`}
-      >
-        <strong className="block text-caption3 text-neutral-900">
-          {chat.sender}
-        </strong>
+        <div
+          role={canOpenProfileAction ? "button" : undefined}
+          tabIndex={canOpenProfileAction ? 0 : undefined}
+          onClick={handleOpenProfileAction}
+          onKeyDown={(event) => {
+            if (!canOpenProfileAction) return;
 
-        <p
-          className={`mt-1 break-words whitespace-pre-wrap text-body3 text-neutral-900 ${
-            chat.pending ? "opacity-60" : ""
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              handleOpenProfileAction();
+            }
+          }}
+          className={`relative min-h-[73px] w-[283px] max-w-full rounded-2xl border border-secondary-300 bg-secondary-0/50 px-[11px] py-[7px] pr-11 ${
+            canOpenProfileAction ? "cursor-pointer" : ""
           }`}
         >
-          {chat.message}
-        </p>
+          <strong className="block text-caption3 text-neutral-900">
+            {chat.sender}
+          </strong>
 
-        <time className="absolute right-[11px] top-1/2 -translate-y-1/2 text-caption4 text-neutral-600">
-          {chat.time}
-        </time>
-      </div>
-    </article>
-  );
-}
+          <p
+            className={`mt-1 break-words whitespace-pre-wrap text-body3 text-neutral-900 ${
+              chat.pending ? "opacity-60" : ""
+            }`}
+          >
+            {chat.message}
+          </p>
+
+          <time className="absolute right-[11px] top-1/2 -translate-y-1/2 text-caption4 text-neutral-600">
+            {chat.time}
+          </time>
+        </div>
+      </article>
+    );
+  }
 
   return (
     <article className="grid grid-cols-[40px_283px] items-start gap-[15px]">
@@ -462,9 +463,7 @@ export function LiveActionBar({
               max={150}
               step={5}
               value={displayVolume}
-              onChange={(event) =>
-                onMicVolumeChange(Number(event.target.value))
-              }
+              onChange={(event) => onMicVolumeChange(Number(event.target.value))}
               aria-label="마이크 볼륨"
               className="h-1 min-w-0 flex-1 cursor-pointer accent-secondary-500"
             />
@@ -500,67 +499,73 @@ export function MemberSheet({
 }) {
   return (
     <div
-      className="absolute inset-0 z-40 bg-black/70"
+      className="fixed inset-0 z-40 flex items-end justify-center bg-black/70"
       onClick={() => go("room")}
       role="presentation"
     >
       <section
-        className="absolute inset-x-0 bottom-0 rounded-t-[22px] bg-neutral-0 px-8 pt-2.5 pb-8"
+        className="flex max-h-[min(72dvh,560px)] min-h-[236px] w-full max-w-[393px] flex-col rounded-t-[22px] bg-neutral-0 px-8 pt-2.5 pb-[calc(env(safe-area-inset-bottom)+24px)]"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="mx-auto h-1 w-[42px] rounded-full bg-neutral-300" />
+        <div className="mx-auto h-1 w-[42px] shrink-0 rounded-full bg-neutral-300" />
 
-        <h2 className="mt-7 text-center text-h4 font-bold text-neutral-900">
+        <h2 className="mt-7 shrink-0 text-center text-h4 font-bold text-neutral-900">
           멤버
         </h2>
 
-        <div className="mt-4 grid gap-3">
-          {isLoading ? (
-            <p className="py-6 text-center text-caption2 text-neutral-500">
-              멤버를 불러오는 중이에요.
-            </p>
-          ) : null}
+        <div className="mt-4 min-h-0 flex-1 overflow-y-auto pr-1">
+          <div className="grid gap-3">
+            {isLoading ? (
+              <p className="py-6 text-center text-caption2 text-neutral-500">
+                멤버를 불러오는 중이에요.
+              </p>
+            ) : null}
 
-          {!isLoading && members.length === 0 ? (
-            <p className="py-6 text-center text-caption2 text-neutral-500">
-              표시할 멤버가 없어요.
-            </p>
-          ) : null}
+            {!isLoading && members.length === 0 ? (
+              <p className="py-6 text-center text-caption2 text-neutral-500">
+                표시할 멤버가 없어요.
+              </p>
+            ) : null}
 
-          {!isLoading
-            ? members.map((member, index) => (
-                <article
-                  key={`${member.nickname}-${member.bandName}-${index}`}
-                  className="flex h-[52px] items-center rounded-lg bg-neutral-0 px-4 shadow-[0_2px_8px_rgba(20,20,20,0.10)]"
-                >
-                  <ProfileImage
-                    size="sm"
-                    src={member.bandProfileImageUrl ?? undefined}
-                  />
+            {!isLoading
+              ? members.map((member, index) => (
+                  <article
+                    key={`${member.nickname}-${member.bandName}-${index}`}
+                    className="flex h-[52px] items-center rounded-lg bg-neutral-0 px-4 shadow-[0_2px_8px_rgba(20,20,20,0.10)]"
+                  >
+                    <ProfileImage
+                      size="sm"
+                      src={
+                        member.profileImageUrl ??
+                        member.bandProfileImageUrl ??
+                        undefined
+                      }
+                    />
 
-                  <div className="ml-3 min-w-0">
-                    <div className="flex items-center gap-1">
-                      <strong className="block truncate text-caption3 text-neutral-900">
-                        {member.nickname}
-                      </strong>
+                    <div className="ml-3 min-w-0">
+                      <div className="flex items-center gap-1">
+                        <strong className="block truncate text-caption3 text-neutral-900">
+                          {member.nickname}
+                        </strong>
 
-                      {member.isLeader ? (
-                        <span className="shrink-0 rounded-full bg-secondary-100 px-1.5 py-0.5 text-caption4 text-secondary-600">
-                          리더
-                        </span>
-                      ) : null}
+                        {member.isLeader ? (
+                          <span className="shrink-0 rounded-full bg-secondary-100 px-1.5 py-0.5 text-caption4 text-secondary-600">
+                            리더
+                          </span>
+                        ) : null}
+                      </div>
+
+                      <span className="block truncate text-caption2 text-neutral-600">
+                        {formatMemberParts(member.part)}
+                      </span>
                     </div>
-
-                    <span className="block truncate text-caption2 text-neutral-600">
-                      {formatMemberParts(member.part)}
-                    </span>
-                  </div>
-                </article>
-              ))
-            : null}
+                  </article>
+                ))
+              : null}
+          </div>
         </div>
 
-        <div className="mx-auto mt-5 h-1 w-[132px] rounded-full bg-neutral-300" />
+        <div className="mx-auto mt-5 h-1 w-[132px] shrink-0 rounded-full bg-neutral-300" />
       </section>
     </div>
   );

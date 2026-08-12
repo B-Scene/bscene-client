@@ -40,7 +40,7 @@ export const RECRUITMENT_GENRE_OPTIONS = [
   "펑크록",
   "하드록",
   "메탈",
-  "etc.",
+  "etc",
 ];
 
 export const RECRUITMENT_REGION_OPTIONS = [

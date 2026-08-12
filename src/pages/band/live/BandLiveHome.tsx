@@ -49,13 +49,6 @@ type ScheduledLiveWithFields = (
   isMyBand?: boolean;
   isBandMember?: boolean;
   isRelatedBand?: boolean;
-
-  thumbnailUrl?: string | null;
-  thumbnailImage?: string | null;
-  thumbnailImageUrl?: string | null;
-  liveThumbnailUrl?: string | null;
-  liveThumbnailImageUrl?: string | null;
-  imageUrl?: string | null;
   bandProfileImageUrl?: string | null;
 };
 
@@ -70,26 +63,11 @@ type LiveNowWithFields = {
   isMyBand?: boolean;
   isBandMember?: boolean;
   isRelatedBand?: boolean;
-
   bandName: string;
   title: string;
   viewerCount?: number;
   viewCount?: number;
-
-  thumbnailImageUrl?: string | null;
-  thumbnailUrl?: string | null;
-  liveThumbnailImageUrl?: string | null;
-  liveThumbnailUrl?: string | null;
-  imageUrl?: string | null;
   bandProfileImageUrl?: string | null;
-};
-
-type ReservationThumbnailResponse = {
-  thumbnailImageUrl?: string | null;
-  thumbnailUrl?: string | null;
-  liveThumbnailImageUrl?: string | null;
-  liveThumbnailUrl?: string | null;
-  imageUrl?: string | null;
 };
 
 type RelationState = "same" | "different" | "unknown";
@@ -237,46 +215,12 @@ const getFirstImageUrl = (...urls: Array<string | null | undefined>) => {
   );
 };
 
-const getScheduledThumbnailUrl = (
-  live: ScheduledLiveItem | ScheduledLiveListItem,
+const getBandProfileImageUrl = (
+  live: {
+    bandProfileImageUrl?: string | null;
+  } | null | undefined,
 ) => {
-  const liveWithFields = live as ScheduledLiveWithFields;
-
-  return getFirstImageUrl(
-    liveWithFields.thumbnailImageUrl,
-    liveWithFields.thumbnailUrl,
-    liveWithFields.liveThumbnailImageUrl,
-    liveWithFields.liveThumbnailUrl,
-    liveWithFields.thumbnailImage,
-    liveWithFields.imageUrl,
-  );
-};
-
-const getLiveNowImageUrl = (live: LiveNowWithFields) => {
-  return getFirstImageUrl(
-    live.thumbnailImageUrl,
-    live.thumbnailUrl,
-    live.liveThumbnailImageUrl,
-    live.liveThumbnailUrl,
-    live.imageUrl,
-    live.bandProfileImageUrl,
-  );
-};
-
-const getReservationThumbnailUrl = (
-  reservation: ReservationThumbnailResponse | null | undefined,
-) => {
-  if (!reservation) {
-    return null;
-  }
-
-  return getFirstImageUrl(
-    reservation.thumbnailImageUrl,
-    reservation.thumbnailUrl,
-    reservation.liveThumbnailImageUrl,
-    reservation.liveThumbnailUrl,
-    reservation.imageUrl,
-  );
+  return getFirstImageUrl(live?.bandProfileImageUrl);
 };
 
 const hasBandRelationField = (
@@ -363,29 +307,6 @@ const mergeScheduledLive = (
   return {
     ...prevLive,
     ...nextLive,
-    thumbnailImageUrl:
-      getFirstImageUrl(
-        nextImageFields.thumbnailImageUrl,
-        prevImageFields.thumbnailImageUrl,
-      ) ?? undefined,
-    thumbnailUrl:
-      getFirstImageUrl(
-        nextImageFields.thumbnailUrl,
-        prevImageFields.thumbnailUrl,
-      ) ?? undefined,
-    liveThumbnailImageUrl:
-      getFirstImageUrl(
-        nextImageFields.liveThumbnailImageUrl,
-        prevImageFields.liveThumbnailImageUrl,
-      ) ?? undefined,
-    liveThumbnailUrl:
-      getFirstImageUrl(
-        nextImageFields.liveThumbnailUrl,
-        prevImageFields.liveThumbnailUrl,
-      ) ?? undefined,
-    imageUrl:
-      getFirstImageUrl(nextImageFields.imageUrl, prevImageFields.imageUrl) ??
-      undefined,
     bandProfileImageUrl:
       getFirstImageUrl(
         nextImageFields.bandProfileImageUrl,
@@ -403,7 +324,7 @@ const mapLiveNowToCandidateCard = (
     title: live.isMine ? "내 라이브 진행 중" : live.bandName,
     subtitle: live.title,
     listeners: `${live.viewerCount ?? live.viewCount ?? 0}명 청취 중`,
-    imageUrl: getLiveNowImageUrl(live),
+    imageUrl: getBandProfileImageUrl(live),
     isMine: live.isMine,
     relationState: getBandRelationState(live, activeBandId),
   };
@@ -419,7 +340,7 @@ const mapScheduledToCandidateCard = (
     title: live.title,
     scheduledAt: live.scheduledAt,
     isMine: Boolean(live.isMine),
-    imageUrl: getScheduledThumbnailUrl(live),
+    imageUrl: getBandProfileImageUrl(live),
     coHostUserIds: (live.coHosts ?? live.coHostList ?? [])
       .map((coHost) => coHost.userId)
       .filter((userId): userId is number => Number.isFinite(userId)),
@@ -579,33 +500,19 @@ export function BandLiveHome({
   const displayScheduledCards = useMemo<ScheduledLiveCardData[]>(() => {
     return scheduledCandidates.flatMap((live, index) => {
       const reservationQuery = scheduledReservationQueries[index];
-      const reservationData = reservationQuery?.data;
       const isReservationChecking =
         reservationQuery?.isLoading || reservationQuery?.isFetching;
-      const reservationThumbnailUrl = getReservationThumbnailUrl(
-        reservationData,
-      );
 
       if (live.relationState === "same") {
-        return [
-          {
-            ...live,
-            imageUrl: reservationThumbnailUrl ?? live.imageUrl,
-          },
-        ];
+        return [live];
       }
 
       if (isReservationChecking) {
         return [];
       }
 
-      if (reservationData) {
-        return [
-          {
-            ...live,
-            imageUrl: reservationThumbnailUrl ?? live.imageUrl,
-          },
-        ];
+      if (reservationQuery?.data) {
+        return [live];
       }
 
       return [];

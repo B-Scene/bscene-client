@@ -48,6 +48,16 @@ interface SessionApplicationsScreenProps {
   onDeleteApplication?: (sessionApplicationId: number) => void;
 }
 
+const normalizeSessionEnumValue = (value: string) => {
+  const trimmedValue = value.trim();
+
+  if (trimmedValue.toLowerCase() === "etc.") {
+    return "etc";
+  }
+
+  return trimmedValue;
+};
+
 const createApplicationRequestFromDraft = (
   draft: SessionApplicationDraft,
   purposeOverride?: string,
@@ -76,11 +86,11 @@ const createApplicationRequestFromDraft = (
     title: draft.title.trim(),
     oneLineIntro: draft.shortIntroduction.trim(),
     intro: draft.introduction.trim(),
-    part: draft.part,
-    skillLevel: draft.skillLevel,
-    genre: draft.genre,
-    region: draft.region,
-    availableActivities: draft.activities,
+    part: normalizeSessionEnumValue(draft.part),
+    skillLevel: normalizeSessionEnumValue(draft.skillLevel),
+    genre: normalizeSessionEnumValue(draft.genre),
+    region: normalizeSessionEnumValue(draft.region),
+    availableActivities: draft.activities.map(normalizeSessionEnumValue),
     careers: careers.length > 0 ? careers : undefined,
     portfolioLinks: portfolioLinks.length > 0 ? portfolioLinks : undefined,
   };
@@ -492,15 +502,15 @@ export const SessionApplicationsScreen = ({
           {hasApplications ? (
             <div className="mt-6 flex flex-col gap-3">
               {applications.map((application) => (
-            <SessionApplicationCard
-              key={application.sessionApplicationId}
-              application={application}
-              visibilityDisabled={visibilityMutation.isPending}
-              onView={handleViewApplication}
-              onEdit={handleEditApplication}
-              onDelete={handleDeleteApplication}
-              onToggleVisibility={handleToggleVisibility}
-            />
+                <SessionApplicationCard
+                  key={application.sessionApplicationId}
+                  application={application}
+                  visibilityDisabled={visibilityMutation.isPending}
+                  onView={handleViewApplication}
+                  onEdit={handleEditApplication}
+                  onDelete={handleDeleteApplication}
+                  onToggleVisibility={handleToggleVisibility}
+                />
               ))}
             </div>
           ) : (
