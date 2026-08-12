@@ -8,6 +8,7 @@ import { BottomNavBar } from "@/components/layout/BottomNavBar";
 import {
   useEnterLiveMutation,
   useLiveHomeQuery,
+  useLiveNowQuery,
   useReplayListQuery,
   useScheduledLiveQuery,
   useToggleLiveAlarmMutation,
@@ -35,8 +36,9 @@ const formatReplayDuration = (totalSeconds?: number) => {
 export function FanLiveHomePage() {
   const navigate = useNavigate();
   const { data, isLoading, isError, refetch } = useLiveHomeQuery();
+  const { data: liveNowListData } = useLiveNowQuery("all");
   const { data: replayListData } = useReplayListQuery("all", "LATEST");
-  const { data: scheduledListData } = useScheduledLiveQuery(true);
+  const { data: scheduledListData } = useScheduledLiveQuery(false);
   const enterLiveMutation = useEnterLiveMutation();
   const toggleAlarmMutation = useToggleLiveAlarmMutation();
   const [notificationOverrides, setNotificationOverrides] = useState<
@@ -52,6 +54,13 @@ export function FanLiveHomePage() {
       ),
     );
   }, [replayListData]);
+  const liveNowBandProfileImages = useMemo(() => {
+    return new Map(
+      (liveNowListData?.pages.flatMap((page) => page.items) ?? []).map(
+        (live) => [live.liveId, live.bandProfileImageUrl],
+      ),
+    );
+  }, [liveNowListData]);
   const scheduledBandProfileImages = useMemo(() => {
     return new Map(
       (scheduledListData?.pages.flatMap((page) => page.items) ?? []).map(
@@ -134,7 +143,11 @@ export function FanLiveHomePage() {
                 {data?.liveNow.map((live) => (
                   <LiveNowCard
                     key={live.liveId}
-                    imageSrc={live.bandProfileImageUrl || BandImage}
+                    imageSrc={
+                      live.bandProfileImageUrl ||
+                      liveNowBandProfileImages.get(live.liveId) ||
+                      BandImage
+                    }
                     imageAlt={`${live.bandName} 라이브 이미지`}
                     title={live.title}
                     bandName={live.bandName}
