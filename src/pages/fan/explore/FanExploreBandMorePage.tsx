@@ -20,6 +20,12 @@ import {
   ExploreFilterSheet,
   type AppliedExploreFilters,
 } from "@/pages/fan/explore/FanExplorePage";
+import {
+  SEARCH_SORT_LABELS,
+  SEARCH_SORT_TO_API,
+  type SearchResultSortOption,
+} from "@/pages/fan/explore/components/fanExploreSearchSort";
+import { SearchResultSortSheet } from "@/pages/fan/explore/components/FanExploreSearchSortSheet";
 import type { FanExploreBand, FanExploreSort } from "@/types/fan/explore";
 import {
   BAND_GENRE_BY_LABEL,
@@ -28,12 +34,6 @@ import {
   getRegionLabel,
 } from "@/utils/bandLabels";
 import { addRecentSearch } from "./recentSearches";
-
-const SORT_LABELS: Record<FanExploreSort, "정확도순" | "인기순"> = {
-  ACCURACY: "정확도순",
-  POPULAR: "인기순",
-  RECOMMEND: "정확도순",
-};
 
 const getSortParam = (value: string | null): FanExploreSort => {
   if (value === "POPULAR") return "POPULAR";
@@ -145,6 +145,7 @@ const FanExploreBandMorePage = () => {
   const [searchParams] = useSearchParams();
   const keyword = searchParams.get("q") || "WAVY";
   const sort = getSortParam(searchParams.get("sort"));
+  const [isSortSheetOpen, setIsSortSheetOpen] = useState(false);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
   const shouldHighlightSort =
     sort === "POPULAR" || searchParams.get("sortSelected") === "1";
@@ -209,6 +210,24 @@ const FanExploreBandMorePage = () => {
     return () => window.clearTimeout(timerId);
   }, [toastMessage]);
 
+  const applySort = (nextSortOption: SearchResultSortOption) => {
+    const nextSort = SEARCH_SORT_TO_API[nextSortOption];
+    const params = new URLSearchParams({
+      q: keyword,
+      sort: nextSort,
+    });
+
+    params.set("sortSelected", "1");
+    if (appliedFilters.genre !== "전체") params.set("genre", appliedFilters.genre);
+    if (appliedFilters.region !== "전체") {
+      params.set("region", appliedFilters.region);
+    }
+
+    navigate(`/fan/explore/search/results/bands?${params.toString()}`, {
+      replace: true,
+    });
+  };
+
   const applyFilters = (filters: AppliedExploreFilters) => {
     const params = new URLSearchParams({
       q: keyword,
@@ -271,8 +290,9 @@ const FanExploreBandMorePage = () => {
       <BandMoreTopBar initialKeyword={keyword} />
       <ExploreFilterBar
         appliedFilters={appliedFilters}
-        appliedSort={SORT_LABELS[sort]}
+        appliedSort={SEARCH_SORT_LABELS[sort]}
         highlightSort={shouldHighlightSort}
+        onSortClick={() => setIsSortSheetOpen(true)}
         onFilterClick={() => setIsFilterSheetOpen(true)}
       />
 
@@ -409,6 +429,12 @@ const FanExploreBandMorePage = () => {
         tone={toastMessage?.includes("실패") ? "error" : "success"}
       />
 
+      <SearchResultSortSheet
+        open={isSortSheetOpen}
+        onClose={() => setIsSortSheetOpen(false)}
+        selectedSort={SEARCH_SORT_LABELS[sort]}
+        onSelect={applySort}
+      />
       <ExploreFilterSheet
         open={isFilterSheetOpen}
         onClose={() => setIsFilterSheetOpen(false)}

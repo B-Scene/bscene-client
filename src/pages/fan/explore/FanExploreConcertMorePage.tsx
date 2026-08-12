@@ -14,18 +14,18 @@ import {
   ExploreFilterSheet,
   type AppliedExploreFilters,
 } from "@/pages/fan/explore/FanExplorePage";
+import {
+  SEARCH_SORT_LABELS,
+  SEARCH_SORT_TO_API,
+  type SearchResultSortOption,
+} from "@/pages/fan/explore/components/fanExploreSearchSort";
+import { SearchResultSortSheet } from "@/pages/fan/explore/components/FanExploreSearchSortSheet";
 import type { FanExplorePerformance, FanExploreSort } from "@/types/fan/explore";
 import {
   BAND_GENRE_BY_LABEL,
   BAND_REGION_BY_LABEL,
 } from "@/utils/bandLabels";
 import { addRecentSearch } from "./recentSearches";
-
-const SORT_LABELS: Record<FanExploreSort, "정확도순" | "인기순"> = {
-  ACCURACY: "정확도순",
-  POPULAR: "인기순",
-  RECOMMEND: "정확도순",
-};
 
 const getSortParam = (value: string | null): FanExploreSort => {
   if (value === "POPULAR") return "POPULAR";
@@ -205,6 +205,7 @@ const FanExploreConcertMorePage = () => {
   const [searchParams] = useSearchParams();
   const keyword = searchParams.get("q") || "WAVY";
   const sort = getSortParam(searchParams.get("sort"));
+  const [isSortSheetOpen, setIsSortSheetOpen] = useState(false);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
   const shouldHighlightSort =
     sort === "POPULAR" || searchParams.get("sortSelected") === "1";
@@ -253,6 +254,24 @@ const FanExploreConcertMorePage = () => {
   const isPerformanceError =
     isError && allSearchQuery.isError && concerts.length === 0;
 
+  const applySort = (nextSortOption: SearchResultSortOption) => {
+    const nextSort = SEARCH_SORT_TO_API[nextSortOption];
+    const params = new URLSearchParams({
+      q: keyword,
+      sort: nextSort,
+    });
+
+    params.set("sortSelected", "1");
+    if (appliedFilters.genre !== "전체") params.set("genre", appliedFilters.genre);
+    if (appliedFilters.region !== "전체") {
+      params.set("region", appliedFilters.region);
+    }
+
+    navigate(`/fan/explore/search/results/concerts?${params.toString()}`, {
+      replace: true,
+    });
+  };
+
   const applyFilters = (filters: AppliedExploreFilters) => {
     const params = new URLSearchParams({
       q: keyword,
@@ -273,8 +292,9 @@ const FanExploreConcertMorePage = () => {
       <ConcertMoreTopBar initialKeyword={keyword} />
       <ExploreFilterBar
         appliedFilters={appliedFilters}
-        appliedSort={SORT_LABELS[sort]}
+        appliedSort={SEARCH_SORT_LABELS[sort]}
         highlightSort={shouldHighlightSort}
+        onSortClick={() => setIsSortSheetOpen(true)}
         onFilterClick={() => setIsFilterSheetOpen(true)}
       />
 
@@ -357,6 +377,12 @@ const FanExploreConcertMorePage = () => {
         <div ref={sentinelRef} aria-hidden="true" className="h-px w-full" />
       </section>
 
+      <SearchResultSortSheet
+        open={isSortSheetOpen}
+        onClose={() => setIsSortSheetOpen(false)}
+        selectedSort={SEARCH_SORT_LABELS[sort]}
+        onSelect={applySort}
+      />
       <ExploreFilterSheet
         open={isFilterSheetOpen}
         onClose={() => setIsFilterSheetOpen(false)}
