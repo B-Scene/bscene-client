@@ -1112,15 +1112,23 @@ const FanHomePage = () => {
         leftAction={
           <button
             type="button"
-            aria-label="공연 캘린더"
-            onClick={() => navigate("/fan/home/concerts/calendar")}
-            className="flex size-6 items-center justify-center text-neutral-900"
+            aria-label="모드 전환"
+            onClick={() => setIsModeSwitchOpen(true)}
           >
-            <CalendarIcon />
+            <img src={SwapIcon} alt="" className="size-6" />
           </button>
         }
         rightAction={
           <>
+            <button
+              type="button"
+              aria-label="공연 캘린더"
+              onClick={() => navigate("/fan/home/concerts/calendar")}
+              className="flex size-6 items-center justify-center text-neutral-900"
+            >
+              <CalendarIcon />
+            </button>
+
             <button
               type="button"
               aria-label="알림"
@@ -1134,14 +1142,6 @@ const FanHomePage = () => {
               className="flex size-6 items-center justify-center text-neutral-900"
             >
               <NotificationBellIcon hasUnread={hasUnreadNotification} />
-            </button>
-
-            <button
-              type="button"
-              aria-label="모드 전환"
-              onClick={() => setIsModeSwitchOpen(true)}
-            >
-              <img src={SwapIcon} alt="" className="size-6" />
             </button>
           </>
         }
