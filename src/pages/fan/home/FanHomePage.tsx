@@ -1115,7 +1115,6 @@ const FanHomePage = () => {
             type="button"
             aria-label="모드 전환"
             onClick={() => setIsModeSwitchOpen(true)}
-            className="-ml-[9px]"
           >
             <img src={SwapIcon} alt="" className="size-6" />
           </button>

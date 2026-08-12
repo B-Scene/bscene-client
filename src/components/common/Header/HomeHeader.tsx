@@ -8,18 +8,18 @@ type HomeHeaderProps = {
 
 export const HomeHeader = ({ rightAction, leftAction }: HomeHeaderProps) => {
   return (
-    <header className="-mx-5 box-border grid h-12 w-[calc(100%+40px)] grid-cols-[1fr_auto_1fr] items-center bg-neutral-0 px-6">
-      <div className="flex items-center gap-4 justify-self-start [&>button]:flex [&>button]:size-6 [&>button]:items-center [&>button]:justify-center [&_svg]:size-6">
+    <header className="relative -mx-5 box-border flex h-12 w-[calc(100%+40px)] items-center justify-between bg-neutral-0 pl-3.75 pr-6">
+      <div className="flex items-center gap-4 [&>button]:flex [&>button]:size-6 [&>button]:items-center [&>button]:justify-center [&_svg]:size-6">
         {leftAction}
       </div>
 
       <img
         src={BSceneLogo}
         alt="B:Scene"
-        className="h-[30px] w-[105px] justify-self-center"
+        className="absolute top-1/2 left-1/2 h-7.5 w-26.25 -translate-x-1/2 -translate-y-1/2"
       />
 
-      <div className="flex items-center justify-end gap-4 [&>button]:flex [&>button]:size-6 [&>button]:items-center [&>button]:justify-center [&_svg]:size-6">
+      <div className="flex items-center gap-4 [&>button]:flex [&>button]:size-6 [&>button]:items-center [&>button]:justify-center [&_svg]:size-6">
         {rightAction}
       </div>
     </header>
