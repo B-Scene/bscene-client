@@ -140,6 +140,13 @@ const toPositiveNumberOrNull = (value: string | null) => {
   return Number.isFinite(numberValue) && numberValue > 0 ? numberValue : null;
 };
 
+// Pending push-read sync only succeeds while logged in; without this guard a
+// logged-out user with unsynced pending reads retries getNotifications on
+// every focus/visibility event, and each 401 bounces them through the axios
+// interceptor's redirect-to-login, which reloads the page and retries again
+// forever (see the 2026-08-13 "infinite refresh on login page" incident).
+const hasAccessToken = () => Boolean(localStorage.getItem("accessToken"));
+
 const getClickedPushNotificationFromCurrentUrl =
   (): ClickedPushNotification | null => {
     const params = new URLSearchParams(window.location.search);
@@ -366,7 +373,7 @@ export const PushNotificationBridge = () => {
     };
 
     const processStoredPendingPushReads = () => {
-      if (isProcessingStoredPendingReads) return;
+      if (isProcessingStoredPendingReads || !hasAccessToken()) return;
 
       isProcessingStoredPendingReads = true;
 
@@ -420,6 +427,8 @@ export const PushNotificationBridge = () => {
       void saveIndexedDbPendingPushNotificationRead(pendingRead).finally(() => {
         processStoredPendingPushReads();
       });
+
+      if (!hasAccessToken()) return;
 
       void getNotifications({ size: 50 })
         .then((notificationsPage) => {
