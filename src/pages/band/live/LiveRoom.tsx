@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
 import {
   createWhipSession,
   deleteWhipSession,
@@ -13,12 +14,13 @@ import {
   useCloseLiveMutation,
   useLeaveLiveMutation,
   useReportLiveUserMutation,
+  useRequestCoHostUpgradeMutation,
   useUnblockLiveUserMutation,
 } from "@/hooks/api/live/useLive";
 import type { LiveMemberItem, ReportLiveUserRequest } from "@/types/live/live";
 import { getApiErrorMessage } from "@/utils/getApiErrorMessage";
+
 import type { ActiveLive, ChatMessage, GoLiveScreen } from "./types";
-import { getCachedScheduledCoHostUserIds } from "./scheduledLiveCache";
 import {
   extractWhipPath,
   getAudioContextConstructor,
@@ -60,6 +62,11 @@ type LiveRoomView = "room" | "report" | "reportComplete";
 type ReportTarget = {
   targetUserId?: number;
   chatMessage: string;
+};
+
+type LiveCoPublisherLike = {
+  userId?: number | null;
+  whepUrl?: string | null;
 };
 
 const MIC_VOLUME_MIN = 0;
@@ -115,6 +122,7 @@ export function LiveRoom({
 }: LiveRoomProps) {
   const closeLiveMutation = useCloseLiveMutation();
   const leaveLiveMutation = useLeaveLiveMutation();
+  const requestCoHostUpgradeMutation = useRequestCoHostUpgradeMutation();
   const acceptCoHostUpgradeMutation = useAcceptCoHostUpgradeMutation();
   const reportLiveUserMutation = useReportLiveUserMutation();
   const blockLiveUserMutation = useBlockLiveUserMutation();
@@ -124,9 +132,12 @@ export function LiveRoom({
   const playbackProtocol = live?.playback?.protocol;
   const playbackUrl = live?.playback?.playbackUrl;
 
-  const canBroadcast =
-    playbackRole === "BROADCASTER" || playbackRole === "CO_HOST";
-  const canCloseLive = playbackRole === "BROADCASTER";
+  const isBroadcaster = playbackRole === "BROADCASTER";
+  const isCoHost = playbackRole === "CO_HOST";
+
+  const canBroadcast = isBroadcaster || isCoHost;
+  const canRequestCoHostUpgrade = playbackRole === "LISTENER";
+  const canAcceptCoHostUpgrade = isBroadcaster;
 
   const [view, setView] = useState<LiveRoomView>("room");
   const [viewerCount, setViewerCount] = useState(() =>
@@ -138,6 +149,11 @@ export function LiveRoom({
   const [audioStatus, setAudioStatus] = useState<LiveAudioStatus>("idle");
   const [audioErrorMessage, setAudioErrorMessage] = useState("");
   const [micInfoMessage, setMicInfoMessage] = useState("");
+  const [coHostRequestMessage, setCoHostRequestMessage] = useState("");
+  const [isCoHostUpgradeConfirmOpen, setIsCoHostUpgradeConfirmOpen] =
+  useState(false);
+  const [hasPendingCoHostUpgradeRequest, setHasPendingCoHostUpgradeRequest] =
+  useState(false);
   const [coHostApprovalMessage, setCoHostApprovalMessage] = useState("");
   const [micVolume, setMicVolume] = useState(DEFAULT_MIC_VOLUME);
   const [isMicMuted, setIsMicMuted] = useState(false);
@@ -150,6 +166,10 @@ export function LiveRoom({
   const [blockedUserIds, setBlockedUserIds] = useState<Set<number>>(
     () => new Set(),
   );
+  const [joinedCoPublisherUserIds, setJoinedCoPublisherUserIds] = useState<
+    Set<number>
+  >(() => new Set());
+  const [approvedCoHostCount, setApprovedCoHostCount] = useState(0);
 
   const selectedUserId = reportTarget?.targetUserId;
 
@@ -160,10 +180,65 @@ export function LiveRoom({
   const isBlockPending =
     blockLiveUserMutation.isPending || unblockLiveUserMutation.isPending;
 
+  const activeCoHostCount = useMemo(() => {
+  if (!canBroadcast) {
+    return 0;
+  }
+
+  /**
+   * 1순위: members API에서 공동 진행자로 표시된 사람만 카운트
+   * 팬/일반 청취자는 제외해야 하므로 liveMembers.length를 쓰면 안 됨.
+   */
+  const coHostCountFromMembers = liveMembers.filter((member) => {
+    return member.isCoHost && !member.isOwner;
+  }).length;
+
+  /**
+   * 2순위: WHEP 공동 송출자 이벤트로 들어온 사람
+   */
+  const coHostCountFromJoinedPublishers = joinedCoPublisherUserIds.size;
+
+  /**
+   * 3순위: 방장이 승인 버튼을 누른 직후 optimistic count
+   * members API가 늦게 반영되는 동안 버튼을 바로 "나가기"로 바꾸기 위함.
+   */
+  const coHostCountFromApproval = approvedCoHostCount;
+
+  /**
+   * 4순위: enterLive 응답에 coPublishers가 들어오는 경우 보정
+   */
+  const liveWithPublishers = live as
+    | (NonNullable<ActiveLive> & {
+        coPublishers?: Array<{
+          userId?: number | null;
+          whepUrl?: string | null;
+        }>;
+      })
+    | null;
+
+  const coHostCountFromLivePayload =
+    liveWithPublishers?.coPublishers?.filter((publisher) =>
+      Number.isFinite(publisher.userId),
+    ).length ?? 0;
+
+  return Math.max(
+    coHostCountFromMembers,
+    coHostCountFromJoinedPublishers,
+    coHostCountFromApproval,
+    coHostCountFromLivePayload,
+  );
+}, [
+  approvedCoHostCount,
+  canBroadcast,
+  joinedCoPublisherUserIds,
+  live,
+  liveMembers,
+]);
+
+const canCloseLive = canBroadcast && activeCoHostCount === 0;
   const visibleMessages = useMemo(() => {
     return messages.filter(
-      (message) =>
-        !message.senderId || !blockedUserIds.has(message.senderId),
+      (message) => !message.senderId || !blockedUserIds.has(message.senderId),
     );
   }, [blockedUserIds, messages]);
 
@@ -201,6 +276,99 @@ export function LiveRoom({
     Boolean(micInfoMessage) ||
     ((isListenerPlayback || isBroadcasterMonitorPlayback) &&
       showListenerPlayButton);
+
+  const refreshLiveMembers = useCallback(async () => {
+    if (!live?.liveId) return;
+
+    try {
+      const response = await getLiveMembers(live.liveId);
+
+      setLiveMembers(response.members);
+
+      if (response.members.length <= 1) {
+        setJoinedCoPublisherUserIds(new Set());
+        setApprovedCoHostCount(0);
+      }
+    } catch {
+    
+    }
+  }, [live?.liveId]);
+  const handleCoHostUpgradeRequested = useCallback(() => {
+  if (!canAcceptCoHostUpgrade) return;
+
+  setHasPendingCoHostUpgradeRequest(true);
+  setIsCoHostUpgradeConfirmOpen(true);
+  setCoHostApprovalMessage("공동 송출자 요청이 도착했어요.");
+
+  void refreshLiveMembers();
+}, [canAcceptCoHostUpgrade, refreshLiveMembers]);
+
+const handleCoHostUpgradeAccepted = useCallback(() => {
+  setCoHostRequestMessage(
+    "공동 진행 요청이 승인됐어요. 잠시 후 송출 권한이 반영돼요.",
+  );
+}, []);
+
+  const handleCoPublisherJoinedEvent = useCallback(
+    (publisher: { userId: number; whepUrl: string }) => {
+      handleCoPublisherJoined(publisher);
+
+      setJoinedCoPublisherUserIds((currentUserIds) => {
+        const nextUserIds = new Set(currentUserIds);
+        nextUserIds.add(publisher.userId);
+        return nextUserIds;
+      });
+
+      void refreshLiveMembers();
+    },
+    [handleCoPublisherJoined, refreshLiveMembers],
+  );
+
+  const handleRequestCoHostUpgrade = async () => {
+    if (!live?.liveId || requestCoHostUpgradeMutation.isPending) return;
+
+    setCoHostRequestMessage("");
+
+    try {
+      await requestCoHostUpgradeMutation.mutateAsync(live.liveId);
+
+      setCoHostRequestMessage(
+        "공동 진행 요청을 보냈어요. 송출자가 승인하면 다시 입장 후 마이크 송출을 시작할 수 있어요.",
+      );
+    } catch (error) {
+      setCoHostRequestMessage(
+        getApiErrorMessage(error, "공동 진행 요청을 보내지 못했어요."),
+      );
+    }
+  };
+
+  const handleAcceptCoHostUpgrade = async () => {
+  if (!live?.liveId || acceptCoHostUpgradeMutation.isPending) return;
+
+  setCoHostApprovalMessage("");
+
+  try {
+    await acceptCoHostUpgradeMutation.mutateAsync({
+      liveId: live.liveId,
+    });
+
+    setApprovedCoHostCount((currentCount) => Math.max(currentCount, 1));
+    setHasPendingCoHostUpgradeRequest(false);
+    setIsCoHostUpgradeConfirmOpen(false);
+    setCoHostApprovalMessage("공동 송출자 요청을 승인했어요.");
+
+    void refreshLiveMembers();
+  } catch (error) {
+    setIsCoHostUpgradeConfirmOpen(false);
+    setHasPendingCoHostUpgradeRequest(false);
+    setCoHostApprovalMessage(
+      getApiErrorMessage(
+        error,
+        "대기 중인 공동 송출자 요청을 승인하지 못했어요.",
+      ),
+    );
+  }
+};
 
   const handleSubmitReport = async (
     request: Omit<ReportLiveUserRequest, "targetUserId" | "chatMessage">,
@@ -298,48 +466,6 @@ export function LiveRoom({
     setIsBlockConfirmOpen(true);
   };
 
-  const handleAcceptCoHostUpgrade = async () => {
-    if (!live?.liveId || acceptCoHostUpgradeMutation.isPending) return;
-
-    const requesterUserIds = getCachedScheduledCoHostUserIds(live.liveId);
-
-    if (requesterUserIds.length === 0) {
-      setCoHostApprovalMessage(
-        "승인할 공동 진행자의 사용자 정보를 찾을 수 없어요.",
-      );
-      return;
-    }
-
-    setCoHostApprovalMessage("");
-
-    try {
-      let lastError: unknown = null;
-
-      for (const userId of requesterUserIds) {
-        try {
-          await acceptCoHostUpgradeMutation.mutateAsync({
-            liveId: live.liveId,
-            userId,
-          });
-
-          setCoHostApprovalMessage("공동 진행 요청을 승인했어요.");
-          return;
-        } catch (error) {
-          lastError = error;
-        }
-      }
-
-      throw lastError;
-    } catch (error) {
-      setCoHostApprovalMessage(
-        getApiErrorMessage(
-          error,
-          "대기 중인 공동 진행 요청을 승인하지 못했어요.",
-        ),
-      );
-    }
-  };
-
   const setAudioStatusSafe = useCallback((nextStatus: LiveAudioStatus) => {
     audioStatusRef.current = nextStatus;
     setAudioStatus(nextStatus);
@@ -425,8 +551,7 @@ export function LiveRoom({
 
   const toggleMicTrackOnly = useCallback(() => {
     const originalTracks = micStreamRef.current?.getAudioTracks() ?? [];
-    const processedTracks =
-      processedMicStreamRef.current?.getAudioTracks() ?? [];
+    const processedTracks = processedMicStreamRef.current?.getAudioTracks() ?? [];
     const allAudioTracks = [...originalTracks, ...processedTracks];
 
     if (allAudioTracks.length === 0) {
@@ -635,6 +760,15 @@ export function LiveRoom({
       alert("라이브방에서 나가지 못했어요. 잠시 후 다시 시도해주세요.");
     }
   };
+useEffect(() => {
+  setLiveMembers([]);
+  setJoinedCoPublisherUserIds(new Set());
+  setApprovedCoHostCount(0);
+  setHasPendingCoHostUpgradeRequest(false);
+  setIsCoHostUpgradeConfirmOpen(false);
+  setCoHostRequestMessage("");
+  setCoHostApprovalMessage("");
+}, [live?.liveId]);
 
   useEffect(() => {
     const initialTimer = window.setTimeout(() => {
@@ -661,14 +795,20 @@ export function LiveRoom({
     const connectViewerEvents = async () => {
       try {
         await subscribeViewerCount({
-          liveId: live.liveId,
-          watchOnly: shouldExcludeMeFromViewerCount,
-          onViewerCount: setViewerCount,
-          onCoPublisherJoined: canBroadcast
-            ? handleCoPublisherJoined
-            : undefined,
-          signal: controller.signal,
-        });
+  liveId: live.liveId,
+  watchOnly: shouldExcludeMeFromViewerCount,
+  onViewerCount: setViewerCount,
+  onCoPublisherJoined: canBroadcast
+    ? handleCoPublisherJoinedEvent
+    : undefined,
+  onCoHostUpgradeRequested: canAcceptCoHostUpgrade
+    ? handleCoHostUpgradeRequested
+    : undefined,
+  onCoHostUpgradeAccepted: canRequestCoHostUpgrade
+    ? handleCoHostUpgradeAccepted
+    : undefined,
+  signal: controller.signal,
+});
       } catch {
         // 일시적인 SSE 연결 오류는 아래 재연결로 복구합니다.
       }
@@ -684,7 +824,29 @@ export function LiveRoom({
       controller.abort();
       if (reconnectTimer !== undefined) window.clearTimeout(reconnectTimer);
     };
-  }, [canBroadcast, handleCoPublisherJoined, live?.liveId]);
+  }, [
+  canAcceptCoHostUpgrade,
+  canBroadcast,
+  canRequestCoHostUpgrade,
+  handleCoHostUpgradeAccepted,
+  handleCoHostUpgradeRequested,
+  handleCoPublisherJoinedEvent,
+  live?.liveId,
+]);
+
+  useEffect(() => {
+    if (!live?.liveId) return;
+
+    void refreshLiveMembers();
+
+    const intervalId = window.setInterval(() => {
+      void refreshLiveMembers();
+    }, 5000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [live?.liveId, refreshLiveMembers]);
 
   useEffect(() => {
     if (overlay !== "members" || !live?.liveId) return;
@@ -767,7 +929,41 @@ export function LiveRoom({
         live={live}
       />
 
-      {canCloseLive ? (
+      {canAcceptCoHostUpgrade ? (
+        <div
+          className={`absolute right-5 z-30 flex max-w-[calc(100%-40px)] flex-col items-end gap-2 transition-[top] duration-200 ${
+            hasTopNotice ? "top-[108px]" : "top-[58px]"
+          }`}
+        >
+          <button
+        type="button"
+        onClick={() => {
+          if (hasPendingCoHostUpgradeRequest) {
+            setIsCoHostUpgradeConfirmOpen(true);
+            return;
+          }
+
+          void handleAcceptCoHostUpgrade();
+        }}
+        disabled={acceptCoHostUpgradeMutation.isPending}
+        className="rounded-full bg-secondary-500 px-4 py-2 text-caption3 font-semibold text-neutral-0 shadow-[0_2px_10px_rgba(20,20,20,0.15)] disabled:opacity-60"
+      >
+        {acceptCoHostUpgradeMutation.isPending
+          ? "승인 중"
+          : hasPendingCoHostUpgradeRequest
+            ? "공동 송출 요청 승인"
+            : "공동 진행 요청 확인"}
+      </button>
+
+          {coHostApprovalMessage ? (
+            <p className="rounded-lg bg-neutral-900/85 px-3 py-2 text-right text-caption3 text-neutral-0">
+              {coHostApprovalMessage}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
+      {canRequestCoHostUpgrade ? (
         <div
           className={`absolute right-5 z-30 flex max-w-[calc(100%-40px)] flex-col items-end gap-2 transition-[top] duration-200 ${
             hasTopNotice ? "top-[108px]" : "top-[58px]"
@@ -775,18 +971,18 @@ export function LiveRoom({
         >
           <button
             type="button"
-            onClick={() => void handleAcceptCoHostUpgrade()}
-            disabled={acceptCoHostUpgradeMutation.isPending}
+            onClick={() => void handleRequestCoHostUpgrade()}
+            disabled={requestCoHostUpgradeMutation.isPending}
             className="rounded-full bg-secondary-500 px-4 py-2 text-caption3 font-semibold text-neutral-0 shadow-[0_2px_10px_rgba(20,20,20,0.15)] disabled:opacity-60"
           >
-            {acceptCoHostUpgradeMutation.isPending
-              ? "승인 중"
-              : "공동 진행 요청 승인"}
+            {requestCoHostUpgradeMutation.isPending
+              ? "요청 중"
+              : "공동 진행 요청"}
           </button>
 
-          {coHostApprovalMessage ? (
-            <p className="rounded-lg bg-neutral-900/85 px-3 py-2 text-right text-caption3 text-neutral-0">
-              {coHostApprovalMessage}
+          {coHostRequestMessage ? (
+            <p className="max-w-[260px] rounded-lg bg-neutral-900/85 px-3 py-2 text-right text-caption3 text-neutral-0">
+              {coHostRequestMessage}
             </p>
           ) : null}
         </div>
@@ -849,11 +1045,7 @@ export function LiveRoom({
       />
 
       {overlay === "members" ? (
-        <MemberSheet
-          go={go}
-          isLoading={isMembersLoading}
-          members={liveMembers}
-        />
+        <MemberSheet go={go} isLoading={isMembersLoading} members={liveMembers} />
       ) : null}
 
       <LiveChatProfileActionSheet
@@ -872,6 +1064,34 @@ export function LiveRoom({
           setView("report");
         }}
       />
+      <ModalOverlay
+      open={isCoHostUpgradeConfirmOpen}
+      panelClassName="rounded-[24px]"
+      onClose={() => {
+        if (!acceptCoHostUpgradeMutation.isPending) {
+          setIsCoHostUpgradeConfirmOpen(false);
+        }
+      }}
+    >
+      <Modal
+        tone="orange"
+        title="공동 송출 요청을 승인할까요?"
+        description={
+          <>
+            승인하면 요청한 밴드 멤버가
+            <br />
+            공동 진행자로 라이브에 참여해요.
+          </>
+        }
+        cancelDisabled={acceptCoHostUpgradeMutation.isPending}
+        confirmDisabled={acceptCoHostUpgradeMutation.isPending}
+        confirmLabel={
+          acceptCoHostUpgradeMutation.isPending ? "승인 중" : "승인하기"
+        }
+        onCancel={() => setIsCoHostUpgradeConfirmOpen(false)}
+        onConfirm={() => void handleAcceptCoHostUpgrade()}
+      />
+    </ModalOverlay>
 
       <ModalOverlay
         open={isBlockConfirmOpen}

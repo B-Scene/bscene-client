@@ -380,6 +380,15 @@ export function LiveForm({
       return [...prevIds, bandMemberId];
     });
   };
+  const handleOpenDatePicker = () => {
+  setIsTimePickerOpen(false);
+  setIsDatePickerOpen(true);
+};
+
+const handleOpenTimePicker = () => {
+  setIsDatePickerOpen(false);
+  setIsTimePickerOpen(true);
+};
 
   const uploadThumbnailIfNeeded = async () => {
     if (!thumbnailImage) return savedThumbnailImageUrl;
@@ -767,11 +776,11 @@ export function LiveForm({
         {isReservationMode ? (
           <FormCard title="예약 일시 설정">
             <DateTimeSelector
-              date={reservedDate}
-              time={reservedTime}
-              onDateClick={() => setIsDatePickerOpen(true)}
-              onTimeClick={() => setIsTimePickerOpen(true)}
-            />
+            date={reservedDate}
+            time={reservedTime}
+            onDateClick={handleOpenDatePicker}
+            onTimeClick={handleOpenTimePicker}
+          />
           </FormCard>
         ) : null}
 
@@ -831,29 +840,36 @@ export function LiveForm({
 
       <BottomNavBar modeOverride="band" />
 
-      <DatePickerSheet
-        open={isDatePickerOpen}
-        startDate={reservedDate}
-        endDate={reservedDate}
-        selectionMode="single"
-        onClose={() => setIsDatePickerOpen(false)}
-        onSelect={({ start }) => {
-          setReservedDate(start);
-          setIsDatePickerOpen(false);
-        }}
-      />
+        {isDatePickerOpen ? (
+          <div className="fixed inset-0 z-[100]">
+            <DatePickerSheet
+              open={isDatePickerOpen}
+              startDate={reservedDate}
+              endDate={reservedDate}
+              selectionMode="single"
+              onClose={() => setIsDatePickerOpen(false)}
+              onSelect={({ start }) => {
+                setReservedDate(start);
+                setIsDatePickerOpen(false);
+              }}
+            />
+          </div>
+        ) : null}
 
-      <TimePickerSheet
-        open={isTimePickerOpen}
-        value={reservedTime}
-        title="라이브 시작 시간"
-        onClose={() => setIsTimePickerOpen(false)}
-        onConfirm={(time) => {
-          setReservedTime(time);
-          setIsTimePickerOpen(false);
-        }}
-      />
-
+        {isTimePickerOpen ? (
+          <div className="fixed inset-0 z-[100]">
+            <TimePickerSheet
+              open={isTimePickerOpen}
+              value={reservedTime}
+              title="라이브 시작 시간"
+              onClose={() => setIsTimePickerOpen(false)}
+              onConfirm={(time) => {
+                setReservedTime(time);
+                setIsTimePickerOpen(false);
+              }}
+            />
+          </div>
+        ) : null}
       {isReservationCancelDialogOpen ? (
         <ConfirmDialog
           title="예약을 취소할까요?"

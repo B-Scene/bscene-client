@@ -36,6 +36,8 @@ interface SubscribeViewerCountParams {
     userId: number;
     whepUrl: string;
   }) => void;
+  onCoHostUpgradeRequested?: () => void;
+  onCoHostUpgradeAccepted?: () => void;
   signal?: AbortSignal;
 }
 
@@ -791,27 +793,52 @@ export const requestCoHostUpgrade = async (
 ): Promise<RequestCoHostUpgradeResponse> => {
   const response = await axiosInstance.post<
     LiveApiResponse<RequestCoHostUpgradeResponse>
-  >(`/lives/${liveId}/co-host`, {});
+  >(`/lives/${liveId}/co-host`);
 
   return unwrapResult(response.data);
 };
 
 export const acceptCoHostUpgrade = async ({
   liveId,
-  userId,
 }: {
   liveId: number;
-  userId?: number;
 }): Promise<AcceptCoHostUpgradeResponse> => {
-  const response = await axiosInstance.post<
-    LiveApiResponse<AcceptCoHostUpgradeResponse>
-  >(
-    `/lives/${liveId}/co-host/acceptance`,
-    Number.isFinite(userId) ? { userId } : {},
-  );
+  try {
+    const response = await axiosInstance.post<
+      LiveApiResponse<AcceptCoHostUpgradeResponse>
+    >(`/lives/${liveId}/co-host/acceptance`, {});
 
-  return unwrapResult(response.data);
+    return unwrapResult(response.data);
+  } catch (error) {
+    const response = (
+      error as {
+        response?: {
+          status?: number;
+          data?: {
+            code?: string;
+            message?: string;
+          };
+        };
+      }
+    ).response;
+
+    const isBodyFormatError =
+      response?.status === 400 && response.data?.code === "COMMON_400_2";
+
+    if (!isBodyFormatError) {
+      throw error;
+    }
+
+    const retryResponse = await axiosInstance.post<
+      LiveApiResponse<AcceptCoHostUpgradeResponse>
+    >(`/lives/${liveId}/co-host/acceptance`, {
+      isAccepted: true,
+    });
+
+    return unwrapResult(retryResponse.data);
+  }
 };
+
 
 export const createWhipSession = async ({
   path,
@@ -895,6 +922,8 @@ export const subscribeViewerCount = async ({
   watchOnly = false,
   onViewerCount,
   onCoPublisherJoined,
+  onCoHostUpgradeRequested,
+  onCoHostUpgradeAccepted,
   signal,
 }: SubscribeViewerCountParams): Promise<void> => {
   const requestUrl = resolveLiveApiUrl(
@@ -965,6 +994,14 @@ export const subscribeViewerCount = async ({
           parseViewerCount(dataLines.join("\n"));
         }
 
+        if (eventName === "coHostUpgradeRequested") {
+          onCoHostUpgradeRequested?.();
+        }
+
+        if (eventName === "coHostUpgradeAccepted") {
+          onCoHostUpgradeAccepted?.();
+        }
+
         if (eventName === "coPublisherJoined" && dataLines.length > 0) {
           try {
             const publisher = JSON.parse(dataLines.join("\n")) as {
@@ -992,6 +1029,7 @@ export const subscribeViewerCount = async ({
     reader.releaseLock();
   }
 };
+
 
 export const createWhepSession = async ({
   whepUrl,

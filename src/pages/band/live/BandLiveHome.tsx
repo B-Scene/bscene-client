@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo } from "react";
 import { useQueries } from "@tanstack/react-query";
 import type { AxiosError } from "axios";
+
 import LiveHeadIcon from "@/assets/icons/live-head.svg";
 import { Header } from "@/components/common/Header/Header";
 import { BottomNavBar } from "@/components/layout/BottomNavBar";
@@ -8,7 +9,6 @@ import { getLiveMembers, getLiveReservation } from "@/api/live/live";
 import {
   useEnterLiveMutation,
   useLiveHomeQuery,
-  useRespondCoHostInvitationMutation,
   useScheduledLiveQuery,
 } from "@/hooks/api/live/useLive";
 import { useActiveBandId } from "@/hooks/api/user/useMyProfiles";
@@ -19,6 +19,7 @@ import type {
   ScheduledLiveItem,
   ScheduledLiveListItem,
 } from "@/types/live/live";
+
 import type {
   ActiveLive,
   GoLiveScreen,
@@ -37,10 +38,7 @@ import {
   useScheduledLiveNow,
 } from "./scheduledLiveTime";
 
-type ScheduledLiveWithFields = (
-  | ScheduledLiveItem
-  | ScheduledLiveListItem
-) & {
+type ScheduledLiveWithFields = (ScheduledLiveItem | ScheduledLiveListItem) & {
   bandId?: number | null;
   myBandId?: number | null;
   bandProfileId?: number | null;
@@ -206,12 +204,12 @@ interface BandLiveHomeProps {
   go: GoLiveScreen;
   onEnterLive: (live: ActiveLive) => void;
   onEditReservation: (liveId: number) => void;
+  onRequestCoHostUpgrade: (liveId: number) => void;
 }
 
 const getFirstImageUrl = (...urls: Array<string | null | undefined>) => {
   return (
-    urls.find((url) => typeof url === "string" && url.trim().length > 0) ??
-    null
+    urls.find((url) => typeof url === "string" && url.trim().length > 0) ?? null
   );
 };
 
@@ -224,10 +222,7 @@ const getBandProfileImageUrl = (
 };
 
 const hasBandRelationField = (
-  live:
-    | ScheduledLiveItem
-    | ScheduledLiveListItem
-    | LiveNowWithFields,
+  live: ScheduledLiveItem | ScheduledLiveListItem | LiveNowWithFields,
 ) => {
   const liveWithFields = live as ScheduledLiveWithFields & LiveNowWithFields;
 
@@ -245,10 +240,7 @@ const hasBandRelationField = (
 };
 
 const getBandRelationState = (
-  live:
-    | ScheduledLiveItem
-    | ScheduledLiveListItem
-    | LiveNowWithFields,
+  live: ScheduledLiveItem | ScheduledLiveListItem | LiveNowWithFields,
   activeBandId: number | null | undefined,
 ): RelationState => {
   const liveWithFields = live as ScheduledLiveWithFields & LiveNowWithFields;
@@ -366,20 +358,19 @@ const isLiveEnterForbiddenError = (error: unknown) => {
   const status = getApiStatus(error);
   const code = getApiErrorBody(error)?.code ?? "";
 
-  return status === 403 || code.startsWith("LIVE403");
-};
-
-const isAlreadyProcessedInvitationError = (error: unknown) => {
-  const status = getApiStatus(error);
-  const code = getApiErrorBody(error)?.code ?? "";
-
-  return status === 409 || code.startsWith("LIVE409");
+  return (
+    status === 403 ||
+    status === 404 ||
+    code.startsWith("LIVE403") ||
+    code.startsWith("LIVE404")
+  );
 };
 
 export function BandLiveHome({
   go,
   onEnterLive,
   onEditReservation,
+  onRequestCoHostUpgrade,
 }: BandLiveHomeProps) {
   const activeBandId = useActiveBandId();
   const now = useScheduledLiveNow();
@@ -399,7 +390,6 @@ export function BandLiveHome({
   } = useScheduledLiveQuery(false);
 
   const enterLiveMutation = useEnterLiveMutation();
-  const respondCoHostInvitationMutation = useRespondCoHostInvitationMutation();
 
   const { liveNowCandidates, scheduledCandidates } = useMemo(() => {
     const liveNowCandidates: LiveNowCandidateCard[] =
@@ -468,7 +458,10 @@ export function BandLiveHome({
           return null;
         }
       },
-      enabled: Boolean(activeBandId) && Boolean(live.id),
+      enabled:
+        Boolean(activeBandId) &&
+        Boolean(live.id) &&
+        live.relationState !== "same",
       staleTime: 0,
       refetchOnMount: "always" as const,
       refetchOnWindowFocus: true,
@@ -545,9 +538,7 @@ export function BandLiveHome({
 
   const isLoading = isHomeLoading || isScheduledLoading;
   const isError = isHomeError && isScheduledError;
-
-  const isEnterPending =
-    enterLiveMutation.isPending || respondCoHostInvitationMutation.isPending;
+  const isEnterPending = enterLiveMutation.isPending;
 
   const handleRefreshLiveHome = useCallback(async () => {
     await Promise.all([refetchHome(), refetchScheduled()]);
@@ -581,47 +572,12 @@ export function BandLiveHome({
 
       enterAndMoveRoom(enteredLive);
     } catch (error) {
-      if (!isLiveEnterForbiddenError(error)) {
-        alert(getApiMessage(error, "라이브 입장에 실패했어요."));
+      if (isLiveEnterForbiddenError(error)) {
+        onRequestCoHostUpgrade(liveId);
         return;
       }
 
-      try {
-        await respondCoHostInvitationMutation.mutateAsync({
-          liveId,
-          request: {
-            isAccepted: true,
-          },
-        });
-
-        const enteredLive = await enterLiveMutation.mutateAsync(liveId);
-
-        enterAndMoveRoom(enteredLive);
-      } catch (coHostError) {
-        if (isAlreadyProcessedInvitationError(coHostError)) {
-          try {
-            const enteredLive = await enterLiveMutation.mutateAsync(liveId);
-
-            enterAndMoveRoom(enteredLive);
-            return;
-          } catch (retryError) {
-            alert(
-              getApiMessage(
-                retryError,
-                "공동 진행자 수락 후에도 라이브방에 입장하지 못했어요.",
-              ),
-            );
-            return;
-          }
-        }
-
-        alert(
-          getApiMessage(
-            coHostError,
-            "공동 진행자 초대 수락에 실패했어요. 알림 또는 초대 상태를 확인해주세요.",
-          ),
-        );
-      }
+      alert(getApiMessage(error, "라이브 입장에 실패했어요."));
     }
   };
 
@@ -696,10 +652,7 @@ export function BandLiveHome({
         ) : null}
 
         <section className="mt-8">
-          <SectionHeader
-            title="진행 중인 라이브"
-            onClick={() => go("liveNowList")}
-          />
+          <SectionHeader title="진행 중인 라이브" onClick={() => go("liveNowList")} />
 
           <div className="mt-3 grid gap-3">
             {isCheckingLiveNowAccess ? (
@@ -724,10 +677,7 @@ export function BandLiveHome({
         </section>
 
         <section className="mt-8">
-          <SectionHeader
-            title="예정된 라이브"
-            onClick={() => go("scheduledList")}
-          />
+          <SectionHeader title="예정된 라이브" onClick={() => go("scheduledList")} />
 
           <div className="mt-3 grid gap-3">
             {isCheckingScheduledAccess ? (
