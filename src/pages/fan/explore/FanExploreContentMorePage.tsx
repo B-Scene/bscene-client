@@ -135,7 +135,7 @@ const FanExploreContentMorePage = () => {
     [data],
   );
   const contents = pagedContents;
-  const totalCount = contents.length;
+  const totalCount = data?.pages[0]?.totalCount ?? contents.length;
   const sentinelRef = useInfiniteScrollObserver({
     enabled: Boolean(hasNextPage) && !isFetchingNextPage,
     onIntersect: fetchNextPage,

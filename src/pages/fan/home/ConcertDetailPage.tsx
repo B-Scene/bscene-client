@@ -45,13 +45,7 @@ type KakaoSharePayload = {
       webUrl: string;
     };
   };
-  buttons: Array<{
-    title: string;
-    link: {
-      mobileWebUrl: string;
-      webUrl: string;
-    };
-  }>;
+  buttonTitle: string;
 };
 
 type KakaoShareApi = {
@@ -750,15 +744,7 @@ const ConcertDetailPage = () => {
             webUrl: concertLink,
           },
         },
-        buttons: [
-          {
-            title: "공연 보러가기",
-            link: {
-              mobileWebUrl: concertLink,
-              webUrl: concertLink,
-            },
-          },
-        ],
+        buttonTitle: "공연 보러가기",
       });
       setIsShareSheetOpen(false);
       setToastMessage("카카오톡 공유 화면을 열었어요");

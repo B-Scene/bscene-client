@@ -212,7 +212,7 @@ const FanExploreConcertMorePage = () => {
     [data],
   );
   const concerts = pagedConcerts;
-  const totalCount = concerts.length;
+  const totalCount = data?.pages[0]?.totalCount ?? concerts.length;
   const sentinelRef = useInfiniteScrollObserver({
     enabled: Boolean(hasNextPage) && !isFetchingNextPage,
     onIntersect: fetchNextPage,

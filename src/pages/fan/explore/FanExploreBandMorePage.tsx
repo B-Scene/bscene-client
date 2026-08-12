@@ -155,7 +155,7 @@ const FanExploreBandMorePage = () => {
     [data],
   );
   const bands = pagedBands;
-  const totalCount = bands.length;
+  const totalCount = data?.pages[0]?.totalCount ?? bands.length;
   const [unfollowTargetBandId, setUnfollowTargetBandId] = useState<number | null>(
     null,
   );
