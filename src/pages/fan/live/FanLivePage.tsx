@@ -153,7 +153,6 @@ export function FanLivePage() {
     () => new Set(),
   );
   const [chatMessages, setChatMessages] = useState<FanChatMessage[]>([]);
-  const [chatEnded, setChatEnded] = useState(false);
   const selectedUserId = reportTarget?.targetUserId;
   const isSelectedUserBlocked = selectedUserId
     ? blockedUserIds.has(selectedUserId)
@@ -209,8 +208,7 @@ export function FanLivePage() {
     enabled: Boolean(live?.isLive && live.liveId),
     onMessage: handleChatMessage,
     onLiveEnded: () => {
-      setChatEnded(true);
-      setAudioMessage("라이브가 종료됐어요.");
+      navigate("/fan/live", { replace: true });
     },
   });
 
@@ -611,12 +609,8 @@ export function FanLivePage() {
       {hasOpenedChat ? (
         <FanLiveChatArea
           composerOpen={isChatComposerOpen}
-          connectionMessage={
-            chatEnded
-              ? "라이브가 종료되어 채팅을 보낼 수 없어요."
-              : chatErrorMessage
-          }
-          isConnected={isChatConnected && !chatEnded}
+          connectionMessage={chatErrorMessage}
+          isConnected={isChatConnected}
           messages={chatMessages}
           onProfileClick={(chat: FanChatMessage) => {
             setReportTarget({
