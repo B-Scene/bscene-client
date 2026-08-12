@@ -409,6 +409,17 @@ export const SessionApplicationsScreen = ({
     updateApplicationMutation.isPending ||
     deleteApplicationMutation.isPending ||
     visibilityMutation.isPending;
+    if (isApplicationFormOpen) {
+  return (
+    <SessionApplicationCreatePage
+      open={isApplicationFormOpen}
+      mode={applicationFormMode}
+      initialValue={editingInitialValue}
+      onClose={handleCloseApplicationForm}
+      onSubmit={handleSubmitApplicationToServer}
+    />
+  );
+}
 
   return (
     <>
@@ -530,13 +541,6 @@ export const SessionApplicationsScreen = ({
         </section>
       </section>
 
-      <SessionApplicationCreatePage
-        open={isApplicationFormOpen}
-        mode={applicationFormMode}
-        initialValue={editingInitialValue}
-        onClose={handleCloseApplicationForm}
-        onSubmit={handleSubmitApplicationToServer}
-      />
 
       <MyApplicationDetail
         open={Boolean(selectedApplicationDetail)}

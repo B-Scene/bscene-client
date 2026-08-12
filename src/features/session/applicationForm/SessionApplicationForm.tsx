@@ -43,7 +43,7 @@ export const SessionApplicationForm = ({
   return (
     <form
       onSubmit={handleSubmit}
-      className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-8 pt-3 pb-6"
+      className="px-8 pt-3 pb-[calc(var(--bottom-nav-height)+32px)]"
     >
       <div className="flex flex-col gap-3">
         <ApplicationFormField label="지원서 유형" required>
@@ -170,7 +170,7 @@ export const SessionApplicationForm = ({
       <button
         type="submit"
         disabled={!isFormValid}
-        className="mt-5 -mx-3 flex h-[52px] w-[calc(100%+24px)] items-center justify-center rounded-[12px] bg-secondary-500 text-body1 text-neutral-0 disabled:cursor-default disabled:bg-neutral-300 disabled:text-neutral-600"
+        className="mt-5 flex h-[52px] w-full items-center justify-center rounded-[12px] bg-secondary-500 text-body1 text-neutral-0 disabled:cursor-default disabled:bg-neutral-300 disabled:text-neutral-600"
       >
         {submitButtonLabel}
       </button>
