@@ -7,6 +7,7 @@ import {
   useState,
   type FormEvent,
 } from "react";
+
 import ArrowLeftIcon from "@/assets/icons/arrow-left.svg";
 import CloseCircleIcon from "@/assets/icons/band/close-circle.svg";
 import SearchContextIcon from "@/assets/icons/band/searchContext.svg";
@@ -17,12 +18,21 @@ import {
   useSessionRecruitmentsQuery,
   useSessionSearchHistoryQuery,
 } from "@/hooks/api/session/useSessionRecruitment";
+import { useSessionApplicationsSearchInfiniteQuery } from "@/hooks/api/session/useSessionApplication";
+import { useInfiniteScrollObserver } from "@/hooks/useInfiniteScrollObserver";
 import type {
   SessionRecruitmentListItem,
   SessionRecruitmentSort,
 } from "@/types/session/sessionRecruitment";
+import type { SessionApplicationSearchItem } from "@/types/session/sessionApplication";
 import type { SessionFilterValues, SessionRecruitmentPost } from "../types";
+
 import { RecruitmentPostCard } from "./RecruitmentPostCard";
+import {
+  SessionCandidateCard,
+  type SessionCandidateCardData,
+} from "./SessionCandidateCard";
+import { SessionApplicationDetailScreen } from "./SessionApplicationDetailScreen";
 import { SessionFilterBar } from "./SessionFilterBar";
 import { SessionFilterBottomSheet } from "./SessionFilterBottomSheet";
 
@@ -40,6 +50,7 @@ interface SearchHistoryItem {
 }
 
 const RECENT_KEYWORD_LIMIT = 10;
+const SESSION_FIND_SEARCH_PAGE_SIZE = 8;
 
 const toDeadlineLabel = (dDay: number) => {
   if (dDay < 0) return "마감";
@@ -60,9 +71,11 @@ const normalizeSessionEnumValue = (value: string) => {
   return trimmedValue;
 };
 
-const normalizePost = (
-  post: SessionRecruitmentPost,
-): SessionRecruitmentPost => {
+const getFilterParam = (value: string) => {
+  return value === "전체" ? undefined : normalizeSessionEnumValue(value);
+};
+
+const normalizePost = (post: SessionRecruitmentPost): SessionRecruitmentPost => {
   return {
     ...post,
     genre: normalizeSessionEnumValue(post.genre),
@@ -90,6 +103,22 @@ const mapRecruitmentToPost = (
   };
 };
 
+const mapApplicationToCandidate = (
+  application: SessionApplicationSearchItem,
+): SessionCandidateCardData => {
+  return {
+    id: application.sessionApplicationId,
+    name: application.nickname,
+    profileImageUrl: application.profileImageUrl,
+    skill: normalizeSessionEnumValue(application.skillLevel),
+    part: normalizeSessionEnumValue(application.part),
+    genre: normalizeSessionEnumValue(application.genre),
+    location: normalizeSessionEnumValue(application.region),
+    applicationTitle: application.title,
+    summary: application.oneLineIntro,
+  };
+};
+
 export const SessionSearchScreen = ({
   mode = "recruitment",
   values,
@@ -110,6 +139,9 @@ export const SessionSearchScreen = ({
   const [optimisticRecentKeywords, setOptimisticRecentKeywords] = useState<
     SearchHistoryItem[]
   >([]);
+  const [selectedApplicationId, setSelectedApplicationId] = useState<
+    number | null
+  >(null);
 
   const searchHistoryQuery = useSessionSearchHistoryQuery();
   const deleteSearchHistoryMutation = useDeleteSessionSearchHistory();
@@ -130,13 +162,36 @@ export const SessionSearchScreen = ({
     };
   }, [values]);
 
-  const searchResultQuery = useSessionRecruitmentsQuery(
+  const recruitmentSearchResultQuery = useSessionRecruitmentsQuery(
     {
       keyword: submittedKeyword,
       sort,
       size: 20,
     },
-    isResultMode,
+    isResultMode && !isFindMode,
+  );
+
+  const applicationSearchParams = useMemo(
+    () => ({
+      keyword: submittedKeyword,
+      part: getFilterParam(normalizedValues.part),
+      skillLevel: getFilterParam(normalizedValues.skill),
+      genre: getFilterParam(normalizedValues.genre),
+      region: getFilterParam(normalizedValues.region),
+      size: SESSION_FIND_SEARCH_PAGE_SIZE,
+    }),
+    [
+      normalizedValues.genre,
+      normalizedValues.part,
+      normalizedValues.region,
+      normalizedValues.skill,
+      submittedKeyword,
+    ],
+  );
+
+  const applicationSearchResultQuery = useSessionApplicationsSearchInfiniteQuery(
+    applicationSearchParams,
+    isResultMode && isFindMode,
   );
 
   const addOptimisticRecentKeyword = useCallback((nextKeyword: string) => {
@@ -187,7 +242,8 @@ export const SessionSearchScreen = ({
 
   const searchedPosts = useMemo(() => {
     const apiPosts =
-      searchResultQuery.data?.content.map(mapRecruitmentToPost) ?? [];
+      recruitmentSearchResultQuery.data?.content.map(mapRecruitmentToPost) ??
+      [];
 
     return apiPosts
       .map((post) => ({
@@ -216,7 +272,63 @@ export const SessionSearchScreen = ({
 
         return matchesPart && matchesSkill && matchesGenre && matchesRegion;
       });
-  }, [bookmarkOverrides, normalizedValues, searchResultQuery.data]);
+  }, [
+    bookmarkOverrides,
+    normalizedValues,
+    recruitmentSearchResultQuery.data,
+  ]);
+
+  const searchedCandidates = useMemo(() => {
+    const apiCandidates =
+      applicationSearchResultQuery.data?.pages.flatMap((page) =>
+        page.content.map(mapApplicationToCandidate),
+      ) ?? [];
+
+    return apiCandidates.filter((candidate) => {
+      const matchesPart =
+        normalizedValues.part === "전체" ||
+        candidate.part.includes(normalizedValues.part);
+
+      const matchesSkill =
+        normalizedValues.skill === "전체" ||
+        candidate.skill.includes(normalizedValues.skill);
+
+      const matchesGenre =
+        normalizedValues.genre === "전체" ||
+        candidate.genre.includes(normalizedValues.genre);
+
+      const matchesRegion =
+        normalizedValues.region === "전체" ||
+        candidate.location.includes(normalizedValues.region);
+
+      return matchesPart && matchesSkill && matchesGenre && matchesRegion;
+    });
+  }, [applicationSearchResultQuery.data, normalizedValues]);
+
+  const loadMoreCandidateResults = useCallback(() => {
+    if (
+      !applicationSearchResultQuery.hasNextPage ||
+      applicationSearchResultQuery.isFetchingNextPage
+    ) {
+      return;
+    }
+
+    void applicationSearchResultQuery.fetchNextPage();
+  }, [applicationSearchResultQuery]);
+
+  const candidateLoadMoreRef = useInfiniteScrollObserver({
+    enabled:
+      isFindMode &&
+      Boolean(applicationSearchResultQuery.hasNextPage) &&
+      !applicationSearchResultQuery.isFetchingNextPage &&
+      !applicationSearchResultQuery.isLoading &&
+      !applicationSearchResultQuery.isError,
+    onIntersect: loadMoreCandidateResults,
+  });
+
+  const isActiveSearchSuccess = isFindMode
+    ? applicationSearchResultQuery.isSuccess
+    : recruitmentSearchResultQuery.isSuccess;
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -242,7 +354,7 @@ export const SessionSearchScreen = ({
   }, [searchHistoryQuery.data]);
 
   useEffect(() => {
-    if (!isResultMode || !submittedKeyword || !searchResultQuery.isSuccess) {
+    if (!isResultMode || !submittedKeyword || !isActiveSearchSuccess) {
       return;
     }
 
@@ -253,11 +365,20 @@ export const SessionSearchScreen = ({
     lastSyncedHistoryKeywordRef.current = submittedKeyword;
     void searchHistoryQuery.refetch();
   }, [
+    isActiveSearchSuccess,
     isResultMode,
     searchHistoryQuery,
-    searchResultQuery.isSuccess,
     submittedKeyword,
   ]);
+
+  const refetchActiveSearchResult = () => {
+    if (isFindMode) {
+      void applicationSearchResultQuery.refetch();
+      return;
+    }
+
+    void recruitmentSearchResultQuery.refetch();
+  };
 
   const handleSearchKeyword = () => {
     if (!trimmedKeyword) return;
@@ -265,7 +386,7 @@ export const SessionSearchScreen = ({
     addOptimisticRecentKeyword(trimmedKeyword);
 
     if (trimmedKeyword === submittedKeyword) {
-      void searchResultQuery.refetch();
+      refetchActiveSearchResult();
       void searchHistoryQuery.refetch();
       return;
     }
@@ -347,24 +468,28 @@ export const SessionSearchScreen = ({
     });
   };
 
+  if (selectedApplicationId) {
+    return (
+      <SessionApplicationDetailScreen
+        sessionApplicationId={selectedApplicationId}
+        onBack={() => setSelectedApplicationId(null)}
+      />
+    );
+  }
+
   if (isResultMode) {
     return (
       <main className="min-h-dvh bg-neutral-0 pb-[calc(var(--bottom-nav-height)+24px)]">
         <header className="flex h-12 w-full items-center gap-1 bg-neutral-0 px-[15px]">
           <BackButton onBack={onBack} />
 
-          <form
-            onSubmit={handleSubmit}
-            className="flex min-w-0 flex-1 items-center"
-          >
+          <form onSubmit={handleSubmit} className="flex min-w-0 flex-1 items-center">
             <SearchField
               ref={inputRef}
               keyword={keyword}
               isSearching={isSearching}
               ariaLabel={
-                isFindMode
-                  ? "세션 지원서 검색"
-                  : "세션 모집 공고 검색"
+                isFindMode ? "세션 지원서 검색" : "세션 모집 공고 검색"
               }
               onChange={setKeyword}
               onClear={handleClearKeyword}
@@ -381,44 +506,94 @@ export const SessionSearchScreen = ({
           onOpenFilter={() => setIsFilterOpen(true)}
         />
 
-        <section className="flex flex-col gap-4 px-[22px] pt-4">
-          {searchResultQuery.isLoading ? (
-            <div className="flex min-h-[220px] items-center justify-center rounded-[14px] bg-neutral-0 px-6 text-center text-caption1 text-neutral-500 shadow-[0_0_12px_rgba(0,0,0,0.08)]">
-              검색 결과를 불러오고 있어요
-            </div>
-          ) : searchResultQuery.isError ? (
-            <div className="flex min-h-[220px] flex-col items-center justify-center rounded-[14px] bg-neutral-0 px-6 text-center shadow-[0_0_12px_rgba(0,0,0,0.08)]">
-              <p className="text-caption1 text-neutral-500">
-                검색 결과를 불러오지 못했어요
-              </p>
+        {isFindMode ? (
+          <section className="flex flex-col gap-[18px] px-6 pt-[18px]">
+            {applicationSearchResultQuery.isLoading ? (
+              <div className="flex min-h-[220px] items-center justify-center rounded-[12px] bg-neutral-0 px-6 text-center text-caption1 text-neutral-500 shadow-[0_0_8px_rgba(0,0,0,0.08)]">
+                세션 뮤지션 검색 결과를 불러오고 있어요
+              </div>
+            ) : applicationSearchResultQuery.isError ? (
+              <div className="flex min-h-[220px] flex-col items-center justify-center rounded-[12px] bg-neutral-0 px-6 text-center shadow-[0_0_8px_rgba(0,0,0,0.08)]">
+                <p className="text-caption1 text-neutral-500">
+                  세션 뮤지션 검색 결과를 불러오지 못했어요
+                </p>
 
-              <button
-                type="button"
-                onClick={() => searchResultQuery.refetch()}
-                className="mt-3 rounded-[8px] bg-secondary-500 px-4 py-2 text-caption2 text-neutral-0"
-              >
-                다시 시도
-              </button>
-            </div>
-          ) : searchedPosts.length > 0 ? (
-            searchedPosts.map((post) => (
-              <RecruitmentPostCard
-                key={post.id}
-                post={post}
-                onToggleBookmark={handleToggleBookmark}
-                onSelect={
-                  onSelectRecruitment
-                    ? () => handleSelectPost(post)
-                    : undefined
-                }
-              />
-            ))
-          ) : (
-            <div className="flex min-h-[220px] items-center justify-center rounded-[14px] bg-neutral-0 px-6 text-center text-caption1 text-neutral-500 shadow-[0_0_12px_rgba(0,0,0,0.08)]">
-              검색 결과가 없어요
-            </div>
-          )}
-        </section>
+                <button
+                  type="button"
+                  onClick={() => void applicationSearchResultQuery.refetch()}
+                  className="mt-3 rounded-[8px] bg-secondary-500 px-4 py-2 text-caption2 text-neutral-0"
+                >
+                  다시 시도
+                </button>
+              </div>
+            ) : searchedCandidates.length > 0 ? (
+              <>
+                {searchedCandidates.map((candidate) => (
+                  <SessionCandidateCard
+                    key={candidate.id}
+                    candidate={candidate}
+                    onSelect={setSelectedApplicationId}
+                  />
+                ))}
+
+                <div ref={candidateLoadMoreRef} className="h-1" />
+
+                {applicationSearchResultQuery.isFetchingNextPage ? (
+                  <p className="py-3 text-center text-caption2 text-neutral-500">
+                    세션 뮤지션을 더 불러오는 중이에요
+                  </p>
+                ) : null}
+              </>
+            ) : (
+              <>
+                <div className="flex min-h-[220px] items-center justify-center rounded-[12px] bg-neutral-0 px-6 text-center text-caption1 text-neutral-500 shadow-[0_0_8px_rgba(0,0,0,0.08)]">
+                  검색 결과가 없어요
+                </div>
+
+                {applicationSearchResultQuery.hasNextPage ? (
+                  <div ref={candidateLoadMoreRef} className="h-1" />
+                ) : null}
+              </>
+            )}
+          </section>
+        ) : (
+          <section className="flex flex-col gap-4 px-[22px] pt-4">
+            {recruitmentSearchResultQuery.isLoading ? (
+              <div className="flex min-h-[220px] items-center justify-center rounded-[14px] bg-neutral-0 px-6 text-center text-caption1 text-neutral-500 shadow-[0_0_12px_rgba(0,0,0,0.08)]">
+                검색 결과를 불러오고 있어요
+              </div>
+            ) : recruitmentSearchResultQuery.isError ? (
+              <div className="flex min-h-[220px] flex-col items-center justify-center rounded-[14px] bg-neutral-0 px-6 text-center shadow-[0_0_12px_rgba(0,0,0,0.08)]">
+                <p className="text-caption1 text-neutral-500">
+                  검색 결과를 불러오지 못했어요
+                </p>
+
+                <button
+                  type="button"
+                  onClick={() => void recruitmentSearchResultQuery.refetch()}
+                  className="mt-3 rounded-[8px] bg-secondary-500 px-4 py-2 text-caption2 text-neutral-0"
+                >
+                  다시 시도
+                </button>
+              </div>
+            ) : searchedPosts.length > 0 ? (
+              searchedPosts.map((post) => (
+                <RecruitmentPostCard
+                  key={post.id}
+                  post={post}
+                  onToggleBookmark={handleToggleBookmark}
+                  onSelect={
+                    onSelectRecruitment ? () => handleSelectPost(post) : undefined
+                  }
+                />
+              ))
+            ) : (
+              <div className="flex min-h-[220px] items-center justify-center rounded-[14px] bg-neutral-0 px-6 text-center text-caption1 text-neutral-500 shadow-[0_0_12px_rgba(0,0,0,0.08)]">
+                검색 결과가 없어요
+              </div>
+            )}
+          </section>
+        )}
 
         {isFilterOpen ? (
           <SessionFilterBottomSheet
@@ -437,17 +612,12 @@ export const SessionSearchScreen = ({
         <BackButton onBack={onBack} />
       </header>
 
-      <form
-        onSubmit={handleSubmit}
-        className="flex h-12 w-full items-center px-[22px]"
-      >
+      <form onSubmit={handleSubmit} className="flex h-12 w-full items-center px-[22px]">
         <SearchField
           ref={inputRef}
           keyword={keyword}
           isSearching={isSearching}
-          ariaLabel={
-            isFindMode ? "세션 지원서 검색" : "세션 모집 공고 검색"
-          }
+          ariaLabel={isFindMode ? "세션 지원서 검색" : "세션 모집 공고 검색"}
           onChange={setKeyword}
           onClear={handleClearKeyword}
           onSearch={handleSearchKeyword}
