@@ -49,6 +49,7 @@ const SEARCH_CONTENT_TO_API = {
   밴드: "BAND",
   공연: "PERFORMANCE",
   영상: "POST",
+  콘텐츠: "POST",
 } as const;
 const getGenreFilterParam = (genre: string) => {
   if (genre === "전체") return undefined;

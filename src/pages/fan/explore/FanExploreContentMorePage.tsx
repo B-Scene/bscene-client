@@ -134,7 +134,7 @@ const FanExploreContentMorePage = () => {
   const appliedFilters: AppliedExploreFilters = {
     genre: getFilterLabelParam(searchParams.get("genre")),
     region: getFilterLabelParam(searchParams.get("region")),
-    content: "영상",
+    content: "콘텐츠",
   };
   const contentsQuery = useFanExploreContentSearchQuery({
     keyword,

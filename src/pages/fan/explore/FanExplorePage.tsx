@@ -83,7 +83,7 @@ const FILTER_OPTIONS = {
     "강원",
     "제주",
   ],
-  content: ["전체", "밴드", "공연", "영상"],
+  content: ["전체", "밴드", "공연", "콘텐츠"],
 };
 
 const EXPLORE_GENRE_LABELS: Record<string, string> = {
@@ -129,7 +129,7 @@ const FILTER_OPTION_WIDTHS: Record<string, number> = {
   제주: 51,
   밴드: 51,
   공연: 51,
-  영상: 51,
+  콘텐츠: 62,
   블루스: 62,
   포크록: 62,
   펑크록: 62,
@@ -240,19 +240,21 @@ export const ExploreFilterBar = ({
   appliedFilters,
   appliedSort,
   highlightSort = true,
+  disabledFilterIds = [],
   onSortClick,
   onFilterClick,
 }: {
   appliedFilters: AppliedExploreFilters;
   appliedSort?: string | null;
   highlightSort?: boolean;
+  disabledFilterIds?: string[];
   onSortClick?: () => void;
   onFilterClick?: () => void;
 }) => {
   const filterChips = [
     { id: "genre", defaultLabel: "장르", value: appliedFilters.genre },
     { id: "region", defaultLabel: "지역", value: appliedFilters.region },
-    { id: "content", defaultLabel: "콘텐츠", value: appliedFilters.content },
+    { id: "content", defaultLabel: "유형", value: appliedFilters.content },
   ];
   const hasAppliedFilter = filterChips.some((filter) => filter.value !== "전체");
   const visibleFilterChips = hasAppliedFilter
@@ -291,18 +293,22 @@ export const ExploreFilterBar = ({
 
         {visibleFilterChips.map((filter) => {
           const isApplied = filter.value !== "전체";
+          const isDisabled = disabledFilterIds.includes(filter.id);
 
           return (
           <button
             key={filter.id}
             type="button"
-            onClick={onFilterClick}
+            disabled={isDisabled}
+            onClick={isDisabled ? undefined : onFilterClick}
             className={[
-              "flex h-[22px] shrink-0 items-center justify-center whitespace-nowrap rounded-full border bg-neutral-0 py-[7px] font-body text-caption3",
+              "flex h-[22px] shrink-0 items-center justify-center whitespace-nowrap rounded-full border py-[7px] font-body text-caption3",
               isApplied ? "px-[15px]" : "w-[48px] px-[15px]",
-              isApplied
+              isDisabled
+                ? "cursor-not-allowed border-neutral-300 bg-neutral-200 text-neutral-500"
+                : isApplied
                 ? "border-primary-400 bg-primary-0 text-primary-400"
-                : "border-neutral-400 text-neutral-600",
+                : "border-neutral-400 bg-neutral-0 text-neutral-600",
             ].join(" ")}
           >
             {isApplied ? filter.value : filter.defaultLabel}
@@ -467,7 +473,7 @@ export const ExploreFilterSheet = ({
             onSelect={regionSelectable ? setSelectedRegion : () => undefined}
           />
           <FilterOptionGroup
-            title="콘텐츠"
+            title="유형"
             options={FILTER_OPTIONS.content}
             selected={selectedContent}
             disabledOptions={
@@ -716,6 +722,7 @@ const FanExplorePage = () => {
         appliedFilters={appliedFilters}
         appliedSort={appliedSort}
         highlightSort={false}
+        disabledFilterIds={["content"]}
         onFilterClick={() => setIsFilterSheetOpen(true)}
       />
       <RecommendationSection
