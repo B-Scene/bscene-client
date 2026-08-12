@@ -10,6 +10,7 @@ import type {
   GetReplayListParams,
   GetScheduledLiveListParams,
   LiveApiResponse,
+  LiveCoPublisher,
   LiveHomeResponse,
   LiveMembersResponse,
   LiveNowListResponse,
@@ -32,10 +33,7 @@ interface SubscribeViewerCountParams {
   liveId: number;
   watchOnly?: boolean;
   onViewerCount: (viewerCount: number) => void;
-  onCoPublisherJoined?: (publisher: {
-    userId: number;
-    whepUrl: string;
-  }) => void;
+  onCoPublishersChanged?: (publishers: LiveCoPublisher[]) => void;
   onCoHostUpgradeRequested?: (requester?: { userId: number }) => void;
   onCoHostUpgradeAccepted?: () => void;
   signal?: AbortSignal;
@@ -1050,7 +1048,7 @@ export const subscribeViewerCount = async ({
   liveId,
   watchOnly = false,
   onViewerCount,
-  onCoPublisherJoined,
+  onCoPublishersChanged,
   onCoHostUpgradeRequested,
   onCoHostUpgradeAccepted,
   signal,
@@ -1140,25 +1138,65 @@ export const subscribeViewerCount = async ({
           onCoHostUpgradeAccepted?.();
         }
 
-        if (eventName === "coPublisherJoined" && dataLines.length > 0) {
+        if (eventName === "coPublishersChanged" && dataLines.length > 0) {
           try {
-            const publisher = JSON.parse(dataLines.join("\n")) as {
-              userId?: number;
-              whepUrl?: string;
-            };
+            const parsed = JSON.parse(dataLines.join("\n")) as unknown;
 
-            if (
-              Number.isFinite(publisher.userId) &&
-              typeof publisher.whepUrl === "string" &&
-              publisher.whepUrl.trim()
-            ) {
-              onCoPublisherJoined?.({
-                userId: publisher.userId as number,
-                whepUrl: publisher.whepUrl,
+            /**
+             * 백엔드가 배열 자체를 내려주는 형태를 기본으로 처리하고,
+             * 배포 과정에서 { coPublishers: [...] } 형태로 감싸서 내려오는 경우도
+             * 안전하게 대응합니다.
+             */
+            const rawPublishers: unknown[] = Array.isArray(parsed)
+              ? parsed
+              : parsed &&
+                  typeof parsed === "object" &&
+                  Array.isArray(
+                    (parsed as { coPublishers?: unknown }).coPublishers,
+                  )
+                ? (
+                    parsed as {
+                      coPublishers: unknown[];
+                    }
+                  ).coPublishers
+                : [];
+
+            const publishersByUserId = new Map<number, LiveCoPublisher>();
+
+            rawPublishers.forEach((item) => {
+              if (!item || typeof item !== "object") return;
+
+              const publisher = item as {
+                userId?: unknown;
+                whepUrl?: unknown;
+              };
+
+              const userId = Number(publisher.userId);
+              const whepUrl =
+                typeof publisher.whepUrl === "string"
+                  ? publisher.whepUrl.trim()
+                  : "";
+
+              if (!Number.isFinite(userId) || userId <= 0 || !whepUrl) {
+                return;
+              }
+
+              publishersByUserId.set(userId, {
+                userId,
+                whepUrl,
               });
-            }
+            });
+
+            /**
+             * 빈 배열도 반드시 전달해야 합니다.
+             * 마지막 상대가 나간 경우 reconcile([])에서 기존 WHEP 연결을
+             * 모두 정리할 수 있기 때문입니다.
+             */
+            onCoPublishersChanged?.(
+              Array.from(publishersByUserId.values()),
+            );
           } catch {
-            // 잘못된 공동 송출자 이벤트는 시청자 수 구독을 끊지 않습니다.
+            // 잘못된 snapshot 하나 때문에 시청자 수 SSE 전체를 끊지 않습니다.
           }
         }
       });
