@@ -138,18 +138,6 @@ const isAlreadyProcessedCoHostInvitationError = (error: unknown) => {
   return status === 409 || code.startsWith("LIVE409");
 };
 
-const isLiveEnterForbiddenError = (error: unknown) => {
-  const status = getApiErrorStatus(error);
-  const code = getApiErrorCode(error) ?? "";
-
-  return (
-    status === 403 ||
-    status === 404 ||
-    code.startsWith("LIVE403") ||
-    code.startsWith("LIVE404")
-  );
-};
-
 const isNotFoundError = (error: unknown) => {
   const status = getApiErrorStatus(error);
   const code = getApiErrorCode(error) ?? "";
@@ -256,7 +244,6 @@ export function BandLivePage() {
   >(null);
 
   const respondCoHostInvitationMutation = useRespondCoHostInvitationMutation();
-  const requestCoHostUpgradeMutation = useRequestCoHostUpgradeMutation();
   const acceptCoHostUpgradeMutation = useAcceptCoHostUpgradeMutation();
   const enterLiveMutation = useEnterLiveMutation();
 
