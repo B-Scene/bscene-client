@@ -14,11 +14,6 @@ export const AGREEMENTS: {
   { key: "service", label: "서비스 이용약관", required: true },
   { key: "privacy", label: "개인정보 수집 및 이용 동의", required: true },
   {
-    key: "notification",
-    label: "서비스 알림 수신 및 알림 정보 이용 동의",
-    required: false,
-  },
-  {
     key: "marketing",
     label: "광고성 정보 수신 및 마케팅 활용 동의",
     required: false,
