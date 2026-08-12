@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef, useState } from 'react'
 import type { KeyboardEvent, ReactNode } from 'react'
 
 type NewsCardProps = {
@@ -12,6 +13,16 @@ type NewsCardProps = {
   showTags?: boolean
   onClick?: () => void
   ariaLabel?: string
+}
+
+const tagChipClassName =
+  'flex w-fit shrink-0 items-center justify-center whitespace-nowrap rounded-full bg-primary-50 px-[5px] py-[2px] font-body text-body5 text-primary-400'
+
+const getTagChipClassName = (tag: ReactNode) => {
+  const tagText = typeof tag === 'string' ? tag.trim() : ''
+  const isTwoLetterTag = tagText.length === 2
+
+  return isTwoLetterTag ? `${tagChipClassName} min-w-[32px]` : tagChipClassName
 }
 
 const NewsCard = ({
@@ -29,12 +40,76 @@ const NewsCard = ({
     </>
   ),
   tags = ['홍대', '정기공연', '인디팝'],
-  showTags = false,
+  showTags = true,
   onClick,
   ariaLabel,
 }: NewsCardProps) => {
   const hasContentImage = Boolean(contentImageSrc)
   const isInteractive = Boolean(onClick)
+  const tagContainerRef = useRef<HTMLDivElement>(null)
+  const tagMeasureRefs = useRef<Array<HTMLSpanElement | null>>([])
+  const [visibleTagCount, setVisibleTagCount] = useState(tags.length)
+
+  useLayoutEffect(() => {
+    if (!showTags || tags.length === 0) return
+
+    let animationFrameId: number | null = null
+
+    const calculateVisibleTags = () => {
+      const container = tagContainerRef.current
+      if (!container) {
+        setVisibleTagCount(tags.length)
+        return
+      }
+
+      const availableWidth = container.clientWidth
+      let usedWidth = 0
+      let nextVisibleCount = 0
+
+      for (const tagElement of tagMeasureRefs.current) {
+        if (!tagElement) continue
+
+        const nextWidth =
+          usedWidth + (nextVisibleCount > 0 ? 4 : 0) + tagElement.offsetWidth
+
+        if (nextWidth > availableWidth) break
+
+        usedWidth = nextWidth
+        nextVisibleCount += 1
+      }
+
+      setVisibleTagCount(nextVisibleCount)
+    }
+
+    const scheduleCalculation = () => {
+      if (animationFrameId !== null) {
+        window.cancelAnimationFrame(animationFrameId)
+      }
+
+      animationFrameId = window.requestAnimationFrame(calculateVisibleTags)
+    }
+
+    scheduleCalculation()
+
+    if (typeof ResizeObserver === 'undefined') {
+      return () => {
+        if (animationFrameId !== null) {
+          window.cancelAnimationFrame(animationFrameId)
+        }
+      }
+    }
+
+    const resizeObserver = new ResizeObserver(scheduleCalculation)
+    const container = tagContainerRef.current
+    if (container) resizeObserver.observe(container)
+
+    return () => {
+      resizeObserver.disconnect()
+      if (animationFrameId !== null) {
+        window.cancelAnimationFrame(animationFrameId)
+      }
+    }
+  }, [showTags, tags])
 
   const handleKeyDown = (event: KeyboardEvent<HTMLElement>) => {
     if (!onClick) return
@@ -51,7 +126,7 @@ const NewsCard = ({
       aria-label={ariaLabel}
       onClick={onClick}
       onKeyDown={isInteractive ? handleKeyDown : undefined}
-      className={`box-border flex h-[196px] w-[200px] shrink-0 flex-col items-start gap-3 rounded-[12px] bg-neutral-0 p-3 text-left shadow-[0_0_10px_1px_rgba(20,20,20,0.12)] ${
+      className={`box-border flex h-[238px] w-[200px] shrink-0 flex-col items-start gap-3 rounded-[12px] bg-neutral-0 p-3 text-left shadow-[0_0_10px_1px_rgba(20,20,20,0.12)] ${
         isInteractive
           ? 'cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-400'
           : ''
@@ -81,17 +156,34 @@ const NewsCard = ({
         />
       ) : null}
 
-      <p className="m-0 line-clamp-2 overflow-hidden font-body text-body5 text-neutral-900">
+      <p className="m-0 line-clamp-2 overflow-hidden font-body text-caption2 text-neutral-900">
         {title}
       </p>
 
       {showTags && tags.length > 0 ? (
-        <div className="mt-auto mb-[2px] flex max-h-[30px] max-w-full flex-wrap gap-[4px] overflow-hidden">
-          {tags.map((tag, index) => (
-            <span
-              className="inline-flex h-[12px] min-w-[30px] max-w-full items-center justify-center truncate whitespace-nowrap rounded-full bg-primary-50 px-[5px] font-body text-caption5 text-primary-400"
-              key={index}
-            >
+        <div
+          ref={tagContainerRef}
+          className="relative mt-auto flex h-[20px] max-w-full flex-nowrap gap-[4px] overflow-hidden"
+        >
+          <div
+            aria-hidden="true"
+            className="pointer-events-none invisible absolute left-0 top-0 flex flex-nowrap gap-[4px]"
+          >
+            {tags.map((tag, index) => (
+              <span
+                ref={(element) => {
+                  tagMeasureRefs.current[index] = element
+                }}
+                className={getTagChipClassName(tag)}
+                key={index}
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+
+          {tags.slice(0, visibleTagCount).map((tag, index) => (
+            <span className={getTagChipClassName(tag)} key={index}>
               {tag}
             </span>
           ))}

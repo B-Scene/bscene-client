@@ -17,6 +17,12 @@ type FollowedNewsCardProps = {
   ariaLabel?: string;
 };
 
+const tagChipClassName =
+  "flex w-fit shrink-0 items-center justify-center whitespace-nowrap rounded-full bg-primary-50 px-[5px] py-[2px] font-body text-body5 text-primary-400";
+
+const getTagChipClassName = (tag: string) =>
+  tag.trim().length === 2 ? `${tagChipClassName} min-w-[32px]` : tagChipClassName;
+
 const ImagePlaceholderIcon = () => (
   <svg
     width="18"
@@ -203,11 +209,11 @@ export const FollowedNewsCard = ({
       </p>
 
       {tags.length > 0 ? (
-        <div className="mt-3 flex max-h-[38px] max-w-full flex-wrap gap-1 overflow-hidden">
+        <div className="mt-3 flex max-h-[20px] max-w-full flex-wrap gap-[4px] overflow-hidden">
           {tags.map((tag, index) => (
             <span
               key={`${tag}-${index}`}
-              className="inline-flex h-[16px] min-w-[35px] max-w-full items-center justify-center truncate whitespace-nowrap rounded-full bg-primary-50 px-[5px] font-body text-label4 text-primary-400"
+              className={getTagChipClassName(tag)}
             >
               {tag}
             </span>
