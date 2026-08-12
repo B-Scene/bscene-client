@@ -21,6 +21,7 @@ import {
   BAND_NOTIFICATION_ROUTES,
   formatNotificationTime,
   getNotificationTargetPath,
+  isCoHostInviteNotificationType,
   isNotificationForMode,
   isNotificationWithinRetention,
   isPostRegistrationNotification,
@@ -512,6 +513,85 @@ const NotificationPage = () => {
                           openRoleModal({ notification });
                         }}
                         className="flex h-7.5 w-35 flex-1 items-center justify-center rounded-md bg-secondary-500 text-caption3 text-neutral-0 disabled:opacity-60"
+                      >
+                        수락
+                      </button>
+                    </div>
+                  ) : null}
+                </article>
+              );
+            }
+
+            const isCoHostInvite = isCoHostInviteNotificationType(
+              notification.type,
+            );
+
+            if (isCoHostInvite) {
+              return (
+                <article
+                  key={notification.notificationId}
+                  className={`flex w-full flex-col gap-3 self-stretch rounded-xl bg-neutral-0 px-4 py-4 shadow-[0_0_8px_0_rgba(0,0,0,0.10)] ${
+                    targetPath ? "cursor-pointer" : ""
+                  } ${notification.isRead ? "opacity-80" : ""}`}
+                  onClick={() => handleNotificationClick(notification)}
+                >
+                  <div className="flex items-start gap-3">
+                    <img
+                      src={InviteAlertIcon}
+                      alt=""
+                      className="shrink-0 rounded-full object-cover"
+                    />
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start gap-2">
+                        <h2 className="m-0 line-clamp-2 flex-1 font-body text-body1 text-neutral-900">
+                          {notification.title}
+                        </h2>
+                        {!notification.isRead ? (
+                          <span
+                            aria-label="읽지 않은 알림"
+                            className="mt-1 size-2 shrink-0 rounded-full bg-secondary-500"
+                          />
+                        ) : null}
+                      </div>
+                      {notification.body ? (
+                        <p className="m-0 mt-1 line-clamp-2 font-body text-caption2 text-neutral-700">
+                          {notification.body}
+                        </p>
+                      ) : null}
+                      {time ? (
+                        <p className="m-0 mt-1 font-body text-caption2 text-neutral-600">
+                          {time}
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  {notification.actionable ? (
+                    <div className="flex gap-3">
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+
+                          if (!notification.isRead) {
+                            markNotificationAsRead.mutate(
+                              notification.notificationId,
+                            );
+                          }
+                        }}
+                        className="flex h-7.5 flex-1 items-center justify-center rounded-md border border-secondary-500 bg-neutral-0 text-caption3 text-secondary-500"
+                      >
+                        거절
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+
+                          handleNotificationClick(notification);
+                        }}
+                        className="flex h-7.5 flex-1 items-center justify-center rounded-md bg-secondary-500 text-caption3 text-neutral-0"
                       >
                         수락
                       </button>

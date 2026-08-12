@@ -72,7 +72,7 @@ export const normalizeDeepLink = (deepLink: string) => {
 export const getRouteSuffix = (path: string) =>
   path.match(/[?#].*$/)?.[0] ?? "";
 
-const isCoHostInviteNotificationType = (type: string) => {
+export const isCoHostInviteNotificationType = (type: string) => {
   const normalizedType = type.toUpperCase();
 
   return (
