@@ -522,6 +522,13 @@ const ConcertDetailPage = () => {
   const detailQuery = useFanPerformanceDetailQuery(
     Number.isFinite(performanceId) ? performanceId : 0,
   );
+  const handleBack = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate("/fan/home", { replace: true });
+    }
+  };
   const detail = detailQuery.data;
   const isLiked = detail?.isInterested ?? false;
   const interestCount = detail?.interestCount ?? 0;
@@ -588,7 +595,7 @@ const ConcertDetailPage = () => {
           </p>
           <button
             type="button"
-            onClick={() => navigate(-1)}
+            onClick={handleBack}
             className="mt-[20px] flex h-[38px] items-center justify-center rounded-[8px] bg-primary-400 px-[20px] font-body text-body1 text-neutral-0"
           >
             돌아가기
@@ -780,6 +787,7 @@ const ConcertDetailPage = () => {
         <Header
           title=""
           align="betweenCompact"
+          onBack={handleBack}
           rightContent={
             <div className="flex items-center gap-4">
               <button
