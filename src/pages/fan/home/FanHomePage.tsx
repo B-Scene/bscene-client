@@ -642,12 +642,12 @@ const BandRecommendationStrip = ({ bands }: { bands: HomeBandItem[] }) => {
                 <img
                   src={band.profileImageSrc}
                   alt=""
-                  className="size-[clamp(56px,16vw,64px)] rounded-full object-cover"
+                  className="size-[52px] rounded-full object-cover"
                 />
                 <strong className="mt-2 max-w-full truncate font-body text-body1 text-neutral-900">
                   {band.name}
                 </strong>
-                <span className="mt-[5px] max-w-full truncate font-body text-body5 text-neutral-600">
+                <span className="max-w-full truncate font-body text-caption2 text-neutral-600">
                   {band.meta}
                 </span>
               </button>
@@ -680,7 +680,7 @@ const BandRecommendationStrip = ({ bands }: { bands: HomeBandItem[] }) => {
                     onSettled: () => setPendingBandId(null),
                   });
                 }}
-                className="mt-2 h-[20px] w-full rounded-full border-[1px] border-primary-400 font-body text-caption3 text-primary-400 disabled:opacity-60"
+                className="mt-2 flex self-stretch items-center justify-center gap-2 rounded-full border-[1px] border-primary-400 px-[15px] py-1 font-body text-caption3 text-primary-400 disabled:opacity-60"
               >
                 {isFollowing ? "팔로잉" : "팔로우"}
               </button>
@@ -1114,6 +1114,7 @@ const FanHomePage = () => {
             type="button"
             aria-label="모드 전환"
             onClick={() => setIsModeSwitchOpen(true)}
+            className="-ml-[9px]"
           >
             <img src={SwapIcon} alt="" className="size-6" />
           </button>
