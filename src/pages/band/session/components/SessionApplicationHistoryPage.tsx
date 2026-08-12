@@ -1,11 +1,12 @@
-import { useMemo, useState } from "react";
+// src/pages/band/session/components/SessionApplicationHistoryPage.tsx
+
+import { useEffect, useMemo, useState } from "react";
 import type { AxiosError } from "axios";
 import { useNavigate } from "react-router-dom";
 
 import EmptyApplicationHistoryIcon from "@/assets/icons/band/empty-application-history.svg";
-import EmptyScrapHistoryIcon from "@/assets/icons/band/empty-scrap-history.svg";
 import EmptyRecentHistoryIcon from "@/assets/icons/band/empty-recent-history.svg";
-
+import EmptyScrapHistoryIcon from "@/assets/icons/band/empty-scrap-history.svg";
 import { ApplicationHistoryCard } from "@/features/session/applicationHistory/ApplicationHistoryCard";
 import type {
   ApplicationHistoryItem,
@@ -19,7 +20,6 @@ import {
   ApplicationHistoryHeader,
   ApplicationHistoryTabs,
 } from "@/features/session/applicationHistory/SessionApplicationHistoryView";
-
 import {
   useApplicationSubmissionsQuery,
   useCancelApplicationSubmissionMutation,
@@ -31,7 +31,6 @@ import {
   useRemoveSessionRecruitmentInterest,
 } from "@/hooks/api/session/useSessionRecruitment";
 import { useCreateSessionChatRoomMutation } from "@/hooks/api/session/useSessionChat";
-
 import type {
   ApplicationSubmissionItem,
   SessionApiResponse,
@@ -205,6 +204,13 @@ export const SessionApplicationHistoryPage = ({
   const removeInterestMutation = useRemoveSessionRecruitmentInterest();
   const createChatRoomMutation = useCreateSessionChatRoomMutation();
 
+  useEffect(() => {
+    window.scrollTo({
+      top: 0,
+      behavior: "auto",
+    });
+  }, [activeTab]);
+
   const applications = useMemo(() => {
     const content = applicationSubmissionsQuery.data?.content ?? [];
 
@@ -334,6 +340,9 @@ export const SessionApplicationHistoryPage = ({
       } else {
         await addInterestMutation.mutateAsync(sessionRecruitmentId);
       }
+
+      void interestedRecruitmentsQuery.refetch();
+      void recentlyViewedRecruitmentsQuery.refetch();
     } catch (error) {
       const apiMessage = (error as AxiosError<SessionApiResponse<null>>)
         .response?.data?.message;
@@ -359,6 +368,9 @@ export const SessionApplicationHistoryPage = ({
       } else {
         await addInterestMutation.mutateAsync(sessionRecruitmentId);
       }
+
+      void interestedRecruitmentsQuery.refetch();
+      void recentlyViewedRecruitmentsQuery.refetch();
     } catch (error) {
       const apiMessage = (error as AxiosError<SessionApiResponse<null>>)
         .response?.data?.message;
@@ -553,18 +565,18 @@ export const SessionApplicationHistoryPage = ({
   };
 
   return (
-    <div className="absolute inset-0 z-[99999] flex h-full w-full flex-col overflow-hidden bg-neutral-0">
-      <ApplicationHistoryHeader onBack={handleClose} onClose={handleClose} />
+  <section className="relative min-h-dvh overscroll-y-contain bg-neutral-50 pb-[calc(var(--bottom-nav-height)+24px)]">
+    <ApplicationHistoryHeader onBack={handleClose} onClose={handleClose} />
 
-      <ApplicationHistoryTabs activeTab={activeTab} onChange={setActiveTab} />
+    <ApplicationHistoryTabs activeTab={activeTab} onChange={setActiveTab} />
 
-      <section className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-5 py-5">
-        {activeTab === "application" ? renderApplicationTab() : null}
-        {activeTab === "scrap" ? renderScrapTab() : null}
-        {activeTab === "recent" ? renderRecentTab() : null}
-      </section>
-    </div>
-  );
+    <section className="bg-neutral-50 px-5 pt-5 pb-[calc(var(--bottom-nav-height)+80px)]">
+      {activeTab === "application" ? renderApplicationTab() : null}
+      {activeTab === "scrap" ? renderScrapTab() : null}
+      {activeTab === "recent" ? renderRecentTab() : null}
+    </section>
+  </section>
+);
 };
 
 export default SessionApplicationHistoryPage;

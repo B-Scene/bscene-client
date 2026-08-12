@@ -100,7 +100,10 @@ const readStoredFilterValues = (
 
 const readStoredFindFilterTouched = () => {
   try {
-    return window.sessionStorage.getItem(SESSION_FIND_FILTER_TOUCHED_STORAGE_KEY) === "true";
+    return (
+      window.sessionStorage.getItem(SESSION_FIND_FILTER_TOUCHED_STORAGE_KEY) ===
+      "true"
+    );
   } catch {
     return false;
   }
@@ -120,7 +123,10 @@ const writeStoredFilterValues = (
 const writeStoredFindFilterTouched = (isTouched: boolean) => {
   try {
     if (isTouched) {
-      window.sessionStorage.setItem(SESSION_FIND_FILTER_TOUCHED_STORAGE_KEY, "true");
+      window.sessionStorage.setItem(
+        SESSION_FIND_FILTER_TOUCHED_STORAGE_KEY,
+        "true",
+      );
       return;
     }
 
@@ -234,6 +240,9 @@ export const RecruitmentNoticeScreen = () => {
     () => readStoredActiveTab(),
   );
 
+  const [isApplicationHistoryMode, setIsApplicationHistoryMode] =
+    useState(false);
+
   const [isFilterOpen, setIsFilterOpen] = useState(false);
 
   const [recruitmentFilterValues, setRecruitmentFilterValues] =
@@ -255,15 +264,11 @@ export const RecruitmentNoticeScreen = () => {
   );
 
   const [sort, setSort] = useState<SessionRecruitmentSort>("LATEST");
-
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-
   const [editingRecruitmentId, setEditingRecruitmentId] = useState<
     number | null
   >(null);
-
   const [isBasicProfileEditOpen, setIsBasicProfileEditOpen] = useState(false);
 
   const openPostId =
@@ -281,7 +286,6 @@ export const RecruitmentNoticeScreen = () => {
   >(null);
 
   const [deletedPostIds, setDeletedPostIds] = useState<number[]>([]);
-
   const [createdPostIds, setCreatedPostIds] = useState<number[]>([]);
 
   const [bookmarkOverrides, setBookmarkOverrides] = useState<
@@ -300,6 +304,7 @@ export const RecruitmentNoticeScreen = () => {
   });
 
   const handleTabChange = useCallback((nextTab: SessionTabId) => {
+    setIsApplicationHistoryMode(false);
     setActiveTab(nextTab);
     writeStoredActiveTab(nextTab);
   }, []);
@@ -315,12 +320,15 @@ export const RecruitmentNoticeScreen = () => {
     [],
   );
 
-  const handleApplyFindFilters = useCallback((nextValues: SessionFilterValues) => {
-    setFindFilterValues(nextValues);
-    writeStoredFilterValues(SESSION_FIND_FILTER_STORAGE_KEY, nextValues);
-    setHasUserChangedFindFilters(true);
-    writeStoredFindFilterTouched(true);
-  }, []);
+  const handleApplyFindFilters = useCallback(
+    (nextValues: SessionFilterValues) => {
+      setFindFilterValues(nextValues);
+      writeStoredFilterValues(SESSION_FIND_FILTER_STORAGE_KEY, nextValues);
+      setHasUserChangedFindFilters(true);
+      writeStoredFindFilterTouched(true);
+    },
+    [],
+  );
 
   const handleRefreshPage = useCallback(async () => {
     writeStoredActiveTab(activeTab);
@@ -343,6 +351,7 @@ export const RecruitmentNoticeScreen = () => {
     isRefreshing: isRecruitmentRefreshing,
   } = usePullToRefresh<HTMLElement>({
     enabled:
+      !isApplicationHistoryMode &&
       (activeTab === "recruitment" ||
         activeTab === "find" ||
         activeTab === "applications") &&
@@ -619,25 +628,25 @@ export const RecruitmentNoticeScreen = () => {
     );
   }
 
- if (isSearchOpen) {
-  const isFindSearch = activeTab === "find";
+  if (isSearchOpen) {
+    const isFindSearch = activeTab === "find";
 
-  return (
-    <SessionSearchScreen
-      mode={isFindSearch ? "find" : "recruitment"}
-      values={isFindSearch ? findFilterValues : recruitmentFilterValues}
-      onBack={() => setIsSearchOpen(false)}
-      onApplyFilters={
-        isFindSearch ? handleApplyFindFilters : handleApplyRecruitmentFilters
-      }
-      onSelectRecruitment={(post) => {
-        setIsSearchOpen(false);
-        setSelectedPostOverride(post);
-        setSelectedPostId(post.id);
-      }}
-    />
-  );
-}
+    return (
+      <SessionSearchScreen
+        mode={isFindSearch ? "find" : "recruitment"}
+        values={isFindSearch ? findFilterValues : recruitmentFilterValues}
+        onBack={() => setIsSearchOpen(false)}
+        onApplyFilters={
+          isFindSearch ? handleApplyFindFilters : handleApplyRecruitmentFilters
+        }
+        onSelectRecruitment={(post) => {
+          setIsSearchOpen(false);
+          setSelectedPostOverride(post);
+          setSelectedPostId(post.id);
+        }}
+      />
+    );
+  }
 
   if (selectedApplicationId) {
     return (
@@ -671,42 +680,51 @@ export const RecruitmentNoticeScreen = () => {
   return (
     <main
       ref={recruitmentRefreshRef}
-      className="relative min-h-dvh overscroll-y-contain bg-neutral-0 pb-[calc(var(--bottom-nav-height)+24px)]"
+      className={`relative min-h-dvh overscroll-y-contain ${
+        isApplicationHistoryMode
+          ? "bg-neutral-50 pb-0"
+          : "bg-neutral-0 pb-[calc(var(--bottom-nav-height)+24px)]"
+      }`}
     >
-      {activeTab === "recruitment" ||
-      activeTab === "find" ||
-      activeTab === "applications" ? (
+      {!isApplicationHistoryMode &&
+      (activeTab === "recruitment" ||
+        activeTab === "find" ||
+        activeTab === "applications") ? (
         <PullToRefreshIndicator
           pullDistance={recruitmentPullDistance}
           isRefreshing={isRecruitmentRefreshing}
         />
       ) : null}
 
-      <SessionPageHeader
-        showSearch={activeTab !== "applications"}
-        onSearch={() => setIsSearchOpen(true)}
-        onMessages={() => navigate("/band/session/messages")}
-      />
+      {!isApplicationHistoryMode ? (
+        <>
+          <SessionPageHeader
+            showSearch={activeTab !== "applications"}
+            onSearch={() => setIsSearchOpen(true)}
+            onMessages={() => navigate("/band/session/messages")}
+          />
 
-      <SessionTabs activeTab={activeTab} onTabChange={handleTabChange} />
+          <SessionTabs activeTab={activeTab} onTabChange={handleTabChange} />
+        </>
+      ) : null}
 
-      {activeTab !== "applications" ? (
-     <SessionFilterBar
-        values={
-          activeTab === "find"
-            ? findFilterValues
-            : recruitmentFilterValues
-        }
-        sort={activeTab === "find" ? "LATEST" : sort}
-        sortOptions={activeTab === "find" ? ["LATEST"] : ["LATEST", "IMMINENT"]}
-        onSortChange={activeTab === "find" ? () => undefined : setSort}
-        showSort={activeTab === "recruitment" || activeTab === "find"}
-        showSelectedValues={false}
-        showBottomBorder={activeTab !== "find"}
-        compactHeight={activeTab === "find"}
-        filterKeys={activeTab === "find" ? [...FIND_FILTER_KEYS] : undefined}
-        onOpenFilter={() => setIsFilterOpen(true)}
-      />
+      {!isApplicationHistoryMode && activeTab !== "applications" ? (
+        <SessionFilterBar
+          values={
+            activeTab === "find" ? findFilterValues : recruitmentFilterValues
+          }
+          sort={activeTab === "find" ? "LATEST" : sort}
+          sortOptions={
+            activeTab === "find" ? ["LATEST"] : ["LATEST", "IMMINENT"]
+          }
+          onSortChange={activeTab === "find" ? () => undefined : setSort}
+          showSort={activeTab === "recruitment" || activeTab === "find"}
+          showSelectedValues={false}
+          showBottomBorder={activeTab !== "find"}
+          compactHeight={activeTab === "find"}
+          filterKeys={activeTab === "find" ? [...FIND_FILTER_KEYS] : undefined}
+          onOpenFilter={() => setIsFilterOpen(true)}
+        />
       ) : null}
 
       {activeTab === "recruitment" ? (
@@ -752,8 +770,15 @@ export const RecruitmentNoticeScreen = () => {
       ) : activeTab === "applications" ? (
         <SessionApplicationsScreen
           onEditBasicInfo={() => setIsBasicProfileEditOpen(true)}
-          onBrowseRecruitments={() => handleTabChange("recruitment")}
+          onViewApplicationHistory={() => setIsApplicationHistoryMode(true)}
+          onCloseApplicationHistory={() => setIsApplicationHistoryMode(false)}
+          onBrowseRecruitments={() => {
+            setIsApplicationHistoryMode(false);
+            handleTabChange("recruitment");
+          }}
           onViewHistoryApplication={(application) => {
+            setIsApplicationHistoryMode(false);
+
             if (!application.sessionApplicationId) {
               window.alert(
                 "지원서 정보를 확인할 수 없어요. 잠시 후 다시 시도해주세요.",
@@ -763,21 +788,25 @@ export const RecruitmentNoticeScreen = () => {
 
             setSelectedApplicationId(application.sessionApplicationId);
           }}
-          onMessage={handleMessageApplication}
-          onOpenRecruitment={handleOpenHistoryRecruitment}
+          onMessage={(application) => {
+            setIsApplicationHistoryMode(false);
+            void handleMessageApplication(application);
+          }}
+          onOpenRecruitment={(recruitment) => {
+            setIsApplicationHistoryMode(false);
+            handleOpenHistoryRecruitment(recruitment);
+          }}
         />
       ) : null}
 
-      {activeTab === "recruitment" ? (
+      {!isApplicationHistoryMode && activeTab === "recruitment" ? (
         <FloatingCreateButton onClick={() => setIsCreateOpen(true)} />
       ) : null}
 
-      {isFilterOpen ? (
+      {!isApplicationHistoryMode && isFilterOpen ? (
         <SessionFilterBottomSheet
           values={
-            activeTab === "find"
-              ? findFilterValues
-              : recruitmentFilterValues
+            activeTab === "find" ? findFilterValues : recruitmentFilterValues
           }
           onApply={
             activeTab === "find"
@@ -790,3 +819,5 @@ export const RecruitmentNoticeScreen = () => {
     </main>
   );
 };
+
+export default RecruitmentNoticeScreen;
