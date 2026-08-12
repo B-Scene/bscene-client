@@ -10,6 +10,7 @@ import SoundCloudIcon from "@/assets/icons/soundcloude.svg";
 import SpotifyIcon from "@/assets/icons/Spotify.svg";
 import YouTubeIcon from "@/assets/icons/youtube.svg";
 import BandImage from "@/assets/icons/band/band-default-profile.svg";
+import { Tabs } from "@/components/band/home/Tabs";
 import ConcertCard from "@/components/common/Card/ConcertCard";
 import { Header } from "@/components/common/Header/Header";
 import { ModalOverlay } from "@/components/common/Modal/ModalOverlay";
@@ -584,28 +585,18 @@ const FanBandProfilePage = () => {
         </div>
       </section>
 
-      <nav className="relative mt-[32px] grid h-[30px] grid-cols-3 px-[32px]">
-        {TABS.map((tab) => (
-          <button
-            key={tab}
-            type="button"
-            onClick={() => setActiveTab(tab)}
-            className={[
-              "relative z-10 flex flex-col items-center gap-[8px] font-body text-body1",
-              activeTab === tab ? "text-neutral-900" : "text-neutral-400",
-            ].join(" ")}
-          >
-            <span>{tab}</span>
-            <span
-              className={[
-                "h-[2px] w-[114px] rounded-full",
-                activeTab === tab ? "bg-primary-400" : "bg-transparent",
-              ].join(" ")}
-            />
-          </button>
-        ))}
-        <span className="pointer-events-none absolute inset-x-0 bottom-0 h-[2px] bg-neutral-400" />
-      </nav>
+      <div className="mt-[32px]">
+        <Tabs
+          tabs={TABS.map((tab) => ({ id: tab, label: tab }))}
+          activeTabId={activeTab}
+          onChange={(tabId) => setActiveTab(tabId as ProfileTab)}
+          colorVariant="primary"
+          edgeClassName=""
+          paddingClassName="px-[32px]"
+          indicatorWidth={114}
+          indicatorRounded
+        />
+      </div>
 
       {activeTab === "콘텐츠" && hasContent ? (
         <section className="px-[23px] pt-[24px]">

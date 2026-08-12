@@ -99,7 +99,9 @@ export const SessionApplicationProfile = ({
       (entries) => {
         const visibleEntry = entries
           .filter((entry) => entry.isIntersecting)
-          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
+          .sort(
+            (a, b) => a.boundingClientRect.top - b.boundingClientRect.top,
+          )[0];
 
         if (!visibleEntry) return;
 
@@ -166,15 +168,19 @@ export const SessionApplicationProfile = ({
 
       <nav
         aria-label="지원서 메뉴"
-        className="sticky top-0 z-10 grid grid-cols-4 border-b border-neutral-300 bg-neutral-0"
+        className="sticky top-0 z-10 grid grid-cols-4 bg-neutral-0"
       >
+        <div className="absolute inset-x-0 bottom-0 h-0.5 bg-neutral-400" />
+
         {TABS.map((tab) => (
           <button
             key={tab}
             type="button"
             onClick={() => handleTabClick(tab)}
-            className={`relative flex h-11 items-center justify-center text-body1 ${
-              activeTab === tab ? "text-neutral-900" : "text-neutral-400"
+            className={`relative flex h-11 items-center justify-center ${
+              activeTab === tab
+                ? "text-body6 text-secondary-500"
+                : "text-body1 text-neutral-400"
             }`}
           >
             {tab}
@@ -185,10 +191,7 @@ export const SessionApplicationProfile = ({
         ))}
       </nav>
 
-      <section
-        ref={introRef}
-        className="flex scroll-mt-11 flex-col gap-3 px-6"
-      >
+      <section ref={introRef} className="flex scroll-mt-11 flex-col gap-3 px-6">
         <h3 className="text-label1 text-neutral-900">세션 소개</h3>
         <blockquote className="text-body1 text-secondary-500">
           “{data.introQuote}”
