@@ -1,5 +1,7 @@
 // src/pages/band/session/components/SessionApplicationCreatePage.tsx
 
+import { createPortal } from "react-dom";
+
 import { SessionApplicationForm } from "@/features/session/applicationForm/SessionApplicationForm";
 import { SessionApplicationFormHeader } from "@/features/session/applicationForm/SessionApplicationFormHeader";
 import { SessionApplicationFormModals } from "@/features/session/applicationForm/SessionApplicationFormModals";
@@ -57,17 +59,20 @@ const SessionApplicationCreatePageContent = ({
     onSubmit,
   });
 
-  return (
-    <main className="min-h-dvh bg-neutral-0 pb-[calc(var(--bottom-nav-height)+32px)]">
+  return createPortal(
+    <main className="frame-width fixed inset-0 z-[100] mx-auto flex h-dvh flex-col overflow-hidden bg-neutral-0">
       <SessionApplicationFormHeader
         title={controller.headerTitle}
         onBack={controller.handleRequestClose}
         onClose={controller.handleRequestClose}
       />
 
-      <SessionApplicationForm controller={controller} />
+      <section className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
+        <SessionApplicationForm controller={controller} />
+      </section>
 
       <SessionApplicationFormModals controller={controller} />
-    </main>
+    </main>,
+    document.body,
   );
 };

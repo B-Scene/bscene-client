@@ -538,18 +538,20 @@ export const SessionApplicationsScreen = ({
               ))}
             </div>
           ) : (
-            <EmptyState
-              title="내 지원서가 없어요"
-              description={
-                <>
-                  모집공고에 바로 지원할 수 있도록
-                  <br />
-                  파트, 실력대, 소개글을 담은 지원서를 먼저 만들어보세요
-                </>
-              }
-              actionLabel="지원서 작성"
-              onAction={handleOpenCreatePage}
-            />
+            <div className="mx-auto mt-12 w-full max-w-[313px]">
+              <EmptyState
+                title="내 지원서가 없어요"
+                description={
+                  <>
+                    모집공고에 바로 지원할 수 있도록
+                    <br />
+                    파트, 실력대, 소개글을 담은 지원서를 먼저 만들어보세요
+                  </>
+                }
+                actionLabel="지원서 작성"
+                onAction={handleOpenCreatePage}
+              />
+            </div>
           )}
         </section>
       </section>
