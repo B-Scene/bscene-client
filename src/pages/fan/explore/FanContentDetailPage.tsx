@@ -474,6 +474,23 @@ const FanContentDetailPage = () => {
   const hasContent = content.trim().length > 0;
   const tags = Array.isArray(postDetail?.tags) ? postDetail.tags : TAGS;
 
+  const handleNavigateToBandProfile = () => {
+    if (bandId == null) return;
+
+    navigate(`/fan/bands/${bandId}`, {
+      state: {
+        bandPreview: {
+          bandId,
+          name: bandName,
+          bandName,
+          genre: postDetail?.band?.genre ?? postDetail?.genre,
+          region: postDetail?.band?.region ?? postDetail?.region,
+          profileImageUrl,
+        },
+      },
+    });
+  };
+
   const handleImageScroll = (event: UIEvent<HTMLDivElement>) => {
     const container = event.currentTarget;
     const nextIndex = Math.round(container.scrollLeft / container.clientWidth);
@@ -620,7 +637,19 @@ const FanContentDetailPage = () => {
       <ContentDetailHeader onBack={() => navigate(-1)} />
 
       <article className="bg-neutral-0 px-[25px] p-[24px]">
-        <header className="flex items-center gap-[16px]">
+        <header
+          role={bandId != null ? "button" : undefined}
+          tabIndex={bandId != null ? 0 : undefined}
+          onClick={handleNavigateToBandProfile}
+          onKeyDown={(event) => {
+            if (bandId == null) return;
+            if (event.key !== "Enter" && event.key !== " ") return;
+
+            event.preventDefault();
+            handleNavigateToBandProfile();
+          }}
+          className={`flex items-center gap-[16px] ${bandId != null ? "cursor-pointer" : ""}`}
+        >
           <div className="flex size-[42px] shrink-0 items-center justify-center overflow-hidden rounded-full bg-neutral-300 text-neutral-600">
             <img
               src={profileImageUrl ?? BandImage}
@@ -912,22 +941,7 @@ const FanContentDetailPage = () => {
         <button
           type="button"
           disabled={bandId == null}
-          onClick={() => {
-            if (bandId != null) {
-              navigate(`/fan/bands/${bandId}`, {
-                state: {
-                  bandPreview: {
-                    bandId,
-                    name: bandName,
-                    bandName,
-                    genre: postDetail?.band?.genre ?? postDetail?.genre,
-                    region: postDetail?.band?.region ?? postDetail?.region,
-                    profileImageUrl,
-                  },
-                },
-              });
-            }
-          }}
+          onClick={handleNavigateToBandProfile}
           className="flex h-[38px] w-[270px] items-center justify-center rounded-[8px] bg-primary-400 px-[20px] font-body text-body1 text-neutral-0 disabled:opacity-60"
         >
           밴드 프로필 보기
