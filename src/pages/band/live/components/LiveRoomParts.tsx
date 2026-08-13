@@ -353,11 +353,7 @@ export function ChatComposer({
   return (
     <form
       onSubmit={handleSubmit}
-<<<<<<< HEAD
       className="absolute inset-x-5 bottom-[112px] z-30 flex items-center gap-[17px]"
-=======
-      className="fixed inset-x-5 bottom-[98px] z-30 flex items-center gap-[17px]"
->>>>>>> 4c197181737599649894ec6168925d5d0bf7c591
     >
       <input
         aria-label="메시지 입력"
@@ -415,11 +411,7 @@ export function LiveActionBar({
       : "마이크 연결";
 
   return (
-<<<<<<< HEAD
     <nav className="absolute inset-x-5 bottom-6 z-30 h-[62px] rounded-[24px] bg-neutral-0 shadow-[0_0_8px_rgba(20,20,20,0.10)]">
-=======
-    <div className="fixed inset-x-5 bottom-3 z-30 h-[62px] rounded-[24px] bg-neutral-0 shadow-[0_4px_15px_rgba(20,20,20,0.10)]">
->>>>>>> 4c197181737599649894ec6168925d5d0bf7c591
       <div className="relative flex h-full items-center justify-between px-10 py-3">
         <button
           type="button"
