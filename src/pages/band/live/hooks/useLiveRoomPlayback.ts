@@ -23,6 +23,7 @@ type CoPublisherPeer = {
   audio: HTMLAudioElement;
   abortController: AbortController;
   sessionUrl: string | null;
+  disconnectTimer: number | null;
 };
 
 const WHEP_RETRY_DELAY_MS = 3000;
@@ -123,29 +124,66 @@ export const useLiveRoomPlayback = ({
     }
   }, [playbackUrl]);
 
-  const closePeer = useCallback(async (userId: number) => {
-    const peer = peersRef.current.get(userId);
+  const syncCoPublisherPlaybackUi = useCallback(() => {
+    if (isUnmountedRef.current) return;
 
-    if (!peer) return;
+    const peers = Array.from(peersRef.current.values());
+    const playablePeers = peers.filter((peer) => peer.audio.srcObject !== null);
 
-    peersRef.current.delete(userId);
-
-    peer.abortController.abort();
-    peer.peerConnection.ontrack = null;
-    peer.peerConnection.close();
-
-    peer.audio.pause();
-    peer.audio.srcObject = null;
-    peer.audio.removeAttribute("src");
-    peer.audio.remove();
-
-    if (peer.sessionUrl) {
-      try {
-        await deleteWhipSession(peer.sessionUrl);
-      } catch {
+    if (playablePeers.length === 0) {
+      if (desiredPublishersRef.current.size === 0) {
+        setListenerAudioMessage("");
+        setShowListenerPlayButton(false);
       }
+      return;
     }
+
+    const hasBlockedPlayback = playablePeers.some((peer) => peer.audio.paused);
+
+    if (hasBlockedPlayback) {
+      setListenerAudioMessage("상대 진행자 소리를 들으려면 눌러주세요.");
+      setShowListenerPlayButton(true);
+      return;
+    }
+
+    setListenerAudioMessage("");
+    setShowListenerPlayButton(false);
   }, []);
+
+  const closePeer = useCallback(
+    async (userId: number) => {
+      const peer = peersRef.current.get(userId);
+
+      if (!peer) return;
+
+      peersRef.current.delete(userId);
+
+      if (peer.disconnectTimer !== null) {
+        window.clearTimeout(peer.disconnectTimer);
+        peer.disconnectTimer = null;
+      }
+
+      peer.abortController.abort();
+      peer.peerConnection.ontrack = null;
+      peer.peerConnection.onconnectionstatechange = null;
+      peer.peerConnection.close();
+
+      peer.audio.pause();
+      peer.audio.srcObject = null;
+      peer.audio.removeAttribute("src");
+      peer.audio.remove();
+
+      if (peer.sessionUrl) {
+        try {
+          await deleteWhipSession(peer.sessionUrl);
+        } catch {
+        }
+      }
+
+      syncCoPublisherPlaybackUi();
+    },
+    [syncCoPublisherPlaybackUi],
+  );
 
   const closeAllPeers = useCallback(
     async (resetUi = true) => {
@@ -211,6 +249,7 @@ export const useLiveRoomPlayback = ({
         audio,
         abortController,
         sessionUrl: null,
+        disconnectTimer: null,
       };
 
       peersRef.current.set(userId, peer);
@@ -224,20 +263,51 @@ export const useLiveRoomPlayback = ({
           event.streams[0] ?? new MediaStream([event.track]);
         audio.volume = 1;
 
-        void audio.play().then(
-          () => {
-            if (isUnmountedRef.current) return;
-            setListenerAudioMessage("");
-            setShowListenerPlayButton(false);
-          },
-          () => {
-            if (isUnmountedRef.current) return;
-            setListenerAudioMessage(
-              "상대 진행자 소리를 들으려면 눌러주세요.",
-            );
-            setShowListenerPlayButton(true);
-          },
-        );
+        void audio.play().finally(() => {
+          syncCoPublisherPlaybackUi();
+        });
+      };
+
+      peerConnection.onconnectionstatechange = () => {
+        if (peersRef.current.get(userId) !== peer) return;
+
+        const state = peerConnection.connectionState;
+
+        if (state === "connected") {
+          if (peer.disconnectTimer !== null) {
+            window.clearTimeout(peer.disconnectTimer);
+            peer.disconnectTimer = null;
+          }
+
+          syncCoPublisherPlaybackUi();
+          return;
+        }
+
+        if (state === "failed") {
+          void closePeer(userId).then(() => {
+            if (desiredPublishersRef.current.get(userId) === whepUrl) {
+              scheduleRetry();
+            }
+          });
+          return;
+        }
+
+        if (state === "disconnected" && peer.disconnectTimer === null) {
+          peer.disconnectTimer = window.setTimeout(() => {
+            peer.disconnectTimer = null;
+
+            if (
+              peersRef.current.get(userId) === peer &&
+              peerConnection.connectionState === "disconnected"
+            ) {
+              void closePeer(userId).then(() => {
+                if (desiredPublishersRef.current.get(userId) === whepUrl) {
+                  scheduleRetry();
+                }
+              });
+            }
+          }, WHEP_RETRY_DELAY_MS);
+        }
       };
 
       try {
@@ -297,7 +367,13 @@ export const useLiveRoomPlayback = ({
         }
       }
     },
-    [audioConnected, canBroadcast, closePeer, scheduleRetry],
+    [
+      audioConnected,
+      canBroadcast,
+      closePeer,
+      scheduleRetry,
+      syncCoPublisherPlaybackUi,
+    ],
   );
 
   const reconcileCoPublishers = useCallback(
@@ -357,35 +433,28 @@ export const useLiveRoomPlayback = ({
       }
     }
 
-    const peerAudios = Array.from(peersRef.current.values()).map(
-      (peer) => peer.audio,
-    );
+    const playableAudios = Array.from(peersRef.current.values())
+      .map((peer) => peer.audio)
+      .filter((audio) => audio.srcObject !== null);
 
-    if (peerAudios.length === 0) {
+    if (playableAudios.length === 0) {
       scheduleRetry();
       return;
     }
 
-    const results = await Promise.allSettled(
-      peerAudios.map(async (audio) => {
+    await Promise.allSettled(
+      playableAudios.map(async (audio) => {
         audio.volume = 1;
         await audio.play();
       }),
     );
 
-    const hasRejectedPlayback = results.some(
-      (result) => result.status === "rejected",
-    );
-
-    if (hasRejectedPlayback) {
-      setListenerAudioMessage("상대 진행자 소리를 들으려면 눌러주세요.");
-      setShowListenerPlayButton(true);
-      return;
-    }
-
-    setListenerAudioMessage("");
-    setShowListenerPlayButton(false);
-  }, [connectPeer, scheduleRetry]);
+    syncCoPublisherPlaybackUi();
+  }, [
+    connectPeer,
+    scheduleRetry,
+    syncCoPublisherPlaybackUi,
+  ]);
 
   const initialCoPublishers = useMemo(
     () => live?.coPublishers ?? [],
