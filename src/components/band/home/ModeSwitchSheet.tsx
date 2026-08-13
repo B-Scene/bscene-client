@@ -252,7 +252,7 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
 
       <div
         onTransitionEnd={handleTransitionEnd}
-        className={`relative z-10 flex w-full flex-col items-center gap-2 rounded-t-3xl bg-neutral-0 px-3.75 pt-3 pb-8 transition-transform duration-300 ease-out ${
+        className={`relative z-10 flex max-h-[85dvh] w-full flex-col items-center gap-2 rounded-t-3xl bg-neutral-0 px-3.75 pt-3 pb-8 transition-transform duration-300 ease-out ${
           isVisible ? "translate-y-0" : "translate-y-full"
         }`}
       >
@@ -260,16 +260,18 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
           <div className="h-1 w-11 shrink-0 rounded bg-[#DEDEDE]" />
         </div>
 
-        <div className="flex w-full flex-col items-center gap-4">
-          <h2 className="text-center text-label1 text-neutral-900">
+        <div className="flex min-h-0 w-full flex-1 flex-col items-center gap-4">
+          <h2 className="shrink-0 text-center text-label1 text-neutral-900">
             모드 전환
           </h2>
 
-          <div className="flex w-full flex-col items-center gap-6">
+          <div className="flex w-full min-h-0 flex-1 flex-col items-center gap-6 overflow-y-auto">
             {fanModeSection}
 
             {bandModeSection}
+          </div>
 
+          <div className="flex w-full shrink-0 flex-col items-center gap-6">
             {!isFanMode ? (
               <div className="h-px w-90.75 shrink-0 bg-neutral-400" />
             ) : null}

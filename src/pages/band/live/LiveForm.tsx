@@ -24,6 +24,7 @@ import type {
   LiveReservationCoHostCandidate,
   LiveReservationResponse,
 } from "@/types/live/live";
+import { getStoredAuthUser } from "@/utils/authUser";
 
 import type { ActiveLive, GoLiveScreen, LiveFormMode } from "./types";
 import { ConfirmDialog } from "./components/ConfirmDialog";
@@ -198,6 +199,7 @@ const isInactiveMemberStatus = (status: string | null | undefined) => {
 
 const mapBandMemberToCoHostCandidate = (
   member: BandMemberListItem,
+  currentUserId: number | null,
 ): LiveReservationCoHostCandidate | null => {
   const nickname = member.profileNickname;
   const resolvedProfileId = member.bandMemberProfileId;
@@ -216,7 +218,9 @@ const mapBandMemberToCoHostCandidate = (
     bandMemberProfileImageUrl: null,
     nickname,
     part: member.part ?? member.memberType,
-    status: member.owner ? "OWNER" : null,
+    // 이 라이브를 실제로 시작하는 사람이 진행자입니다. 밴드 오너라도
+    // 지금 로그인한 사용자가 아니면 진행자가 아니라 초대 가능한 후보입니다.
+    status: member.userId === currentUserId ? "OWNER" : null,
     userId: member.userId,
   };
 };
@@ -560,12 +564,16 @@ export function LiveForm({
       if (isMounted) setIsCoHostLoading(true);
     }, 0);
 
+    const currentUserId = getStoredAuthUser()?.userId ?? null;
+
     getBandMembers(activeBandId)
       .then((members) => {
         if (!isMounted) return;
 
         const candidates = members
-          .map(mapBandMemberToCoHostCandidate)
+          .map((member) =>
+            mapBandMemberToCoHostCandidate(member, currentUserId),
+          )
           .filter(
             (candidate): candidate is LiveReservationCoHostCandidate =>
               Boolean(candidate),
