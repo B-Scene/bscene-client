@@ -286,7 +286,7 @@ export const SessionApplicationsScreen = ({
         await visibilityMutation.mutateAsync({
           sessionApplicationId: createdApplication.sessionApplicationId,
           body: {
-            isPublic: false,
+            isPublic: true,
           },
         });
       }
