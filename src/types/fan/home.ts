@@ -199,7 +199,11 @@ export interface FanPerformanceDetailResponse {
   performanceDate?: string | null;
   performanceTime?: string | null;
   startAt?: string | null;
+  startedAt?: string | null;
   startDateTime?: string | null;
+  startDate?: string | null;
+  startTime?: string | null;
+  time?: string | null;
   ticketPrice?: string | number | null;
   price?: string | number | null;
   ageRating?: PerformanceAgeRating | string | null;

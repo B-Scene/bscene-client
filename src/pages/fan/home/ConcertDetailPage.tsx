@@ -374,10 +374,15 @@ const getPerformanceDate = (detail?: FanPerformanceDetailResponse) => {
   if (!detail) return null;
 
   const dateValue =
-    detail.startAt ?? detail.startDateTime ?? detail.performanceDate;
+    detail.startAt ??
+    detail.startedAt ??
+    detail.startDateTime ??
+    detail.performanceDate ??
+    detail.startDate;
+  const timeValue = detail.performanceTime ?? detail.startTime ?? detail.time;
 
-  if (dateValue && detail.performanceTime && !dateValue.includes("T")) {
-    return toDate(`${dateValue}T${detail.performanceTime}`);
+  if (dateValue && timeValue && !dateValue.includes("T")) {
+    return toDate(`${dateValue}T${timeValue}`);
   }
 
   return toDate(dateValue);
