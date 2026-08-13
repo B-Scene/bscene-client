@@ -125,6 +125,31 @@ const isLiveReferenceType = (value) => {
   return getStringValue(value).toUpperCase() === "LIVE";
 };
 
+/**
+ * type이 단순 LIVE인 알림은 라이브 예약/시작 등 여러 용도로 오기 때문에
+ * LIVE라는 이유만으로 공동 진행 초대로 취급하면 안 됩니다. generic LIVE
+ * 알림 중 실제 문구에 "공동 진행/공동 송출" + "초대" 의미가 함께 있을 때만
+ * 공동 진행 초대로 판단합니다. (src/utils/notificationDeepLink.ts와 동일 로직)
+ */
+const isGenericLiveCoHostInviteNotification = (data, notification = {}) => {
+  if (!isLiveReferenceType(getNotificationType(data))) return false;
+
+  const content = `${getStringValue(notification.title || data.title)} ${getStringValue(
+    notification.body || data.body,
+  )}`.toUpperCase();
+  const hasCoHostKeyword =
+    content.includes("CO_HOST") ||
+    content.includes("COHOST") ||
+    content.includes("공동 진행") ||
+    content.includes("공동 송출");
+  const hasInviteKeyword =
+    content.includes("INVITE") ||
+    content.includes("INVITATION") ||
+    content.includes("초대");
+
+  return hasCoHostKeyword && hasInviteKeyword;
+};
+
 const isCoHostUpgradeRequest = (data, notification = {}) => {
   const type = getNotificationType(data).toUpperCase();
 
@@ -240,7 +265,10 @@ const shouldUseCoHostInviteActions = (data, notification) => {
   if (!liveId) return false;
   if (isCoHostUpgradeRequest(data, notification)) return false;
 
-  return isCoHostInviteType(type) || isLiveReferenceType(type);
+  return (
+    isCoHostInviteType(type) ||
+    isGenericLiveCoHostInviteNotification(data, notification)
+  );
 };
 
 const getPushPayload = (event) => {
@@ -268,7 +296,11 @@ const getBaseDeepLinkFromPayload = (payload) => {
     return createCoHostUpgradeApprovalDeepLink(liveId);
   }
 
-  if ((isCoHostInviteType(type) || isLiveReferenceType(type)) && liveId) {
+  if (
+    liveId &&
+    (isCoHostInviteType(type) ||
+      isGenericLiveCoHostInviteNotification(data, notification))
+  ) {
     return createBandLiveDeepLink(liveId);
   }
 
