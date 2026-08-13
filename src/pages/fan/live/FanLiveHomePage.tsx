@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { AxiosError } from "axios";
 import { useNavigate } from "react-router-dom";
 import BandImage from "@/assets/icons/band/band-default-profile.svg";
@@ -19,6 +19,9 @@ import {
   FanLiveSectionHeader,
   ReplayPreviewCard,
 } from "./components/FanLiveHomeParts";
+
+const REPLAY_CARD_WIDTH = 110;
+const REPLAY_CARD_GAP = 12;
 
 const formatReplayDuration = (totalSeconds?: number) => {
   if (totalSeconds === undefined) return "00:00:00";
@@ -44,6 +47,59 @@ export function FanLiveHomePage() {
   const [notificationOverrides, setNotificationOverrides] = useState<
     Record<number, boolean>
   >({});
+  const replayRowRef = useRef<HTMLDivElement>(null);
+  const [visibleReplayCount, setVisibleReplayCount] = useState(3);
+  const replayCount = data?.replays.length ?? 0;
+
+  useLayoutEffect(() => {
+    if (replayCount === 0) return;
+
+    let animationFrameId: number | null = null;
+
+    const calculateVisibleReplayCount = () => {
+      const container = replayRowRef.current;
+      if (!container) return;
+
+      const availableWidth = container.clientWidth;
+      const fitCount = Math.floor(
+        (availableWidth + REPLAY_CARD_GAP) /
+          (REPLAY_CARD_WIDTH + REPLAY_CARD_GAP),
+      );
+
+      setVisibleReplayCount(Math.min(replayCount, Math.max(1, fitCount)));
+    };
+
+    const scheduleCalculation = () => {
+      if (animationFrameId !== null) {
+        window.cancelAnimationFrame(animationFrameId);
+      }
+
+      animationFrameId = window.requestAnimationFrame(
+        calculateVisibleReplayCount,
+      );
+    };
+
+    scheduleCalculation();
+
+    if (typeof ResizeObserver === "undefined") {
+      return () => {
+        if (animationFrameId !== null) {
+          window.cancelAnimationFrame(animationFrameId);
+        }
+      };
+    }
+
+    const resizeObserver = new ResizeObserver(scheduleCalculation);
+    const container = replayRowRef.current;
+    if (container) resizeObserver.observe(container);
+
+    return () => {
+      resizeObserver.disconnect();
+      if (animationFrameId !== null) {
+        window.cancelAnimationFrame(animationFrameId);
+      }
+    };
+  }, [replayCount]);
   const replayDurations = useMemo(() => {
     return new Map(
       (replayListData?.pages.flatMap((page) => page.items) ?? []).map(
@@ -170,8 +226,11 @@ export function FanLiveHomePage() {
                 onMoreClick={() => navigate("/fan/live/replays")}
               />
               {data?.replays.length ? (
-                <div className="fan-live-home-scroll -mr-5 mt-3 flex gap-3 overflow-x-auto pr-5 pb-1">
-                  {data.replays.slice(0, 3).map((replay) => (
+                <div
+                  ref={replayRowRef}
+                  className="fan-live-home-scroll -mr-5 mt-3 flex gap-3 overflow-x-auto pr-5 pb-1"
+                >
+                  {data.replays.slice(0, visibleReplayCount).map((replay) => (
                     <ReplayPreviewCard
                       key={replay.liveId}
                       imageSrc={replay.thumbnailImageUrl || BandImage}
