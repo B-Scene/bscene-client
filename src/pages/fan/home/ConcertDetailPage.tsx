@@ -3,6 +3,7 @@ import { isAxiosError } from "axios";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
 import Modal from "@/components/Modal/Modal";
+import { Tabs } from "@/components/band/home/Tabs";
 import { Header } from "@/components/common/Header/Header";
 import { ModalOverlay } from "@/components/common/Modal/ModalOverlay";
 import NotificationOffIcon from "@/assets/icons/Notification Off.svg";
@@ -946,27 +947,16 @@ const ConcertDetailPage = () => {
         </section>
       </section>
 
-      <nav
-        aria-label="공연 상세 메뉴"
-        className="sticky top-0 z-10 grid h-[43px] w-full grid-cols-3 bg-neutral-0"
-      >
-        {TABS.map((tab) => (
-          <button
-            key={tab}
-            type="button"
-            onClick={() => handleTabClick(tab)}
-            className={`relative flex items-center justify-center font-body text-body1 ${
-              selectedTab === tab ? "text-neutral-900" : "text-neutral-400"
-            }`}
-          >
-            {tab}
-            {selectedTab === tab ? (
-              <span className="absolute bottom-0 left-1/2 z-10 h-[2px] w-[114px] -translate-x-1/2 rounded-full bg-primary-400" />
-            ) : null}
-          </button>
-        ))}
-        <span className="pointer-events-none absolute bottom-0 left-1/2 h-[2px] w-[393px] max-w-full -translate-x-1/2 bg-neutral-400" />
-      </nav>
+      <div className="sticky top-0 z-10 bg-neutral-0" aria-label="공연 상세 메뉴">
+        <Tabs
+          tabs={TABS.map((tab) => ({ id: tab, label: tab }))}
+          activeTabId={selectedTab}
+          onChange={(tabId) => handleTabClick(tabId as ConcertDetailTab)}
+          colorVariant="primary"
+          edgeClassName=""
+          paddingClassName=""
+        />
+      </div>
 
       <section
         ref={concertInfoRef}
