@@ -1,37 +1,33 @@
 import { useEffect, useMemo, useState } from "react";
 import type { AxiosError } from "axios";
-import CloseIcon from "@/assets/icons/close-header.svg";
-import { Header } from "@/components/common/Header/Header";
-import { BottomNavBar } from "@/components/layout/BottomNavBar";
-import { DatePickerSheet } from "@/components/band/home/DatePickerSheet";
-import { TimePickerSheet } from "@/components/band/home/TimePickerSheet";
-import {
-  useCreateLiveMutation,
-  useEnterLiveMutation,
-} from "@/hooks/api/live/useLive";
-import { useActiveBandId } from "@/hooks/api/user/useMyProfiles";
+
+import { getBandMembers } from "@/api/band/bandMember";
 import {
   cancelLiveReservation,
   getLiveReservation,
   updateLiveReservation,
 } from "@/api/live/live";
-import { getBandMembers } from "@/api/band/bandMember";
-import {
-  getActiveBandMemberProfile,
-  getBandMemberProfile,
-} from "@/api/band/bandMemberProfile";
 import { uploadMediaFile } from "@/api/media/media";
+import CloseIcon from "@/assets/icons/close-header.svg";
+import { DatePickerSheet } from "@/components/band/home/DatePickerSheet";
+import { TimePickerSheet } from "@/components/band/home/TimePickerSheet";
+import { Header } from "@/components/common/Header/Header";
+import { BottomNavBar } from "@/components/layout/BottomNavBar";
+import {
+  useCreateLiveMutation,
+  useEnterLiveMutation,
+} from "@/hooks/api/live/useLive";
+import { useActiveBandId } from "@/hooks/api/user/useMyProfiles";
 import type { BandMemberListItem } from "@/types/band/bandMember";
-import type { BandMemberProfileResponse } from "@/types/band/bandMemberProfile";
 import type {
   LiveApiResponse,
   LiveReservationCoHostCandidate,
   LiveReservationResponse,
 } from "@/types/live/live";
+
 import type { ActiveLive, GoLiveScreen, LiveFormMode } from "./types";
 import { ConfirmDialog } from "./components/ConfirmDialog";
 import { CoHostSelectionScreen } from "./components/CoHostSelectionScreen";
-import { MicTestScreen } from "./components/MicTestScreen";
 import {
   ChoiceCard,
   CoHostCard,
@@ -40,6 +36,7 @@ import {
   LiveInfoFields,
   TestBroadcastCard,
 } from "./components/LiveFormParts";
+import { MicTestScreen } from "./components/MicTestScreen";
 
 interface LiveFormProps {
   mode: LiveFormMode;
@@ -201,11 +198,9 @@ const isInactiveMemberStatus = (status: string | null | undefined) => {
 
 const mapBandMemberToCoHostCandidate = (
   member: BandMemberListItem,
-  activeProfileId?: number | null,
-  profile?: BandMemberProfileResponse | null,
 ): LiveReservationCoHostCandidate | null => {
-  const nickname = member.profileNickname ?? profile?.nickname;
-  const resolvedProfileId = member.bandMemberProfileId ?? member.id;
+  const nickname = member.profileNickname;
+  const resolvedProfileId = member.bandMemberProfileId;
 
   if (!member.id || !member.userId || !resolvedProfileId || !nickname) {
     return null;
@@ -215,17 +210,13 @@ const mapBandMemberToCoHostCandidate = (
     return null;
   }
 
-  const isOwner =
-    Boolean(activeProfileId) &&
-    Number(resolvedProfileId) === Number(activeProfileId);
-
   return {
     bandMemberId: member.id,
     bandMemberProfileId: resolvedProfileId,
     bandMemberProfileImageUrl: null,
     nickname,
-    part: profile?.part ?? member.memberType,
-    status: isOwner ? "OWNER" : null,
+    part: member.part ?? member.memberType,
+    status: member.owner ? "OWNER" : null,
     userId: member.userId,
   };
 };
@@ -380,15 +371,16 @@ export function LiveForm({
       return [...prevIds, bandMemberId];
     });
   };
-  const handleOpenDatePicker = () => {
-  setIsTimePickerOpen(false);
-  setIsDatePickerOpen(true);
-};
 
-const handleOpenTimePicker = () => {
-  setIsDatePickerOpen(false);
-  setIsTimePickerOpen(true);
-};
+  const handleOpenDatePicker = () => {
+    setIsTimePickerOpen(false);
+    setIsDatePickerOpen(true);
+  };
+
+  const handleOpenTimePicker = () => {
+    setIsDatePickerOpen(false);
+    setIsTimePickerOpen(true);
+  };
 
   const uploadThumbnailIfNeeded = async () => {
     if (!thumbnailImage) return savedThumbnailImageUrl;
@@ -527,7 +519,6 @@ const handleOpenTimePicker = () => {
 
     try {
       await cancelLiveReservation(reservationLiveId);
-
       setIsReservationCancelDialogOpen(false);
       go("home");
     } catch (error) {
@@ -569,34 +560,12 @@ const handleOpenTimePicker = () => {
       if (isMounted) setIsCoHostLoading(true);
     }, 0);
 
-    Promise.all([
-      getBandMembers(activeBandId),
-      getActiveBandMemberProfile().catch(() => null),
-    ])
-      .then(async ([members, activeProfile]) => {
-        if (!isMounted) return;
-
-        const activeProfileId = activeProfile?.id ?? null;
-        const memberProfiles = await Promise.all(
-          members.map((member) =>
-            member.bandMemberProfileId
-              ? getBandMemberProfile(member.bandMemberProfileId).catch(
-                  () => null,
-                )
-              : Promise.resolve(null),
-          ),
-        );
-
+    getBandMembers(activeBandId)
+      .then((members) => {
         if (!isMounted) return;
 
         const candidates = members
-          .map((member, index) =>
-            mapBandMemberToCoHostCandidate(
-              member,
-              activeProfileId,
-              memberProfiles[index],
-            ),
-          )
+          .map(mapBandMemberToCoHostCandidate)
           .filter(
             (candidate): candidate is LiveReservationCoHostCandidate =>
               Boolean(candidate),
@@ -776,11 +745,11 @@ const handleOpenTimePicker = () => {
         {isReservationMode ? (
           <FormCard title="예약 일시 설정">
             <DateTimeSelector
-            date={reservedDate}
-            time={reservedTime}
-            onDateClick={handleOpenDatePicker}
-            onTimeClick={handleOpenTimePicker}
-          />
+              date={reservedDate}
+              time={reservedTime}
+              onDateClick={handleOpenDatePicker}
+              onTimeClick={handleOpenTimePicker}
+            />
           </FormCard>
         ) : null}
 
@@ -840,36 +809,37 @@ const handleOpenTimePicker = () => {
 
       <BottomNavBar modeOverride="band" />
 
-        {isDatePickerOpen ? (
-          <div className="fixed inset-0 z-[100]">
-            <DatePickerSheet
-              open={isDatePickerOpen}
-              startDate={reservedDate}
-              endDate={reservedDate}
-              selectionMode="single"
-              onClose={() => setIsDatePickerOpen(false)}
-              onSelect={({ start }) => {
-                setReservedDate(start);
-                setIsDatePickerOpen(false);
-              }}
-            />
-          </div>
-        ) : null}
+      {isDatePickerOpen ? (
+        <div className="fixed inset-0 z-[100]">
+          <DatePickerSheet
+            open={isDatePickerOpen}
+            startDate={reservedDate}
+            endDate={reservedDate}
+            selectionMode="single"
+            onClose={() => setIsDatePickerOpen(false)}
+            onSelect={({ start }) => {
+              setReservedDate(start);
+              setIsDatePickerOpen(false);
+            }}
+          />
+        </div>
+      ) : null}
 
-        {isTimePickerOpen ? (
-          <div className="fixed inset-0 z-[100]">
-            <TimePickerSheet
-              open={isTimePickerOpen}
-              value={reservedTime}
-              title="라이브 시작 시간"
-              onClose={() => setIsTimePickerOpen(false)}
-              onConfirm={(time) => {
-                setReservedTime(time);
-                setIsTimePickerOpen(false);
-              }}
-            />
-          </div>
-        ) : null}
+      {isTimePickerOpen ? (
+        <div className="fixed inset-0 z-[100]">
+          <TimePickerSheet
+            open={isTimePickerOpen}
+            value={reservedTime}
+            title="라이브 시작 시간"
+            onClose={() => setIsTimePickerOpen(false)}
+            onConfirm={(time) => {
+              setReservedTime(time);
+              setIsTimePickerOpen(false);
+            }}
+          />
+        </div>
+      ) : null}
+
       {isReservationCancelDialogOpen ? (
         <ConfirmDialog
           title="예약을 취소할까요?"
