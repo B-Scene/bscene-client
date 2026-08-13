@@ -548,7 +548,7 @@ const FanBandProfilePage = () => {
             <p className="m-0 mt-[5px] font-body text-caption2 text-neutral-700">
               {bandGenre} · {bandRegion} · 팔로워 {followerCount}명
             </p>
-            <p className="m-0 mt-[5px] font-body text-body5 text-neutral-600">
+            <p className="m-0 mt-[5px] whitespace-pre-line font-body text-body5 text-neutral-600">
               {bandDescription}
             </p>
           </div>
