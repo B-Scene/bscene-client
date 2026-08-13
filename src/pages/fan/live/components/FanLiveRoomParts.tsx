@@ -188,7 +188,7 @@ export function FanLiveActionBar({
   return (
     <nav
       aria-label="라이브 메뉴"
-      className="fan-live-action-bar absolute inset-x-5 bottom-6 z-20 h-[62px] rounded-[24px] bg-neutral-0"
+      className="fan-live-action-bar absolute bottom-6 left-1/2 z-20 h-[62px] w-[calc(100%-40px)] max-w-[353px] -translate-x-1/2 rounded-[24px] bg-neutral-0"
     >
       <div className="relative flex h-full items-center justify-between px-10 py-3">
         <ActionItem icon={UsersIcon} label="멤버" onClick={onOpenMembers} />
@@ -384,7 +384,7 @@ export function FanLiveChatArea({
       </div>
 
       {composerOpen ? (
-        <div className="absolute inset-x-5 bottom-[112px] z-10">
+        <div className="absolute bottom-[112px] left-1/2 z-10 w-[calc(100%-40px)] max-w-[353px] -translate-x-1/2">
           {connectionMessage ? (
             <p className="mb-2 text-center text-caption4 text-error">
               {connectionMessage}
