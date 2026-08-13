@@ -181,6 +181,28 @@ const getCoHostInvitePath = (liveId: string | number) =>
     String(liveId),
   )}&action=accept`;
 
+export const isCoHostInviteNotification = (notification: NotificationItem) => {
+  const type = notification.type.toUpperCase();
+
+  return (
+    isCoHostInviteNotificationType(type) ||
+    isGenericLiveCoHostInviteNotification(notification)
+  );
+};
+
+export const getCoHostInviteLiveId = (notification: NotificationItem) => {
+  if (!isCoHostInviteNotification(notification)) return null;
+
+  const liveId =
+    getLiveIdFromDeepLink(notification.deepLink) ?? notification.referenceId;
+
+  if (liveId == null) return null;
+
+  const numericLiveId = Number(liveId);
+
+  return Number.isFinite(numericLiveId) ? numericLiveId : null;
+};
+
 const getCoHostUpgradeApprovalPath = (
   liveId: string | number,
   requesterUserId?: number | null,
@@ -208,8 +230,6 @@ const getRequesterNickname = (notification: NotificationItem) => {
 };
 
 export const getLiveReferencePath = (notification: NotificationItem) => {
-  const type = notification.type.toUpperCase();
-
   if (isCoHostUpgradeRequestNotification(notification)) {
     const liveId =
       getLiveIdFromDeepLink(notification.deepLink) ?? notification.referenceId;
@@ -232,11 +252,7 @@ export const getLiveReferencePath = (notification: NotificationItem) => {
    * generic LIVE 알림 중 실제 문구가 공동 진행 초대인 경우에만
    * 공동 진행 초대 수락 경로로 이동합니다.
    */
-  const isCoHostInvite =
-    isCoHostInviteNotificationType(type) ||
-    isGenericLiveCoHostInviteNotification(notification);
-
-  if (!isCoHostInvite) {
+  if (!isCoHostInviteNotification(notification)) {
     return null;
   }
 
