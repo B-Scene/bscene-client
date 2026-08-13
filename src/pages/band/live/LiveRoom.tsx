@@ -160,7 +160,7 @@ export function LiveRoom({
   const [coHostApprovalMessage, setCoHostApprovalMessage] = useState("");
 
   const [micVolume, setMicVolume] = useState(DEFAULT_MIC_VOLUME);
-  const [isMicMuted, setIsMicMuted] = useState(false);
+  const [isMicMuted, setIsMicMuted] = useState(true);
   const [liveMembers, setLiveMembers] = useState<LiveMemberItem[]>([]);
   const [isMembersLoading, setIsMembersLoading] = useState(false);
   const [isProfileActionSheetOpen, setIsProfileActionSheetOpen] =
@@ -521,7 +521,7 @@ export function LiveRoom({
       }
     }
 
-    setIsMicMuted(false);
+    setIsMicMuted(true);
     setMicInfoMessage("");
   }, []);
 
@@ -650,8 +650,12 @@ export function LiveRoom({
         }
       }
 
+      micStream.getAudioTracks().forEach((track) => {
+        track.enabled = false;
+      });
+
       broadcastStream.getAudioTracks().forEach((track) => {
-        track.enabled = true;
+        track.enabled = false;
         peerConnection.addTrack(track, broadcastStream);
       });
 
@@ -684,7 +688,7 @@ export function LiveRoom({
 
       whipSessionUrlRef.current = sessionUrl;
 
-      setIsMicMuted(false);
+      setIsMicMuted(true);
       setAudioStatusSafe("connected");
     } catch (error) {
       await cleanupWhipBroadcast();
@@ -803,6 +807,16 @@ export function LiveRoom({
   }, [live?.startedAt]);
 
   
+  const viewerEventHandlersRef = useRef({
+    handleCoHostUpgradeRequested,
+    handleCoPublishersChangedEvent,
+  });
+
+  viewerEventHandlersRef.current = {
+    handleCoHostUpgradeRequested,
+    handleCoPublishersChangedEvent,
+  };
+
   useEffect(() => {
     if (!live?.liveId) return;
 
@@ -813,14 +827,19 @@ export function LiveRoom({
       try {
         await subscribeViewerCount({
           liveId: live.liveId,
-
           watchOnly: false,
           onViewerCount: setViewerCount,
           onCoPublishersChanged: canBroadcast
-            ? handleCoPublishersChangedEvent
+            ? (publishers) =>
+                viewerEventHandlersRef.current.handleCoPublishersChangedEvent(
+                  publishers,
+                )
             : undefined,
           onCoHostUpgradeRequested: canAcceptCoHostUpgrade
-            ? handleCoHostUpgradeRequested
+            ? (requester) =>
+                viewerEventHandlersRef.current.handleCoHostUpgradeRequested(
+                  requester,
+                )
             : undefined,
           signal: controller.signal,
         });
@@ -841,13 +860,7 @@ export function LiveRoom({
         window.clearTimeout(reconnectTimer);
       }
     };
-  }, [
-    canAcceptCoHostUpgrade,
-    canBroadcast,
-    handleCoHostUpgradeRequested,
-    handleCoPublishersChangedEvent,
-    live?.liveId,
-  ]);
+  }, [canAcceptCoHostUpgrade, canBroadcast, live?.liveId]);
 
   useEffect(() => {
     if (!live?.liveId) return;
@@ -919,7 +932,7 @@ export function LiveRoom({
   }
 
   return (
-    <main className="relative flex h-dvh min-h-0 flex-col overflow-hidden bg-neutral-0 text-neutral-900">
+    <main className="relative h-full min-h-full overflow-hidden bg-neutral-0 text-neutral-900">
       <LiveRoomHeader
         canCloseLive={canCloseLive}
         durationSeconds={durationSeconds}

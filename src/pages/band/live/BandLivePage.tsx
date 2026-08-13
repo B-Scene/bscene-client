@@ -307,13 +307,22 @@ export function BandLivePage() {
     [activeLive],
   );
 
-  const handleLiveEndedFromSocket = useCallback(() => {
-    if (activeLive?.liveId) {
-      setEndedLiveId(activeLive.liveId);
-    }
+const handleLiveEndedFromSocket = useCallback(() => {
+  if (activeLive?.playback?.role === "CO_HOST") {
+    setActiveLive(null);
+    setEndedLiveId(null);
+    setSelectedReservationLiveId(null);
+    setLiveMessages([]);
+    setScreen("home");
+    return;
+  }
 
-    setScreen("ended");
-  }, [activeLive]);
+  if (activeLive?.liveId) {
+    setEndedLiveId(activeLive.liveId);
+  }
+
+  setScreen("ended");
+}, [activeLive]);
 
   const { lastErrorMessage: chatErrorMessage, sendMessage } = useLiveChatSocket({
     liveId: activeLive?.liveId,
