@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   createWhepSession,
@@ -64,6 +64,12 @@ export const useLiveRoomPlayback = ({
   const listenerAudioRef = useRef<HTMLAudioElement | null>(null);
 
   const desiredPublishersRef = useRef<Map<number, string>>(new Map());
+  const initialSnapshotLiveIdRef = useRef<number | null>(null);
+  const canBroadcastRef = useRef(canBroadcast);
+  const audioConnectedRef = useRef(audioConnected);
+
+  canBroadcastRef.current = canBroadcast;
+  audioConnectedRef.current = audioConnected;
 
   const peersRef = useRef<Map<number, CoPublisherPeer>>(new Map());
 
@@ -215,7 +221,13 @@ export const useLiveRoomPlayback = ({
 
   const connectPeer = useCallback(
     async (userId: number, whepUrl: string) => {
-      if (!canBroadcast || !audioConnected || isUnmountedRef.current) return;
+      if (
+        !canBroadcastRef.current ||
+        !audioConnectedRef.current ||
+        isUnmountedRef.current
+      ) {
+        return;
+      }
 
       const desiredUrl = desiredPublishersRef.current.get(userId);
       if (desiredUrl !== whepUrl) return;
@@ -367,13 +379,7 @@ export const useLiveRoomPlayback = ({
         }
       }
     },
-    [
-      audioConnected,
-      canBroadcast,
-      closePeer,
-      scheduleRetry,
-      syncCoPublisherPlaybackUi,
-    ],
+    [closePeer, scheduleRetry, syncCoPublisherPlaybackUi],
   );
 
   const reconcileCoPublishers = useCallback(
@@ -399,7 +405,7 @@ export const useLiveRoomPlayback = ({
         }
       }
 
-      if (canBroadcast && audioConnected) {
+      if (canBroadcastRef.current && audioConnectedRef.current) {
         for (const [userId, whepUrl] of next) {
           const existing = peersRef.current.get(userId);
 
@@ -414,7 +420,7 @@ export const useLiveRoomPlayback = ({
         setShowListenerPlayButton(false);
       }
     },
-    [audioConnected, canBroadcast, closePeer, connectPeer],
+    [closePeer, connectPeer],
   );
 
   const handleCoPublishersChanged = useCallback(
@@ -456,14 +462,21 @@ export const useLiveRoomPlayback = ({
     syncCoPublisherPlaybackUi,
   ]);
 
-  const initialCoPublishers = useMemo(
-    () => live?.coPublishers ?? [],
-    [live?.coPublishers],
-  );
-
   useEffect(() => {
-    reconcileCoPublishers(initialCoPublishers);
-  }, [initialCoPublishers, live?.liveId, reconcileCoPublishers]);
+    const liveId = live?.liveId ?? null;
+
+    if (!liveId) {
+      initialSnapshotLiveIdRef.current = null;
+      return;
+    }
+
+    if (initialSnapshotLiveIdRef.current === liveId) {
+      return;
+    }
+
+    initialSnapshotLiveIdRef.current = liveId;
+    reconcileCoPublishers(live?.coPublishers ?? []);
+  }, [live?.coPublishers, live?.liveId, reconcileCoPublishers]);
 
   useEffect(() => {
     if (!canBroadcast || !audioConnected) {
