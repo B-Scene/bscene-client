@@ -155,6 +155,10 @@ export function LiveRoom({
     useState(false);
   const [pendingCoHostRequesterUserId, setPendingCoHostRequesterUserId] =
     useState<number | null>(null);
+  const [
+    pendingCoHostRequesterNickname,
+    setPendingCoHostRequesterNickname,
+  ] = useState<string | null>(null);
   const [coHostApprovalMessage, setCoHostApprovalMessage] = useState("");
 
   const [isMicStartGuideOpen, setIsMicStartGuideOpen] = useState(false);
@@ -250,13 +254,18 @@ export function LiveRoom({
 
   
   const handleCoHostUpgradeRequested = useCallback(
-    (requester?: { userId: number }) => {
+    (requester?: { userId: number; nickname?: string | null }) => {
       if (!canAcceptCoHostUpgrade) return;
 
       setHasPendingCoHostUpgradeRequest(true);
       setPendingCoHostRequesterUserId(requester?.userId ?? null);
+      setPendingCoHostRequesterNickname(requester?.nickname?.trim() || null);
       setIsCoHostUpgradeConfirmOpen(false);
-      setCoHostApprovalMessage("공동 진행 요청이 도착했어요.");
+      setCoHostApprovalMessage(
+        requester?.nickname?.trim()
+          ? `${requester.nickname.trim()}님의 공동 진행 요청이 도착했어요.`
+          : "공동 진행 요청이 도착했어요.",
+      );
     },
     [canAcceptCoHostUpgrade],
   );
@@ -289,6 +298,7 @@ export function LiveRoom({
 
       setHasPendingCoHostUpgradeRequest(false);
       setPendingCoHostRequesterUserId(null);
+      setPendingCoHostRequesterNickname(null);
       setIsCoHostUpgradeConfirmOpen(false);
       setCoHostApprovalMessage("공동 송출자 요청을 승인했어요.");
     } catch (error) {
@@ -694,6 +704,7 @@ export function LiveRoom({
     setLiveMembers([]);
     setHasPendingCoHostUpgradeRequest(false);
     setPendingCoHostRequesterUserId(null);
+    setPendingCoHostRequesterNickname(null);
     setIsCoHostUpgradeConfirmOpen(false);
     setCoHostApprovalMessage("");
   }, [live?.liveId]);
@@ -886,7 +897,9 @@ export function LiveRoom({
             disabled={acceptCoHostUpgradeMutation.isPending}
             className="rounded-full bg-secondary-500 px-4 py-2 text-caption3 font-semibold text-neutral-0 shadow-[0_2px_10px_rgba(20,20,20,0.15)] disabled:opacity-60"
           >
-            공동 진행 요청 확인
+            {pendingCoHostRequesterNickname
+              ? `${pendingCoHostRequesterNickname}님의 요청 확인`
+              : "공동 진행 요청 확인"}
           </button>
 
           {coHostApprovalMessage ? (
@@ -993,6 +1006,8 @@ export function LiveRoom({
               라이브방에 입장했어요.
               <br />
               하단의 마이크 버튼을 눌러야 실제 라이브 송출이 시작돼요.
+              <br />
+              30초안에 마이크연결이 되어야합니다.
             </>
           }
           showCancel={false}
@@ -1012,10 +1027,17 @@ export function LiveRoom({
       >
         <Modal
           tone="orange"
-          title="공동 송출 요청을 승인할까요?"
+          title={
+            pendingCoHostRequesterNickname
+              ? `${pendingCoHostRequesterNickname}님의 공동 송출 요청을 승인할까요?`
+              : "공동 송출 요청을 승인할까요?"
+          }
           description={
             <>
-              승인하면 요청한 밴드 멤버가
+              승인하면{" "}
+              {pendingCoHostRequesterNickname
+                ? `${pendingCoHostRequesterNickname}님이`
+                : "요청한 밴드 멤버가"}
               <br />
               공동 진행자로 라이브에 참여해요.
             </>

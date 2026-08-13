@@ -34,7 +34,10 @@ interface SubscribeViewerCountParams {
   watchOnly?: boolean;
   onViewerCount: (viewerCount: number) => void;
   onCoPublishersChanged?: (publishers: LiveCoPublisher[]) => void;
-  onCoHostUpgradeRequested?: (requester?: { userId: number }) => void;
+  onCoHostUpgradeRequested?: (requester?: {
+    userId: number;
+    nickname?: string | null;
+  }) => void;
   onCoHostUpgradeAccepted?: () => void;
   signal?: AbortSignal;
 }
@@ -63,7 +66,6 @@ const rememberPendingCoHostRequesterUserId = (liveId: number, userId: number) =>
       String(userId),
     );
   } catch {
-    // 메모리 캐시는 유지되므로 sessionStorage 실패는 무시합니다.
   }
 };
 
@@ -73,7 +75,6 @@ const forgetPendingCoHostRequesterUserId = (liveId: number) => {
   try {
     window.sessionStorage.removeItem(getPendingCoHostRequesterStorageKey(liveId));
   } catch {
-    // sessionStorage 접근이 제한된 환경에서는 무시합니다.
   }
 };
 
@@ -126,7 +127,7 @@ const getPendingCoHostRequesterUserId = (liveId: number) => {
   );
 };
 
-const parseCoHostRequesterUserId = (rawData: string) => {
+const parseCoHostRequester = (rawData: string) => {
   const trimmedData = rawData.trim();
 
   if (!trimmedData) return null;
@@ -134,14 +135,20 @@ const parseCoHostRequesterUserId = (rawData: string) => {
   const directUserId = Number(trimmedData);
 
   if (isValidPositiveId(directUserId)) {
-    return directUserId;
+    return {
+      userId: directUserId,
+      nickname: null,
+    };
   }
 
   try {
     const parsed = JSON.parse(trimmedData) as unknown;
 
     if (isValidPositiveId(parsed)) {
-      return parsed;
+      return {
+        userId: parsed,
+        nickname: null,
+      };
     }
 
     if (!parsed || typeof parsed !== "object") {
@@ -158,7 +165,7 @@ const parseCoHostRequesterUserId = (rawData: string) => {
         ? (record.data as Record<string, unknown>)
         : null;
 
-    const candidates = [
+    const userIdCandidates = [
       record.userId,
       record.requesterUserId,
       record.targetUserId,
@@ -168,18 +175,45 @@ const parseCoHostRequesterUserId = (rawData: string) => {
       nestedData?.requesterUserId,
     ];
 
-    for (const candidate of candidates) {
-      const userId = Number(candidate);
+    let userId: number | null = null;
 
-      if (isValidPositiveId(userId)) {
-        return userId;
+    for (const candidate of userIdCandidates) {
+      const parsedUserId = Number(candidate);
+
+      if (isValidPositiveId(parsedUserId)) {
+        userId = parsedUserId;
+        break;
       }
     }
+
+    if (!userId) {
+      return null;
+    }
+
+    const nicknameCandidates = [
+      record.nickname,
+      record.requesterNickname,
+      record.profileNickname,
+      nestedRequester?.nickname,
+      nestedRequester?.profileNickname,
+      nestedData?.nickname,
+      nestedData?.requesterNickname,
+      nestedData?.profileNickname,
+    ];
+
+    const nickname =
+      nicknameCandidates.find(
+        (candidate): candidate is string =>
+          typeof candidate === "string" && candidate.trim().length > 0,
+      )?.trim() ?? null;
+
+    return {
+      userId,
+      nickname,
+    };
   } catch {
     return null;
   }
-
-  return null;
 };
 
 type MaybePaginatedResponse<T> =
@@ -1122,13 +1156,11 @@ export const subscribeViewerCount = async ({
         }
 
         if (eventName === "coHostUpgradeRequested") {
-          const requesterUserId = parseCoHostRequesterUserId(
-            dataLines.join("\n"),
-          );
+          const requester = parseCoHostRequester(dataLines.join("\n"));
 
-          if (requesterUserId) {
-            rememberPendingCoHostRequesterUserId(liveId, requesterUserId);
-            onCoHostUpgradeRequested?.({ userId: requesterUserId });
+          if (requester) {
+            rememberPendingCoHostRequesterUserId(liveId, requester.userId);
+            onCoHostUpgradeRequested?.(requester);
           } else {
             onCoHostUpgradeRequested?.();
           }
@@ -1142,11 +1174,7 @@ export const subscribeViewerCount = async ({
           try {
             const parsed = JSON.parse(dataLines.join("\n")) as unknown;
 
-            /**
-             * 백엔드가 배열 자체를 내려주는 형태를 기본으로 처리하고,
-             * 배포 과정에서 { coPublishers: [...] } 형태로 감싸서 내려오는 경우도
-             * 안전하게 대응합니다.
-             */
+            
             const rawPublishers: unknown[] = Array.isArray(parsed)
               ? parsed
               : parsed &&
@@ -1187,16 +1215,11 @@ export const subscribeViewerCount = async ({
               });
             });
 
-            /**
-             * 빈 배열도 반드시 전달해야 합니다.
-             * 마지막 상대가 나간 경우 reconcile([])에서 기존 WHEP 연결을
-             * 모두 정리할 수 있기 때문입니다.
-             */
+            
             onCoPublishersChanged?.(
               Array.from(publishersByUserId.values()),
             );
           } catch {
-            // 잘못된 snapshot 하나 때문에 시청자 수 SSE 전체를 끊지 않습니다.
           }
         }
       });
