@@ -157,8 +157,6 @@ export function LiveRoom({
     useState<number | null>(null);
   const [coHostApprovalMessage, setCoHostApprovalMessage] = useState("");
 
-  // 방장이 라이브방에 처음 진입했을 때
-  // 실제 송출은 마이크 버튼을 눌러야 시작된다는 안내 모달입니다.
   const [isMicStartGuideOpen, setIsMicStartGuideOpen] = useState(false);
 
   const [micVolume, setMicVolume] = useState(DEFAULT_MIC_VOLUME);
@@ -172,19 +170,6 @@ export function LiveRoom({
   const [blockedUserIds, setBlockedUserIds] = useState<Set<number>>(
     () => new Set(),
   );
-  const [joinedCoPublisherUserIds, setJoinedCoPublisherUserIds] = useState<
-    Set<number>
-  >(
-    () =>
-      new Set(
-        (live?.coPublishers ?? [])
-          .map((publisher) => publisher.userId)
-          .filter((userId) => Number.isFinite(userId)),
-      ),
-  );
-  const [hasCoPublishersSnapshot, setHasCoPublishersSnapshot] =
-    useState(false);
-  const [approvedCoHostCount, setApprovedCoHostCount] = useState(0);
 
   const selectedUserId = reportTarget?.targetUserId;
 
@@ -195,59 +180,7 @@ export function LiveRoom({
   const isBlockPending =
     blockLiveUserMutation.isPending || unblockLiveUserMutation.isPending;
 
-  /**
-   * 현재 라이브에 남아있는 "송출 가능한 사람" 수를 계산합니다.
-   *
-   * 기존 activeCoHostCount는 CO_HOST 자기 자신까지 1명으로 세기 때문에
-   * 공동 진행자가 혼자 남아도 canCloseLive가 false가 될 수 있었습니다.
-   *
-   * 이제 OWNER 또는 CO_HOST인 멤버를 모두 speaker로 계산해서
-   * speaker가 1명만 남으면 그 사람이 라이브를 종료할 수 있게 합니다.
-   */
-  const activeSpeakerCount = useMemo(() => {
-    if (!canBroadcast) {
-      return 0;
-    }
-
-    /**
-     * coPublishersChanged payload는 항상 "나를 제외한 현재 송출자 전체 목록"입니다.
-     * 따라서 snapshot을 한 번이라도 받은 뒤에는 이 값이 가장 정확합니다.
-     */
-    if (hasCoPublishersSnapshot) {
-      return 1 + joinedCoPublisherUserIds.size;
-    }
-
-    const speakerCountFromMembers = liveMembers.filter(
-      (member) => member.isOwner || member.isCoHost,
-    ).length;
-
-    /**
-     * 최초 SSE snapshot을 받기 전에는 입장 API의 coPublishers와
-     * 승인 직후 optimistic count, members API를 함께 이용해 보정합니다.
-     */
-    const speakerCountFromInitialCoPublishers =
-      1 + joinedCoPublisherUserIds.size;
-    const speakerCountFromApproval = 1 + approvedCoHostCount;
-
-    return Math.max(
-      1,
-      speakerCountFromMembers,
-      speakerCountFromInitialCoPublishers,
-      speakerCountFromApproval,
-    );
-  }, [
-    approvedCoHostCount,
-    canBroadcast,
-    hasCoPublishersSnapshot,
-    joinedCoPublisherUserIds,
-    liveMembers,
-  ]);
-
-  /**
-   * 방장 또는 공동 진행자 중 단 한 명만 남으면
-   * 헤더 버튼을 "나가기" -> "라이브 종료"로 변경합니다.
-   */
-  const canCloseLive = canBroadcast && activeSpeakerCount <= 1;
+  const canCloseLive = isBroadcaster;
 
   const visibleMessages = useMemo(() => {
     return messages.filter(
@@ -290,24 +223,32 @@ export function LiveRoom({
     ((isListenerPlayback || isBroadcasterMonitorPlayback) &&
       showListenerPlayButton);
 
+  const applyLiveMembers = useCallback((members: LiveMemberItem[]) => {
+    setLiveMembers((currentMembers) => {
+      if (members.length > 0) {
+        return members;
+      }
+
+      if (currentMembers.length > 0) {
+        return currentMembers;
+      }
+
+      return members;
+    });
+  }, []);
+
   const refreshLiveMembers = useCallback(async () => {
     if (!live?.liveId) return;
 
     try {
       const response = await getLiveMembers(live.liveId);
-
-      setLiveMembers(response.members);
-
+      applyLiveMembers(response.members);
     } catch {
-      // 멤버 갱신 실패는 실시간 라이브 자체를 끊지 않습니다.
+      return;
     }
-  }, [live?.liveId]);
+  }, [applyLiveMembers, live?.liveId]);
 
-  /**
-   * 공동 진행 요청 SSE를 받았을 때는 승인 모달을 자동으로 띄우지 않습니다.
-   * "공동 진행 요청 확인" 버튼만 노출하고,
-   * 방장이 버튼을 눌렀을 때 모달을 열도록 합니다.
-   */
+  
   const handleCoHostUpgradeRequested = useCallback(
     (requester?: { userId: number }) => {
       if (!canAcceptCoHostUpgrade) return;
@@ -316,45 +257,20 @@ export function LiveRoom({
       setPendingCoHostRequesterUserId(requester?.userId ?? null);
       setIsCoHostUpgradeConfirmOpen(false);
       setCoHostApprovalMessage("공동 진행 요청이 도착했어요.");
-
-      void refreshLiveMembers();
     },
-    [canAcceptCoHostUpgrade, refreshLiveMembers],
+    [canAcceptCoHostUpgrade],
   );
 
-  /**
-   * 새 SSE coPublishersChanged는 단건 join 이벤트가 아니라
-   * "현재 내가 구독해야 할 상대 송출자 전체 목록"을 내려줍니다.
-   * WHEP 연결 Map과 헤더의 송출자 수를 동일한 snapshot으로 맞춥니다.
-   */
+  
   const handleCoPublishersChangedEvent = useCallback(
     (publishers: LiveCoPublisher[]) => {
       handleCoPublishersChanged(publishers);
-
-      setJoinedCoPublisherUserIds(
-        new Set(
-          publishers
-            .map((publisher) => publisher.userId)
-            .filter((userId) => Number.isFinite(userId)),
-        ),
-      );
-      setHasCoPublishersSnapshot(true);
-
-      // snapshot이 도착한 뒤에는 optimistic 승인 카운트가 필요 없습니다.
-      setApprovedCoHostCount(0);
-
       void refreshLiveMembers();
     },
     [handleCoPublishersChanged, refreshLiveMembers],
   );
 
-  /**
-   * 방장이 승인 모달에서 "승인하기"를 눌렀을 때만 호출됩니다.
-   * requester userId를 request body로 넘깁니다.
-   *
-   * userId가 SSE에서 직접 전달되지 않은 경우에는 undefined를 넘기며,
-   * live.ts에서 알림 URL/sessionStorage에 저장된 requester userId를 한 번 더 찾습니다.
-   */
+  
   const handleAcceptCoHostUpgrade = async () => {
     if (!live?.liveId || acceptCoHostUpgradeMutation.isPending) return;
 
@@ -371,13 +287,10 @@ export function LiveRoom({
         userId: pendingCoHostRequesterUserId ?? undefined,
       });
 
-      setApprovedCoHostCount((currentCount) => Math.max(currentCount, 1));
       setHasPendingCoHostUpgradeRequest(false);
       setPendingCoHostRequesterUserId(null);
       setIsCoHostUpgradeConfirmOpen(false);
       setCoHostApprovalMessage("공동 송출자 요청을 승인했어요.");
-
-      void refreshLiveMembers();
     } catch (error) {
       setIsCoHostUpgradeConfirmOpen(false);
       setCoHostApprovalMessage(
@@ -520,7 +433,6 @@ export function LiveRoom({
       try {
         await deleteWhipSession(sessionUrl);
       } catch {
-        // 이미 종료된 세션이면 무시
       }
     }
 
@@ -536,13 +448,11 @@ export function LiveRoom({
     try {
       micSourceNodeRef.current?.disconnect();
     } catch {
-      // 이미 끊긴 노드는 무시
     }
 
     try {
       micGainNodeRef.current?.disconnect();
     } catch {
-      // 이미 끊긴 노드는 무시
     }
 
     micSourceNodeRef.current = null;
@@ -555,7 +465,6 @@ export function LiveRoom({
       try {
         await audioContext.close();
       } catch {
-        // 이미 닫힌 AudioContext면 무시
       }
     }
 
@@ -761,7 +670,7 @@ export function LiveRoom({
   };
 
   const handleHeaderAction = async () => {
-    if (canCloseLive) {
+    if (isBroadcaster) {
       go("endConfirm");
       return;
     }
@@ -783,28 +692,13 @@ export function LiveRoom({
 
   useEffect(() => {
     setLiveMembers([]);
-    setJoinedCoPublisherUserIds(
-      new Set(
-        (live?.coPublishers ?? [])
-          .map((publisher) => publisher.userId)
-          .filter((userId) => Number.isFinite(userId)),
-      ),
-    );
-    setHasCoPublishersSnapshot(false);
-    setApprovedCoHostCount(0);
     setHasPendingCoHostUpgradeRequest(false);
     setPendingCoHostRequesterUserId(null);
     setIsCoHostUpgradeConfirmOpen(false);
     setCoHostApprovalMessage("");
   }, [live?.liveId]);
 
-  /**
-   * 라이브 생성/예약 시작 후 방장 화면에 처음 진입하면
-   * "마이크 버튼을 눌러야 실제 송출이 시작된다"는 안내를 한 번만 보여줍니다.
-   *
-   * room/chat/members 화면 전환으로 LiveRoom이 다시 렌더링되어도
-   * 같은 liveId에서는 sessionStorage를 이용해 반복 노출하지 않습니다.
-   */
+  
   useEffect(() => {
     if (!isBroadcaster || !live?.liveId) {
       setIsMicStartGuideOpen(false);
@@ -825,7 +719,6 @@ export function LiveRoom({
 
       window.sessionStorage.setItem(storageKey, "shown");
     } catch {
-      // sessionStorage를 사용할 수 없는 환경에서도 안내는 정상 노출합니다.
     }
 
     setIsMicStartGuideOpen(true);
@@ -846,10 +739,7 @@ export function LiveRoom({
     };
   }, [live?.startedAt]);
 
-  /**
-   * 방장(BROADCASTER)은 SSE에서 공동 진행 요청 이벤트를 받습니다.
-   * 이벤트가 오면 버튼만 노출하고 모달은 자동으로 띄우지 않습니다.
-   */
+  
   useEffect(() => {
     if (!live?.liveId) return;
 
@@ -861,14 +751,8 @@ export function LiveRoom({
         await subscribeViewerCount({
           liveId: live.liveId,
 
-          // 공동 진행 요청 이벤트를 받기 위해 항상 false로 구독합니다.
           watchOnly: false,
-          onViewerCount: (nextViewerCount) => {
-            setViewerCount(nextViewerCount);
-
-            // 누군가 입/퇴장하면 송출자 목록도 즉시 다시 확인합니다.
-            void refreshLiveMembers();
-          },
+          onViewerCount: setViewerCount,
           onCoPublishersChanged: canBroadcast
             ? handleCoPublishersChangedEvent
             : undefined,
@@ -878,7 +762,6 @@ export function LiveRoom({
           signal: controller.signal,
         });
       } catch {
-        // 일시적인 SSE 연결 오류는 아래 재연결로 복구합니다.
       }
 
       if (!controller.signal.aborted) {
@@ -901,33 +784,21 @@ export function LiveRoom({
     handleCoHostUpgradeRequested,
     handleCoPublishersChangedEvent,
     live?.liveId,
-    refreshLiveMembers,
   ]);
 
   useEffect(() => {
     if (!live?.liveId) return;
-
     void refreshLiveMembers();
-
-    const intervalId = window.setInterval(() => {
-      void refreshLiveMembers();
-    }, 5000);
-
-    return () => {
-      window.clearInterval(intervalId);
-    };
   }, [live?.liveId, refreshLiveMembers]);
 
   useEffect(() => {
-    if (overlay !== "members" || !live?.liveId) return;
+    if (overlay !== "members" || !live?.liveId || liveMembers.length > 0) {
+      return;
+    }
 
     let isMounted = true;
 
     const loadMembers = async () => {
-      await Promise.resolve();
-
-      if (!isMounted) return;
-
       setIsMembersLoading(true);
 
       try {
@@ -935,11 +806,9 @@ export function LiveRoom({
 
         if (!isMounted) return;
 
-        setLiveMembers(response.members);
+        applyLiveMembers(response.members);
       } catch {
-        if (!isMounted) return;
-
-        setLiveMembers([]);
+        return;
       } finally {
         if (isMounted) {
           setIsMembersLoading(false);
@@ -952,7 +821,12 @@ export function LiveRoom({
     return () => {
       isMounted = false;
     };
-  }, [live?.liveId, overlay]);
+  }, [
+    applyLiveMembers,
+    live?.liveId,
+    liveMembers.length,
+    overlay,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -999,10 +873,7 @@ export function LiveRoom({
         live={live}
       />
 
-      {/**
-       * 공동 진행 요청이 실제로 도착한 경우에만 방장에게 버튼을 노출합니다.
-       * 버튼 클릭 -> 승인 모달 -> 승인하기 순서입니다.
-       */}
+      {}
       {canAcceptCoHostUpgrade && hasPendingCoHostUpgradeRequest ? (
         <div
           className={`absolute right-5 z-30 flex max-w-[calc(100%-40px)] flex-col items-end gap-2 transition-[top] duration-200 ${
@@ -1026,11 +897,7 @@ export function LiveRoom({
         </div>
       ) : null}
 
-      {/**
-       * 기존 LISTENER용 "공동 진행 요청" 버튼은 제거했습니다.
-       * 새 흐름에서는 라이브 목록의 "입장" 버튼에서 이미 /co-host 요청을 보내고
-       * BandLivePage가 승인 대기 화면을 보여주기 때문입니다.
-       */}
+      {}
 
       {audioErrorMessage ? (
         <p className="absolute top-[56px] left-1/2 z-20 w-[calc(100%-40px)] max-w-[353px] -translate-x-1/2 rounded-lg bg-error px-3 py-2 text-center text-caption3 text-neutral-0">
