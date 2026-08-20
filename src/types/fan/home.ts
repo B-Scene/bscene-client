@@ -199,7 +199,11 @@ export interface FanPerformanceDetailResponse {
   performanceDate?: string | null;
   performanceTime?: string | null;
   startAt?: string | null;
+  startedAt?: string | null;
   startDateTime?: string | null;
+  startDate?: string | null;
+  startTime?: string | null;
+  time?: string | null;
   ticketPrice?: string | number | null;
   price?: string | number | null;
   ageRating?: PerformanceAgeRating | string | null;
@@ -220,6 +224,11 @@ export interface FanPerformanceDetailResponse {
   imageUrls?: string[] | string;
   isInterested: boolean;
   interestCount?: number;
+  notificationEnabled?: boolean;
+  isAlarmSet?: boolean;
+  alarmSet?: boolean;
+  alarmEnabled?: boolean;
+  isAlarmEnabled?: boolean;
   participationStatus: PerformanceParticipationStatus | null;
   casting: FanPerformanceCastingBand[];
 }
@@ -270,9 +279,16 @@ export interface FollowingPostsResponse {
 }
 
 export type UpcomingPerformanceSort = "IMMINENT" | "LATEST" | "POPULAR";
+export type RecommendedPerformanceSort = "POPULAR" | "IMMINENT";
 
 export interface UpcomingPerformancesParams {
   sort?: UpcomingPerformanceSort;
+  page?: number;
+  size?: number;
+}
+
+export interface RecommendedPerformancesParams {
+  sort?: RecommendedPerformanceSort;
   page?: number;
   size?: number;
 }
@@ -294,6 +310,8 @@ export interface UpcomingPerformancesResponse {
   totalElements?: number;
   total?: number;
 }
+
+export type RecommendedPerformancesResponse = UpcomingPerformancesResponse;
 
 export type PerformanceCalendarParams =
   | {

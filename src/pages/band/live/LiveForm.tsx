@@ -1,5 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import type { AxiosError } from "axios";
+
+import { getBandMembers } from "@/api/band/bandMember";
+import {
+  cancelLiveReservation,
+  getLiveReservation,
+  updateLiveReservation,
+} from "@/api/live/live";
+import { uploadMediaFile } from "@/api/media/media";
+import CloseIcon from "@/assets/icons/close-header.svg";
+import { DatePickerSheet } from "@/components/band/home/DatePickerSheet";
+import { TimePickerSheet } from "@/components/band/home/TimePickerSheet";
 import { Header } from "@/components/common/Header/Header";
 import { BottomNavBar } from "@/components/layout/BottomNavBar";
 import {
@@ -7,27 +18,17 @@ import {
   useEnterLiveMutation,
 } from "@/hooks/api/live/useLive";
 import { useActiveBandId } from "@/hooks/api/user/useMyProfiles";
-import {
-  cancelLiveReservation,
-  getLiveReservation,
-  updateLiveReservation,
-} from "@/api/live/live";
-import { getBandMembers } from "@/api/band/bandMember";
-import {
-  getActiveBandMemberProfile,
-  getBandMemberProfile,
-} from "@/api/band/bandMemberProfile";
-import { uploadMediaFile } from "@/api/media/media";
 import type { BandMemberListItem } from "@/types/band/bandMember";
-import type { BandMemberProfileResponse } from "@/types/band/bandMemberProfile";
 import type {
   LiveApiResponse,
   LiveReservationCoHostCandidate,
+  LiveReservationResponse,
 } from "@/types/live/live";
+import { getStoredAuthUser } from "@/utils/authUser";
+
 import type { ActiveLive, GoLiveScreen, LiveFormMode } from "./types";
 import { ConfirmDialog } from "./components/ConfirmDialog";
 import { CoHostSelectionScreen } from "./components/CoHostSelectionScreen";
-import { MicTestScreen } from "./components/MicTestScreen";
 import {
   ChoiceCard,
   CoHostCard,
@@ -36,6 +37,7 @@ import {
   LiveInfoFields,
   TestBroadcastCard,
 } from "./components/LiveFormParts";
+import { MicTestScreen } from "./components/MicTestScreen";
 
 interface LiveFormProps {
   mode: LiveFormMode;
@@ -104,6 +106,68 @@ const getErrorMessage = (error: unknown, fallbackMessage: string) => {
   return fallbackMessage;
 };
 
+const getUploadedMediaUrl = (uploadResult: unknown) => {
+  if (typeof uploadResult === "string") {
+    return uploadResult;
+  }
+
+  if (!uploadResult || typeof uploadResult !== "object") {
+    return "";
+  }
+
+  const result = uploadResult as {
+    url?: string;
+    imageUrl?: string;
+    fileUrl?: string;
+    mediaUrl?: string;
+    thumbnailImageUrl?: string;
+    result?:
+      | string
+      | {
+          url?: string;
+          imageUrl?: string;
+          fileUrl?: string;
+          mediaUrl?: string;
+          thumbnailImageUrl?: string;
+        };
+  };
+
+  if (typeof result.result === "string") {
+    return result.result;
+  }
+
+  if (result.result && typeof result.result === "object") {
+    return (
+      result.result.thumbnailImageUrl ??
+      result.result.imageUrl ??
+      result.result.fileUrl ??
+      result.result.mediaUrl ??
+      result.result.url ??
+      ""
+    );
+  }
+
+  return (
+    result.thumbnailImageUrl ??
+    result.imageUrl ??
+    result.fileUrl ??
+    result.mediaUrl ??
+    result.url ??
+    ""
+  );
+};
+
+const getReservationThumbnailUrl = (reservation: LiveReservationResponse) => {
+  return (
+    reservation.thumbnailImageUrl ??
+    reservation.thumbnailUrl ??
+    reservation.liveThumbnailImageUrl ??
+    reservation.liveThumbnailUrl ??
+    reservation.imageUrl ??
+    ""
+  );
+};
+
 const getInitialSelectedCoHostIds = (
   candidates: LiveReservationCoHostCandidate[],
 ) => {
@@ -135,11 +199,10 @@ const isInactiveMemberStatus = (status: string | null | undefined) => {
 
 const mapBandMemberToCoHostCandidate = (
   member: BandMemberListItem,
-  activeProfileId?: number | null,
-  profile?: BandMemberProfileResponse | null,
+  currentUserId: number | null,
 ): LiveReservationCoHostCandidate | null => {
-  const nickname = member.profileNickname ?? profile?.nickname;
-  const resolvedProfileId = member.bandMemberProfileId ?? member.id;
+  const nickname = member.profileNickname;
+  const resolvedProfileId = member.bandMemberProfileId;
 
   if (!member.id || !member.userId || !resolvedProfileId || !nickname) {
     return null;
@@ -149,16 +212,15 @@ const mapBandMemberToCoHostCandidate = (
     return null;
   }
 
-  const isOwner =
-    Boolean(activeProfileId) && Number(resolvedProfileId) === Number(activeProfileId);
-
   return {
     bandMemberId: member.id,
     bandMemberProfileId: resolvedProfileId,
     bandMemberProfileImageUrl: null,
     nickname,
-    part: profile?.part ?? member.memberType,
-    status: isOwner ? "OWNER" : null,
+    part: member.part ?? member.memberType,
+    // 이 라이브를 실제로 시작하는 사람이 진행자입니다. 밴드 오너라도
+    // 지금 로그인한 사용자가 아니면 진행자가 아니라 초대 가능한 후보입니다.
+    status: member.userId === currentUserId ? "OWNER" : null,
     userId: member.userId,
   };
 };
@@ -184,8 +246,7 @@ function HeaderCloseButton({ onClick }: { onClick: () => void }) {
       aria-label="닫기"
       className="absolute top-0 right-5 z-20 flex h-[52px] w-10 items-center justify-center"
     >
-      <span className="absolute h-[28px] w-[2.5px] rotate-45 rounded-full bg-neutral-500" />
-      <span className="absolute h-[28px] w-[2.5px] -rotate-45 rounded-full bg-neutral-500" />
+      <img src={CloseIcon} alt="" className="size-7" />
     </button>
   );
 }
@@ -216,6 +277,8 @@ export function LiveForm({
 
   const [reservedDate, setReservedDate] = useState(getTomorrowDateString);
   const [reservedTime, setReservedTime] = useState("20:00");
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const [isTimePickerOpen, setIsTimePickerOpen] = useState(false);
   const [submitErrorMessage, setSubmitErrorMessage] = useState("");
   const [coHostLoadErrorMessage, setCoHostLoadErrorMessage] = useState("");
 
@@ -251,18 +314,14 @@ export function LiveForm({
           (candidate) => candidate.bandMemberId === coHostId,
         ),
       )
-      .filter(
-        (
-          candidate,
-        ): candidate is LiveReservationCoHostCandidate => {
-          if (!candidate) return false;
-          if (candidate.status === "OWNER") return false;
+      .filter((candidate): candidate is LiveReservationCoHostCandidate => {
+        if (!candidate) return false;
+        if (candidate.status === "OWNER") return false;
 
-          const submitId = candidate.userId ?? candidate.bandMemberProfileId;
+        const submitId = candidate.userId ?? candidate.bandMemberProfileId;
 
-          return Number.isFinite(submitId);
-        },
-      )
+        return Number.isFinite(submitId);
+      })
       .map((candidate) => candidate.userId ?? candidate.bandMemberProfileId);
   };
 
@@ -317,16 +376,34 @@ export function LiveForm({
     });
   };
 
+  const handleOpenDatePicker = () => {
+    setIsTimePickerOpen(false);
+    setIsDatePickerOpen(true);
+  };
+
+  const handleOpenTimePicker = () => {
+    setIsDatePickerOpen(false);
+    setIsTimePickerOpen(true);
+  };
+
   const uploadThumbnailIfNeeded = async () => {
     if (!thumbnailImage) return savedThumbnailImageUrl;
 
     setIsUploadingThumbnail(true);
 
     try {
-      return await uploadMediaFile({
+      const uploadResult = await uploadMediaFile({
         category: "STREAM_THUMBNAIL",
         file: thumbnailImage,
       });
+
+      const uploadedUrl = getUploadedMediaUrl(uploadResult);
+
+      if (!uploadedUrl) {
+        throw new Error("썸네일 이미지 업로드 URL을 확인할 수 없어요.");
+      }
+
+      return uploadedUrl;
     } finally {
       setIsUploadingThumbnail(false);
     }
@@ -351,6 +428,7 @@ export function LiveForm({
         title: trimmedTitle,
         description: trimmedDescription || undefined,
         thumbnailImageUrl,
+        thumbnailUrl: thumbnailImageUrl,
         scheduledAt: isReserve
           ? toCreateScheduledAt(reservedDate, reservedTime)
           : null,
@@ -408,6 +486,7 @@ export function LiveForm({
           title: trimmedTitle,
           description: trimmedDescription,
           thumbnailImageUrl,
+          thumbnailUrl: thumbnailImageUrl,
           scheduledAt: toUpdateScheduledAt(reservedDate, reservedTime),
           cohosts: hasCoHostSelectionChanged ? submitCoHostIds : null,
         },
@@ -444,7 +523,6 @@ export function LiveForm({
 
     try {
       await cancelLiveReservation(reservationLiveId);
-
       setIsReservationCancelDialogOpen(false);
       go("home");
     } catch (error) {
@@ -486,38 +564,18 @@ export function LiveForm({
       if (isMounted) setIsCoHostLoading(true);
     }, 0);
 
-    Promise.all([
-      getBandMembers(activeBandId),
-      getActiveBandMemberProfile().catch(() => null),
-    ])
-      .then(async ([members, activeProfile]) => {
-        if (!isMounted) return;
+    const currentUserId = getStoredAuthUser()?.userId ?? null;
 
-        const activeProfileId = activeProfile?.id ?? null;
-        const memberProfiles = await Promise.all(
-          members.map((member) =>
-            member.bandMemberProfileId
-              ? getBandMemberProfile(member.bandMemberProfileId).catch(
-                  () => null,
-                )
-              : Promise.resolve(null),
-          ),
-        );
-
+    getBandMembers(activeBandId)
+      .then((members) => {
         if (!isMounted) return;
 
         const candidates = members
-          .map((member, index) =>
-            mapBandMemberToCoHostCandidate(
-              member,
-              activeProfileId,
-              memberProfiles[index],
-            ),
+          .map((member) =>
+            mapBandMemberToCoHostCandidate(member, currentUserId),
           )
           .filter(
-            (
-              candidate,
-            ): candidate is LiveReservationCoHostCandidate =>
+            (candidate): candidate is LiveReservationCoHostCandidate =>
               Boolean(candidate),
           );
 
@@ -567,11 +625,12 @@ export function LiveForm({
         const { date, time } = splitScheduledAt(reservation.scheduledAt);
         const candidates = reservation.cohostCandidates ?? [];
         const initialSelectedIds = getInitialSelectedCoHostIds(candidates);
+        const thumbnailImageUrl = getReservationThumbnailUrl(reservation);
 
         setTitle(reservation.title ?? "");
         setDescription(reservation.description ?? "");
-        setSavedThumbnailImageUrl(reservation.thumbnailImageUrl ?? "");
-        setThumbnailPreviewUrl(reservation.thumbnailImageUrl ?? null);
+        setSavedThumbnailImageUrl(thumbnailImageUrl);
+        setThumbnailPreviewUrl(thumbnailImageUrl || null);
         setThumbnailImage(null);
         setReservedDate(date);
         setReservedTime(time);
@@ -696,8 +755,8 @@ export function LiveForm({
             <DateTimeSelector
               date={reservedDate}
               time={reservedTime}
-              onDateChange={setReservedDate}
-              onTimeChange={setReservedTime}
+              onDateClick={handleOpenDatePicker}
+              onTimeClick={handleOpenTimePicker}
             />
           </FormCard>
         ) : null}
@@ -757,6 +816,37 @@ export function LiveForm({
       </div>
 
       <BottomNavBar modeOverride="band" />
+
+      {isDatePickerOpen ? (
+        <div className="fixed inset-0 z-[100]">
+          <DatePickerSheet
+            open={isDatePickerOpen}
+            startDate={reservedDate}
+            endDate={reservedDate}
+            selectionMode="single"
+            onClose={() => setIsDatePickerOpen(false)}
+            onSelect={({ start }) => {
+              setReservedDate(start);
+              setIsDatePickerOpen(false);
+            }}
+          />
+        </div>
+      ) : null}
+
+      {isTimePickerOpen ? (
+        <div className="fixed inset-0 z-[100]">
+          <TimePickerSheet
+            open={isTimePickerOpen}
+            value={reservedTime}
+            title="라이브 시작 시간"
+            onClose={() => setIsTimePickerOpen(false)}
+            onConfirm={(time) => {
+              setReservedTime(time);
+              setIsTimePickerOpen(false);
+            }}
+          />
+        </div>
+      ) : null}
 
       {isReservationCancelDialogOpen ? (
         <ConfirmDialog

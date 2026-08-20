@@ -15,12 +15,12 @@ export const SessionApplicationFormHeader = ({
   onClose,
 }: SessionApplicationFormHeaderProps) => {
   return (
-    <header className="relative flex h-[88px] w-full shrink-0 items-end justify-center bg-neutral-0 pb-[23px]">
+    <header className="relative flex h-12 w-full shrink-0 items-center justify-center bg-neutral-0 px-[15px] py-[5px]">
       <button
         type="button"
         aria-label="뒤로가기"
         onClick={onBack}
-        className="absolute bottom-[18px] left-[15px] flex size-8 items-center justify-center"
+        className="absolute top-[5px] left-[15px] flex size-[38px] items-center justify-center"
       >
         <img src={ArrowLeftIcon} alt="" className="size-6" />
       </button>
@@ -31,7 +31,7 @@ export const SessionApplicationFormHeader = ({
         type="button"
         aria-label={`${title} 닫기`}
         onClick={onClose}
-        className="absolute right-[15px] bottom-[18px] flex size-8 items-center justify-center"
+        className="absolute top-[5px] right-[15px] flex size-[38px] items-center justify-center"
       >
         <img src={CloseIcon} alt="" className="size-6" />
       </button>

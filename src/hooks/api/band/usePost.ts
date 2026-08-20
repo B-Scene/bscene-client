@@ -6,6 +6,7 @@ import {
   getPosts,
   updatePost,
 } from "@/api/band/post";
+import { bandPostDetailKeys } from "@/hooks/api/band/usePostDetail";
 import type {
   CreatePostRequest,
   GetPostsParams,
@@ -57,6 +58,9 @@ export const useUpdatePost = (postId: number) => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: postKeys.detail(postId) });
       queryClient.invalidateQueries({ queryKey: postKeys.all });
+      queryClient.invalidateQueries({
+        queryKey: bandPostDetailKeys.detail(postId),
+      });
     },
   });
 };

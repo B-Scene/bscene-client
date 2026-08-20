@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { isAxiosError } from "axios";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
 import Modal from "@/components/Modal/Modal";
+import { Tabs } from "@/components/band/home/Tabs";
 import { Header } from "@/components/common/Header/Header";
 import { ModalOverlay } from "@/components/common/Modal/ModalOverlay";
 import NotificationOffIcon from "@/assets/icons/Notification Off.svg";
@@ -18,7 +20,10 @@ import {
   useFanPerformanceDetailQuery,
   useSetPerformanceAlarm,
 } from "@/hooks/api/fan/useFanHome";
-import { isAlreadyInterestedPerformanceError } from "@/api/fan/home";
+import {
+  isAlreadyInterestedPerformanceError,
+  isAlreadySetPerformanceAlarmError,
+} from "@/api/fan/home";
 import type { FanPerformanceDetailResponse } from "@/types/fan/home";
 
 const TABS = ["공연정보", "공연소개", "캐스팅"] as const;
@@ -31,11 +36,15 @@ const AGE_RATING_LABELS: Record<string, string> = {
 
 type ConcertDetailTab = (typeof TABS)[number];
 type KakaoSharePayload = {
-  objectType: "text";
-  text: string;
-  link: {
-    mobileWebUrl: string;
-    webUrl: string;
+  objectType: "feed";
+  content: {
+    title: string;
+    description: string;
+    imageUrl?: string;
+    link: {
+      mobileWebUrl: string;
+      webUrl: string;
+    };
   };
   buttonTitle: string;
 };
@@ -44,14 +53,86 @@ type KakaoShareApi = {
   sendDefault: (payload: KakaoSharePayload) => void;
 };
 
+type KakaoGlobal = {
+  Share?: KakaoShareApi;
+  Link?: KakaoShareApi;
+  init: (javaScriptKey: string) => void;
+  isInitialized?: () => boolean;
+};
+
 declare global {
   interface Window {
-    Kakao?: {
-      Share?: KakaoShareApi;
-      Link?: KakaoShareApi;
-    };
+    Kakao?: KakaoGlobal;
   }
 }
+
+const KAKAO_SDK_SCRIPT_ID = "kakao-js-sdk";
+const KAKAO_SDK_URL = "https://t1.kakaocdn.net/kakao_js_sdk/2.7.5/kakao.min.js";
+const KAKAO_JAVASCRIPT_KEY = import.meta.env.VITE_KAKAO_JAVASCRIPT_KEY as
+  | string
+  | undefined;
+const normalizeBaseUrl = (url?: string) => url?.replace(/\/+$/, "");
+const PUBLIC_SITE_URL =
+  normalizeBaseUrl(import.meta.env.VITE_PUBLIC_SITE_URL as string | undefined) ??
+  "https://bscene.app";
+
+let kakaoSdkPromise: Promise<KakaoGlobal> | null = null;
+
+const loadKakaoSdk = () => {
+  if (window.Kakao) return Promise.resolve(window.Kakao);
+  if (kakaoSdkPromise) return kakaoSdkPromise;
+
+  kakaoSdkPromise = new Promise<KakaoGlobal>((resolve, reject) => {
+    const existingScript = document.getElementById(
+      KAKAO_SDK_SCRIPT_ID,
+    ) as HTMLScriptElement | null;
+
+    const handleLoad = () => {
+      if (window.Kakao) {
+        resolve(window.Kakao);
+        return;
+      }
+
+      reject(new Error("Kakao SDK was not loaded"));
+    };
+    const handleError = () => reject(new Error("Failed to load Kakao SDK"));
+
+    if (existingScript) {
+      existingScript.addEventListener("load", handleLoad, { once: true });
+      existingScript.addEventListener("error", handleError, { once: true });
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.id = KAKAO_SDK_SCRIPT_ID;
+    script.src = KAKAO_SDK_URL;
+    script.async = true;
+    script.addEventListener("load", handleLoad, { once: true });
+    script.addEventListener("error", handleError, { once: true });
+    document.head.appendChild(script);
+  });
+
+  return kakaoSdkPromise;
+};
+
+const getKakaoShareApi = async () => {
+  if (!KAKAO_JAVASCRIPT_KEY) {
+    throw new Error("Missing Kakao JavaScript key");
+  }
+
+  const Kakao = await loadKakaoSdk();
+
+  if (!Kakao.isInitialized?.()) {
+    Kakao.init(KAKAO_JAVASCRIPT_KEY);
+  }
+
+  const kakaoShareApi = Kakao.Share ?? Kakao.Link;
+  if (!kakaoShareApi) {
+    throw new Error("Kakao Share API is unavailable");
+  }
+
+  return kakaoShareApi;
+};
 
 const ImagePlaceholderIcon = () => (
   <svg
@@ -158,7 +239,7 @@ const LinkCopyIcon = () => (
 );
 
 const Tag = ({ children }: { children: string }) => (
-  <span className="rounded-full bg-primary-50 px-[9px] py-[3px] font-body text-caption5 text-primary-400">
+  <span className="rounded-full bg-primary-50 px-3 py-1 font-body text-caption2 text-primary-400">
     {children}
   </span>
 );
@@ -294,10 +375,15 @@ const getPerformanceDate = (detail?: FanPerformanceDetailResponse) => {
   if (!detail) return null;
 
   const dateValue =
-    detail.startAt ?? detail.startDateTime ?? detail.performanceDate;
+    detail.startAt ??
+    detail.startedAt ??
+    detail.startDateTime ??
+    detail.performanceDate ??
+    detail.startDate;
+  const timeValue = detail.performanceTime ?? detail.startTime ?? detail.time;
 
-  if (dateValue && detail.performanceTime && !dateValue.includes("T")) {
-    return toDate(`${dateValue}T${detail.performanceTime}`);
+  if (dateValue && timeValue && !dateValue.includes("T")) {
+    return toDate(`${dateValue}T${timeValue}`);
   }
 
   return toDate(dateValue);
@@ -385,6 +471,41 @@ const getDetailTags = (detail?: FanPerformanceDetailResponse) => {
   return detail?.tags?.length ? detail.tags : [getDetailTitle(detail)];
 };
 
+const isNotFoundDetailError = (error: unknown) => {
+  if (!isAxiosError(error)) return false;
+
+  const data = error.response?.data as
+    | { code?: unknown; message?: unknown }
+    | undefined;
+  const code = String(error.code ?? data?.code ?? "");
+  const message = String(error.message ?? data?.message ?? "");
+
+  return (
+    error.response?.status === 404 ||
+    code.includes("404") ||
+    message.includes("찾을 수") ||
+    message.includes("존재하지") ||
+    message.includes("삭제")
+  );
+};
+
+const getPerformanceAlarmEnabled = (
+  detail?: FanPerformanceDetailResponse,
+) => {
+  const explicitAlarmState =
+    detail?.isAlarmSet ??
+    detail?.alarmSet ??
+    detail?.notificationEnabled ??
+    detail?.isAlarmEnabled ??
+    detail?.alarmEnabled;
+
+  if (explicitAlarmState !== undefined) {
+    return explicitAlarmState;
+  }
+
+  return detail?.participationStatus === "SCHEDULED";
+};
+
 const ConcertDetailPage = () => {
   const navigate = useNavigate();
   const { concertId = "default-concert" } = useParams();
@@ -394,9 +515,10 @@ const ConcertDetailPage = () => {
   const castingRef = useRef<HTMLElement | null>(null);
   const queryClient = useQueryClient();
   const [selectedTab, setSelectedTab] = useState<ConcertDetailTab>("공연정보");
-  const [notificationOverride, setNotificationOverride] = useState<
-    boolean | null
-  >(null);
+  const [notificationOverride, setNotificationOverride] = useState<{
+    performanceId: number;
+    value: boolean;
+  } | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isShareSheetOpen, setIsShareSheetOpen] = useState(false);
   const [isInterestSyncing, setIsInterestSyncing] = useState(false);
@@ -406,10 +528,20 @@ const ConcertDetailPage = () => {
   const detailQuery = useFanPerformanceDetailQuery(
     Number.isFinite(performanceId) ? performanceId : 0,
   );
+  const handleBack = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate("/fan/home", { replace: true });
+    }
+  };
   const detail = detailQuery.data;
   const isLiked = detail?.isInterested ?? false;
+  const interestCount = detail?.interestCount ?? 0;
   const isNotificationEnabled =
-    notificationOverride ?? detail?.participationStatus != null;
+    notificationOverride?.performanceId === performanceId
+      ? notificationOverride.value
+      : getPerformanceAlarmEnabled(detail);
   const showNotificationHint =
     Boolean(detail) && !isNotificationEnabled && !isNotificationHintDismissed;
   const title = getDetailTitle(detail);
@@ -450,6 +582,34 @@ const ConcertDetailPage = () => {
 
     return () => window.clearTimeout(timerId);
   }, [toastMessage]);
+
+  const isDeletedPerformance =
+    !detailQuery.isLoading &&
+    detailQuery.isError &&
+    isNotFoundDetailError(detailQuery.error);
+
+  if (isDeletedPerformance) {
+    return (
+      <main className="min-h-dvh bg-neutral-0">
+        <Header title="" align="betweenCompact" />
+        <section className="flex min-h-[420px] flex-col items-center justify-center px-[25px] text-center">
+          <h1 className="m-0 font-body text-label1 text-neutral-900">
+            공연 정보가 삭제되었어요
+          </h1>
+          <p className="m-0 mt-[8px] font-body text-caption2 text-neutral-600">
+            삭제된 공연 정보는 열 수 없어요
+          </p>
+          <button
+            type="button"
+            onClick={handleBack}
+            className="mt-[20px] flex h-[38px] items-center justify-center rounded-[8px] bg-primary-400 px-[20px] font-body text-body1 text-neutral-0"
+          >
+            돌아가기
+          </button>
+        </section>
+      </main>
+    );
+  }
 
   const handleLikeClick = async () => {
     if (!Number.isFinite(performanceId) || performanceId <= 0) {
@@ -508,12 +668,28 @@ const ConcertDetailPage = () => {
       return;
     }
 
+    const refetchAlarmEnabled = async () => {
+      setNotificationOverride(null);
+      const result = await detailQuery.refetch();
+
+      return getPerformanceAlarmEnabled(result.data);
+    };
+
     if (isNotificationEnabled) {
       try {
         await deletePerformanceAlarmMutation.mutateAsync(performanceId);
-        setNotificationOverride(false);
+
+        const isStillNotificationEnabled = await refetchAlarmEnabled();
+
+        if (isStillNotificationEnabled) {
+          setToastMessage("공연 알림 해제에 실패했어요");
+          return;
+        }
+
+        setNotificationOverride({ performanceId, value: false });
         setToastMessage("공연 알림을 해제했어요");
       } catch {
+        setNotificationOverride(null);
         setToastMessage("공연 알림 해제에 실패했어요");
       }
       return;
@@ -521,15 +697,43 @@ const ConcertDetailPage = () => {
 
     try {
       await setPerformanceAlarmMutation.mutateAsync(performanceId);
-      setNotificationOverride(true);
+
+      const isUpdatedNotificationEnabled = await refetchAlarmEnabled();
+
+      if (!isUpdatedNotificationEnabled) {
+        setToastMessage("공연 알림 설정에 실패했어요");
+        return;
+      }
+
+      setNotificationOverride({ performanceId, value: true });
       setIsNotificationHintDismissed(true);
       setIsNotificationModalOpen(true);
-    } catch {
+    } catch (error) {
+      if (isAlreadySetPerformanceAlarmError(error)) {
+        try {
+          const isUpdatedNotificationEnabled = await refetchAlarmEnabled();
+
+          if (isUpdatedNotificationEnabled) {
+            setToastMessage("이미 공연 알림이 설정되어 있어요");
+            return;
+          }
+        } catch {
+          setNotificationOverride(null);
+        }
+      }
+
+      setNotificationOverride(null);
       setToastMessage("공연 알림 설정에 실패했어요");
     }
   };
 
-  const getConcertLink = () => window.location.href;
+  const getConcertLink = () => {
+    if (Number.isFinite(performanceId) && performanceId > 0) {
+      return `${PUBLIC_SITE_URL}/fan/home/concerts/${performanceId}`;
+    }
+
+    return window.location.href;
+  };
 
   const handleTicketClick = () => {
     if (!detail?.ticketLink) return;
@@ -537,43 +741,35 @@ const ConcertDetailPage = () => {
     window.open(detail.ticketLink, "_blank", "noopener,noreferrer");
   };
 
-  const handleKakaoShareClick = () => {
+  const handleKakaoShareClick = async () => {
     const concertLink = getConcertLink();
-    const kakaoShareApi = window.Kakao?.Share ?? window.Kakao?.Link;
 
-    if (kakaoShareApi) {
-      try {
-        kakaoShareApi.sendDefault({
-          objectType: "text",
-          text: title,
+    try {
+      const kakaoShareApi = await getKakaoShareApi();
+      kakaoShareApi.sendDefault({
+        objectType: "feed",
+        content: {
+          title,
+          description: `${location} · ${dateTime}`,
+          imageUrl: posterImageUrl,
           link: {
             mobileWebUrl: concertLink,
             webUrl: concertLink,
           },
-          buttonTitle: "공연 보러가기",
-        });
-        setIsShareSheetOpen(false);
-        setToastMessage("카카오톡 공유 화면을 열었어요");
-      } catch {
-        setToastMessage("카카오톡 공유를 시작하지 못했어요");
+        },
+        buttonTitle: "공연 보러가기",
+      });
+      setIsShareSheetOpen(false);
+      setToastMessage("카카오톡 공유 화면을 열었어요");
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("JavaScript key")) {
+        setToastMessage("카카오톡 공유 설정이 필요해요");
+        return;
       }
 
-      return;
-    }
-
-    const shareUrl = `https://sharer.kakao.com/talk/friends/picker/link?url=${encodeURIComponent(
-      concertLink,
-    )}&text=${encodeURIComponent(title)}`;
-    const shareWindow = window.open(shareUrl, "_blank");
-
-    if (!shareWindow) {
       setToastMessage("카카오톡 공유를 시작하지 못했어요");
       return;
     }
-
-    shareWindow.opener = null;
-    setIsShareSheetOpen(false);
-    setToastMessage("카카오톡 공유 화면을 열었어요");
   };
 
   const handleCopyLinkClick = async () => {
@@ -597,6 +793,7 @@ const ConcertDetailPage = () => {
         <Header
           title=""
           align="betweenCompact"
+          onBack={handleBack}
           rightContent={
             <div className="flex items-center gap-4">
               <button
@@ -723,13 +920,16 @@ const ConcertDetailPage = () => {
               isInterestSyncing
             }
             onClick={() => void handleLikeClick()}
-            className="mt-[38px] flex size-6 shrink-0 items-center justify-center"
+            className="mt-[38px] flex shrink-0 items-center gap-[2px] font-body text-caption3 text-neutral-700"
           >
             <img
               src={isLiked ? LikedHeartIcon : HeartIcon}
               alt=""
               className="size-6"
             />
+            <span className="tabular-nums">
+              {interestCount}
+            </span>
           </button>
         </div>
 
@@ -747,27 +947,16 @@ const ConcertDetailPage = () => {
         </section>
       </section>
 
-      <nav
-        aria-label="공연 상세 메뉴"
-        className="sticky top-0 z-10 grid h-[43px] w-full grid-cols-3 bg-neutral-0"
-      >
-        {TABS.map((tab) => (
-          <button
-            key={tab}
-            type="button"
-            onClick={() => handleTabClick(tab)}
-            className={`relative flex items-center justify-center font-body text-body1 ${
-              selectedTab === tab ? "text-neutral-900" : "text-neutral-400"
-            }`}
-          >
-            {tab}
-            {selectedTab === tab ? (
-              <span className="absolute bottom-0 left-1/2 z-10 h-[2px] w-[114px] -translate-x-1/2 rounded-full bg-primary-400" />
-            ) : null}
-          </button>
-        ))}
-        <span className="pointer-events-none absolute bottom-0 left-1/2 h-[2px] w-[393px] max-w-full -translate-x-1/2 bg-neutral-400" />
-      </nav>
+      <div className="sticky top-0 z-10 bg-neutral-0" aria-label="공연 상세 메뉴">
+        <Tabs
+          tabs={TABS.map((tab) => ({ id: tab, label: tab }))}
+          activeTabId={selectedTab}
+          onChange={(tabId) => handleTabClick(tabId as ConcertDetailTab)}
+          colorVariant="primary"
+          edgeClassName=""
+          paddingClassName=""
+        />
+      </div>
 
       <section
         ref={concertInfoRef}

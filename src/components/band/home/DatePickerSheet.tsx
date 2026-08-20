@@ -12,6 +12,7 @@ interface DatePickerSheetProps {
   endDate: string;
   minDate?: string;
   maxDate?: string;
+  selectionMode?: "single" | "range";
   onClose: () => void;
   onSelect: (range: DateRange) => void;
 }
@@ -35,6 +36,7 @@ const formatDateKey = (date: Date) =>
 
 const parseDateKey = (dateKey: string) => {
   const [year, month, day] = dateKey.split("-").map(Number);
+
   return new Date(year, month - 1, day);
 };
 
@@ -96,6 +98,7 @@ export const DatePickerSheet = ({
   endDate,
   minDate,
   maxDate,
+  selectionMode = "range",
   onClose,
   onSelect,
 }: DatePickerSheetProps) => {
@@ -135,6 +138,13 @@ export const DatePickerSheet = ({
   };
 
   const handleDayClick = (dateKey: string) => {
+    if (selectionMode === "single") {
+      setRangeStart(dateKey);
+      setRangeEnd(dateKey);
+      onSelect({ start: dateKey, end: dateKey });
+      return;
+    }
+
     const hasCompleteRange = Boolean(rangeStart) && Boolean(rangeEnd);
 
     if (!rangeStart || hasCompleteRange) {
@@ -157,13 +167,14 @@ export const DatePickerSheet = ({
       onSelect({ start: rangeStart, end: rangeEnd || rangeStart });
       return;
     }
+
     onClose();
   };
 
   if (!rendered) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center">
+    <div className="absolute inset-0 z-50 flex items-end overflow-hidden">
       <div
         className={`absolute inset-0 bg-neutral-900/50 transition-opacity duration-300 ease-out ${
           isVisible ? "opacity-100" : "opacity-0"
@@ -238,12 +249,13 @@ export const DatePickerSheet = ({
               const inRangeCheck = (candidate?: CalendarDay) =>
                 Boolean(
                   candidate &&
-                  !candidate.muted &&
-                  rangeStart &&
-                  rangeEnd &&
-                  candidate.dateKey >= rangeStart &&
-                  candidate.dateKey <= rangeEnd,
+                    !candidate.muted &&
+                    rangeStart &&
+                    rangeEnd &&
+                    candidate.dateKey >= rangeStart &&
+                    candidate.dateKey <= rangeEnd,
                 );
+
               const inRange = inRangeCheck(day);
               const isFirstColumn = index % 7 === 0;
               const isLastColumn = index % 7 === 6;
@@ -291,6 +303,7 @@ export const DatePickerSheet = ({
                     }`}
                   >
                     {day.label}
+
                     {day.today && !isStart && !isEnd ? (
                       <span className="absolute bottom-0.5 size-1 rounded-full bg-primary-400" />
                     ) : null}

@@ -1,5 +1,29 @@
 :root {
   --bottom-nav-height: 5rem;
+  /* Visible height of the app content area. Equal to --app-height everywhere
+     except inside the boxed desktop/tablet layout (see .phone-frame below),
+     where it's capped to match the frame so pages don't size themselves
+     against the full browser window and end up scrolling inside a shorter
+     box than they think they have. */
+  --frame-height: var(--app-height, 100dvh);
+}
+
+@media (min-width: 768px) {
+  :root {
+    --frame-height: min(852px, var(--app-height, 100dvh));
+  }
+}
+
+/* Samsung Internet / some Galaxy browsers report 100dvh larger than the
+   actually visible viewport, leaving a stale gap below short page content.
+   Route dvh-based height utilities through the corrected --app-height
+   (see MobileLayout) instead of the raw dvh unit. */
+.min-h-dvh {
+  min-height: var(--frame-height);
+}
+
+.h-dvh {
+  height: var(--frame-height);
 }
 
 .page-frame {
@@ -21,12 +45,26 @@
      anchor to the frame instead of the browser viewport */
   transform: translateZ(0);
 
-  @media (min-width: 768px), (hover: hover) and (pointer: fine) {
+  /* min-width alone (no hover/pointer check): S Pen-capable Galaxy phones
+     report (hover: hover) and (pointer: fine) via the pen's hover sensing
+     even when the user is just touching with a finger, which previously
+     boxed those phones into the desktop-mockup frame and let .page-frame's
+     dark background peek out above/below the letterboxed content. */
+  @media (min-width: 768px) {
     width: min(393px, 100vw);
+    height: var(--frame-height);
+  }
+}
 
-    @media (min-height: 852px) {
-      height: min(852px, var(--app-height, 100dvh));
-    }
+/* Same width rule as .phone-frame, for content portaled to document.body
+   (e.g. via createPortal) that can't inherit .phone-frame's width because
+   it renders outside it in the DOM. Keep the breakpoint/width in sync with
+   .phone-frame above. */
+.frame-width {
+  width: 100%;
+
+  @media (min-width: 768px) {
+    width: min(393px, 100vw);
   }
 }
 

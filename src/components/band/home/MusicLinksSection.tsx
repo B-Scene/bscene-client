@@ -17,18 +17,32 @@ interface MusicLinkRowProps {
   iconSrc: string;
   label: string;
   url: string;
+  filledIcon?: boolean;
 }
 
-const MusicLinkRow = ({ iconSrc, label, url }: MusicLinkRowProps) => (
+const MusicLinkRow = ({
+  iconSrc,
+  label,
+  url,
+  filledIcon = false,
+}: MusicLinkRowProps) => (
   <a
     href={url}
     target="_blank"
     rel="noreferrer"
     className="flex items-center gap-6.25 rounded-xl py-3 pl-3 pr-3.75 text-left shadow-[0_0_8px_0_rgba(0,0,0,0.10)]"
   >
-    <span className="flex size-8.75 shrink-0 items-center justify-center rounded-lg bg-neutral-400">
-      <img src={iconSrc} alt="" className="size-5" />
-    </span>
+    {filledIcon ? (
+      <img
+        src={iconSrc}
+        alt=""
+        className="size-8.75 shrink-0 rounded-lg object-cover"
+      />
+    ) : (
+      <span className="flex size-8.75 shrink-0 items-center justify-center rounded-lg bg-neutral-400">
+        <img src={iconSrc} alt="" className="size-5" />
+      </span>
+    )}
     <div className="flex min-w-0 flex-1 flex-col">
       <span className="text-caption3 text-neutral-900">{label}</span>
       <span className="truncate text-caption2 text-neutral-600">{url}</span>
@@ -68,6 +82,7 @@ export const MusicLinksSection = ({
             iconSrc={SpotifyIcon}
             label="Spotify"
             url={spotifyUrl}
+            filledIcon
           />
         ) : null}
 
@@ -76,6 +91,7 @@ export const MusicLinksSection = ({
             iconSrc={YoutubeIcon}
             label="YouTube"
             url={youtubeUrl}
+            filledIcon
           />
         ) : null}
 
@@ -84,6 +100,7 @@ export const MusicLinksSection = ({
             iconSrc={SoundcloudIcon}
             label="SoundCloud"
             url={soundcloudUrl}
+            filledIcon
           />
         ) : null}
 

@@ -4,27 +4,25 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import TimesCircleIcon from "@/assets/icons/ic_Times Circle.svg";
 import ConcertCard from "@/components/common/Card/ConcertCard";
 import { Header } from "@/components/common/Header/Header";
-import {
-  useFanExplorePerformanceSearchQuery,
-  useFanExploreSearchQuery,
-} from "@/hooks/api/fan/useFanExplore";
+import { useFanExplorePerformanceSearchQuery } from "@/hooks/api/fan/useFanExplore";
 import { useInfiniteScrollObserver } from "@/hooks/useInfiniteScrollObserver";
 import {
   ExploreFilterBar,
+  ExploreFilterSheet,
   type AppliedExploreFilters,
 } from "@/pages/fan/explore/FanExplorePage";
+import {
+  SEARCH_SORT_LABELS,
+  SEARCH_SORT_TO_API,
+  type SearchResultSortOption,
+} from "@/pages/fan/explore/components/fanExploreSearchSort";
+import { SearchResultSortSheet } from "@/pages/fan/explore/components/FanExploreSearchSortSheet";
 import type { FanExplorePerformance, FanExploreSort } from "@/types/fan/explore";
 import {
   BAND_GENRE_BY_LABEL,
   BAND_REGION_BY_LABEL,
 } from "@/utils/bandLabels";
 import { addRecentSearch } from "./recentSearches";
-
-const SORT_LABELS: Record<FanExploreSort, "정확도순" | "인기순"> = {
-  ACCURACY: "정확도순",
-  POPULAR: "인기순",
-  RECOMMEND: "정확도순",
-};
 
 const getSortParam = (value: string | null): FanExploreSort => {
   if (value === "POPULAR") return "POPULAR";
@@ -41,6 +39,15 @@ const getGenreFilterParam = (genre: string) => {
 const getRegionFilterParam = (region: string) => {
   if (region === "전체") return undefined;
   return BAND_REGION_BY_LABEL[region] ?? region;
+};
+
+const getResultPathByContent = (content: string) => {
+  if (content === "밴드") return "/fan/explore/search/results/bands";
+  if (content === "영상" || content === "콘텐츠") {
+    return "/fan/explore/search/results/contents";
+  }
+  if (content === "공연") return "/fan/explore/search/results/concerts";
+  return "/fan/explore/search/results";
 };
 
 const MONTH_LABELS = [
@@ -120,25 +127,6 @@ const formatDday = (date: Date | null, status?: string | null) => {
 const getPerformanceId = (performance: FanExplorePerformance) =>
   performance.performanceId ?? performance.concertId ?? performance.id;
 
-const mergePerformances = (
-  primaryPerformances: FanExplorePerformance[],
-  fallbackPerformances: FanExplorePerformance[],
-) => {
-  const seenIds = new Set<string>();
-
-  return [...primaryPerformances, ...fallbackPerformances].filter(
-    (performance, index) => {
-      const key = String(
-        getPerformanceId(performance) ?? `${performance.title ?? ""}-${index}`,
-      );
-
-      if (seenIds.has(key)) return false;
-      seenIds.add(key);
-      return true;
-    },
-  );
-};
-
 const ConcertMoreTopBar = ({ initialKeyword }: { initialKeyword: string }) => {
   const navigate = useNavigate();
   const [keyword, setKeyword] = useState(initialKeyword);
@@ -195,6 +183,8 @@ const FanExploreConcertMorePage = () => {
   const [searchParams] = useSearchParams();
   const keyword = searchParams.get("q") || "WAVY";
   const sort = getSortParam(searchParams.get("sort"));
+  const [isSortSheetOpen, setIsSortSheetOpen] = useState(false);
+  const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
   const shouldHighlightSort =
     sort === "POPULAR" || searchParams.get("sortSelected") === "1";
   const appliedFilters: AppliedExploreFilters = {
@@ -209,13 +199,6 @@ const FanExploreConcertMorePage = () => {
     region: getRegionFilterParam(appliedFilters.region),
     size: 30,
   });
-  const allSearchQuery = useFanExploreSearchQuery({
-    keyword,
-    type: "ALL",
-    sort,
-    genre: getGenreFilterParam(appliedFilters.genre),
-    region: getRegionFilterParam(appliedFilters.region),
-  });
   const {
     data,
     fetchNextPage,
@@ -228,27 +211,57 @@ const FanExploreConcertMorePage = () => {
     () => data?.pages.flatMap((page) => page.items) ?? [],
     [data],
   );
-  const concerts = useMemo(
-    () => mergePerformances(pagedConcerts, allSearchQuery.data?.performances ?? []),
-    [allSearchQuery.data?.performances, pagedConcerts],
-  );
-  const totalCount = concerts.length;
+  const concerts = pagedConcerts;
+  const totalCount = data?.pages[0]?.totalCount ?? concerts.length;
   const sentinelRef = useInfiniteScrollObserver({
     enabled: Boolean(hasNextPage) && !isFetchingNextPage,
     onIntersect: fetchNextPage,
   });
-  const isInitialLoading =
-    isLoading && allSearchQuery.isLoading && concerts.length === 0;
-  const isPerformanceError =
-    isError && allSearchQuery.isError && concerts.length === 0;
+  const isInitialLoading = isLoading && concerts.length === 0;
+  const isPerformanceError = isError && concerts.length === 0;
+
+  const applySort = (nextSortOption: SearchResultSortOption) => {
+    const nextSort = SEARCH_SORT_TO_API[nextSortOption];
+    const params = new URLSearchParams({
+      q: keyword,
+      sort: nextSort,
+    });
+
+    params.set("sortSelected", "1");
+    if (appliedFilters.genre !== "전체") params.set("genre", appliedFilters.genre);
+    if (appliedFilters.region !== "전체") {
+      params.set("region", appliedFilters.region);
+    }
+
+    navigate(`/fan/explore/search/results/concerts?${params.toString()}`, {
+      replace: true,
+    });
+  };
+
+  const applyFilters = (filters: AppliedExploreFilters) => {
+    const params = new URLSearchParams({
+      q: keyword,
+      sort,
+    });
+
+    if (shouldHighlightSort) params.set("sortSelected", "1");
+    if (filters.genre !== "전체") params.set("genre", filters.genre);
+    if (filters.region !== "전체") params.set("region", filters.region);
+
+    navigate(`${getResultPathByContent(filters.content)}?${params.toString()}`, {
+      replace: true,
+    });
+  };
 
   return (
     <main className="min-h-dvh bg-neutral-0 pb-[calc(var(--bottom-nav-height)+24px)]">
       <ConcertMoreTopBar initialKeyword={keyword} />
       <ExploreFilterBar
         appliedFilters={appliedFilters}
-        appliedSort={SORT_LABELS[sort]}
+        appliedSort={SEARCH_SORT_LABELS[sort]}
         highlightSort={shouldHighlightSort}
+        onSortClick={() => setIsSortSheetOpen(true)}
+        onFilterClick={() => setIsFilterSheetOpen(true)}
       />
 
       <section className="px-[25px] pt-[16px]">
@@ -269,7 +282,6 @@ const FanExploreConcertMorePage = () => {
               type="button"
               onClick={() => {
                 void performancesQuery.refetch();
-                void allSearchQuery.refetch();
               }}
               className="font-body text-caption2 text-primary-400"
             >
@@ -329,6 +341,20 @@ const FanExploreConcertMorePage = () => {
         </div>
         <div ref={sentinelRef} aria-hidden="true" className="h-px w-full" />
       </section>
+
+      <SearchResultSortSheet
+        open={isSortSheetOpen}
+        onClose={() => setIsSortSheetOpen(false)}
+        selectedSort={SEARCH_SORT_LABELS[sort]}
+        onSelect={applySort}
+      />
+      <ExploreFilterSheet
+        open={isFilterSheetOpen}
+        onClose={() => setIsFilterSheetOpen(false)}
+        appliedFilters={appliedFilters}
+        contentSelectable
+        onApply={applyFilters}
+      />
     </main>
   );
 };

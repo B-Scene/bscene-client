@@ -157,6 +157,7 @@ export const useRemoveBandMember = (bandId: number) => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: bandMemberKeys.lists(bandId) });
       queryClient.invalidateQueries({ queryKey: bandMemberProfileKeys.all });
+      queryClient.invalidateQueries({ queryKey: myProfilesKeys.all });
     },
   });
 };

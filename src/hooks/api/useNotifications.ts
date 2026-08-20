@@ -4,6 +4,7 @@ import {
   useQuery,
   useQueryClient,
   type InfiniteData,
+  type QueryClient,
 } from "@tanstack/react-query";
 import {
   deletePushToken,
@@ -28,6 +29,36 @@ export const notificationKeys = {
   list: (size: number) => [...notificationKeys.all, "list", size] as const,
   settings: (mode: NotificationSettingsMode) =>
     [...notificationKeys.all, "settings", mode] as const,
+};
+
+export const markNotificationReadInCache = (
+  queryClient: QueryClient,
+  notificationId: number,
+) => {
+  const readAt = new Date().toISOString();
+
+  queryClient.setQueriesData<InfiniteData<NotificationsPageResponse>>(
+    { queryKey: notificationKeys.all },
+    (currentData) => {
+      if (!currentData) return currentData;
+
+      return {
+        ...currentData,
+        pages: currentData.pages.map((page) => ({
+          ...page,
+          items: page.items.map((notification) =>
+            notification.notificationId === notificationId
+              ? {
+                  ...notification,
+                  isRead: true,
+                  readAt: notification.readAt ?? readAt,
+                }
+              : notification,
+          ),
+        })),
+      };
+    },
+  );
 };
 
 export const useNotificationsInfiniteQuery = (size = 20) => {
@@ -109,11 +140,6 @@ export const useUpdateNotificationSettingMutation = () => {
       }
     },
 
-    onSettled: (_data, _error, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: notificationKeys.settings(variables.mode),
-      });
-    },
   });
 };
 
@@ -131,30 +157,7 @@ export const useMarkNotificationAsReadMutation = () => {
           queryKey: notificationKeys.all,
         });
 
-      queryClient.setQueriesData<InfiniteData<NotificationsPageResponse>>(
-        { queryKey: notificationKeys.all },
-        (currentData) => {
-          if (!currentData) return currentData;
-
-          const readAt = new Date().toISOString();
-
-          return {
-            ...currentData,
-            pages: currentData.pages.map((page) => ({
-              ...page,
-              items: page.items.map((notification) =>
-                notification.notificationId === notificationId
-                  ? {
-                      ...notification,
-                      isRead: true,
-                      readAt: notification.readAt ?? readAt,
-                    }
-                  : notification,
-              ),
-            })),
-          };
-        },
-      );
+      markNotificationReadInCache(queryClient, notificationId);
 
       return { previousNotifications };
     },

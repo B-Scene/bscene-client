@@ -1,35 +1,12 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import ArrowLeftIcon from "@/assets/icons/arrow-left.svg";
 import LocationIcon from "@/assets/icons/band/ic_location.svg";
+import ImagePlaceholderIcon from "@/assets/icons/fan/image-icon.svg";
 import TicketPerformIcon from "@/assets/icons/fan/ticket-perform.svg";
+import { Header } from "@/components/common/Header/Header";
 import { usePerformanceHistoryQuery } from "@/hooks/api/user/usePerformanceHistory";
 import { useInfiniteScrollObserver } from "@/hooks/useInfiniteScrollObserver";
 import type { PerformanceHistoryFilter } from "@/types/user/performanceHistory";
-
-const MONTH_ABBREVIATIONS = [
-  "JAN",
-  "FEB",
-  "MAR",
-  "APR",
-  "MAY",
-  "JUN",
-  "JUL",
-  "AUG",
-  "SEP",
-  "OCT",
-  "NOV",
-  "DEC",
-];
-
-const getDateBadge = (performanceDate: string) => {
-  const [, month, day] = performanceDate.split("-");
-
-  return {
-    month: MONTH_ABBREVIATIONS[Number(month) - 1] ?? "",
-    day: day ?? "",
-  };
-};
 
 const AttendedConcertsPage = () => {
   const navigate = useNavigate();
@@ -59,25 +36,10 @@ const AttendedConcertsPage = () => {
   });
 
   return (
-    <main className="min-h-dvh bg-neutral-0 px-5 pb-[calc(var(--bottom-nav-height)+24px)]">
-      <header className="-mx-5 flex h-15 items-center justify-between px-3.75">
-        <button
-          type="button"
-          aria-label="뒤로가기"
-          onClick={() => navigate(-1)}
-          className="flex size-6 items-center justify-center"
-        >
-          <img src={ArrowLeftIcon} alt="" className="size-6" />
-        </button>
+    <main className="min-h-dvh bg-neutral-0 pb-[calc(var(--bottom-nav-height)+24px)]">
+      <Header title="공연 참여 기록" />
 
-        <h1 className="m-0 font-body text-label2 text-neutral-900">
-          공연 참여 기록
-        </h1>
-
-        <span aria-hidden="true" className="size-6" />
-      </header>
-
-      <div className="mt-4 flex flex-col gap-5">
+      <div className="mt-4 flex flex-col gap-5 px-5">
         <div className="rounded-xl border border-primary-300 bg-primary-0 p-3 text-center">
           <p className="m-0 text-caption2 leading-5 text-neutral-600">
             공연 상세페이지에서 알림을 설정하면,
@@ -123,20 +85,31 @@ const AttendedConcertsPage = () => {
 
         <ul className="flex flex-col gap-3">
           {concerts.map((concert) => {
-            const { month, day } = getDateBadge(concert.performanceDate);
-
             return (
               <li
                 key={concert.performanceId}
-                className="flex items-center gap-4 rounded-xl bg-neutral-0 px-4 py-3 shadow-[0_0_8px_0_rgba(0,0,0,0.10)]"
+                role="button"
+                tabIndex={0}
+                onClick={() =>
+                  navigate(`/fan/home/concerts/${concert.performanceId}`)
+                }
+                onKeyDown={(event) => {
+                  if (event.key !== "Enter" && event.key !== " ") return;
+                  event.preventDefault();
+                  navigate(`/fan/home/concerts/${concert.performanceId}`);
+                }}
+                className="flex cursor-pointer items-center gap-4 rounded-xl bg-neutral-0 px-4 py-3 shadow-[0_0_8px_0_rgba(0,0,0,0.10)]"
               >
-                <div className="flex w-12.5 h-15.5 shrink-0 flex-col items-center justify-center rounded-lg bg-primary-600">
-                  <span className="text-[14px] leading-none font-medium text-neutral-0">
-                    {month}
-                  </span>
-                  <span className="mt-1 text-[22px] leading-none font-semibold text-neutral-0">
-                    {day}
-                  </span>
+                <div className="flex w-12.5 h-15.5 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-neutral-400">
+                  {concert.posterImageUrl ? (
+                    <img
+                      src={concert.posterImageUrl}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <img src={ImagePlaceholderIcon} alt="" />
+                  )}
                 </div>
 
                 <div className="flex min-w-0 flex-col gap-1.25">

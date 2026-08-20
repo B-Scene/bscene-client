@@ -10,7 +10,8 @@ import CommentIcon from "@/assets/icons/Comment.svg";
 import HeartIcon from "@/assets/icons/Heart.svg";
 import LikedHeartIcon from "@/assets/icons/Union.svg";
 import BandImage from "@/assets/icons/band/band-default-profile.svg";
-import FanImage from "@/assets/images/IMG_my.svg";
+import OfficialIcon from "@/assets/icons/band/official-icon.svg";
+import DefaultUserAvatar from "@/assets/icons/band/user-default-profile.svg";
 import { Header } from "@/components/common/Header/Header";
 import {
   useCreateFanExplorePostComment,
@@ -21,6 +22,7 @@ import {
   useUnlikeFanExplorePost,
   useUpdateFanExplorePostComment,
 } from "@/hooks/api/fan/useFanExplore";
+import { useBandMembersQuery } from "@/hooks/api/band/useBandMember";
 import { getStoredAuthUser } from "@/utils/authUser";
 import { getApiErrorMessage } from "@/utils/getApiErrorMessage";
 import { useInfiniteScrollObserver } from "@/hooks/useInfiniteScrollObserver";
@@ -149,6 +151,21 @@ const getCommentMutationErrorMessage = (
   return getApiErrorMessage(error, fallbackMessage);
 };
 
+const isNotFoundDetailError = (error: unknown) => {
+  if (!isAxiosError(error)) return false;
+
+  const code = String(error.code ?? error.response?.data?.code ?? "");
+  const message = String(error.message ?? error.response?.data?.message ?? "");
+
+  return (
+    error.response?.status === 404 ||
+    code.includes("404") ||
+    message.includes("찾을 수") ||
+    message.includes("존재하지") ||
+    message.includes("삭제")
+  );
+};
+
 const ContentDetailHeader = ({ onBack }: { onBack: () => void }) => {
   return <Header title="" onBack={onBack} />;
 };
@@ -202,19 +219,29 @@ const CommentItem = ({
   onSubmitEdit,
   onDelete,
 }: CommentItemProps) => {
+  const isBandMember =
+    comment.writerMode === "BAND" || comment.hasUnresolvedNickname;
+
   return (
     <article className="flex w-full gap-[16px]">
       <img
-        src={comment.profileImageUrl ?? FanImage}
+        src={comment.profileImageUrl ?? DefaultUserAvatar}
         alt=""
         className="size-[35px] shrink-0 rounded-full object-cover"
       />
 
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-[6px]">
+        <div className="flex items-center gap-1">
           <strong className="font-body text-caption3 text-neutral-900">
             {comment.authorName}
           </strong>
+          {isBandMember ? (
+            <img
+              src={OfficialIcon}
+              alt="밴드 멤버"
+              className="size-3.5 shrink-0"
+            />
+          ) : null}
           {comment.createdAt ? (
             <span className="font-body text-caption4 text-neutral-500">
               {formatRelativeTime(comment.createdAt)}
@@ -250,31 +277,30 @@ const CommentItem = ({
             </div>
           </div>
         ) : (
-          <>
-            <p className="m-0 font-body text-caption2 text-neutral-700">
-              {comment.content}
-            </p>
-            {isEditable ? (
-              <div className="mt-[6px] flex gap-[10px]">
-                <button
-                  type="button"
-                  onClick={onStartEdit}
-                  className="font-body text-caption4 text-neutral-600"
-                >
-                  수정
-                </button>
-                <button
-                  type="button"
-                  onClick={onDelete}
-                  disabled={isPending}
-                  className="font-body text-caption4 text-neutral-600 disabled:opacity-50"
-                >
-                  삭제
-                </button>
-              </div>
-            ) : null}
-          </>
+          <p className="m-0 font-body text-caption2 text-neutral-700">
+            {comment.content}
+          </p>
         )}
+
+        {!isEditing && isEditable ? (
+          <div className="mt-[6px] flex gap-[10px]">
+            <button
+              type="button"
+              onClick={onStartEdit}
+              className="font-body text-caption4 text-neutral-600"
+            >
+              수정
+            </button>
+            <button
+              type="button"
+              onClick={onDelete}
+              disabled={isPending}
+              className="font-body text-caption4 text-neutral-600 disabled:opacity-50"
+            >
+              삭제
+            </button>
+          </div>
+        ) : null}
       </div>
     </article>
   );
@@ -293,7 +319,8 @@ const FanContentDetailPage = () => {
   const postId = Number(contentId);
   const validPostId = Number.isFinite(postId) ? postId : undefined;
   const postDetailQuery = useFanExplorePostDetailQuery(validPostId);
-  const commentsQuery = useFanExplorePostCommentsQuery(validPostId, {
+  const postDetail = postDetailQuery.data;
+  const commentsQuery = useFanExplorePostCommentsQuery(postDetail ? validPostId : undefined, {
     size: COMMENT_PAGE_SIZE,
   });
   const likePostMutation = useLikeFanExplorePost();
@@ -301,7 +328,15 @@ const FanContentDetailPage = () => {
   const createCommentMutation = useCreateFanExplorePostComment();
   const updateCommentMutation = useUpdateFanExplorePostComment();
   const deleteCommentMutation = useDeleteFanExplorePostComment();
-  const postDetail = postDetailQuery.data;
+  const bandId =
+    toNumericId(postDetail?.band?.bandId) ??
+    toNumericId(postDetail?.band?.id) ??
+    toNumericId(postDetail?.bandId);
+  const bandMembersQuery = useBandMembersQuery(bandId ?? NaN);
+  const currentUser = getStoredAuthUser();
+  const myBandMemberNickname = bandMembersQuery.data?.find(
+    (member) => member.userId === currentUser?.userId,
+  )?.profileNickname;
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [likeOverride, setLikeOverride] = useState<{
@@ -312,7 +347,6 @@ const FanContentDetailPage = () => {
   const [editingCommentId, setEditingCommentId] = useState<number | null>(null);
   const [editingCommentDraft, setEditingCommentDraft] = useState("");
   const [commentErrorMessage, setCommentErrorMessage] = useState("");
-  const currentUser = getStoredAuthUser();
   const commentSentinelRef = useInfiniteScrollObserver({
     enabled:
       Boolean(commentsQuery.hasNextPage) && !commentsQuery.isFetchingNextPage,
@@ -324,32 +358,37 @@ const FanContentDetailPage = () => {
   }
 
   if (postDetailQuery.isError || !postDetail) {
+    const isDeletedContent =
+      postDetailQuery.isError && isNotFoundDetailError(postDetailQuery.error);
+
     return (
       <main className="min-h-dvh bg-neutral-0">
         <ContentDetailHeader onBack={() => navigate(-1)} />
         <section className="flex min-h-[420px] flex-col items-center justify-center px-[25px] text-center">
           <h1 className="m-0 font-body text-label1 text-neutral-900">
-            콘텐츠를 불러오지 못했어요
+            {isDeletedContent
+              ? "콘텐츠가 삭제되었어요"
+              : "콘텐츠를 불러오지 못했어요"}
           </h1>
           <p className="m-0 mt-[8px] font-body text-caption2 text-neutral-600">
-            잠시 후 다시 시도해주세요
+            {isDeletedContent
+              ? "삭제된 콘텐츠는 열 수 없어요"
+              : "잠시 후 다시 시도해주세요"}
           </p>
           <button
             type="button"
-            onClick={() => void postDetailQuery.refetch()}
+            onClick={() =>
+              isDeletedContent ? navigate(-1) : void postDetailQuery.refetch()
+            }
             className="mt-[20px] flex h-[38px] items-center justify-center rounded-[8px] bg-primary-400 px-[20px] font-body text-body1 text-neutral-0"
           >
-            다시 시도
+            {isDeletedContent ? "돌아가기" : "다시 시도"}
           </button>
         </section>
       </main>
     );
   }
 
-  const bandId =
-    toNumericId(postDetail?.band?.bandId) ??
-    toNumericId(postDetail?.band?.id) ??
-    toNumericId(postDetail?.bandId);
   const bandName =
     postDetail?.band?.bandName ??
     postDetail?.band?.name ??
@@ -400,10 +439,24 @@ const FanContentDetailPage = () => {
       .map((comment) => comment.commentId)
       .filter((commentId): commentId is number => commentId !== null),
   );
-  const myComments = (commentsQuery.data?.pages[0]?.myComments ?? []).filter(
-    (comment) =>
-      comment.commentId === null || !commentIds.has(comment.commentId),
+  const applyMyNicknameFallback = (
+    comment: NormalizedFanExplorePostComment,
+  ): NormalizedFanExplorePostComment =>
+    comment.hasUnresolvedNickname && myBandMemberNickname
+      ? { ...comment, authorName: myBandMemberNickname }
+      : comment;
+  const rawMyComments = commentsQuery.data?.pages[0]?.myComments ?? [];
+  const myCommentIds = new Set(
+    rawMyComments
+      .map((comment) => comment.commentId)
+      .filter((commentId): commentId is number => commentId !== null),
   );
+  const myComments = rawMyComments
+    .filter(
+      (comment) =>
+        comment.commentId === null || !commentIds.has(comment.commentId),
+    )
+    .map(applyMyNicknameFallback);
   const commentCount =
     postDetail?.commentCount ?? myComments.length + comments.length;
   const isCommentMutationPending =
@@ -420,6 +473,23 @@ const FanContentDetailPage = () => {
     : "다음 공연을 앞두고 멤버들과 합주를 진행했어요.\n새롭게 편곡한 곡과 라이브 셋리스트를 맞춰보며\n무대에서 더 좋은 사운드를 들려드릴 준비를 하고 있습니다.";
   const hasContent = content.trim().length > 0;
   const tags = Array.isArray(postDetail?.tags) ? postDetail.tags : TAGS;
+
+  const handleNavigateToBandProfile = () => {
+    if (bandId == null) return;
+
+    navigate(`/fan/bands/${bandId}`, {
+      state: {
+        bandPreview: {
+          bandId,
+          name: bandName,
+          bandName,
+          genre: postDetail?.band?.genre ?? postDetail?.genre,
+          region: postDetail?.band?.region ?? postDetail?.region,
+          profileImageUrl,
+        },
+      },
+    });
+  };
 
   const handleImageScroll = (event: UIEvent<HTMLDivElement>) => {
     const container = event.currentTarget;
@@ -567,7 +637,19 @@ const FanContentDetailPage = () => {
       <ContentDetailHeader onBack={() => navigate(-1)} />
 
       <article className="bg-neutral-0 px-[25px] p-[24px]">
-        <header className="flex items-center gap-[16px]">
+        <header
+          role={bandId != null ? "button" : undefined}
+          tabIndex={bandId != null ? 0 : undefined}
+          onClick={handleNavigateToBandProfile}
+          onKeyDown={(event) => {
+            if (bandId == null) return;
+            if (event.key !== "Enter" && event.key !== " ") return;
+
+            event.preventDefault();
+            handleNavigateToBandProfile();
+          }}
+          className={`flex items-center gap-[16px] ${bandId != null ? "cursor-pointer" : ""}`}
+        >
           <div className="flex size-[42px] shrink-0 items-center justify-center overflow-hidden rounded-full bg-neutral-300 text-neutral-600">
             <img
               src={profileImageUrl ?? BandImage}
@@ -605,7 +687,7 @@ const FanContentDetailPage = () => {
                     src={url}
                     alt={`콘텐츠 이미지 ${index + 1}`}
                     onClick={() => setLightboxIndex(index)}
-                    className="h-full w-full shrink-0 snap-center cursor-zoom-in object-cover"
+                    className="h-full w-full shrink-0 snap-center cursor-zoom-in object-cover [dynamic-range-limit:standard]"
                   />
                 ))
               )
@@ -790,13 +872,17 @@ const FanContentDetailPage = () => {
                   const isEditable =
                     comment.commentId !== null &&
                     (comment.isMine ||
+                      myCommentIds.has(comment.commentId) ||
                       (currentUser?.userId != null &&
                         comment.authorId === currentUser.userId));
+                  const displayComment = isEditable
+                    ? applyMyNicknameFallback(comment)
+                    : comment;
 
                   return (
                     <CommentItem
                       key={getCommentKey("comment", comment, index)}
-                      comment={comment}
+                      comment={displayComment}
                       isEditable={isEditable}
                       isEditing={
                         comment.commentId !== null &&
@@ -836,7 +922,7 @@ const FanContentDetailPage = () => {
 
       <div aria-hidden="true" className="h-[86px] bg-primary-0" />
 
-      <div className="fixed inset-x-0 bottom-0 z-40 mx-auto flex h-[86px] w-full max-w-[393px] items-center justify-between bg-neutral-0 px-[25px] py-[12px] shadow-[0_-5px_20px_0_rgba(0,0,0,0.03)]">
+      <div className="fixed inset-x-0 bottom-0 z-40 flex h-[86px] w-full items-center justify-between bg-neutral-0 px-[25px] py-[12px] shadow-[0_-5px_20px_0_rgba(0,0,0,0.03)]">
         <button
           type="button"
           aria-label={isLiked ? "좋아요 취소" : "좋아요"}
@@ -855,22 +941,7 @@ const FanContentDetailPage = () => {
         <button
           type="button"
           disabled={bandId == null}
-          onClick={() => {
-            if (bandId != null) {
-              navigate(`/fan/bands/${bandId}`, {
-                state: {
-                  bandPreview: {
-                    bandId,
-                    name: bandName,
-                    bandName,
-                    genre: postDetail?.band?.genre ?? postDetail?.genre,
-                    region: postDetail?.band?.region ?? postDetail?.region,
-                    profileImageUrl,
-                  },
-                },
-              });
-            }
-          }}
+          onClick={handleNavigateToBandProfile}
           className="flex h-[38px] w-[270px] items-center justify-center rounded-[8px] bg-primary-400 px-[20px] font-body text-body1 text-neutral-0 disabled:opacity-60"
         >
           밴드 프로필 보기

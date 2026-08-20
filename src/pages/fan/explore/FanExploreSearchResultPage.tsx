@@ -2,7 +2,6 @@ import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import ArrowIcon from "@/assets/Arrow.svg";
-import CheckActiveIcon from "@/assets/icons/check-active.svg";
 import TimesCircleIcon from "@/assets/icons/ic_Times Circle.svg";
 import BandImage from "@/assets/icons/band/band-default-profile.svg";
 import BandCard from "@/components/common/Card/BandCard";
@@ -16,13 +15,17 @@ import {
   useFollowExploreBand,
   useUnfollowExploreBand,
 } from "@/hooks/api/fan/useFanExplore";
-import { useSlideUpSheet } from "@/hooks/useSlideUpSheet";
 import {
   ExploreFilterBar,
   ExploreFilterSheet,
   type AppliedExploreFilters,
 } from "@/pages/fan/explore/FanExplorePage";
 import { FanExploreContentNewsList } from "@/pages/fan/explore/components/FanExploreContentNewsList";
+import {
+  SEARCH_SORT_TO_API,
+  type SearchResultSortOption,
+} from "@/pages/fan/explore/components/fanExploreSearchSort";
+import { SearchResultSortSheet } from "@/pages/fan/explore/components/FanExploreSearchSortSheet";
 import type {
   FanExploreBand,
   FanExplorePerformance,
@@ -36,29 +39,18 @@ import {
 } from "@/utils/bandLabels";
 import { addRecentSearch } from "./recentSearches";
 
-const SEARCH_RESULT_SORT_OPTIONS = ["정확도순", "인기순"] as const;
-type SearchResultSortOption = (typeof SEARCH_RESULT_SORT_OPTIONS)[number];
 type SearchResultSortState = {
   keyword: string;
   sort: SearchResultSortOption;
   selectedByUser: boolean;
-};
-const SEARCH_SORT_TO_API: Record<SearchResultSortOption, FanExploreSort> = {
-  정확도순: "ACCURACY",
-  인기순: "POPULAR",
 };
 const SEARCH_CONTENT_TO_API = {
   전체: "ALL",
   밴드: "BAND",
   공연: "PERFORMANCE",
   영상: "POST",
+  콘텐츠: "POST",
 } as const;
-const DEFAULT_SEARCH_FILTERS: AppliedExploreFilters = {
-  genre: "전체",
-  region: "전체",
-  content: "전체",
-};
-
 const getGenreFilterParam = (genre: string) => {
   if (genre === "전체") return undefined;
   return BAND_GENRE_BY_LABEL[genre] ?? genre;
@@ -69,6 +61,8 @@ const getRegionFilterParam = (region: string) => {
   return BAND_REGION_BY_LABEL[region] ?? region;
 };
 
+const getFilterLabelParam = (value: string | null) => value || "전체";
+
 const createMoreResultPath = ({
   keyword,
   path,
@@ -77,7 +71,7 @@ const createMoreResultPath = ({
   filters,
 }: {
   keyword: string;
-  path: "concerts" | "contents";
+  path: "bands" | "concerts" | "contents";
   sort: FanExploreSort;
   shouldHighlightSort: boolean;
   filters: AppliedExploreFilters;
@@ -92,6 +86,13 @@ const createMoreResultPath = ({
   if (filters.region !== "전체") params.set("region", filters.region);
 
   return `/fan/explore/search/results/${path}?${params.toString()}`;
+};
+
+const getMoreResultPathByContent = (content: string) => {
+  if (content === "밴드") return "bands";
+  if (content === "공연") return "concerts";
+  if (content === "영상" || content === "콘텐츠") return "contents";
+  return null;
 };
 
 const MONTH_LABELS = [
@@ -263,72 +264,6 @@ const SearchResultTopBar = ({ initialKeyword }: { initialKeyword: string }) => {
   );
 };
 
-const SearchResultSortSheet = ({
-  open,
-  onClose,
-  selectedSort,
-  onSelect,
-}: {
-  open: boolean;
-  onClose: () => void;
-  selectedSort: SearchResultSortOption;
-  onSelect: (sort: SearchResultSortOption) => void;
-}) => {
-  const { rendered, isVisible, handleTransitionEnd } = useSlideUpSheet(open);
-
-  if (!rendered) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center">
-      <button
-        type="button"
-        aria-label="정렬 닫기"
-        onClick={onClose}
-        className={`absolute inset-0 bg-neutral-900/75 transition-opacity duration-300 ${
-          isVisible ? "opacity-100" : "opacity-0"
-        }`}
-      />
-
-      <section
-        role="dialog"
-        aria-modal="true"
-        aria-label="정렬"
-        onTransitionEnd={handleTransitionEnd}
-        className={[
-          "relative z-10 flex w-[393px] max-w-full flex-col items-start gap-[10px] rounded-t-[20px] bg-neutral-0 px-[15px] pb-[48px] pt-[32px] transition-transform duration-300 ease-out",
-          isVisible ? "translate-y-0" : "translate-y-full",
-        ].join(" ")}
-      >
-        {SEARCH_RESULT_SORT_OPTIONS.map((option) => {
-          const isSelected = selectedSort === option;
-
-          return (
-            <button
-              key={option}
-              type="button"
-              onClick={() => {
-                onSelect(option);
-                onClose();
-              }}
-              className={[
-                "box-border flex h-6 w-full items-center justify-between px-3 font-body text-label2",
-                isSelected ? "text-primary-400" : "text-neutral-900",
-              ].join(" ")}
-            >
-              {option}
-              <span className="flex h-5 w-5 items-center justify-center">
-                {isSelected ? (
-                  <img src={CheckActiveIcon} alt="" className="h-5 w-5" />
-                ) : null}
-              </span>
-            </button>
-          );
-        })}
-      </section>
-    </div>
-  );
-};
-
 const FanExploreSearchResultPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -336,7 +271,11 @@ const FanExploreSearchResultPage = () => {
   const [isSortSheetOpen, setIsSortSheetOpen] = useState(false);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
   const [appliedFilters, setAppliedFilters] = useState<AppliedExploreFilters>(
-    DEFAULT_SEARCH_FILTERS,
+    () => ({
+      genre: getFilterLabelParam(searchParams.get("genre")),
+      region: getFilterLabelParam(searchParams.get("region")),
+      content: getFilterLabelParam(searchParams.get("content")),
+    }),
   );
   const [sortState, setSortState] = useState<SearchResultSortState>(() => ({
     keyword,
@@ -371,12 +310,13 @@ const FanExploreSearchResultPage = () => {
   const performances = searchQuery.data?.performances ?? [];
   const contents = searchQuery.data?.contents ?? [];
   const unfollowTarget = bands.find((band) => getBandId(band) === unfollowTargetBandId);
+  const visibleBands = bands.slice(0, 4);
   const visiblePerformances = performances.slice(0, 4);
   const visibleContents = contents.slice(0, 4);
   const resultCounts = {
-    bands: bands.length,
-    concerts: performances.length,
-    contents: contents.length,
+    bands: searchQuery.data?.bandCount ?? bands.length,
+    concerts: searchQuery.data?.performanceCount ?? performances.length,
+    contents: searchQuery.data?.contentCount ?? contents.length,
   };
 
   useEffect(() => {
@@ -386,6 +326,25 @@ const FanExploreSearchResultPage = () => {
 
     return () => window.clearTimeout(timerId);
   }, [toastMessage]);
+
+  const applyFilters = (filters: AppliedExploreFilters) => {
+    const moreResultPath = getMoreResultPathByContent(filters.content);
+
+    if (moreResultPath) {
+      navigate(
+        createMoreResultPath({
+          keyword,
+          path: moreResultPath,
+          sort: selectedSort,
+          shouldHighlightSort,
+          filters,
+        }),
+      );
+      return;
+    }
+
+    setAppliedFilters(filters);
+  };
 
   const followBand = async (band: FanExploreBand) => {
     const bandId = getBandId(band);
@@ -441,7 +400,22 @@ const FanExploreSearchResultPage = () => {
       />
 
       <section className="px-[23px] pt-[16px]">
-        <SectionTitle title="밴드" count={resultCounts.bands} />
+        <SectionTitle
+          title="밴드"
+          count={resultCounts.bands}
+          showMore
+          onMoreClick={() =>
+            navigate(
+              createMoreResultPath({
+                keyword,
+                path: "bands",
+                sort: selectedSort,
+                shouldHighlightSort,
+                filters: appliedFilters,
+              }),
+            )
+          }
+        />
         {searchQuery.isLoading ? (
           <p className="m-0 font-body text-caption2 text-neutral-600">
             검색 결과를 불러오는 중이에요
@@ -455,80 +429,88 @@ const FanExploreSearchResultPage = () => {
             검색 결과 다시 불러오기
           </button>
         ) : (
-          bands.map((band) => {
-            const bandInfo = getBandInfo(band);
-            const bandId = getBandId(band);
-            const name = bandInfo.name ?? bandInfo.bandName ?? keyword;
-            const genre = bandInfo.genre ? getGenreLabel(bandInfo.genre) : "장르";
-            const region = bandInfo.region
-              ? getRegionLabel(bandInfo.region)
-              : "지역";
+          <div className="flex flex-col gap-[12px]">
+            {visibleBands.map((band) => {
+              const bandInfo = getBandInfo(band);
+              const bandId = getBandId(band);
+              const name = bandInfo.name ?? bandInfo.bandName ?? keyword;
+              const genre = bandInfo.genre ? getGenreLabel(bandInfo.genre) : "장르";
+              const region = bandInfo.region
+                ? getRegionLabel(bandInfo.region)
+                : "지역";
 
-            return (
-              <BandCard
-                key={String(bandInfo.bandId ?? bandInfo.id ?? name)}
-                imageSrc={
-                  bandInfo.profileImageUrl ??
-                  bandInfo.bandProfileImageUrl ??
-                  bandInfo.imageUrl ??
-                  BandImage
-                }
-                imageAlt={`${name} 프로필`}
-                title={name}
-                subtitle={`${genre} · ${region}`}
-                description={bandInfo.description ?? bandInfo.introduction ?? ""}
-                following={
-                  bandInfo.isFollowing ??
-                  bandInfo.following ??
-                  band.isFollowing ??
-                  band.following ??
-                  false
-                }
-                onClick={() => {
-                  if (bandId == null) return;
+              return (
+                <BandCard
+                  key={String(bandInfo.bandId ?? bandInfo.id ?? name)}
+                  imageSrc={
+                    bandInfo.profileImageUrl ??
+                    bandInfo.bandProfileImageUrl ??
+                    bandInfo.imageUrl ??
+                    BandImage
+                  }
+                  imageAlt={`${name} 프로필`}
+                  title={name}
+                  subtitle={`${genre} · ${region}`}
+                  description={bandInfo.description ?? bandInfo.introduction ?? ""}
+                  following={
+                    bandInfo.isFollowing ??
+                    bandInfo.following ??
+                    band.isFollowing ??
+                    band.following ??
+                    false
+                  }
+                  onClick={() => {
+                    if (bandId == null) return;
 
-                  navigate(`/fan/bands/${bandId}`, {
-                    state: {
-                      bandPreview: {
-                        bandId,
-                        name,
-                        genre: bandInfo.genre,
-                        region: bandInfo.region,
-                        profileImageUrl:
-                          bandInfo.profileImageUrl ??
-                          bandInfo.bandProfileImageUrl ??
-                          bandInfo.imageUrl ??
-                          null,
-                        description:
-                          bandInfo.description ?? bandInfo.introduction ?? "",
-                        followerCount:
-                          bandInfo.followerCount ??
-                          bandInfo.followers ??
-                          band.followerCount ??
-                          band.followers ??
-                          0,
-                        isFollowing:
-                          bandInfo.isFollowing ??
-                          bandInfo.following ??
-                          band.isFollowing ??
-                          band.following ??
-                          false,
+                    navigate(`/fan/bands/${bandId}`, {
+                      state: {
+                        bandPreview: {
+                          bandId,
+                          name,
+                          genre: bandInfo.genre,
+                          region: bandInfo.region,
+                          profileImageUrl:
+                            bandInfo.profileImageUrl ??
+                            bandInfo.bandProfileImageUrl ??
+                            bandInfo.imageUrl ??
+                            null,
+                          description:
+                            bandInfo.description ?? bandInfo.introduction ?? "",
+                          followerCount:
+                            bandInfo.followerCount ??
+                            bandInfo.followersCount ??
+                            bandInfo.followerCnt ??
+                            bandInfo.followCount ??
+                            bandInfo.followers ??
+                            band.followerCount ??
+                            band.followersCount ??
+                            band.followerCnt ??
+                            band.followCount ??
+                            band.followers ??
+                            0,
+                          isFollowing:
+                            bandInfo.isFollowing ??
+                            bandInfo.following ??
+                            band.isFollowing ??
+                            band.following ??
+                            false,
+                        },
                       },
-                    },
-                  });
-                }}
-                onToggleFollow={() => void followBand(band)}
-                className="!h-[86px] !w-[348px] !gap-[16px]"
-                contentClassName="!h-auto flex-1 shrink !w-auto"
-                descriptionClassName="line-clamp-2 text-primary-300"
-                descriptionMultiline
-              />
-            );
-          })
+                    });
+                  }}
+                  onToggleFollow={() => void followBand(band)}
+                  className="!h-[86px] !w-full !gap-[16px]"
+                  contentClassName="!h-auto flex-1 shrink !w-auto"
+                  descriptionClassName="line-clamp-2 text-primary-300"
+                  descriptionMultiline
+                />
+              );
+            })}
+          </div>
         )}
       </section>
 
-      <div aria-hidden="true" className="mt-[16px] h-[16px] w-full max-w-[393px] bg-primary-0" />
+      <div aria-hidden="true" className="mt-[16px] h-[16px] w-full bg-primary-0" />
 
       <section className="bg-neutral-0 px-[23px] py-[16px]">
         <SectionTitle
@@ -600,7 +582,7 @@ const FanExploreSearchResultPage = () => {
         </div>
       </section>
 
-      <div aria-hidden="true" className="h-[16px] w-full max-w-[393px] bg-primary-0" />
+      <div aria-hidden="true" className="h-[16px] w-full bg-primary-0" />
 
       <section className="px-[23px] py-[16px]">
         <SectionTitle
@@ -639,7 +621,7 @@ const FanExploreSearchResultPage = () => {
         onClose={() => setIsFilterSheetOpen(false)}
         appliedFilters={appliedFilters}
         contentSelectable
-        onApply={setAppliedFilters}
+        onApply={applyFilters}
       />
 
       <ModalOverlay

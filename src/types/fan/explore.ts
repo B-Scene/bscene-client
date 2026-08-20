@@ -150,6 +150,8 @@ export interface FanExplorePostLikeResponse {
   likes?: number;
 }
 
+export type FanExplorePostCommentWriterMode = "FAN" | "BAND";
+
 export interface FanExplorePostComment {
   comment?: FanExplorePostComment;
   author?: FanExplorePostComment;
@@ -162,6 +164,7 @@ export interface FanExplorePostComment {
   memberId?: number | string;
   authorId?: number | string;
   writerId?: number | string;
+  writerMode?: FanExplorePostCommentWriterMode | null;
   nickname?: string | null;
   authorName?: string | null;
   userName?: string | null;
@@ -189,6 +192,8 @@ export interface NormalizedFanExplorePostComment {
   commentId: number | null;
   authorId: number | null;
   authorName: string;
+  hasUnresolvedNickname: boolean;
+  writerMode: FanExplorePostCommentWriterMode | null;
   profileImageUrl: string | null;
   content: string;
   createdAt: string | null;
@@ -226,6 +231,9 @@ export interface FanExploreBand {
   description?: string | null;
   introduction?: string | null;
   followerCount?: number;
+  followersCount?: number;
+  followCount?: number;
+  followerCnt?: number;
   followers?: number;
   isFollowing?: boolean;
   isFollowed?: boolean;
@@ -396,6 +404,14 @@ export interface NormalizedFanExploreBandsResponse
   hasNext: boolean;
   page: number;
   nextCursor: number | null;
+}
+
+export interface NormalizedFanExploreBandSearchResponse
+  extends FanExplorePageResponse<FanExploreBand> {
+  items: FanExploreBand[];
+  hasNext: boolean;
+  page: number;
+  nextCursor: string | number | null;
 }
 
 export interface NormalizedFanExplorePerformancesResponse

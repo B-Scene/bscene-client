@@ -12,7 +12,7 @@ import type {
   NotificationsPageResponse,
   RegisterPushTokenRequest,
   SendTestNotificationRequest,
-  UpdateNotificationSettingRequest,
+  UpdateNotificationSettingParams,
 } from "@/types/notification";
 
 type RawRecord = Record<string, unknown>;
@@ -215,6 +215,8 @@ const getSettingItemKey = (item: RawRecord): string | null => {
   const key =
     toStringOrNull(item.key) ??
     toStringOrNull(item.settingKey) ??
+    toStringOrNull(item.settingType) ??
+    toStringOrNull(item.notificationSettingType) ??
     toStringOrNull(item.type) ??
     toStringOrNull(item.name) ??
     toStringOrNull(item.id);
@@ -302,7 +304,7 @@ export const getNotificationSettings = async ({
 export const updateNotificationSetting = async ({
   settingType,
   enabled,
-}: UpdateNotificationSettingRequest) => {
+}: UpdateNotificationSettingParams) => {
   const { data } = await axiosInstance.patch<ApiResponse<unknown>>(
     `/users/me/notification-settings/${settingType}`,
     { enabled },

@@ -13,10 +13,12 @@ export const PhotoLightbox = ({
 }: PhotoLightboxProps) => {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const [prevInitialIndex, setPrevInitialIndex] = useState(initialIndex);
 
-  useEffect(() => {
+  if (initialIndex !== prevInitialIndex) {
+    setPrevInitialIndex(initialIndex);
     setCurrentIndex(initialIndex);
-  }, [initialIndex]);
+  }
 
   useEffect(() => {
     const originalOverflow = document.body.style.overflow;
@@ -96,7 +98,7 @@ export const PhotoLightbox = ({
         <img
           src={images[currentIndex]}
           alt={`이미지 ${currentIndex + 1}/${images.length}`}
-          className="max-h-full max-w-full object-contain"
+          className="max-h-full max-w-full object-contain [dynamic-range-limit:standard]"
           onClick={(event) => event.stopPropagation()}
         />
       </div>

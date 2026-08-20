@@ -1,5 +1,3 @@
-// src/features/session/applicationHistory/ApplicationHistoryCard.tsx
-
 import type {
   ApplicationHistoryItem,
   ApplicationHistoryStatus,
@@ -8,17 +6,13 @@ import type {
 interface ApplicationHistoryCardProps {
   application: ApplicationHistoryItem;
 
-  onViewApplication: (
-    application: ApplicationHistoryItem,
-  ) => void;
+  onViewApplication: (application: ApplicationHistoryItem) => void;
 
-  onCancelApplication: (
-    applicationId: number,
-  ) => void;
+  onCancelApplication: (applicationId: number) => void;
 
-  onMessage: (
-    application: ApplicationHistoryItem,
-  ) => void;
+  onMessage: (application: ApplicationHistoryItem) => void;
+
+  onFinalizeApplication?: (application: ApplicationHistoryItem) => void;
 }
 
 const STATUS_STYLE: Record<
@@ -30,23 +24,19 @@ const STATUS_STYLE: Record<
 > = {
   completed: {
     label: "지원 완료",
-    className:
-      "bg-[#FFF6E5] text-secondary-500",
+    className: "bg-[#FFF6E5] text-secondary-500",
   },
   accepted: {
     label: "지원 수락",
-    className:
-      "bg-secondary-400 text-neutral-0",
+    className: "bg-secondary-400 text-neutral-0",
   },
   rejected: {
     label: "지원 거절",
-    className:
-      "bg-neutral-300 text-neutral-600",
+    className: "bg-neutral-300 text-neutral-600",
   },
   canceled: {
     label: "지원 취소",
-    className:
-      "border border-neutral-400 bg-neutral-0 text-neutral-400",
+    className: "border border-neutral-400 bg-neutral-0 text-neutral-400",
   },
 };
 
@@ -55,12 +45,12 @@ export const ApplicationHistoryCard = ({
   onViewApplication,
   onCancelApplication,
   onMessage,
+  onFinalizeApplication,
 }: ApplicationHistoryCardProps) => {
-  const status =
-    STATUS_STYLE[application.status];
+  const status = STATUS_STYLE[application.status];
 
   return (
-    <article className="flex flex-col gap-[10px] rounded-[12px] bg-neutral-0 px-6 py-3 shadow-[0_0_8px_rgba(0,0,0,0.10)]">
+    <article className="flex flex-col gap-[10px] rounded-[12px] bg-neutral-0 px-6 py-[18px] shadow-[0_0_8px_rgba(0,0,0,0.10)]">
       <div className="flex items-center justify-between gap-3">
         <span
           className={`inline-flex h-[22px] items-center justify-center rounded-full px-3 text-caption3 ${status.className}`}
@@ -99,14 +89,12 @@ export const ApplicationHistoryCard = ({
           <button
             type="button"
             aria-label={`${application.bandName}에게 채팅하기`}
-            onClick={() =>
-              onMessage(application)
-            }
-            className="flex w-9 shrink-0 flex-col items-center text-neutral-800"
+            onClick={() => onMessage(application)}
+            className="flex w-[44px] shrink-0 flex-col items-center text-neutral-800"
           >
             <MessageIcon />
 
-            <span className="text-caption5">
+            <span className="mt-0.5 whitespace-nowrap text-caption4">
               채팅하기
             </span>
           </button>
@@ -114,19 +102,24 @@ export const ApplicationHistoryCard = ({
       </div>
 
       {application.canViewApplication ||
-      application.canCancel ? (
+      application.canCancel ||
+      application.canFinalize ? (
         <div className="grid grid-cols-2 gap-[18px]">
           {application.canViewApplication ? (
             <button
               type="button"
-              onClick={() =>
-                onViewApplication(
-                  application,
-                )
-              }
+              onClick={() => onViewApplication(application)}
               className="flex h-[30px] items-center justify-center rounded-[5px] bg-[#FFF6E5] text-caption3 text-neutral-600"
             >
               지원서 보기
+            </button>
+          ) : application.canFinalize ? (
+            <button
+              type="button"
+              onClick={() => onFinalizeApplication?.(application)}
+              className="flex h-[30px] items-center justify-center rounded-[5px] bg-secondary-500 text-caption3 text-neutral-0"
+            >
+              확정하기
             </button>
           ) : (
             <span />
@@ -135,11 +128,7 @@ export const ApplicationHistoryCard = ({
           {application.canCancel ? (
             <button
               type="button"
-              onClick={() =>
-                onCancelApplication(
-                  application.id,
-                )
-              }
+              onClick={() => onCancelApplication(application.id)}
               className="flex h-[30px] items-center justify-center rounded-[5px] bg-neutral-300 text-caption3 text-neutral-600"
             >
               지원 취소

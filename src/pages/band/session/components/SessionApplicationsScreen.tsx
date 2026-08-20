@@ -34,19 +34,24 @@ import { SessionApplicationHistoryPage } from "./SessionApplicationHistoryPage";
 
 interface SessionApplicationsScreenProps {
   onEditBasicInfo: () => void;
-
   onViewApplicationHistory?: () => void;
-
+  onCloseApplicationHistory?: () => void;
   onBrowseRecruitments?: () => void;
-
   onViewHistoryApplication?: (application: ApplicationHistoryItem) => void;
-
   onMessage?: (application: ApplicationHistoryItem) => void;
-
   onOpenRecruitment?: (recruitment: RecruitmentHistoryItem) => void;
-
   onDeleteApplication?: (sessionApplicationId: number) => void;
 }
+
+const normalizeSessionEnumValue = (value: string) => {
+  const trimmedValue = value.trim();
+
+  if (trimmedValue.toLowerCase() === "etc.") {
+    return "etc";
+  }
+
+  return trimmedValue;
+};
 
 const createApplicationRequestFromDraft = (
   draft: SessionApplicationDraft,
@@ -76,11 +81,11 @@ const createApplicationRequestFromDraft = (
     title: draft.title.trim(),
     oneLineIntro: draft.shortIntroduction.trim(),
     intro: draft.introduction.trim(),
-    part: draft.part,
-    skillLevel: draft.skillLevel,
-    genre: draft.genre,
-    region: draft.region,
-    availableActivities: draft.activities,
+    part: normalizeSessionEnumValue(draft.part),
+    skillLevel: normalizeSessionEnumValue(draft.skillLevel),
+    genre: normalizeSessionEnumValue(draft.genre),
+    region: normalizeSessionEnumValue(draft.region),
+    availableActivities: draft.activities.map(normalizeSessionEnumValue),
     careers: careers.length > 0 ? careers : undefined,
     portfolioLinks: portfolioLinks.length > 0 ? portfolioLinks : undefined,
   };
@@ -130,6 +135,7 @@ const isDefaultApplicationDraft = (
 export const SessionApplicationsScreen = ({
   onEditBasicInfo,
   onViewApplicationHistory,
+  onCloseApplicationHistory,
   onBrowseRecruitments,
   onViewHistoryApplication,
   onMessage,
@@ -142,15 +148,10 @@ export const SessionApplicationsScreen = ({
 
   const summaryQuery = useMySessionApplicationSummaryQuery();
   const sessionProfileQuery = useSessionProfileQuery();
-
   const visibilityMutation = useUpdateSessionApplicationVisibility();
-
   const createApplicationMutation = useCreateSessionApplication();
-
   const updateApplicationMutation = useUpdateSessionApplication();
-
   const deleteApplicationMutation = useDeleteSessionApplication();
-
   const fetchMySessionApplicationDetail = useFetchMySessionApplicationDetail();
 
   const summary = summaryQuery.data;
@@ -188,7 +189,6 @@ export const SessionApplicationsScreen = ({
 
       visibilityMutation.mutate({
         sessionApplicationId,
-
         body: {
           isPublic,
         },
@@ -213,17 +213,17 @@ export const SessionApplicationsScreen = ({
 
   const handleOpenApplicationHistory = () => {
     setIsApplicationHistoryOpen(true);
-
     onViewApplicationHistory?.();
   };
 
   const handleCloseApplicationHistory = () => {
     setIsApplicationHistoryOpen(false);
+    onCloseApplicationHistory?.();
   };
 
   const handleBrowseRecruitments = () => {
     setIsApplicationHistoryOpen(false);
-
+    onCloseApplicationHistory?.();
     onBrowseRecruitments?.();
   };
 
@@ -286,7 +286,7 @@ export const SessionApplicationsScreen = ({
         await visibilityMutation.mutateAsync({
           sessionApplicationId: createdApplication.sessionApplicationId,
           body: {
-            isPublic: false,
+            isPublic: true,
           },
         });
       }
@@ -379,17 +379,14 @@ export const SessionApplicationsScreen = ({
   const stats = [
     {
       label: "지원서",
-
       value: (summary?.applicationCount ?? 0) + localApplicationCount,
     },
     {
       label: "지원",
-
       value: summary?.submissionCount ?? 0,
     },
     {
       label: "진행중",
-
       value: summary?.inProgressCount ?? 0,
     },
   ];
@@ -400,9 +397,46 @@ export const SessionApplicationsScreen = ({
     deleteApplicationMutation.isPending ||
     visibilityMutation.isPending;
 
+  if (isApplicationFormOpen) {
+    return (
+      <SessionApplicationCreatePage
+        open={isApplicationFormOpen}
+        mode={applicationFormMode}
+        initialValue={editingInitialValue}
+        onClose={handleCloseApplicationForm}
+        onSubmit={handleSubmitApplicationToServer}
+      />
+    );
+  }
+
+  if (isApplicationHistoryOpen) {
+    return (
+      <SessionApplicationHistoryPage
+        open={isApplicationHistoryOpen}
+        onClose={handleCloseApplicationHistory}
+        onBrowseRecruitments={handleBrowseRecruitments}
+        onViewApplication={(application) => {
+          setIsApplicationHistoryOpen(false);
+          onCloseApplicationHistory?.();
+          onViewHistoryApplication?.(application);
+        }}
+        onMessage={(application) => {
+          setIsApplicationHistoryOpen(false);
+          onCloseApplicationHistory?.();
+          onMessage?.(application);
+        }}
+        onOpenRecruitment={(recruitment) => {
+          setIsApplicationHistoryOpen(false);
+          onCloseApplicationHistory?.();
+          onOpenRecruitment?.(recruitment);
+        }}
+      />
+    );
+  }
+
   return (
     <>
-      <section className="flex min-h-[calc(100dvh_-_154px_-_var(--bottom-nav-height))] flex-col bg-neutral-0">
+      <section className="relative min-h-[calc(100dvh_-_154px_-_var(--bottom-nav-height))] bg-neutral-0 pb-[calc(var(--bottom-nav-height)+24px)]">
         <section className="flex flex-col gap-4 bg-secondary-0 px-[22px] py-6">
           <div className="flex w-full items-center justify-between gap-4">
             <div className="flex min-w-0 items-center gap-4">
@@ -467,7 +501,7 @@ export const SessionApplicationsScreen = ({
           ) : null}
         </section>
 
-        <section className="flex min-h-[360px] flex-1 flex-col px-[22px] pt-6 pb-8">
+        <section className="px-[22px] pt-6 pb-8">
           <header className="flex items-end justify-between gap-4">
             <div className="min-w-0">
               <h2 className="text-label1 text-neutral-900">지원서</h2>
@@ -504,50 +538,31 @@ export const SessionApplicationsScreen = ({
               ))}
             </div>
           ) : (
-            <EmptyState
-              title="내 지원서가 없어요"
-              description={
-                <>
-                  모집공고에 바로 지원할 수 있도록
-                  <br />
-                  파트, 실력대, 소개글을 담은 지원서를 먼저 만들어보세요
-                </>
-              }
-              actionLabel="지원서 작성"
-              onAction={handleOpenCreatePage}
-            />
+            <div className="mx-auto mt-12 w-full max-w-[313px]">
+              <EmptyState
+                title="내 지원서가 없어요"
+                description={
+                  <>
+                    모집공고에 바로 지원할 수 있도록
+                    <br />
+                    파트, 실력대, 소개글을 담은 지원서를 먼저 만들어보세요
+                  </>
+                }
+                actionLabel="지원서 작성"
+                onAction={handleOpenCreatePage}
+              />
+            </div>
           )}
         </section>
       </section>
-
-      <SessionApplicationCreatePage
-        open={isApplicationFormOpen}
-        mode={applicationFormMode}
-        initialValue={editingInitialValue}
-        onClose={handleCloseApplicationForm}
-        onSubmit={handleSubmitApplicationToServer}
-      />
 
       <MyApplicationDetail
         open={Boolean(selectedApplicationDetail)}
         application={selectedApplicationDetail}
         onClose={handleCloseApplicationDetail}
       />
-
-      <SessionApplicationHistoryPage
-        open={isApplicationHistoryOpen}
-        onClose={handleCloseApplicationHistory}
-        onBrowseRecruitments={handleBrowseRecruitments}
-        onViewApplication={(application) => {
-          setIsApplicationHistoryOpen(false);
-          onViewHistoryApplication?.(application);
-        }}
-        onMessage={onMessage}
-        onOpenRecruitment={(recruitment) => {
-          setIsApplicationHistoryOpen(false);
-          onOpenRecruitment?.(recruitment);
-        }}
-      />
     </>
   );
 };
+
+export default SessionApplicationsScreen;

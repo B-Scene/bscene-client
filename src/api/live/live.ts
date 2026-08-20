@@ -10,6 +10,7 @@ import type {
   GetReplayListParams,
   GetScheduledLiveListParams,
   LiveApiResponse,
+  LiveCoPublisher,
   LiveHomeResponse,
   LiveMembersResponse,
   LiveNowListResponse,
@@ -32,12 +33,188 @@ interface SubscribeViewerCountParams {
   liveId: number;
   watchOnly?: boolean;
   onViewerCount: (viewerCount: number) => void;
-  onCoPublisherJoined?: (publisher: {
+  onCoPublishersChanged?: (publishers: LiveCoPublisher[]) => void;
+  onCoHostUpgradeRequested?: (requester?: {
     userId: number;
-    whepUrl: string;
+    nickname?: string | null;
   }) => void;
+  onCoHostUpgradeAccepted?: () => void;
   signal?: AbortSignal;
 }
+
+const PENDING_CO_HOST_REQUESTER_STORAGE_PREFIX =
+  "bscene:live:pending-co-host-requester:";
+
+const pendingCoHostRequesterUserIds = new Map<number, number>();
+
+const isValidPositiveId = (value: unknown): value is number => {
+  return typeof value === "number" && Number.isFinite(value) && value > 0;
+};
+
+const getPendingCoHostRequesterStorageKey = (liveId: number) => {
+  return `${PENDING_CO_HOST_REQUESTER_STORAGE_PREFIX}${liveId}`;
+};
+
+const rememberPendingCoHostRequesterUserId = (liveId: number, userId: number) => {
+  if (!isValidPositiveId(liveId) || !isValidPositiveId(userId)) return;
+
+  pendingCoHostRequesterUserIds.set(liveId, userId);
+
+  try {
+    window.sessionStorage.setItem(
+      getPendingCoHostRequesterStorageKey(liveId),
+      String(userId),
+    );
+  } catch {
+  }
+};
+
+const forgetPendingCoHostRequesterUserId = (liveId: number) => {
+  pendingCoHostRequesterUserIds.delete(liveId);
+
+  try {
+    window.sessionStorage.removeItem(getPendingCoHostRequesterStorageKey(liveId));
+  } catch {
+  }
+};
+
+const readStoredPendingCoHostRequesterUserId = (liveId: number) => {
+  const inMemoryUserId = pendingCoHostRequesterUserIds.get(liveId);
+
+  if (isValidPositiveId(inMemoryUserId)) {
+    return inMemoryUserId;
+  }
+
+  try {
+    const storedValue = window.sessionStorage.getItem(
+      getPendingCoHostRequesterStorageKey(liveId),
+    );
+    const storedUserId = Number(storedValue);
+
+    return isValidPositiveId(storedUserId) ? storedUserId : null;
+  } catch {
+    return null;
+  }
+};
+
+const getCoHostRequesterUserIdFromCurrentUrl = (liveId: number) => {
+  try {
+    const searchParams = new URLSearchParams(window.location.search);
+    const queryLiveId = Number(
+      searchParams.get("liveId") ?? searchParams.get("referenceId"),
+    );
+
+    if (isValidPositiveId(queryLiveId) && queryLiveId !== liveId) {
+      return null;
+    }
+
+    const userId = Number(
+      searchParams.get("coHostRequesterUserId") ??
+        searchParams.get("requesterUserId") ??
+        searchParams.get("userId"),
+    );
+
+    return isValidPositiveId(userId) ? userId : null;
+  } catch {
+    return null;
+  }
+};
+
+const getPendingCoHostRequesterUserId = (liveId: number) => {
+  return (
+    getCoHostRequesterUserIdFromCurrentUrl(liveId) ??
+    readStoredPendingCoHostRequesterUserId(liveId)
+  );
+};
+
+const parseCoHostRequester = (rawData: string) => {
+  const trimmedData = rawData.trim();
+
+  if (!trimmedData) return null;
+
+  const directUserId = Number(trimmedData);
+
+  if (isValidPositiveId(directUserId)) {
+    return {
+      userId: directUserId,
+      nickname: null,
+    };
+  }
+
+  try {
+    const parsed = JSON.parse(trimmedData) as unknown;
+
+    if (isValidPositiveId(parsed)) {
+      return {
+        userId: parsed,
+        nickname: null,
+      };
+    }
+
+    if (!parsed || typeof parsed !== "object") {
+      return null;
+    }
+
+    const record = parsed as Record<string, unknown>;
+    const nestedRequester =
+      record.requester && typeof record.requester === "object"
+        ? (record.requester as Record<string, unknown>)
+        : null;
+    const nestedData =
+      record.data && typeof record.data === "object"
+        ? (record.data as Record<string, unknown>)
+        : null;
+
+    const userIdCandidates = [
+      record.userId,
+      record.requesterUserId,
+      record.targetUserId,
+      record.memberUserId,
+      nestedRequester?.userId,
+      nestedData?.userId,
+      nestedData?.requesterUserId,
+    ];
+
+    let userId: number | null = null;
+
+    for (const candidate of userIdCandidates) {
+      const parsedUserId = Number(candidate);
+
+      if (isValidPositiveId(parsedUserId)) {
+        userId = parsedUserId;
+        break;
+      }
+    }
+
+    if (!userId) {
+      return null;
+    }
+
+    const nicknameCandidates = [
+      record.nickname,
+      record.requesterNickname,
+      record.profileNickname,
+      nestedRequester?.nickname,
+      nestedRequester?.profileNickname,
+      nestedData?.nickname,
+      nestedData?.requesterNickname,
+      nestedData?.profileNickname,
+    ];
+
+    const nickname =
+      nicknameCandidates.find(
+        (candidate): candidate is string =>
+          typeof candidate === "string" && candidate.trim().length > 0,
+      )?.trim() ?? null;
+
+    return {
+      userId,
+      nickname,
+    };
+  } catch {
+    return null;
+  }
+};
 
 type MaybePaginatedResponse<T> =
   | {
@@ -58,6 +235,26 @@ type MaybePaginatedResponse<T> =
   | T[]
   | null
   | undefined;
+
+type LiveThumbnailFieldAliases = {
+  thumbnailImageUrl?: string | null;
+  thumbnailUrl?: string | null;
+  liveThumbnailImageUrl?: string | null;
+  liveThumbnailUrl?: string | null;
+  imageUrl?: string | null;
+  bandProfileImageUrl?: string | null;
+  profileImageUrl?: string | null;
+  bandImageUrl?: string | null;
+  bandProfileUrl?: string | null;
+  bandLogoUrl?: string | null;
+  band?: {
+    bandProfileImageUrl?: string | null;
+    profileImageUrl?: string | null;
+    bandImageUrl?: string | null;
+    bandProfileUrl?: string | null;
+    imageUrl?: string | null;
+  } | null;
+};
 
 const normalizeToken = (value: string) => {
   return value
@@ -327,11 +524,66 @@ const getLiveCoHosts = (
   return [];
 };
 
+const getFirstNonEmptyString = (
+  ...values: Array<string | null | undefined>
+) => {
+  return (
+    values.find(
+      (value) => typeof value === "string" && value.trim().length > 0,
+    ) ?? null
+  );
+};
+
+const getThumbnailImageUrl = (value: LiveThumbnailFieldAliases) => {
+  return getFirstNonEmptyString(
+    value.thumbnailImageUrl,
+    value.thumbnailUrl,
+    value.liveThumbnailImageUrl,
+    value.liveThumbnailUrl,
+    value.imageUrl,
+  );
+};
+
+const getBandProfileImageUrl = (value: LiveThumbnailFieldAliases) => {
+  return getFirstNonEmptyString(
+    value.bandProfileImageUrl,
+    value.profileImageUrl,
+    value.bandImageUrl,
+    value.bandProfileUrl,
+    value.bandLogoUrl,
+    value.band?.bandProfileImageUrl,
+    value.band?.profileImageUrl,
+    value.band?.bandImageUrl,
+    value.band?.bandProfileUrl,
+    value.band?.imageUrl,
+  );
+};
+
+const normalizeLiveThumbnailFields = <T extends LiveThumbnailFieldAliases>(
+  value: T,
+): T => {
+  const thumbnailImageUrl = getThumbnailImageUrl(value);
+  const bandProfileImageUrl = getBandProfileImageUrl(value);
+
+  return {
+    ...value,
+    thumbnailImageUrl: thumbnailImageUrl ?? value.thumbnailImageUrl ?? null,
+    bandProfileImageUrl:
+      bandProfileImageUrl ?? value.bandProfileImageUrl ?? null,
+  };
+};
+
 const normalizeCreateLiveRequest = (request: CreateLiveRequest) => {
+  const thumbnailImageUrl = getFirstNonEmptyString(
+    request.thumbnailImageUrl,
+    request.thumbnailUrl,
+  );
+
   const normalizedRequest: {
     title: string;
     description?: string;
     thumbnailImageUrl?: string;
+    thumbnailUrl?: string;
     scheduledAt?: string;
     coHost: number[];
   } = {
@@ -345,8 +597,9 @@ const normalizeCreateLiveRequest = (request: CreateLiveRequest) => {
     normalizedRequest.description = description;
   }
 
-  if (request.thumbnailImageUrl) {
-    normalizedRequest.thumbnailImageUrl = request.thumbnailImageUrl;
+  if (thumbnailImageUrl) {
+    normalizedRequest.thumbnailImageUrl = thumbnailImageUrl;
+    normalizedRequest.thumbnailUrl = thumbnailImageUrl;
   }
 
   if (request.scheduledAt) {
@@ -359,10 +612,16 @@ const normalizeCreateLiveRequest = (request: CreateLiveRequest) => {
 const normalizeUpdateLiveReservationRequest = (
   request: UpdateLiveReservationRequest,
 ) => {
+  const thumbnailImageUrl = getFirstNonEmptyString(
+    request.thumbnailImageUrl,
+    request.thumbnailUrl,
+  );
+
   const normalizedRequest: {
     title: string;
     description?: string;
     thumbnailImageUrl?: string;
+    thumbnailUrl?: string;
     scheduledAt: string;
     coHost: number[];
   } = {
@@ -377,8 +636,9 @@ const normalizeUpdateLiveReservationRequest = (
     normalizedRequest.description = description;
   }
 
-  if (request.thumbnailImageUrl) {
-    normalizedRequest.thumbnailImageUrl = request.thumbnailImageUrl;
+  if (thumbnailImageUrl) {
+    normalizedRequest.thumbnailImageUrl = thumbnailImageUrl;
+    normalizedRequest.thumbnailUrl = thumbnailImageUrl;
   }
 
   return normalizedRequest;
@@ -415,10 +675,7 @@ const setupAuthenticatedHlsXhr = (
     url.searchParams.has("X-Amz-Algorithm");
 
   if (!hasUrlAuthorization) {
-    xhr.setRequestHeader(
-      "Authorization",
-      getAuthorization(),
-    );
+    xhr.setRequestHeader("Authorization", getAuthorization());
   }
 };
 
@@ -426,22 +683,14 @@ export const setupLivePlaybackXhr = (
   xhr: XMLHttpRequest,
   requestUrl: string,
 ) => {
-  setupAuthenticatedHlsXhr(
-    xhr,
-    requestUrl,
-    getLivePlaybackAuthorization,
-  );
+  setupAuthenticatedHlsXhr(xhr, requestUrl, getLivePlaybackAuthorization);
 };
 
 export const setupLiveReplayXhr = (
   xhr: XMLHttpRequest,
   requestUrl: string,
 ) => {
-  setupAuthenticatedHlsXhr(
-    xhr,
-    requestUrl,
-    getLiveReplayAuthorization,
-  );
+  setupAuthenticatedHlsXhr(xhr, requestUrl, getLiveReplayAuthorization);
 };
 
 const parseErrorMessage = (responseText: string, fallbackMessage: string) => {
@@ -469,13 +718,17 @@ export const getLiveHome = async (): Promise<LiveHomeResponse> => {
   const result = unwrapResult(response.data) ?? {};
 
   return {
-    liveNow: result.liveNow ?? [],
-    replays: (result.replays ?? []).map(normalizeReplayLiveId),
-    scheduled: result.scheduled ?? [],
+    liveNow: (result.liveNow ?? []).map(normalizeLiveThumbnailFields),
+    replays: (result.replays ?? [])
+      .map(normalizeReplayLiveId)
+      .map(normalizeLiveThumbnailFields),
+    scheduled: (result.scheduled ?? []).map(normalizeLiveThumbnailFields),
     myNickname: result.myNickname ?? result.nickname ?? null,
     nickname: result.nickname ?? result.myNickname ?? null,
-    myProfileImageUrl: result.myProfileImageUrl ?? result.profileImageUrl ?? null,
-    profileImageUrl: result.profileImageUrl ?? result.myProfileImageUrl ?? null,
+    myProfileImageUrl:
+      result.myProfileImageUrl ?? result.profileImageUrl ?? null,
+    profileImageUrl:
+      result.profileImageUrl ?? result.myProfileImageUrl ?? null,
     coHosts: result.coHosts ?? result.coHostList ?? [],
     coHostList: result.coHostList ?? result.coHosts ?? [],
   };
@@ -498,7 +751,7 @@ export const getLiveNowList = async ({
   const result = unwrapResult(response.data);
 
   return {
-    items: getPaginatedItems(result),
+    items: getPaginatedItems(result).map(normalizeLiveThumbnailFields),
     pageInfo: getPageInfo(result),
   };
 };
@@ -523,7 +776,7 @@ export const getScheduledLiveList = async ({
   const result = unwrapResult(response.data);
 
   return {
-    items: getPaginatedItems(result),
+    items: getPaginatedItems(result).map(normalizeLiveThumbnailFields),
     pageInfo: getPageInfo(result),
   };
 };
@@ -557,7 +810,9 @@ export const getReplayList = async ({
   const result = unwrapResult(response.data);
 
   return {
-    items: getPaginatedItems(result).map(normalizeReplayLiveId),
+    items: getPaginatedItems(result)
+      .map(normalizeReplayLiveId)
+      .map(normalizeLiveThumbnailFields),
     pageInfo: getPageInfo(result),
   };
 };
@@ -571,7 +826,7 @@ export const getReplayPlayback = async (
     withCredentials: true,
   });
 
-  return unwrapResult(response.data);
+  return normalizeLiveThumbnailFields(unwrapResult(response.data));
 };
 
 export const createLive = async (
@@ -592,7 +847,7 @@ export const enterLive = async (
     `/lives/${liveId}`,
   );
 
-  return unwrapResult(response.data);
+  return normalizeLiveThumbnailFields(unwrapResult(response.data));
 };
 
 export const leaveLive = async (liveId: number): Promise<void> => {
@@ -668,7 +923,7 @@ export const getLiveReservation = async (
     LiveApiResponse<LiveReservationResponse>
   >(`/lives/${liveId}/reservation`);
 
-  return unwrapResult(response.data);
+  return normalizeLiveThumbnailFields(unwrapResult(response.data));
 };
 
 export const updateLiveReservation = async ({
@@ -713,23 +968,35 @@ export const requestCoHostUpgrade = async (
 ): Promise<RequestCoHostUpgradeResponse> => {
   const response = await axiosInstance.post<
     LiveApiResponse<RequestCoHostUpgradeResponse>
-  >(`/lives/${liveId}/co-host`, {});
+  >(`/lives/${liveId}/co-host`);
 
   return unwrapResult(response.data);
 };
 
 export const acceptCoHostUpgrade = async ({
   liveId,
-  userId,
+  userId: requestedUserId,
 }: {
   liveId: number;
   userId?: number;
 }): Promise<AcceptCoHostUpgradeResponse> => {
+  const userId = isValidPositiveId(requestedUserId)
+    ? requestedUserId
+    : getPendingCoHostRequesterUserId(liveId);
+
+  if (!userId) {
+    throw new Error(
+      "승인할 공동 송출 요청자의 userId를 확인할 수 없어요. 요청 알림 또는 라이브 요청을 다시 받아주세요.",
+    );
+  }
+
   const response = await axiosInstance.post<
     LiveApiResponse<AcceptCoHostUpgradeResponse>
-  >(`/lives/${liveId}/co-host/acceptance`,
-    Number.isFinite(userId) ? { userId } : {},
-  );
+  >(`/lives/${liveId}/co-host/acceptance`, {
+    userId,
+  });
+
+  forgetPendingCoHostRequesterUserId(liveId);
 
   return unwrapResult(response.data);
 };
@@ -815,7 +1082,9 @@ export const subscribeViewerCount = async ({
   liveId,
   watchOnly = false,
   onViewerCount,
-  onCoPublisherJoined,
+  onCoPublishersChanged,
+  onCoHostUpgradeRequested,
+  onCoHostUpgradeAccepted,
   signal,
 }: SubscribeViewerCountParams): Promise<void> => {
   const requestUrl = resolveLiveApiUrl(
@@ -886,25 +1155,71 @@ export const subscribeViewerCount = async ({
           parseViewerCount(dataLines.join("\n"));
         }
 
-        if (eventName === "coPublisherJoined" && dataLines.length > 0) {
-          try {
-            const publisher = JSON.parse(dataLines.join("\n")) as {
-              userId?: number;
-              whepUrl?: string;
-            };
+        if (eventName === "coHostUpgradeRequested") {
+          const requester = parseCoHostRequester(dataLines.join("\n"));
 
-            if (
-              Number.isFinite(publisher.userId) &&
-              typeof publisher.whepUrl === "string" &&
-              publisher.whepUrl.trim()
-            ) {
-              onCoPublisherJoined?.({
-                userId: publisher.userId as number,
-                whepUrl: publisher.whepUrl,
+          if (requester) {
+            rememberPendingCoHostRequesterUserId(liveId, requester.userId);
+            onCoHostUpgradeRequested?.(requester);
+          } else {
+            onCoHostUpgradeRequested?.();
+          }
+        }
+
+        if (eventName === "coHostUpgradeAccepted") {
+          onCoHostUpgradeAccepted?.();
+        }
+
+        if (eventName === "coPublishersChanged" && dataLines.length > 0) {
+          try {
+            const parsed = JSON.parse(dataLines.join("\n")) as unknown;
+
+            
+            const rawPublishers: unknown[] = Array.isArray(parsed)
+              ? parsed
+              : parsed &&
+                  typeof parsed === "object" &&
+                  Array.isArray(
+                    (parsed as { coPublishers?: unknown }).coPublishers,
+                  )
+                ? (
+                    parsed as {
+                      coPublishers: unknown[];
+                    }
+                  ).coPublishers
+                : [];
+
+            const publishersByUserId = new Map<number, LiveCoPublisher>();
+
+            rawPublishers.forEach((item) => {
+              if (!item || typeof item !== "object") return;
+
+              const publisher = item as {
+                userId?: unknown;
+                whepUrl?: unknown;
+              };
+
+              const userId = Number(publisher.userId);
+              const whepUrl =
+                typeof publisher.whepUrl === "string"
+                  ? publisher.whepUrl.trim()
+                  : "";
+
+              if (!Number.isFinite(userId) || userId <= 0 || !whepUrl) {
+                return;
+              }
+
+              publishersByUserId.set(userId, {
+                userId,
+                whepUrl,
               });
-            }
+            });
+
+            
+            onCoPublishersChanged?.(
+              Array.from(publishersByUserId.values()),
+            );
           } catch {
-            // 잘못된 공동 송출자 이벤트는 시청자 수 구독을 끊지 않습니다.
           }
         }
       });
@@ -930,6 +1245,7 @@ export const createWhepSession = async ({
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     signal?.throwIfAborted();
+
     response = await fetch(requestUrl, {
       method: "POST",
       headers: {
@@ -940,10 +1256,9 @@ export const createWhepSession = async ({
       body: sdpOffer,
       signal,
     });
+
     responseText = await response.text();
 
-    // coPublisherJoined can arrive just before the media server exposes WHEP.
-    // Keep the exact URL supplied by the backend and wait briefly for it.
     if (response.status !== 404 || attempt === maxAttempts) {
       break;
     }
@@ -953,6 +1268,7 @@ export const createWhepSession = async ({
         signal?.removeEventListener("abort", handleAbort);
         resolve();
       }, 1000);
+
       const handleAbort = () => {
         window.clearTimeout(timeoutId);
         reject(signal?.reason ?? new DOMException("Aborted", "AbortError"));

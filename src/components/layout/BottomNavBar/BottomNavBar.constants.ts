@@ -43,7 +43,7 @@ export const BAND_NAV_TABS: BottomNavTab[] = [
     path: '/band/home',
     Icon: BandIcon,
     ActiveIcon: BandActiveIcon,
-    activePrefixes: ['/band/home', '/band/profile', '/band/concerts', '/band/videos', '/band/music', '/band/register'],
+    activePrefixes: ['/band/home', '/band/profile', '/band/concerts', '/band/videos', '/band/music', '/band/register', '/band/contents'],
   },
   { id: 'session', label: '세션', path: '/band/session', Icon: SessionIcon, ActiveIcon: SessionActiveIcon },
   { id: 'live', label: '라이브', path: '/band/live', Icon: LiveIcon, ActiveIcon: LiveIcon },

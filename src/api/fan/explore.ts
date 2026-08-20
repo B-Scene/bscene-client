@@ -16,6 +16,7 @@ import type {
   FanExploreRecommendationParams,
   FanExploreSearchParams,
   FanExploreSearchResponse,
+  NormalizedFanExploreBandSearchResponse,
   NormalizedFanExploreBandsResponse,
   NormalizedFanExploreContentsResponse,
   NormalizedFanExplorePerformancesResponse,
@@ -29,6 +30,7 @@ import type {
 type FanExplorePageLike<T> = Omit<FanExplorePageResponse<T>, "results"> & {
   sections?: FanExplorePageLike<T>;
   results?: T[] | FanExplorePageResponse<T> | FanExplorePageLike<T>;
+  band?: FanExplorePageResponse<T> | T[];
   bandSection?: FanExplorePageResponse<T> | T[];
   performanceSection?: FanExplorePageResponse<T> | T[];
   postSection?: FanExplorePageResponse<T> | T[];
@@ -47,6 +49,13 @@ const PERFORMANCE_SECTION_KEYS: Array<FanExploreSectionKey<FanExplorePerformance
 const CONTENT_SECTION_KEYS: Array<FanExploreSectionKey<FanExploreContent>> = [
   "contents",
   "posts",
+];
+const BAND_SECTION_KEYS: Array<FanExploreSectionKey<FanExploreBand>> = [
+  "bands",
+  "band",
+  "bandSection",
+  "bandResults",
+  "BAND",
 ];
 
 type FanExploreContentAlias = FanExploreContent & {
@@ -462,6 +471,70 @@ const normalizeBandDetail = (
   };
 };
 
+const BAND_FOLLOWER_COUNT_KEYS = [
+  "followerCount",
+  "followersCount",
+  "followerCnt",
+  "followCount",
+  "followers",
+  "bandFollowerCount",
+  "bandFollowersCount",
+  "fanCount",
+  "fansCount",
+  "subscriberCount",
+  "subscribersCount",
+  "totalFollowerCount",
+  "totalFollowers",
+] as const;
+
+const toNumberOrUndefined = (value: unknown) => {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim()) {
+    const parsedValue = Number(value);
+
+    return Number.isFinite(parsedValue) ? parsedValue : undefined;
+  }
+
+  return undefined;
+};
+
+const getBandFollowerCount = (band?: FanExploreBand | FanExploreBandDetail) => {
+  if (!band) return undefined;
+
+  const record = band as Record<string, unknown>;
+
+  for (const key of BAND_FOLLOWER_COUNT_KEYS) {
+    const count = toNumberOrUndefined(record[key]);
+
+    if (count !== undefined) return count;
+  }
+
+  return undefined;
+};
+
+const normalizeExploreBand = (band: FanExploreBand): FanExploreBand => {
+  const bandInfo = band.band ?? band;
+  const followerCount =
+    getBandFollowerCount(band) ?? getBandFollowerCount(bandInfo);
+
+  if (followerCount == null) {
+    return band;
+  }
+
+  return {
+    ...band,
+    followerCount,
+    followers: band.followers ?? followerCount,
+    band: band.band
+      ? {
+          ...bandInfo,
+          followerCount,
+          followers: bandInfo.followers ?? followerCount,
+        }
+      : band.band,
+  };
+};
+
 const toNumericId = (value?: number | string | null) => {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value === "string") {
@@ -660,23 +733,29 @@ const normalizePostComment = (
     toNumericId(authorInfo.id) ??
     null;
 
+  const resolvedAuthorName =
+    toStringOrNull(result.authorName) ??
+    toStringOrNull(result.nickname) ??
+    toStringOrNull(result.userName) ??
+    toStringOrNull(result.memberName) ??
+    toStringOrNull(result.writerName) ??
+    toStringOrNull(result.name) ??
+    toStringOrNull(authorInfo.authorName) ??
+    toStringOrNull(authorInfo.nickname) ??
+    toStringOrNull(authorInfo.userName) ??
+    toStringOrNull(authorInfo.memberName) ??
+    toStringOrNull(authorInfo.writerName) ??
+    toStringOrNull(authorInfo.name);
+
   return {
     commentId,
     authorId,
-    authorName:
-      toStringOrNull(result.authorName) ??
-      toStringOrNull(result.nickname) ??
-      toStringOrNull(result.userName) ??
-      toStringOrNull(result.memberName) ??
-      toStringOrNull(result.writerName) ??
-      toStringOrNull(result.name) ??
-      toStringOrNull(authorInfo.authorName) ??
-      toStringOrNull(authorInfo.nickname) ??
-      toStringOrNull(authorInfo.userName) ??
-      toStringOrNull(authorInfo.memberName) ??
-      toStringOrNull(authorInfo.writerName) ??
-      toStringOrNull(authorInfo.name) ??
-      "익명",
+    writerMode:
+      result.writerMode === "FAN" || result.writerMode === "BAND"
+        ? result.writerMode
+        : null,
+    hasUnresolvedNickname: resolvedAuthorName === null,
+    authorName: resolvedAuthorName ?? "익명",
     profileImageUrl:
       toStringOrNull(result.profileImageUrl) ??
       toStringOrNull(result.authorProfileImageUrl) ??
@@ -920,7 +999,13 @@ export const getRecommendedExploreBands = async ({
     }),
   });
 
-  return normalizeNumberCursorPage(assertSuccess(response), cursor);
+  const normalizedPage = normalizeNumberCursorPage(assertSuccess(response), cursor);
+  const items = normalizedPage.items.map(normalizeExploreBand);
+
+  return {
+    ...normalizedPage,
+    items,
+  };
 };
 
 export const getFanExploreBandDetail = async (
@@ -1071,7 +1156,7 @@ export const searchFanExplore = async ({
     sections.postSection ??
     sections.contentResults ??
     sections.POST;
-  const bands = getSectionItems(bandSection);
+  const bands = getSectionItems(bandSection).map(normalizeExploreBand);
   const performances = getSectionItems(performanceSection);
   const contents = getSectionItems(contentSection).map(normalizeExploreContent);
 
@@ -1104,6 +1189,41 @@ export const searchFanExplore = async ({
       sections.totalContentCount ??
       getSectionCount(contentSection) ??
       contents.length,
+  };
+};
+
+export const searchFanExploreBands = async ({
+  keyword,
+  sort = "POPULAR",
+  cursor,
+  size = 20,
+  genre,
+  region,
+}: FanExploreSearchParams): Promise<NormalizedFanExploreBandSearchResponse> => {
+  const response = await axiosInstance.get<
+    FanExploreApiResponse<FanExplorePageResponse<FanExploreBand> | FanExploreBand[]>
+  >("/explore/search", {
+    params: removeEmptyParams({
+      keyword,
+      type: "BAND",
+      sort,
+      genre,
+      region,
+      cursor,
+      size,
+    }),
+  });
+
+  const normalized = normalizeCursorPage(
+    assertSuccess(response),
+    cursor,
+    BAND_SECTION_KEYS,
+  );
+  const items = normalized.items.map(normalizeExploreBand);
+
+  return {
+    ...normalized,
+    items,
   };
 };
 

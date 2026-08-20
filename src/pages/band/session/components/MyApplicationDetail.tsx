@@ -109,7 +109,7 @@ export const MyApplicationDetail = ({
   };
 
   return createPortal(
-    <main className="fixed inset-0 z-[99999] mx-auto flex h-dvh w-full max-w-[393px] flex-col overflow-hidden bg-neutral-0">
+    <main className="frame-width fixed inset-0 z-[99999] mx-auto flex h-dvh flex-col overflow-hidden bg-neutral-0">
       <MyApplicationDetailHeader onBack={handleClose} />
 
       <section

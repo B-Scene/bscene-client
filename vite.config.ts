@@ -20,6 +20,7 @@ export default defineConfig(({ mode }) => {
       VitePWA({
         // site.webmanifest is already generated under public/favicon and linked from index.html
         manifest: false,
+        injectRegister: false,
         registerType: 'autoUpdate',
         includeAssets: [
           'favicon/favicon.ico',

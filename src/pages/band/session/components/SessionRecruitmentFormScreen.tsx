@@ -1,10 +1,12 @@
 import { useState, type ChangeEvent } from "react";
 import type { AxiosError } from "axios";
+
 import Modal from "@/components/Modal/Modal";
 import { ModalOverlay } from "@/components/common/Modal/ModalOverlay";
 import {
   DEFAULT_RECRUITMENT_BASIC_VALUES,
   DEFAULT_RECRUITMENT_DETAIL_VALUES,
+  RECRUITMENT_GENRE_OPTIONS,
 } from "@/features/session/recruitmentForm/sessionRecruitmentForm.constants";
 import type {
   BasicFormValues,
@@ -20,6 +22,7 @@ import {
 } from "@/features/session/recruitmentForm/sessionRecruitmentForm.utils";
 import {
   RecruitmentFormTopBar,
+  RecruitmentSelectBottomSheet,
   RecruitmentStepIndicator,
 } from "@/features/session/recruitmentForm/RecruitmentFormChrome";
 import { RecruitmentBasicInfoStep } from "@/features/session/recruitmentForm/RecruitmentBasicInfoStep";
@@ -34,6 +37,7 @@ import type {
   CreateSessionRecruitmentResponse,
   SessionApiResponse,
 } from "@/types/session/sessionRecruitment";
+
 import { SessionRecruitmentCompleteScreen } from "./SessionRecruitmentCompleteScreen";
 
 interface SessionRecruitmentFormScreenProps {
@@ -43,6 +47,34 @@ interface SessionRecruitmentFormScreenProps {
   editSessionRecruitmentId?: number;
   onSaved?: () => void;
 }
+
+type RecruitmentSelectBottomSheetType = "genre" | null;
+
+const normalizeRecruitmentEnumValue = (value: string) => {
+  const trimmedValue = value.trim();
+
+  if (trimmedValue.toLowerCase() === "etc.") {
+    return "etc";
+  }
+
+  return trimmedValue;
+};
+
+const normalizeBasicValues = (values: BasicFormValues): BasicFormValues => {
+  return {
+    ...values,
+    part: normalizeRecruitmentEnumValue(values.part),
+    skill: normalizeRecruitmentEnumValue(values.skill),
+    genre: normalizeRecruitmentEnumValue(values.genre),
+  };
+};
+
+const normalizeDetailValues = (values: DetailFormValues): DetailFormValues => {
+  return {
+    ...values,
+    region: normalizeRecruitmentEnumValue(values.region),
+  };
+};
 
 export const SessionRecruitmentFormScreen = ({
   onBack,
@@ -55,8 +87,12 @@ export const SessionRecruitmentFormScreen = ({
     return (
       <SessionRecruitmentFormBody
         mode="create"
-        initialBasicValues={DEFAULT_RECRUITMENT_BASIC_VALUES}
-        initialDetailValues={DEFAULT_RECRUITMENT_DETAIL_VALUES}
+        initialBasicValues={normalizeBasicValues(
+          DEFAULT_RECRUITMENT_BASIC_VALUES,
+        )}
+        initialDetailValues={normalizeDetailValues(
+          DEFAULT_RECRUITMENT_DETAIL_VALUES,
+        )}
         onBack={onBack}
         onClose={onClose}
         onViewCreatedPost={onViewCreatedPost}
@@ -87,7 +123,9 @@ const SessionRecruitmentEditLoader = ({
   onClose,
   onSaved,
 }: SessionRecruitmentEditLoaderProps) => {
-  const editInfoQuery = useSessionRecruitmentEditInfoQuery(sessionRecruitmentId);
+  const editInfoQuery = useSessionRecruitmentEditInfoQuery(
+    sessionRecruitmentId,
+  );
 
   if (editInfoQuery.isError) {
     return (
@@ -95,6 +133,7 @@ const SessionRecruitmentEditLoader = ({
         <p className="text-caption1 text-neutral-500">
           모집 공고 정보를 불러오지 못했어요
         </p>
+
         <button
           type="button"
           onClick={onBack}
@@ -123,22 +162,22 @@ const SessionRecruitmentEditLoader = ({
     <SessionRecruitmentFormBody
       mode="edit"
       sessionRecruitmentId={sessionRecruitmentId}
-      initialBasicValues={{
+      initialBasicValues={normalizeBasicValues({
         title: detail.recruitmentTitle,
         summary: detail.summary,
         detail: detail.content,
         part: detail.part,
         skill: detail.skillLevel,
         genre: detail.genre,
-      }}
-      initialDetailValues={{
+      })}
+      initialDetailValues={normalizeDetailValues({
         region: detail.region,
         practiceSchedule: detail.practiceSchedule,
         practiceLocation: detail.practicePlace,
         deadlineDate: deadline.deadlineDate,
         deadlineTime: deadline.deadlineTime,
         qualification: detail.qualification,
-      }}
+      })}
       onBack={onBack}
       onClose={onClose}
       onSaved={onSaved}
@@ -170,18 +209,23 @@ const SessionRecruitmentFormBody = ({
   const createRecruitmentMutation = useCreateSessionRecruitment();
   const updateRecruitmentMutation = useUpdateSessionRecruitment();
   const activeBandMemberId = useActiveBandMemberId();
+
   const [currentStep, setCurrentStep] = useState<FormStep>(1);
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [isCompleteScreenOpen, setIsCompleteScreenOpen] = useState(false);
+  const [selectBottomSheetType, setSelectBottomSheetType] =
+    useState<RecruitmentSelectBottomSheetType>(null);
   const [createdRecruitment, setCreatedRecruitment] =
     useState<CreateSessionRecruitmentResponse | null>(null);
   const [submitErrorMessage, setSubmitErrorMessage] = useState("");
 
-  const [basicValues, setBasicValues] =
-    useState<BasicFormValues>(initialBasicValues);
+  const [basicValues, setBasicValues] = useState<BasicFormValues>(() =>
+    normalizeBasicValues(initialBasicValues),
+  );
 
-  const [detailValues, setDetailValues] =
-    useState<DetailFormValues>(initialDetailValues);
+  const [detailValues, setDetailValues] = useState<DetailFormValues>(() =>
+    normalizeDetailValues(initialDetailValues),
+  );
 
   const [errors, setErrors] = useState<FormErrors>({});
 
@@ -208,10 +252,12 @@ const SessionRecruitmentFormBody = ({
         ...currentValues,
         [field]: event.target.value,
       }));
+
       setErrors((currentErrors) => ({
         ...currentErrors,
         [field]: undefined,
       }));
+
       setSubmitErrorMessage("");
     };
 
@@ -227,42 +273,64 @@ const SessionRecruitmentFormBody = ({
         ...currentValues,
         [field]: event.target.value,
       }));
+
       setErrors((currentErrors) => ({
         ...currentErrors,
         [field]: undefined,
       }));
+
       setSubmitErrorMessage("");
     };
 
   const handlePartClick = (part: string) => {
     setBasicValues((currentValues) => ({
       ...currentValues,
-      part,
+      part: normalizeRecruitmentEnumValue(part),
     }));
-    setErrors((currentErrors) => ({ ...currentErrors, part: undefined }));
+
+    setErrors((currentErrors) => ({
+      ...currentErrors,
+      part: undefined,
+    }));
+
     setSubmitErrorMessage("");
   };
 
   const handleSkillClick = (skill: string) => {
-    setBasicValues((currentValues) => ({ ...currentValues, skill }));
+    setBasicValues((currentValues) => ({
+      ...currentValues,
+      skill: normalizeRecruitmentEnumValue(skill),
+    }));
+
     setSubmitErrorMessage("");
   };
 
   const handleGenreSelect = (genre: string) => {
     setBasicValues((currentValues) => ({
       ...currentValues,
-      genre,
+      genre: normalizeRecruitmentEnumValue(genre),
     }));
-    setErrors((currentErrors) => ({ ...currentErrors, genre: undefined }));
+
+    setErrors((currentErrors) => ({
+      ...currentErrors,
+      genre: undefined,
+    }));
+
     setSubmitErrorMessage("");
+    setSelectBottomSheetType(null);
   };
 
   const handleRegionSelect = (region: string) => {
     setDetailValues((currentValues) => ({
       ...currentValues,
-      region,
+      region: normalizeRecruitmentEnumValue(region),
     }));
-    setErrors((currentErrors) => ({ ...currentErrors, region: undefined }));
+
+    setErrors((currentErrors) => ({
+      ...currentErrors,
+      region: undefined,
+    }));
+
     setSubmitErrorMessage("");
   };
 
@@ -271,11 +339,13 @@ const SessionRecruitmentFormBody = ({
       ...currentValues,
       deadlineDate: date,
     }));
+
     setErrors((currentErrors) => ({
       ...currentErrors,
       deadlineDate: undefined,
       deadlineTime: undefined,
     }));
+
     setSubmitErrorMessage("");
   };
 
@@ -284,11 +354,13 @@ const SessionRecruitmentFormBody = ({
       ...currentValues,
       deadlineTime: time,
     }));
+
     setErrors((currentErrors) => ({
       ...currentErrors,
       deadlineDate: undefined,
       deadlineTime: undefined,
     }));
+
     setSubmitErrorMessage("");
   };
 
@@ -316,6 +388,7 @@ const SessionRecruitmentFormBody = ({
     }
 
     setErrors(nextErrors);
+
     return Object.keys(nextErrors).length === 0 && isBasicComplete;
   };
 
@@ -358,6 +431,7 @@ const SessionRecruitmentFormBody = ({
     }
 
     setErrors(nextErrors);
+
     return Object.keys(nextErrors).length === 0 && isDetailComplete;
   };
 
@@ -368,6 +442,25 @@ const SessionRecruitmentFormBody = ({
     }
   };
 
+  const getRecruitmentBody = () => {
+    return {
+      recruitmentTitle: basicValues.title.trim(),
+      summary: basicValues.summary.trim(),
+      content: basicValues.detail.trim(),
+      part: normalizeRecruitmentEnumValue(basicValues.part),
+      skillLevel: normalizeRecruitmentEnumValue(basicValues.skill),
+      genre: normalizeRecruitmentEnumValue(basicValues.genre),
+      region: normalizeRecruitmentEnumValue(detailValues.region),
+      practiceSchedule: detailValues.practiceSchedule.trim(),
+      practicePlace: detailValues.practiceLocation.trim(),
+      deadlineAt: toRecruitmentDeadlineAt(
+        detailValues.deadlineDate,
+        detailValues.deadlineTime,
+      ),
+      qualification: detailValues.qualification.trim(),
+    };
+  };
+
   const handleSubmit = async () => {
     if (!validateDetailForm()) return;
 
@@ -376,35 +469,20 @@ const SessionRecruitmentFormBody = ({
     if (mode === "edit") {
       if (!sessionRecruitmentId) return;
 
-      const body = {
-        recruitmentTitle: basicValues.title.trim(),
-        summary: basicValues.summary.trim(),
-        content: basicValues.detail.trim(),
-        part: basicValues.part,
-        skillLevel: basicValues.skill,
-        genre: basicValues.genre,
-        region: detailValues.region,
-        practiceSchedule: detailValues.practiceSchedule.trim(),
-        practicePlace: detailValues.practiceLocation.trim(),
-        deadlineAt: toRecruitmentDeadlineAt(
-          detailValues.deadlineDate,
-          detailValues.deadlineTime,
-        ),
-        qualification: detailValues.qualification.trim(),
-      };
-
       try {
         await updateRecruitmentMutation.mutateAsync({
           sessionRecruitmentId,
-          body,
+          body: getRecruitmentBody(),
         });
+
         onSaved?.();
       } catch (error) {
         const apiMessage = (error as AxiosError<SessionApiResponse<null>>)
           .response?.data?.message;
 
         setSubmitErrorMessage(
-          apiMessage ?? "모집 공고 수정에 실패했어요. 잠시 후 다시 시도해주세요.",
+          apiMessage ??
+            "모집 공고 수정에 실패했어요. 잠시 후 다시 시도해주세요.",
         );
       }
 
@@ -420,26 +498,11 @@ const SessionRecruitmentFormBody = ({
       return;
     }
 
-    const requestBody = {
-      bandMemberId,
-      recruitmentTitle: basicValues.title.trim(),
-      summary: basicValues.summary.trim(),
-      content: basicValues.detail.trim(),
-      part: basicValues.part,
-      skillLevel: basicValues.skill,
-      genre: basicValues.genre,
-      region: detailValues.region,
-      practiceSchedule: detailValues.practiceSchedule.trim(),
-      practicePlace: detailValues.practiceLocation.trim(),
-      deadlineAt: toRecruitmentDeadlineAt(
-        detailValues.deadlineDate,
-        detailValues.deadlineTime,
-      ),
-      qualification: detailValues.qualification.trim(),
-    };
-
     try {
-      const result = await createRecruitmentMutation.mutateAsync(requestBody);
+      const result = await createRecruitmentMutation.mutateAsync({
+        bandMemberId,
+        ...getRecruitmentBody(),
+      });
 
       setCreatedRecruitment(result);
       setIsCompleteScreenOpen(true);
@@ -457,7 +520,8 @@ const SessionRecruitmentFormBody = ({
       }
 
       setSubmitErrorMessage(
-        apiMessage ?? "모집 공고 등록에 실패했어요. 잠시 후 다시 시도해주세요.",
+        apiMessage ??
+          "모집 공고 등록에 실패했어요. 잠시 후 다시 시도해주세요.",
       );
     }
   };
@@ -487,12 +551,21 @@ const SessionRecruitmentFormBody = ({
   const deadlineSummary = splitRecruitmentDeadlineAt(
     createdRecruitment?.deadlineAt,
   );
+
   const completionSummary = {
     title: createdRecruitment?.recruitmentTitle ?? basicValues.title.trim(),
-    part: createdRecruitment?.part ?? basicValues.part,
-    skill: createdRecruitment?.skillLevel ?? basicValues.skill,
-    genre: createdRecruitment?.genre ?? basicValues.genre,
-    region: createdRecruitment?.region ?? detailValues.region,
+    part: normalizeRecruitmentEnumValue(
+      createdRecruitment?.part ?? basicValues.part,
+    ),
+    skill: normalizeRecruitmentEnumValue(
+      createdRecruitment?.skillLevel ?? basicValues.skill,
+    ),
+    genre: normalizeRecruitmentEnumValue(
+      createdRecruitment?.genre ?? basicValues.genre,
+    ),
+    region: normalizeRecruitmentEnumValue(
+      createdRecruitment?.region ?? detailValues.region,
+    ),
     deadlineDate: deadlineSummary.deadlineDate || detailValues.deadlineDate,
     deadlineTime: deadlineSummary.deadlineTime || detailValues.deadlineTime,
   };
@@ -513,12 +586,13 @@ const SessionRecruitmentFormBody = ({
       : createRecruitmentMutation.isPending;
 
   return (
-    <main className="min-h-dvh bg-secondary-0 pb-[calc(var(--bottom-nav-height)+24px)]">
+    <main className="min-h-dvh bg-secondary-0 pb-[calc(var(--bottom-nav-height)+92px)]">
       <RecruitmentFormTopBar
         title={mode === "edit" ? "세션 모집 공고 수정" : "세션 모집 공고 등록"}
         onBack={handleBack}
         onClose={onClose}
       />
+
       <RecruitmentStepIndicator currentStep={currentStep} />
 
       {currentStep === 1 ? (
@@ -529,7 +603,7 @@ const SessionRecruitmentFormBody = ({
           onFieldChange={handleBasicFieldChange}
           onPartClick={handlePartClick}
           onSkillClick={handleSkillClick}
-          onGenreChange={handleGenreSelect}
+          onOpenGenreSelect={() => setSelectBottomSheetType("genre")}
           onNext={handleNext}
         />
       ) : (
@@ -570,6 +644,16 @@ const SessionRecruitmentFormBody = ({
           onConfirm={handleCancelConfirm}
         />
       </ModalOverlay>
+
+      {selectBottomSheetType === "genre" ? (
+        <RecruitmentSelectBottomSheet
+          title="장르"
+          options={RECRUITMENT_GENRE_OPTIONS}
+          selectedValue={basicValues.genre}
+          onSelect={handleGenreSelect}
+          onClose={() => setSelectBottomSheetType(null)}
+        />
+      ) : null}
     </main>
   );
 };

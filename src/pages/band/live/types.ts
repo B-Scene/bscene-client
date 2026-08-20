@@ -39,6 +39,7 @@ export type ScheduledLiveCardData = {
 
 export type ChatMessage = {
   id: number;
+  senderId?: number;
   sender: string;
   message: string;
   time: string;

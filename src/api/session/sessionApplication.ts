@@ -10,6 +10,7 @@ import type {
   CreateSessionApplicationResponse,
   DeleteSessionApplicationResponse,
   FinalizeApplicationSubmissionRequest,
+  FinalizeApplicationSubmissionResponse,
   MySessionApplicationDetailResponse,
   SessionApiResponse,
   SessionApplicationDetailResponse,
@@ -159,10 +160,9 @@ export const finalizeApplicationSubmission = async (
   applySubmissionId: number,
   body: FinalizeApplicationSubmissionRequest,
 ) => {
-  const { data } = await axiosInstance.post<SessionApiResponse<null>>(
-    `/users/me/${applySubmissionId}/final`,
-    body,
-  );
+  const { data } = await axiosInstance.post<
+    SessionApiResponse<FinalizeApplicationSubmissionResponse | null>
+  >(`/users/me/${applySubmissionId}/final`, body);
 
   return data.result;
 };

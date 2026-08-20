@@ -32,6 +32,7 @@ import type {
 import { notificationKeys } from "@/hooks/api/useNotifications";
 import { myProfilesKeys } from "@/hooks/api/user/useMyProfiles";
 import { bandMemberProfileKeys } from "@/hooks/api/band/useBandMemberProfile";
+import { activateBandMemberProfile } from "@/api/band/bandMemberProfile";
 
 interface UpdateVisibilityVariables {
   sessionApplicationId: number;
@@ -325,7 +326,17 @@ export const useFinalizeApplicationSubmissionMutation = () => {
       body,
     }: FinalizeApplicationSubmissionVariables) =>
       finalizeApplicationSubmission(applySubmissionId, body),
-    onSuccess: () => {
+    onSuccess: async (result, { body }) => {
+      // Once the backend returns the confirmed bandMemberProfileId in the
+      // final response, activate it so the band shows up as the user's
+      // current band right away instead of staying inactive until a
+      // separate manual activation step.
+      if (body.isAccepted && result?.bandMemberProfileId) {
+        await activateBandMemberProfile(result.bandMemberProfileId).catch(
+          () => undefined,
+        );
+      }
+
       queryClient.invalidateQueries({
         queryKey: sessionApplicationKeys.submissions(),
       });

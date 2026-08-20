@@ -4,10 +4,112 @@ const firebaseConfig = Object.fromEntries(
   new URL(self.location.href).searchParams.entries(),
 );
 
+self.addEventListener("install", () => {
+  self.skipWaiting();
+});
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil(self.clients.claim());
+});
+
+const PUSH_READ_DB_NAME = "bscenePushNotificationReads";
+const PUSH_READ_DB_VERSION = 1;
+const PUSH_READ_STORE_NAME = "pendingReads";
+
 const getStringValue = (value) => {
   if (typeof value === "string") return value.trim();
   if (typeof value === "number") return String(value);
   return "";
+};
+
+const getNotificationIdFromData = (data) => {
+  return (
+    getStringValue(data.notificationId) ||
+    getStringValue(data.notification_id) ||
+    getStringValue(data["notification-id"]) ||
+    getStringValue(data.pushNotificationId) ||
+    getStringValue(data.id) ||
+    getStringValue(data.alarmId) ||
+    getStringValue(data.notificationSeq)
+  );
+};
+
+const toPositiveNumberOrNull = (value) => {
+  const numberValue = Number(value);
+
+  return Number.isFinite(numberValue) && numberValue > 0 ? numberValue : null;
+};
+
+const createPendingPushRead = ({
+  notificationId,
+  title,
+  body,
+  type,
+  referenceId,
+  deepLink,
+}) => {
+  const normalizedNotificationId = toPositiveNumberOrNull(notificationId);
+
+  return {
+    key:
+      normalizedNotificationId !== null
+        ? `id:${normalizedNotificationId}`
+        : `push:${Date.now()}:${Math.random().toString(36).slice(2)}`,
+    notificationId: normalizedNotificationId,
+    title: getStringValue(title),
+    body: getStringValue(body),
+    type: getStringValue(type),
+    referenceId: toPositiveNumberOrNull(referenceId),
+    deepLink: getStringValue(deepLink),
+    createdAt: Date.now(),
+  };
+};
+
+const openPendingPushReadDb = () =>
+  new Promise((resolve, reject) => {
+    const request = indexedDB.open(PUSH_READ_DB_NAME, PUSH_READ_DB_VERSION);
+
+    request.onupgradeneeded = () => {
+      const db = request.result;
+
+      if (!db.objectStoreNames.contains(PUSH_READ_STORE_NAME)) {
+        db.createObjectStore(PUSH_READ_STORE_NAME, { keyPath: "key" });
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+
+const savePendingPushRead = async (pendingRead) => {
+  try {
+    const db = await openPendingPushReadDb();
+
+    await new Promise((resolve, reject) => {
+      const transaction = db.transaction(PUSH_READ_STORE_NAME, "readwrite");
+      const store = transaction.objectStore(PUSH_READ_STORE_NAME);
+      const request = store.put(pendingRead);
+
+      request.onerror = () => reject(request.error);
+      transaction.oncomplete = () => {
+        db.close();
+        resolve();
+      };
+      transaction.onerror = () => reject(transaction.error);
+    });
+  } catch (error) {
+    console.error("[BScene Push SW] failed to save pending read", error);
+  }
+};
+
+const getNestedMessageData = (data) => {
+  return data?.FCM_MSG?.data || data?.["firebase-messaging-msg-data"]?.data || {};
+};
+
+const getClickData = (notificationData) => {
+  return {
+    ...getNestedMessageData(notificationData),
+    ...(notificationData || {}),
+  };
 };
 
 const isCoHostInviteType = (value) => {
@@ -21,6 +123,31 @@ const isCoHostInviteType = (value) => {
 
 const isLiveReferenceType = (value) => {
   return getStringValue(value).toUpperCase() === "LIVE";
+};
+
+/**
+ * type이 단순 LIVE인 알림은 라이브 예약/시작 등 여러 용도로 오기 때문에
+ * LIVE라는 이유만으로 공동 진행 초대로 취급하면 안 됩니다. generic LIVE
+ * 알림 중 실제 문구에 "공동 진행/공동 송출" + "초대" 의미가 함께 있을 때만
+ * 공동 진행 초대로 판단합니다. (src/utils/notificationDeepLink.ts와 동일 로직)
+ */
+const isGenericLiveCoHostInviteNotification = (data, notification = {}) => {
+  if (!isLiveReferenceType(getNotificationType(data))) return false;
+
+  const content = `${getStringValue(notification.title || data.title)} ${getStringValue(
+    notification.body || data.body,
+  )}`.toUpperCase();
+  const hasCoHostKeyword =
+    content.includes("CO_HOST") ||
+    content.includes("COHOST") ||
+    content.includes("공동 진행") ||
+    content.includes("공동 송출");
+  const hasInviteKeyword =
+    content.includes("INVITE") ||
+    content.includes("INVITATION") ||
+    content.includes("초대");
+
+  return hasCoHostKeyword && hasInviteKeyword;
 };
 
 const isCoHostUpgradeRequest = (data, notification = {}) => {
@@ -79,6 +206,8 @@ const appendQueryParam = (deepLink, key, value) => {
   try {
     const url = new URL(deepLink, self.location.origin);
 
+    if (url.origin !== self.location.origin) return deepLink;
+
     url.searchParams.set(key, value);
 
     return `${url.pathname}${url.search}${url.hash}`;
@@ -88,6 +217,33 @@ const appendQueryParam = (deepLink, key, value) => {
     return `${deepLink}${separator}${encodeURIComponent(key)}=${encodeURIComponent(
       value,
     )}`;
+  }
+};
+
+const appendPushClickContext = (deepLink, context) => {
+  try {
+    const url = new URL(deepLink, self.location.origin);
+
+    if (url.origin !== self.location.origin) return deepLink;
+
+    url.searchParams.set("pushNotificationClicked", "1");
+
+    Object.entries({
+      notificationId: context.notificationId,
+      pushTitle: context.title,
+      pushBody: context.body,
+      pushType: context.type,
+      pushReferenceId: context.referenceId,
+      pushDeepLink: context.deepLink,
+    }).forEach(([key, value]) => {
+      if (value) url.searchParams.set(key, value);
+    });
+
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return context.notificationId
+      ? appendQueryParam(deepLink, "notificationId", context.notificationId)
+      : deepLink;
   }
 };
 
@@ -109,7 +265,25 @@ const shouldUseCoHostInviteActions = (data, notification) => {
   if (!liveId) return false;
   if (isCoHostUpgradeRequest(data, notification)) return false;
 
-  return isCoHostInviteType(type) || isLiveReferenceType(type);
+  return (
+    isCoHostInviteType(type) ||
+    isGenericLiveCoHostInviteNotification(data, notification)
+  );
+};
+
+const getPushPayload = (event) => {
+  if (!event.data) return {};
+
+  try {
+    return event.data.json();
+  } catch {
+    return {
+      data: {
+        title: "B:Scene",
+        body: event.data.text(),
+      },
+    };
+  }
 };
 
 const getBaseDeepLinkFromPayload = (payload) => {
@@ -122,7 +296,11 @@ const getBaseDeepLinkFromPayload = (payload) => {
     return createCoHostUpgradeApprovalDeepLink(liveId);
   }
 
-  if ((isCoHostInviteType(type) || isLiveReferenceType(type)) && liveId) {
+  if (
+    liveId &&
+    (isCoHostInviteType(type) ||
+      isGenericLiveCoHostInviteNotification(data, notification))
+  ) {
     return createBandLiveDeepLink(liveId);
   }
 
@@ -134,6 +312,111 @@ const getBaseDeepLinkFromPayload = (payload) => {
     "/"
   );
 };
+
+const showPushNotificationFromPayload = (payload) => {
+  if ("BroadcastChannel" in self) {
+    const channel = new BroadcastChannel("bscene-push");
+    channel.postMessage(payload);
+    channel.close();
+  }
+
+  console.info("[BScene Push SW] background message", payload);
+
+  const notification = payload.notification || {};
+  const data = payload.data || {};
+  const title = notification.title || data.title || "B:Scene";
+  const baseDeepLink = getBaseDeepLinkFromPayload(payload);
+  const notificationId = getNotificationIdFromData(data);
+  const pushClickContext = {
+    notificationId,
+    title,
+    body: notification.body || data.body || "",
+    type: getNotificationType(data),
+    referenceId:
+      data.referenceId ||
+      data.liveId ||
+      data.targetId ||
+      data.resourceId ||
+      "",
+    deepLink: baseDeepLink,
+  };
+  const trackedDeepLink = appendPushClickContext(
+    baseDeepLink,
+    pushClickContext,
+  );
+  const shouldShowActions = shouldUseCoHostInviteActions(data, notification);
+
+  const options = {
+    body: notification.body || data.body,
+    icon: notification.icon || "/favicon/favicon-96x96.png",
+    badge: "/favicon/favicon-96x96.png",
+    data: {
+      deepLink: trackedDeepLink,
+      acceptDeepLink: appendQueryParam(trackedDeepLink, "action", "accept"),
+      notificationId: notificationId || null,
+      title,
+      body: notification.body || data.body || null,
+      type: getNotificationType(data) || null,
+      liveId: getLiveIdFromData(data) || null,
+      referenceId: data.referenceId || null,
+      originalDeepLink: baseDeepLink,
+    },
+  };
+
+  if (shouldShowActions) {
+    options.actions = [
+      {
+        action: "accept",
+        title: "수락",
+      },
+      {
+        action: "later",
+        title: "나중에",
+      },
+    ];
+  }
+
+  return self.registration.showNotification(title, options);
+};
+
+const showFallbackPushNotification = (error) => {
+  console.error("[BScene Push SW] failed to show notification", error);
+
+  return self.registration.showNotification("B:Scene", {
+    body: "새 알림이 도착했습니다.",
+    icon: "/favicon/favicon-96x96.png",
+    badge: "/favicon/favicon-96x96.png",
+    data: {
+      deepLink: "/",
+      originalDeepLink: "/",
+    },
+  });
+};
+
+const getTargetDeepLinkFromNotification = (notification) => {
+  const rawData = notification.data || {};
+  const data = getClickData(rawData);
+  const fcmMessage = rawData.FCM_MSG || rawData["firebase-messaging-msg-data"];
+
+  return (
+    data.deepLink ||
+    data.link ||
+    fcmMessage?.fcmOptions?.link ||
+    fcmMessage?.webpush?.fcmOptions?.link ||
+    rawData.deepLink ||
+    rawData.link ||
+    "/"
+  );
+};
+
+self.addEventListener("push", (event) => {
+  event.stopImmediatePropagation();
+  event.waitUntil(
+    showPushNotificationFromPayload(getPushPayload(event)).catch(
+      showFallbackPushNotification,
+    ),
+  );
+});
 
 if (
   firebaseConfig.apiKey &&
@@ -153,47 +436,9 @@ if (
   const messaging = firebase.messaging();
 
   messaging.onBackgroundMessage((payload) => {
-    if ("BroadcastChannel" in self) {
-      const channel = new BroadcastChannel("bscene-push");
-      channel.postMessage(payload);
-      channel.close();
-    }
-
-    console.info("[BScene Push SW] background message", payload);
-
-    const notification = payload.notification || {};
-    const data = payload.data || {};
-    const title = notification.title || data.title || "B:Scene";
-    const baseDeepLink = getBaseDeepLinkFromPayload(payload);
-    const shouldShowActions = shouldUseCoHostInviteActions(data, notification);
-
-    const options = {
-      body: notification.body || data.body,
-      icon: notification.icon || "/favicon/favicon-96x96.png",
-      badge: "/favicon/favicon-96x96.png",
-      data: {
-        deepLink: baseDeepLink,
-        acceptDeepLink: appendQueryParam(baseDeepLink, "action", "accept"),
-        type: getNotificationType(data) || null,
-        liveId: getLiveIdFromData(data) || null,
-        referenceId: data.referenceId || null,
-      },
-    };
-
-    if (shouldShowActions) {
-      options.actions = [
-        {
-          action: "accept",
-          title: "수락",
-        },
-        {
-          action: "later",
-          title: "나중에",
-        },
-      ];
-    }
-
-    return self.registration.showNotification(title, options);
+    return showPushNotificationFromPayload(payload).catch(
+      showFallbackPushNotification,
+    );
   });
 }
 
@@ -204,34 +449,82 @@ self.addEventListener("notificationclick", (event) => {
     return;
   }
 
+  const notificationData = event.notification.data || {};
+  const clickData = getClickData(notificationData);
+  const baseTargetDeepLink = getTargetDeepLinkFromNotification(event.notification);
   const deepLink =
     event.action === "accept"
-      ? event.notification.data?.acceptDeepLink
-      : event.notification.data?.deepLink;
+      ? notificationData.acceptDeepLink
+      : baseTargetDeepLink;
 
   const targetDeepLink = deepLink || "/";
+  const notificationId = getNotificationIdFromData(clickData);
+  const pushClickMessage = {
+    type: "BSCENE_PUSH_NOTIFICATION_CLICK",
+    notificationId,
+    title: event.notification.title || clickData.title || "",
+    body: event.notification.body || clickData.body || "",
+    notificationType: getNotificationType(clickData),
+    referenceId:
+      clickData.referenceId ||
+      clickData.liveId ||
+      clickData.targetId ||
+      clickData.resourceId ||
+      "",
+    deepLink: notificationData.originalDeepLink || baseTargetDeepLink,
+    targetDeepLink,
+  };
+  const trackedTargetDeepLink = appendPushClickContext(targetDeepLink, {
+    notificationId,
+    title: pushClickMessage.title,
+    body: pushClickMessage.body,
+    type: pushClickMessage.notificationType,
+    referenceId: pushClickMessage.referenceId,
+    deepLink: pushClickMessage.deepLink,
+  });
+  const pendingPushRead = createPendingPushRead({
+    notificationId,
+    title: pushClickMessage.title,
+    body: pushClickMessage.body,
+    type: pushClickMessage.notificationType,
+    referenceId: pushClickMessage.referenceId,
+    deepLink: pushClickMessage.deepLink,
+  });
+
+  pushClickMessage.targetDeepLink = trackedTargetDeepLink;
 
   event.waitUntil(
-    self.clients
-      .matchAll({
-        type: "window",
-        includeUncontrolled: true,
-      })
-      .then((clientList) => {
-        const existingClient = clientList.find((client) => {
-          try {
-            return new URL(client.url).origin === self.location.origin;
-          } catch {
-            return false;
+    Promise.all([
+      savePendingPushRead(pendingPushRead),
+      self.clients
+        .matchAll({
+          type: "window",
+          includeUncontrolled: true,
+        })
+        .then((clientList) => {
+          const existingClient = clientList.find((client) => {
+            try {
+              return new URL(client.url).origin === self.location.origin;
+            } catch {
+              return false;
+            }
+          });
+
+          const targetUrl = new URL(
+            trackedTargetDeepLink,
+            self.location.origin,
+          ).href;
+
+          if (existingClient) {
+            existingClient.postMessage(pushClickMessage);
+            return existingClient
+              .navigate(targetUrl)
+              .then((client) => (client ? client.focus() : existingClient.focus()))
+              .catch(() => existingClient.focus());
           }
-        });
 
-        if (existingClient) {
-          existingClient.focus();
-          return existingClient.navigate(targetDeepLink);
-        }
-
-        return self.clients.openWindow(targetDeepLink);
-      }),
+          return self.clients.openWindow(targetUrl);
+        }),
+    ]),
   );
 });

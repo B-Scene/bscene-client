@@ -1,5 +1,7 @@
+import type { RouteObject } from "react-router-dom";
 import { createBrowserRouter, Navigate, Outlet } from "react-router-dom";
 import { MobileLayout } from "@/components/layout/MobileLayout";
+import { ModeGuard } from "@/components/common/ModeGuard";
 import Splash from "@/pages/auth/Splash";
 import Login from "@/pages/auth/LoginPage";
 import AgreementPage from "@/pages/onboarding/AgreementPage";
@@ -32,6 +34,7 @@ import ProfileEditPage from "@/pages/fan/my/ProfileEditPage";
 import FanExplorePage from "@/pages/fan/explore/FanExplorePage";
 import FanExploreSearchPage from "@/pages/fan/explore/FanExploreSearchPage";
 import FanExploreSearchResultPage from "@/pages/fan/explore/FanExploreSearchResultPage";
+import FanExploreBandMorePage from "@/pages/fan/explore/FanExploreBandMorePage";
 import FanExploreConcertMorePage from "@/pages/fan/explore/FanExploreConcertMorePage";
 import FanExploreContentMorePage from "@/pages/fan/explore/FanExploreContentMorePage";
 import FanContentDetailPage from "@/pages/fan/explore/FanContentDetailPage";
@@ -63,6 +66,26 @@ import SessionChatPage from "@/pages/band/session/components/SessionChatPage";
 import ApplicationDetailPage from "@/pages/band/my/ApplicationDetailPage";
 import BandInviteLinkPage from "@/pages/band/home/BandInviteLinkPage";
 
+function withModeGuard(routes: RouteObject[]): RouteObject[] {
+  return routes.map((route) => {
+    if (route.path?.startsWith("/fan")) {
+      return {
+        ...route,
+        element: <ModeGuard allowedMode="FAN">{route.element}</ModeGuard>,
+      };
+    }
+
+    if (route.path?.startsWith("/band")) {
+      return {
+        ...route,
+        element: <ModeGuard allowedMode="BAND">{route.element}</ModeGuard>,
+      };
+    }
+
+    return route;
+  });
+}
+
 export const router = createBrowserRouter([
   {
     element: (
@@ -70,7 +93,7 @@ export const router = createBrowserRouter([
         <Outlet />
       </MobileLayout>
     ),
-    children: [
+    children: withModeGuard([
       //onboarding
       {
         path: "/",
@@ -224,7 +247,7 @@ export const router = createBrowserRouter([
         path: "/band/session/messages/:messageId",
         element: <SessionChatPage />,
       },
-    ],
+    ]),
   },
   {
     element: (
@@ -232,7 +255,7 @@ export const router = createBrowserRouter([
         <Outlet />
       </MobileLayout>
     ),
-    children: [
+    children: withModeGuard([
       //band
       {
         path: "/fan/home",
@@ -249,6 +272,10 @@ export const router = createBrowserRouter([
       {
         path: "/fan/explore/search/results",
         element: <FanExploreSearchResultPage />,
+      },
+      {
+        path: "/fan/explore/search/results/bands",
+        element: <FanExploreBandMorePage />,
       },
       {
         path: "/fan/explore/search/results/concerts",
@@ -350,6 +377,6 @@ export const router = createBrowserRouter([
         path: "/band/my/followers",
         element: <BandFollowersPage />,
       },
-    ],
+    ]),
   },
 ]);

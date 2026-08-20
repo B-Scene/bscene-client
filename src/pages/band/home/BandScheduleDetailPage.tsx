@@ -1,7 +1,18 @@
+import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { Header } from "@/components/common/Header/Header";
 import HeartIcon from "@/assets/icons/Heart.svg";
-import { usePerformanceQuery } from "@/hooks/api/band/usePerformance";
+import LikedHeartIcon from "@/assets/icons/Union.svg";
+import {
+  performanceKeys,
+  usePerformanceQuery,
+} from "@/hooks/api/band/usePerformance";
+import {
+  useAddPerformanceInterest,
+  useDeletePerformanceInterest,
+} from "@/hooks/api/fan/useFanHome";
+import { isAlreadyInterestedPerformanceError } from "@/api/fan/home";
 import {
   BAND_REGION_LABELS,
   PERFORMANCE_AGE_RATING_LABELS,
@@ -37,7 +48,7 @@ const ImagePlaceholderIcon = () => (
 );
 
 const Tag = ({ children }: { children: string }) => (
-  <span className="rounded-full bg-secondary-100 px-[9px] py-[3px] font-body text-caption5 text-secondary-600">
+  <span className="rounded-full bg-secondary-100 px-3 py-1 font-body text-caption2 text-secondary-600">
     {children}
   </span>
 );
@@ -111,10 +122,17 @@ const getDdayLabel = (performanceDate: string, startTime: string) => {
 
 const BandScheduleDetailPage = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { performanceId: performanceIdParam } = useParams();
   const performanceId = Number(performanceIdParam);
   const detailQuery = usePerformanceQuery(performanceId);
   const detail = detailQuery.data;
+  const addPerformanceInterestMutation = useAddPerformanceInterest();
+  const deletePerformanceInterestMutation = useDeletePerformanceInterest();
+  const [likeOverride, setLikeOverride] = useState<{
+    isLiked: boolean;
+    interestCount: number;
+  } | null>(null);
 
   if (detailQuery.isLoading) {
     return (
@@ -174,6 +192,52 @@ const BandScheduleDetailPage = () => {
     { label: "티켓 가격", value: ticketPrice },
     { label: "관람 연령", value: ageRating },
   ];
+  const isLiked = likeOverride?.isLiked ?? detail.isInterested ?? false;
+  const interestCount =
+    likeOverride?.interestCount ?? detail.interestCount ?? 0;
+  const isLikePending =
+    addPerformanceInterestMutation.isPending ||
+    deletePerformanceInterestMutation.isPending;
+
+  const handleLikeClick = async () => {
+    if (isLikePending) return;
+
+    const previousOverride = likeOverride;
+
+    if (isLiked) {
+      setLikeOverride({
+        isLiked: false,
+        interestCount: Math.max(0, interestCount - 1),
+      });
+
+      try {
+        await deletePerformanceInterestMutation.mutateAsync(performanceId);
+        queryClient.invalidateQueries({
+          queryKey: performanceKeys.detail(performanceId),
+        });
+      } catch {
+        setLikeOverride(previousOverride);
+      }
+      return;
+    }
+
+    setLikeOverride({ isLiked: true, interestCount: interestCount + 1 });
+
+    try {
+      await addPerformanceInterestMutation.mutateAsync(performanceId);
+      queryClient.invalidateQueries({
+        queryKey: performanceKeys.detail(performanceId),
+      });
+    } catch (error) {
+      if (isAlreadyInterestedPerformanceError(error)) {
+        queryClient.invalidateQueries({
+          queryKey: performanceKeys.detail(performanceId),
+        });
+        return;
+      }
+      setLikeOverride(previousOverride);
+    }
+  };
 
   return (
     <main className="min-h-dvh bg-neutral-0">
@@ -205,10 +269,23 @@ const BandScheduleDetailPage = () => {
             </p>
           </div>
 
-          <div className="mt-[38px] flex shrink-0 items-center gap-1 font-body text-caption3 text-neutral-700">
-            <img src={HeartIcon} alt="" className="size-6" />
-            {detail.interestCount}
-          </div>
+          <button
+            type="button"
+            aria-label={isLiked ? "좋아요 취소" : "좋아요"}
+            aria-pressed={isLiked}
+            disabled={isLikePending}
+            onClick={() => void handleLikeClick()}
+            className="mt-[38px] flex shrink-0 items-center gap-1 font-body text-caption3 text-neutral-700"
+          >
+            <img
+              src={isLiked ? LikedHeartIcon : HeartIcon}
+              alt=""
+              className="size-6"
+            />
+            <span className="inline-block min-w-[3ch] tabular-nums">
+              {interestCount}
+            </span>
+          </button>
         </div>
 
         <section className="mt-4 rounded-[12px] bg-neutral-0 px-4 pb-3 pt-3 shadow-[0_0_8px_0_rgba(0,0,0,0.10)]">
@@ -218,10 +295,8 @@ const BandScheduleDetailPage = () => {
 
       <div className="h-4 bg-secondary-0" />
 
-      <section className="px-6 pb-12 pt-4">
-        <h2 className="m-0 font-body text-body1 text-neutral-900">
-          공연 소개
-        </h2>
+      <section className="px-6 pb-25 pt-4">
+        <h2 className="m-0 font-body text-body1 text-neutral-900">공연 소개</h2>
         <p className="m-0 mt-[20px] whitespace-pre-line font-body text-caption2 text-neutral-900">
           {detail.description || "공연 소개가 준비 중이에요."}
         </p>

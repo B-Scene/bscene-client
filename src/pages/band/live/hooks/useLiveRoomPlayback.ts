@@ -1,29 +1,57 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+
 import {
   createWhepSession,
   deleteWhipSession,
-  enterLive,
 } from "@/api/live/live";
+import type { LiveCoPublisher } from "@/types/live/live";
 import { getStoredAuthUser } from "@/utils/authUser";
-import type { PlaybackProtocol } from "@/types/live/live";
+
 import type { ActiveLive } from "../types";
 import { waitForIceGatheringComplete } from "./liveMediaUtils";
-
-const getOtherCoPublisherWhepUrl = (live: ActiveLive) => {
-  const currentUserId = getStoredAuthUser()?.userId;
-
-  return live?.coPublishers?.find(
-    (publisher) =>
-      publisher.whepUrl &&
-      (!Number.isFinite(currentUserId) || publisher.userId !== currentUserId),
-  )?.whepUrl;
-};
 
 interface UseLiveRoomPlaybackParams {
   live: ActiveLive;
   canBroadcast: boolean;
   audioConnected: boolean;
 }
+
+type CoPublisherPeer = {
+  userId: number;
+  whepUrl: string;
+  peerConnection: RTCPeerConnection;
+  audio: HTMLAudioElement;
+  abortController: AbortController;
+  sessionUrl: string | null;
+  disconnectTimer: number | null;
+};
+
+const WHEP_RETRY_DELAY_MS = 3000;
+
+const normalizeCoPublishers = (publishers: LiveCoPublisher[]) => {
+  const currentUserId = getStoredAuthUser()?.userId;
+  const normalized = new Map<number, string>();
+
+  publishers.forEach((publisher) => {
+    if (!Number.isFinite(publisher.userId)) return;
+    if (publisher.userId === currentUserId) return;
+    if (typeof publisher.whepUrl !== "string") return;
+
+    const whepUrl = publisher.whepUrl.trim();
+    if (!whepUrl) return;
+
+    normalized.set(publisher.userId, whepUrl);
+  });
+
+  return normalized;
+};
+
+const mapToPublisherList = (publishers: Map<number, string>): LiveCoPublisher[] => {
+  return Array.from(publishers, ([userId, whepUrl]) => ({
+    userId,
+    whepUrl,
+  }));
+};
 
 export const useLiveRoomPlayback = ({
   live,
@@ -32,34 +60,37 @@ export const useLiveRoomPlayback = ({
 }: UseLiveRoomPlaybackParams) => {
   const playbackRole = live?.playback?.role;
   const playbackUrl = live?.playback?.playbackUrl;
-  const initialWhepUrl = getOtherCoPublisherWhepUrl(live);
-  const [monitorPlaybackUrl, setMonitorPlaybackUrl] = useState<string | null>(
-    () => initialWhepUrl ?? live?.monitorPlaybackUrl ?? null,
-  );
-  const [monitorPlaybackProtocol, setMonitorPlaybackProtocol] =
-    useState<PlaybackProtocol | null>(
-      () =>
-        (initialWhepUrl ? "WHEP" : live?.monitorPlaybackProtocol) ?? null,
-    );
+
+  const listenerAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  const desiredPublishersRef = useRef<Map<number, string>>(new Map());
+  const initialSnapshotLiveIdRef = useRef<number | null>(null);
+  const canBroadcastRef = useRef(canBroadcast);
+  const audioConnectedRef = useRef(audioConnected);
+
+  canBroadcastRef.current = canBroadcast;
+  audioConnectedRef.current = audioConnected;
+
+  const peersRef = useRef<Map<number, CoPublisherPeer>>(new Map());
+
+  const retryTimerRef = useRef<number | null>(null);
+  const isUnmountedRef = useRef(false);
+
   const [listenerAudioMessage, setListenerAudioMessage] = useState("");
   const [showListenerPlayButton, setShowListenerPlayButton] = useState(false);
-  const [monitorRetryNonce, setMonitorRetryNonce] = useState(0);
-  const listenerAudioRef = useRef<HTMLAudioElement | null>(null);
-  const whepSessionUrlRef = useRef<string | null>(null);
-  const monitorPeerConnectionRef = useRef<RTCPeerConnection | null>(null);
-  const connectedMonitorUrlRef = useRef<string | null>(null);
-  const negotiatingMonitorUrlRef = useRef<string | null>(null);
-  const whepAbortControllerRef = useRef<AbortController | null>(null);
-  const whepGenerationRef = useRef(0);
-  const monitorRetryTimerRef = useRef<number | null>(null);
+  const [coPublisherCount, setCoPublisherCount] = useState(() =>
+    normalizeCoPublishers(live?.coPublishers ?? []).size,
+  );
+  const [retryNonce, setRetryNonce] = useState(0);
 
   const isListenerPlayback =
     Boolean(live?.liveId) && playbackRole === "LISTENER" && Boolean(playbackUrl);
+
   const isBroadcasterMonitorPlayback =
     Boolean(live?.liveId) &&
     canBroadcast &&
     audioConnected &&
-    Boolean(monitorPlaybackUrl);
+    coPublisherCount > 0;
 
   const stopListenerPlayback = useCallback((resetUi = true) => {
     const audio = listenerAudioRef.current;
@@ -83,9 +114,14 @@ export const useLiveRoomPlayback = ({
     if (!audio || !playbackUrl) return;
 
     try {
-      if (audio.src !== playbackUrl) audio.src = playbackUrl;
+      if (audio.src !== playbackUrl) {
+        audio.srcObject = null;
+        audio.src = playbackUrl;
+      }
+
       audio.volume = 1;
       await audio.play();
+
       setListenerAudioMessage("");
       setShowListenerPlayButton(false);
     } catch {
@@ -94,258 +130,416 @@ export const useLiveRoomPlayback = ({
     }
   }, [playbackUrl]);
 
-  const stopBroadcasterMonitorPlayback = useCallback(
-    async (resetUi = true) => {
-      if (monitorRetryTimerRef.current !== null) {
-        window.clearTimeout(monitorRetryTimerRef.current);
-        monitorRetryTimerRef.current = null;
-      }
-      whepGenerationRef.current += 1;
-      whepAbortControllerRef.current?.abort();
-      whepAbortControllerRef.current = null;
-      const sessionUrl = whepSessionUrlRef.current;
+  const syncCoPublisherPlaybackUi = useCallback(() => {
+    if (isUnmountedRef.current) return;
 
-      whepSessionUrlRef.current = null;
-      connectedMonitorUrlRef.current = null;
-      negotiatingMonitorUrlRef.current = null;
-      monitorPeerConnectionRef.current?.close();
-      monitorPeerConnectionRef.current = null;
+    const peers = Array.from(peersRef.current.values());
+    const playablePeers = peers.filter((peer) => peer.audio.srcObject !== null);
 
-      const audio = listenerAudioRef.current;
-      if (audio) {
-        audio.pause();
-        audio.srcObject = null;
-        audio.removeAttribute("src");
-        audio.load();
-      }
-
-      if (sessionUrl) {
-        try {
-          await deleteWhipSession(sessionUrl);
-        } catch {
-          // 이미 종료된 수신 세션이면 무시합니다.
-        }
-      }
-
-      if (resetUi) {
+    if (playablePeers.length === 0) {
+      if (desiredPublishersRef.current.size === 0) {
         setListenerAudioMessage("");
         setShowListenerPlayButton(false);
-      }
-    },
-    [],
-  );
-
-  const startBroadcasterMonitorPlayback = useCallback(async () => {
-    const audio = listenerAudioRef.current;
-
-    if (!audio || !monitorPlaybackUrl) return;
-
-    const activeMonitorUrl =
-      connectedMonitorUrlRef.current ?? negotiatingMonitorUrlRef.current;
-
-    if (activeMonitorUrl && activeMonitorUrl !== monitorPlaybackUrl) {
-      await stopBroadcasterMonitorPlayback(false);
-    } else if (monitorPeerConnectionRef.current) {
-      try {
-        await audio.play();
-        setListenerAudioMessage("");
-        setShowListenerPlayButton(false);
-      } catch {
-        setListenerAudioMessage("상대 진행자 소리를 들으려면 눌러주세요.");
-        setShowListenerPlayButton(true);
       }
       return;
     }
 
-    try {
-      if (
-        monitorPlaybackProtocol === "HLS" ||
-        monitorPlaybackUrl.toLowerCase().includes(".m3u8")
-      ) {
-        audio.srcObject = null;
-        audio.src = monitorPlaybackUrl;
-        audio.volume = 1;
-        connectedMonitorUrlRef.current = monitorPlaybackUrl;
-        await audio.play();
+    const hasBlockedPlayback = playablePeers.some((peer) => peer.audio.paused);
+
+    if (hasBlockedPlayback) {
+      setListenerAudioMessage("상대 진행자 소리를 들으려면 눌러주세요.");
+      setShowListenerPlayButton(true);
+      return;
+    }
+
+    setListenerAudioMessage("");
+    setShowListenerPlayButton(false);
+  }, []);
+
+  const closePeer = useCallback(
+    async (userId: number) => {
+      const peer = peersRef.current.get(userId);
+
+      if (!peer) return;
+
+      peersRef.current.delete(userId);
+
+      if (peer.disconnectTimer !== null) {
+        window.clearTimeout(peer.disconnectTimer);
+        peer.disconnectTimer = null;
+      }
+
+      peer.abortController.abort();
+      peer.peerConnection.ontrack = null;
+      peer.peerConnection.onconnectionstatechange = null;
+      peer.peerConnection.close();
+
+      peer.audio.pause();
+      peer.audio.srcObject = null;
+      peer.audio.removeAttribute("src");
+      peer.audio.remove();
+
+      if (peer.sessionUrl) {
+        try {
+          await deleteWhipSession(peer.sessionUrl);
+        } catch {
+        }
+      }
+
+      syncCoPublisherPlaybackUi();
+    },
+    [syncCoPublisherPlaybackUi],
+  );
+
+  const closeAllPeers = useCallback(
+    async (resetUi = true) => {
+      if (retryTimerRef.current !== null) {
+        window.clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = null;
+      }
+
+      const userIds = Array.from(peersRef.current.keys());
+      await Promise.all(userIds.map((userId) => closePeer(userId)));
+
+      if (resetUi && !isUnmountedRef.current) {
         setListenerAudioMessage("");
         setShowListenerPlayButton(false);
+      }
+    },
+    [closePeer],
+  );
+
+  const scheduleRetry = useCallback(() => {
+    if (isUnmountedRef.current) return;
+    if (retryTimerRef.current !== null) return;
+
+    retryTimerRef.current = window.setTimeout(() => {
+      retryTimerRef.current = null;
+      setRetryNonce((current) => current + 1);
+    }, WHEP_RETRY_DELAY_MS);
+  }, []);
+
+  const connectPeer = useCallback(
+    async (userId: number, whepUrl: string) => {
+      if (
+        !canBroadcastRef.current ||
+        !audioConnectedRef.current ||
+        isUnmountedRef.current
+      ) {
         return;
       }
 
-      const targetWhepUrl = monitorPlaybackUrl;
-      const generation = whepGenerationRef.current + 1;
-      whepGenerationRef.current = generation;
-      whepAbortControllerRef.current?.abort();
-      const abortController = new AbortController();
-      whepAbortControllerRef.current = abortController;
-      negotiatingMonitorUrlRef.current = targetWhepUrl;
+      const desiredUrl = desiredPublishersRef.current.get(userId);
+      if (desiredUrl !== whepUrl) return;
 
+      const existing = peersRef.current.get(userId);
+
+      if (existing?.whepUrl === whepUrl) {
+        return;
+      }
+
+      if (existing) {
+        await closePeer(userId);
+      }
+
+      if (desiredPublishersRef.current.get(userId) !== whepUrl) return;
+
+      const abortController = new AbortController();
       const peerConnection = new RTCPeerConnection();
-      monitorPeerConnectionRef.current = peerConnection;
+      const audio = document.createElement("audio");
+
+      audio.autoplay = true;
+      audio.volume = 1;
+      audio.setAttribute("data-live-co-publisher-user-id", String(userId));
+      audio.style.display = "none";
+      document.body.appendChild(audio);
+
+      const peer: CoPublisherPeer = {
+        userId,
+        whepUrl,
+        peerConnection,
+        audio,
+        abortController,
+        sessionUrl: null,
+        disconnectTimer: null,
+      };
+
+      peersRef.current.set(userId, peer);
+
       peerConnection.addTransceiver("audio", { direction: "recvonly" });
+
       peerConnection.ontrack = (event) => {
+        if (peersRef.current.get(userId) !== peer) return;
+
         audio.srcObject =
           event.streams[0] ?? new MediaStream([event.track]);
         audio.volume = 1;
-        void audio.play().catch(() => {
-          setListenerAudioMessage("상대 진행자 소리를 들으려면 눌러주세요.");
-          setShowListenerPlayButton(true);
+
+        void audio.play().finally(() => {
+          syncCoPublisherPlaybackUi();
         });
       };
 
-      const offer = await peerConnection.createOffer();
-      await peerConnection.setLocalDescription(offer);
-      await waitForIceGatheringComplete(peerConnection);
+      peerConnection.onconnectionstatechange = () => {
+        if (peersRef.current.get(userId) !== peer) return;
 
-      const sdpOffer = peerConnection.localDescription?.sdp;
-      if (!sdpOffer) throw new Error("WHEP SDP Offer 생성에 실패했습니다.");
+        const state = peerConnection.connectionState;
 
-      const { sdpAnswer, sessionUrl } = await createWhepSession({
-        whepUrl: targetWhepUrl,
-        sdpOffer,
-        signal: abortController.signal,
-      });
+        if (state === "connected") {
+          if (peer.disconnectTimer !== null) {
+            window.clearTimeout(peer.disconnectTimer);
+            peer.disconnectTimer = null;
+          }
 
-      if (
-        abortController.signal.aborted ||
-        whepGenerationRef.current !== generation
-      ) {
-        peerConnection.close();
-        await deleteWhipSession(sessionUrl).catch(() => undefined);
-        return;
+          syncCoPublisherPlaybackUi();
+          return;
+        }
+
+        if (state === "failed") {
+          void closePeer(userId).then(() => {
+            if (desiredPublishersRef.current.get(userId) === whepUrl) {
+              scheduleRetry();
+            }
+          });
+          return;
+        }
+
+        if (state === "disconnected" && peer.disconnectTimer === null) {
+          peer.disconnectTimer = window.setTimeout(() => {
+            peer.disconnectTimer = null;
+
+            if (
+              peersRef.current.get(userId) === peer &&
+              peerConnection.connectionState === "disconnected"
+            ) {
+              void closePeer(userId).then(() => {
+                if (desiredPublishersRef.current.get(userId) === whepUrl) {
+                  scheduleRetry();
+                }
+              });
+            }
+          }, WHEP_RETRY_DELAY_MS);
+        }
+      };
+
+      try {
+        const offer = await peerConnection.createOffer();
+        await peerConnection.setLocalDescription(offer);
+        await waitForIceGatheringComplete(peerConnection);
+
+        const sdpOffer = peerConnection.localDescription?.sdp;
+
+        if (!sdpOffer) {
+          throw new Error("WHEP SDP Offer 생성에 실패했습니다.");
+        }
+
+        const { sdpAnswer, sessionUrl } = await createWhepSession({
+          whepUrl,
+          sdpOffer,
+          signal: abortController.signal,
+        });
+
+        if (
+          abortController.signal.aborted ||
+          peersRef.current.get(userId) !== peer ||
+          desiredPublishersRef.current.get(userId) !== whepUrl
+        ) {
+          peerConnection.close();
+          await deleteWhipSession(sessionUrl).catch(() => undefined);
+          return;
+        }
+
+        peer.sessionUrl = sessionUrl;
+
+        await peerConnection.setRemoteDescription({
+          type: "answer",
+          sdp: sdpAnswer,
+        });
+      } catch (error) {
+        if (
+          abortController.signal.aborted ||
+          (error instanceof DOMException && error.name === "AbortError")
+        ) {
+          return;
+        }
+
+        await closePeer(userId);
+
+        if (desiredPublishersRef.current.get(userId) === whepUrl) {
+          if (!isUnmountedRef.current) {
+            setListenerAudioMessage(
+              error instanceof Error
+                ? error.message
+                : "공동 진행자 오디오 수신에 실패했어요.",
+            );
+            setShowListenerPlayButton(true);
+          }
+
+          scheduleRetry();
+        }
       }
-
-      whepSessionUrlRef.current = sessionUrl;
-      negotiatingMonitorUrlRef.current = null;
-      connectedMonitorUrlRef.current = targetWhepUrl;
-      await peerConnection.setRemoteDescription({
-        type: "answer",
-        sdp: sdpAnswer,
-      });
-      setListenerAudioMessage("");
-      setShowListenerPlayButton(false);
-    } catch (error) {
-      if (
-        error instanceof DOMException &&
-        error.name === "AbortError"
-      ) {
-        return;
-      }
-
-      await stopBroadcasterMonitorPlayback(false);
-      setListenerAudioMessage(
-        error instanceof Error
-          ? error.message
-          : "공동 진행자 오디오 수신에 실패했어요.",
-      );
-      setShowListenerPlayButton(true);
-      monitorRetryTimerRef.current = window.setTimeout(() => {
-        monitorRetryTimerRef.current = null;
-        setMonitorRetryNonce((current) => current + 1);
-      }, 3000);
-    } finally {
-      if (whepAbortControllerRef.current?.signal.aborted) {
-        whepAbortControllerRef.current = null;
-      }
-    }
-  }, [
-    monitorPlaybackProtocol,
-    monitorPlaybackUrl,
-    stopBroadcasterMonitorPlayback,
-  ]);
-
-  const handleCoPublisherJoined = useCallback(
-    ({ userId, whepUrl }: { userId: number; whepUrl: string }) => {
-      if (userId === getStoredAuthUser()?.userId) return;
-
-      setMonitorPlaybackUrl(whepUrl);
-      setMonitorPlaybackProtocol("WHEP");
     },
-    [],
+    [closePeer, scheduleRetry, syncCoPublisherPlaybackUi],
   );
 
-  useEffect(() => {
-    if (
-      !live?.liveId ||
-      !canBroadcast ||
-      !audioConnected ||
-      monitorPlaybackUrl
-    ) {
+  const reconcileCoPublishers = useCallback(
+    (publishers: LiveCoPublisher[]) => {
+      const next = normalizeCoPublishers(publishers);
+      desiredPublishersRef.current = next;
+      setCoPublisherCount(next.size);
+
+      for (const [userId, peer] of peersRef.current) {
+        const nextWhepUrl = next.get(userId);
+
+        if (!nextWhepUrl) {
+          void closePeer(userId);
+          continue;
+        }
+
+        if (nextWhepUrl !== peer.whepUrl) {
+          void closePeer(userId).then(() => {
+            if (desiredPublishersRef.current.get(userId) === nextWhepUrl) {
+              void connectPeer(userId, nextWhepUrl);
+            }
+          });
+        }
+      }
+
+      if (canBroadcastRef.current && audioConnectedRef.current) {
+        for (const [userId, whepUrl] of next) {
+          const existing = peersRef.current.get(userId);
+
+          if (!existing) {
+            void connectPeer(userId, whepUrl);
+          }
+        }
+      }
+
+      if (next.size === 0) {
+        setListenerAudioMessage("");
+        setShowListenerPlayButton(false);
+      }
+    },
+    [closePeer, connectPeer],
+  );
+
+  const handleCoPublishersChanged = useCallback(
+    (publishers: LiveCoPublisher[]) => {
+      reconcileCoPublishers(publishers);
+    },
+    [reconcileCoPublishers],
+  );
+
+  const startBroadcasterMonitorPlayback = useCallback(async () => {
+    const desiredPublishers = desiredPublishersRef.current;
+
+    for (const [userId, whepUrl] of desiredPublishers) {
+      if (!peersRef.current.has(userId)) {
+        void connectPeer(userId, whepUrl);
+      }
+    }
+
+    const playableAudios = Array.from(peersRef.current.values())
+      .map((peer) => peer.audio)
+      .filter((audio) => audio.srcObject !== null);
+
+    if (playableAudios.length === 0) {
+      scheduleRetry();
       return;
     }
 
-    let isCancelled = false;
-    let timeoutId: number | undefined;
+    await Promise.allSettled(
+      playableAudios.map(async (audio) => {
+        audio.volume = 1;
+        await audio.play();
+      }),
+    );
 
-    const refreshCoPublishers = async () => {
-      try {
-        const refreshedLive = await enterLive(live.liveId);
-        const whepUrl = getOtherCoPublisherWhepUrl(refreshedLive);
+    syncCoPublisherPlaybackUi();
+  }, [
+    connectPeer,
+    scheduleRetry,
+    syncCoPublisherPlaybackUi,
+  ]);
 
-        if (isCancelled) return;
-        if (whepUrl) {
-          setMonitorPlaybackUrl(whepUrl);
-          setMonitorPlaybackProtocol("WHEP");
-          return;
-        }
-      } catch {
-        // SSE 이벤트를 놓친 경우의 보조 조회이므로 다음 주기에 재시도합니다.
-      }
+  useEffect(() => {
+    const liveId = live?.liveId ?? null;
 
-      if (!isCancelled) {
-        timeoutId = window.setTimeout(refreshCoPublishers, 3000);
-      }
-    };
+    if (!liveId) {
+      initialSnapshotLiveIdRef.current = null;
+      return;
+    }
 
-    void refreshCoPublishers();
-    return () => {
-      isCancelled = true;
-      if (timeoutId !== undefined) window.clearTimeout(timeoutId);
-    };
-  }, [audioConnected, canBroadcast, live?.liveId, monitorPlaybackUrl]);
+    if (initialSnapshotLiveIdRef.current === liveId) {
+      return;
+    }
+
+    initialSnapshotLiveIdRef.current = liveId;
+    reconcileCoPublishers(live?.coPublishers ?? []);
+  }, [live?.coPublishers, live?.liveId, reconcileCoPublishers]);
+
+  useEffect(() => {
+    if (!canBroadcast || !audioConnected) {
+      void closeAllPeers(false);
+      return;
+    }
+
+    reconcileCoPublishers(mapToPublisherList(desiredPublishersRef.current));
+  }, [audioConnected, canBroadcast, closeAllPeers, reconcileCoPublishers]);
+
+  useEffect(() => {
+    if (!retryNonce || !canBroadcast || !audioConnected) return;
+
+    reconcileCoPublishers(mapToPublisherList(desiredPublishersRef.current));
+  }, [
+    audioConnected,
+    canBroadcast,
+    reconcileCoPublishers,
+    retryNonce,
+  ]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
       if (isListenerPlayback) {
-        void stopBroadcasterMonitorPlayback(false);
+        void closeAllPeers(false);
         void startListenerPlayback();
         return;
       }
 
-      if (isBroadcasterMonitorPlayback) {
+      if (canBroadcast) {
         stopListenerPlayback(false);
-        void startBroadcasterMonitorPlayback();
         return;
       }
 
       stopListenerPlayback(false);
-      void stopBroadcasterMonitorPlayback(false);
+      void closeAllPeers(false);
     }, 0);
 
     return () => window.clearTimeout(timeoutId);
   }, [
-    isBroadcasterMonitorPlayback,
+    canBroadcast,
+    closeAllPeers,
     isListenerPlayback,
-    monitorRetryNonce,
-    startBroadcasterMonitorPlayback,
     startListenerPlayback,
-    stopBroadcasterMonitorPlayback,
     stopListenerPlayback,
   ]);
 
   useEffect(() => {
     return () => {
-      if (monitorRetryTimerRef.current !== null) {
-        window.clearTimeout(monitorRetryTimerRef.current);
-        monitorRetryTimerRef.current = null;
+      isUnmountedRef.current = true;
+
+      if (retryTimerRef.current !== null) {
+        window.clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = null;
       }
+
       stopListenerPlayback(false);
-      void stopBroadcasterMonitorPlayback(false);
+      void closeAllPeers(false);
     };
-  }, [stopBroadcasterMonitorPlayback, stopListenerPlayback]);
+  }, [closeAllPeers, stopListenerPlayback]);
 
   return {
-    handleCoPublisherJoined,
+    handleCoPublishersChanged,
     isBroadcasterMonitorPlayback,
     isListenerPlayback,
     listenerAudioMessage,
