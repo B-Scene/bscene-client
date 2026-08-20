@@ -265,7 +265,7 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
             모드 전환
           </h2>
 
-          <div className="flex w-full min-h-0 flex-1 flex-col items-center gap-6 overflow-y-auto">
+          <div className="flex w-full min-h-0 flex-1 flex-col items-center gap-6 overflow-y-auto py-2">
             {fanModeSection}
 
             {bandModeSection}
