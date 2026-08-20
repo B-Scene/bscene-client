@@ -32,12 +32,42 @@ export const MobileLayout = ({
       );
     };
 
+    // iOS Safari (non-standalone tab) shows/hides its address and toolbar
+    // as the user scrolls, changing the visible height without firing
+    // window's resize event, so --app-height goes stale and fixed-position
+    // bottom bars (e.g. live action bar) end up misaligned. visualViewport
+    // reports that change reliably. Skipped while an input is focused so it
+    // doesn't fight the keyboard-offset logic above.
+    const setAppHeightFromVisualViewport = () => {
+      const activeElement = document.activeElement;
+      const isEditableFocused =
+        activeElement instanceof HTMLElement &&
+        (activeElement.tagName === "INPUT" ||
+          activeElement.tagName === "TEXTAREA" ||
+          activeElement.isContentEditable);
+
+      if (isEditableFocused || !window.visualViewport) return;
+
+      document.documentElement.style.setProperty(
+        "--app-height",
+        `${window.visualViewport.height}px`,
+      );
+    };
+
     setAppHeight();
 
     window.addEventListener("resize", setAppHeight);
+    window.visualViewport?.addEventListener(
+      "resize",
+      setAppHeightFromVisualViewport,
+    );
 
     return () => {
       window.removeEventListener("resize", setAppHeight);
+      window.visualViewport?.removeEventListener(
+        "resize",
+        setAppHeightFromVisualViewport,
+      );
     };
   }, []);
 
