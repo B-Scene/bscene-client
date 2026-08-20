@@ -664,8 +664,9 @@ const setupAuthenticatedHlsXhr = (
   xhr: XMLHttpRequest,
   requestUrl: string,
   getAuthorization: () => string,
+  withCredentials: boolean,
 ) => {
-  xhr.withCredentials = false;
+  xhr.withCredentials = withCredentials;
 
   const url = new URL(requestUrl, window.location.href);
   const hasUrlAuthorization =
@@ -683,14 +684,26 @@ export const setupLivePlaybackXhr = (
   xhr: XMLHttpRequest,
   requestUrl: string,
 ) => {
-  setupAuthenticatedHlsXhr(xhr, requestUrl, getLivePlaybackAuthorization);
+  // MediaMTX HLS 세션은 쿠키로 유지되므로, 라이브 재생 요청은 credentials를 함께 보내야 해요.
+  setupAuthenticatedHlsXhr(
+    xhr,
+    requestUrl,
+    getLivePlaybackAuthorization,
+    true,
+  );
 };
 
 export const setupLiveReplayXhr = (
   xhr: XMLHttpRequest,
   requestUrl: string,
 ) => {
-  setupAuthenticatedHlsXhr(xhr, requestUrl, getLiveReplayAuthorization);
+  // 다시보기는 S3 서명 URL을 사용해 credentials를 보내면 CORS가 깨지므로 기존대로 둬요.
+  setupAuthenticatedHlsXhr(
+    xhr,
+    requestUrl,
+    getLiveReplayAuthorization,
+    false,
+  );
 };
 
 const parseErrorMessage = (responseText: string, fallbackMessage: string) => {
