@@ -378,12 +378,22 @@ export function FanLivePage() {
           setAudioMessage("");
         };
 
+        const handleNativeError = () => {
+          console.error("[Fan Live native HLS error]", {
+            code: audio.error?.code,
+            message: audio.error?.message,
+            playbackUrl,
+          });
+        };
+
         audio.addEventListener("canplay", handleCanPlay);
         audio.addEventListener("loadedmetadata", handleLoadedMetadata);
+        audio.addEventListener("error", handleNativeError);
 
         return () => {
           audio.removeEventListener("canplay", handleCanPlay);
           audio.removeEventListener("loadedmetadata", handleLoadedMetadata);
+          audio.removeEventListener("error", handleNativeError);
           audio.pause();
           audio.removeAttribute("src");
           audio.load();
@@ -416,6 +426,8 @@ export function FanLivePage() {
     });
 
     hls.on(Hls.Events.FRAG_LOADED, () => {
+      if (audio.paused) return;
+
       setAudioMessage("");
     });
 
@@ -672,9 +684,13 @@ export function FanLivePage() {
       />
 
       {audioMessage ? (
-        <p className="absolute inset-x-5 top-[56px] z-20 rounded-lg bg-primary-400 px-3 py-2 text-center font-body text-caption3 text-neutral-0">
+        <button
+          type="button"
+          onClick={() => void startPlayback()}
+          className="absolute inset-x-5 top-[56px] z-20 rounded-lg bg-primary-400 px-3 py-2 text-center font-body text-caption3 text-neutral-0"
+        >
           {audioMessage}
-        </p>
+        </button>
       ) : null}
 
       {hasOpenedChat ? (
