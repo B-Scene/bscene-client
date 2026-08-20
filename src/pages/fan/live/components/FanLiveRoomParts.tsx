@@ -134,7 +134,7 @@ export function FanLiveHero({
 
 export function EmptyChatArea() {
   return (
-    <section className="absolute inset-x-0 top-[386px] bottom-0 flex flex-col items-center bg-primary-0/70 px-[87px] pt-[81px] text-center">
+    <section className="absolute inset-x-0 top-[386px] bottom-0 flex flex-col items-center justify-center bg-primary-0/70 px-[87px] pb-[110px] text-center">
       <div className="flex w-[219px] flex-col items-center justify-center gap-6">
         <img src={ChatIcon} alt="" className="size-[52px] opacity-[0.15]" />
         <div>
