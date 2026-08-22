@@ -1,4 +1,5 @@
 import { useEffect, useState, type ChangeEvent } from "react";
+import { useDragToCloseSheet } from "@/hooks/useDragToCloseSheet";
 import { useSlideUpSheet } from "@/hooks/useSlideUpSheet";
 
 interface TimePickerSheetProps {
@@ -69,6 +70,11 @@ export const TimePickerSheet = ({
     setMinute(onlyDigits(event.target.value));
   };
 
+  const { dragPhase, translateY, dragHandleProps } = useDragToCloseSheet(
+    isVisible,
+    onClose,
+  );
+
   const handleConfirm = () => {
     const clampedHour = clamp(hour, 23);
     const clampedMinute = clamp(minute, 59);
@@ -96,12 +102,17 @@ export const TimePickerSheet = ({
 
       <div
         onTransitionEnd={handleTransitionEnd}
-        style={{ marginBottom: keyboardOffset }}
-        className={`relative z-10 flex w-full flex-col items-center gap-4 rounded-t-3xl bg-neutral-0 px-3.75 pt-2 pb-16 transition-[transform,margin-bottom] duration-300 ease-out ${
-          isVisible ? "translate-y-0" : "translate-y-full"
-        }`}
+        style={{
+          marginBottom: keyboardOffset,
+          transform: `translateY(${translateY})`,
+          transition:
+            dragPhase === "dragging"
+              ? "margin-bottom 300ms ease-out"
+              : undefined,
+        }}
+        className="relative z-10 flex w-full flex-col items-center gap-4 rounded-t-3xl bg-neutral-0 px-3.75 pt-2 pb-16 transition-[transform,margin-bottom] duration-300 ease-out"
       >
-        <div className="pb-3">
+        <div className="touch-none pb-3" {...dragHandleProps}>
           <div className="h-1 w-11 shrink-0 rounded bg-[#DEDEDE]" />
         </div>
 

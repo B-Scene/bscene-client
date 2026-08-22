@@ -14,6 +14,7 @@ import {
   useRecommendedExploreBandsInfiniteQuery,
   useUnfollowExploreBand,
 } from "@/hooks/api/fan/useFanExplore";
+import { useDragToCloseSheet } from "@/hooks/useDragToCloseSheet";
 import { useInfiniteScrollObserver } from "@/hooks/useInfiniteScrollObserver";
 import { useSlideUpSheet } from "@/hooks/useSlideUpSheet";
 import type { FanExploreBand } from "@/types/fan/explore";
@@ -505,6 +506,10 @@ export const ExploreFilterSheet = ({
       setSelectedContent(contentSelectable ? appliedFilters.content : "전체");
     },
   );
+  const { dragPhase, translateY, dragHandleProps } = useDragToCloseSheet(
+    isVisible,
+    onClose,
+  );
 
   if (!rendered) return null;
 
@@ -524,12 +529,15 @@ export const ExploreFilterSheet = ({
         aria-modal="true"
         aria-label="필터"
         onTransitionEnd={handleTransitionEnd}
-        className={[
-          "relative z-10 flex max-h-[calc(100dvh-16px)] w-full flex-col rounded-t-[24px] bg-neutral-0 pb-[8px] pt-[8px] transition-transform duration-300 ease-out",
-          isVisible ? "translate-y-0" : "translate-y-full",
-        ].join(" ")}
+        style={{
+          transform: `translateY(${translateY})`,
+          transition: dragPhase === "dragging" ? "none" : undefined,
+        }}
+        className="relative z-10 flex max-h-[calc(100dvh-16px)] w-full flex-col rounded-t-[24px] bg-neutral-0 pb-[8px] pt-[8px] transition-transform duration-300 ease-out"
       >
-        <div className="mx-auto h-[4px] w-[42px] rounded-full bg-neutral-400" />
+        <div className="touch-none pb-[4px]" {...dragHandleProps}>
+          <div className="mx-auto h-[4px] w-[42px] rounded-full bg-neutral-400" />
+        </div>
         <h2 className="m-0 mt-[20px] text-center font-body text-label1 text-neutral-900">
           필터
         </h2>

@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useDragToCloseSheet } from "@/hooks/useDragToCloseSheet";
 import { useSlideUpSheet } from "@/hooks/useSlideUpSheet";
 
 export interface DateRange {
@@ -171,6 +172,11 @@ export const DatePickerSheet = ({
     onClose();
   };
 
+  const { dragPhase, translateY, dragHandleProps } = useDragToCloseSheet(
+    isVisible,
+    handleDismiss,
+  );
+
   if (!rendered) return null;
 
   return (
@@ -184,11 +190,13 @@ export const DatePickerSheet = ({
 
       <div
         onTransitionEnd={handleTransitionEnd}
-        className={`relative z-10 flex w-full flex-col items-center gap-4 rounded-t-3xl bg-neutral-0 px-3.75 pt-2 pb-12 transition-transform duration-300 ease-out ${
-          isVisible ? "translate-y-0" : "translate-y-full"
-        }`}
+        style={{
+          transform: `translateY(${translateY})`,
+          transition: dragPhase === "dragging" ? "none" : undefined,
+        }}
+        className="relative z-10 flex w-full flex-col items-center gap-4 rounded-t-3xl bg-neutral-0 px-3.75 pt-2 pb-12 transition-transform duration-300 ease-out"
       >
-        <div className="pb-3">
+        <div className="touch-none pb-3" {...dragHandleProps}>
           <div className="h-1 w-11 shrink-0 rounded bg-[#DEDEDE]" />
         </div>
 
