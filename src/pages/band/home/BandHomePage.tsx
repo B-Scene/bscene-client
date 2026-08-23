@@ -134,28 +134,27 @@ const BandHomePage = () => {
   return (
     <main className="relative flex min-h-dvh flex-col bg-neutral-0 px-5 pb-24">
       <HomeHeader
+        leftAction={
+          <button
+            type="button"
+            aria-label="모드 전환"
+            onClick={() => setIsModeSwitchOpen(true)}
+          >
+            <img src={SwapIcon} alt="" className="size-6" />
+          </button>
+        }
         rightAction={
-          <>
-            <button
-              type="button"
-              aria-label="알림"
-              onClick={() => navigate("/band/notifications")}
-              className="text-neutral-900"
-            >
-              <NotificationBellIcon
-                hasUnread={hasUnreadNotification}
-                dotColor="var(--color-secondary-400)"
-              />
-            </button>
-
-            <button
-              type="button"
-              aria-label="모드 전환"
-              onClick={() => setIsModeSwitchOpen(true)}
-            >
-              <img src={SwapIcon} alt="" className="size-6" />
-            </button>
-          </>
+          <button
+            type="button"
+            aria-label="알림"
+            onClick={() => navigate("/band/notifications")}
+            className="text-neutral-900"
+          >
+            <NotificationBellIcon
+              hasUnread={hasUnreadNotification}
+              dotColor="var(--color-secondary-400)"
+            />
+          </button>
         }
       />
 

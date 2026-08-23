@@ -28,6 +28,10 @@ export interface LiveNowItem {
   liveId: number;
   bandProfileImageUrl?: string | null;
   thumbnailImageUrl?: string | null;
+  thumbnailUrl?: string | null;
+  liveThumbnailUrl?: string | null;
+  liveThumbnailImageUrl?: string | null;
+  imageUrl?: string | null;
   bandName: string;
   title: string;
   viewerCount: number;
@@ -41,6 +45,10 @@ export interface LiveReplayItem {
   liveId: number;
   replayId?: number;
   thumbnailImageUrl?: string | null;
+  thumbnailUrl?: string | null;
+  liveThumbnailUrl?: string | null;
+  liveThumbnailImageUrl?: string | null;
+  imageUrl?: string | null;
   title: string;
   bandName: string;
   viewCount: number;
@@ -52,6 +60,10 @@ export interface ScheduledLiveItem {
   liveId: number;
   bandProfileImageUrl?: string | null;
   thumbnailImageUrl?: string | null;
+  thumbnailUrl?: string | null;
+  liveThumbnailUrl?: string | null;
+  liveThumbnailImageUrl?: string | null;
+  imageUrl?: string | null;
   bandName: string;
   title: string;
   scheduledAt: string;
@@ -81,6 +93,10 @@ export interface LiveNowListItem {
   liveId: number;
   bandProfileImageUrl?: string | null;
   thumbnailImageUrl?: string | null;
+  thumbnailUrl?: string | null;
+  liveThumbnailUrl?: string | null;
+  liveThumbnailImageUrl?: string | null;
+  imageUrl?: string | null;
   title: string;
   bandName: string;
   viewCount: number;
@@ -110,6 +126,10 @@ export interface ScheduledLiveListItem {
   liveId: number;
   bandProfileImageUrl?: string | null;
   thumbnailImageUrl?: string | null;
+  thumbnailUrl?: string | null;
+  liveThumbnailUrl?: string | null;
+  liveThumbnailImageUrl?: string | null;
+  imageUrl?: string | null;
   title: string;
   bandName: string;
   scheduledAt: string;
@@ -144,6 +164,10 @@ export interface ReplayListItem {
   liveId: number;
   replayId?: number;
   thumbnailImageUrl?: string | null;
+  thumbnailUrl?: string | null;
+  liveThumbnailUrl?: string | null;
+  liveThumbnailImageUrl?: string | null;
+  imageUrl?: string | null;
   title: string;
   bandName: string;
   viewCount: number;
@@ -168,6 +192,10 @@ export interface ReplayPlaybackResponse {
   bandName: string;
   bandProfileImageUrl?: string | null;
   thumbnailImageUrl?: string | null;
+  thumbnailUrl?: string | null;
+  liveThumbnailUrl?: string | null;
+  liveThumbnailImageUrl?: string | null;
+  imageUrl?: string | null;
   viewCount: number;
   durationSec: number;
   durationSeconds?: number;
@@ -178,6 +206,7 @@ export interface CreateLiveRequest {
   title: string;
   description?: string | null;
   thumbnailImageUrl?: string | null;
+  thumbnailUrl?: string | null;
   scheduledAt?: string | null;
   coHost?: number[];
   cohosts?: number[] | null;
@@ -216,6 +245,11 @@ export interface EnterLiveResponse {
   viewerCount?: number;
   viewCount?: number;
   bandProfileImageUrl: string | null;
+  thumbnailImageUrl?: string | null;
+  thumbnailUrl?: string | null;
+  liveThumbnailUrl?: string | null;
+  liveThumbnailImageUrl?: string | null;
+  imageUrl?: string | null;
   bandName: string;
   title: string;
   description: string | null;
@@ -306,6 +340,10 @@ export interface LiveReservationResponse {
   title: string;
   description: string | null;
   thumbnailImageUrl: string | null;
+  thumbnailUrl?: string | null;
+  liveThumbnailUrl?: string | null;
+  liveThumbnailImageUrl?: string | null;
+  imageUrl?: string | null;
   scheduledAt: string;
   cohostCandidates: LiveReservationCoHostCandidate[];
 }
@@ -314,6 +352,7 @@ export interface UpdateLiveReservationRequest {
   title: string;
   description?: string | null;
   thumbnailImageUrl?: string | null;
+  thumbnailUrl?: string | null;
   scheduledAt: string;
   coHost?: number[] | null;
   cohosts?: number[] | null;

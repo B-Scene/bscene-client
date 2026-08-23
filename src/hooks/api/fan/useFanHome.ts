@@ -5,6 +5,7 @@ import {
   useQueryClient,
   type QueryClient,
 } from "@tanstack/react-query";
+import { isAxiosError } from "axios";
 import {
   addPerformanceInterest,
   completePerformanceParticipation,
@@ -79,6 +80,27 @@ export const invalidatePerformanceInterestQueries = (
   ]);
 };
 
+const isNotFoundQueryError = (error: unknown) => {
+  if (!isAxiosError(error)) return false;
+
+  const data = error.response?.data as
+    | { code?: unknown; message?: unknown }
+    | undefined;
+  const code = String(error.code ?? data?.code ?? "");
+  const message = String(error.message ?? data?.message ?? "");
+
+  return (
+    error.response?.status === 404 ||
+    code.includes("404") ||
+    message.includes("찾을 수") ||
+    message.includes("존재하지") ||
+    message.includes("삭제")
+  );
+};
+
+const retryUnlessNotFound = (failureCount: number, error: unknown) =>
+  !isNotFoundQueryError(error) && failureCount < 3;
+
 export const useFanHomeQuery = () => {
   return useQuery({
     queryKey: fanHomeKeys.main(),
@@ -111,6 +133,7 @@ export const useFanPerformanceDetailQuery = (performanceId: number) => {
     queryKey: fanHomeKeys.performanceDetail(performanceId),
     queryFn: () => getFanPerformanceDetail(performanceId),
     enabled: performanceId > 0,
+    retry: retryUnlessNotFound,
     staleTime: 1000 * 30,
   });
 };

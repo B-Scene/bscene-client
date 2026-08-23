@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import ArrowLeftIcon from "@/assets/icons/arrow-left.svg";
 import DefaultAvatar from "@/assets/icons/band/band-default-profile.svg";
 import Modal from "@/components/Modal/Modal";
+import { Header } from "@/components/common/Header/Header";
 import { ModalOverlay } from "@/components/common/Modal/ModalOverlay";
 import { Toast } from "@/components/common/Toast/Toast";
 import { useUnfollowExploreBand } from "@/hooks/api/fan/useFanExplore";
@@ -105,29 +105,14 @@ const FollowedBandsPage = () => {
   };
 
   return (
-    <main className="min-h-dvh bg-neutral-0 px-5 pb-[calc(var(--bottom-nav-height)+24px)]">
-      <header className="-mx-5 flex h-15 items-center justify-between px-3.75">
-        <button
-          type="button"
-          aria-label="뒤로가기"
-          onClick={() => navigate(-1)}
-          className="flex size-6 items-center justify-center"
-        >
-          <img src={ArrowLeftIcon} alt="" className="size-6" />
-        </button>
+    <main className="min-h-dvh bg-neutral-0 pb-[calc(var(--bottom-nav-height)+24px)]">
+      <Header title="팔로우한 밴드" />
 
-        <h1 className="m-0 font-body text-label2 text-neutral-900">
-          팔로우한 밴드
-        </h1>
-
-        <span aria-hidden="true" className="size-6" />
-      </header>
-
-      <p className="mt-4 text-caption3 text-neutral-700">
+      <p className="mt-4 px-5 text-caption3 text-neutral-700">
         팔로우한 밴드 {totalCount}팀
       </p>
 
-      <div className="mt-4 px-3">
+      <div className="mt-4 px-8">
         <ul className="flex flex-col gap-5">
           {bands.map((band) => {
             const bandId = getBandId(band);

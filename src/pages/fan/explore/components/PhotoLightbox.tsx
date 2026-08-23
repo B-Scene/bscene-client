@@ -13,10 +13,12 @@ export const PhotoLightbox = ({
 }: PhotoLightboxProps) => {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const [prevInitialIndex, setPrevInitialIndex] = useState(initialIndex);
 
-  useEffect(() => {
+  if (initialIndex !== prevInitialIndex) {
+    setPrevInitialIndex(initialIndex);
     setCurrentIndex(initialIndex);
-  }, [initialIndex]);
+  }
 
   useEffect(() => {
     const originalOverflow = document.body.style.overflow;

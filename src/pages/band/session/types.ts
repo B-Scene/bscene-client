@@ -13,6 +13,7 @@ export interface SessionRecruitmentPost {
   bandName: string;
   genre: string;
   location: string;
+  postedAgo?: number;
   description: string;
   tags: string[];
   practiceSchedule?: string;

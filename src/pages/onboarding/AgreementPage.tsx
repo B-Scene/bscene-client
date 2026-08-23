@@ -28,7 +28,7 @@ const AgreementPage = () => {
     useState<AgreementKey | null>(null);
 
   const isAllChecked = useMemo(
-    () => Object.values(checked).every(Boolean),
+    () => AGREEMENTS.every((item) => checked[item.key]),
     [checked],
   );
 
@@ -47,7 +47,7 @@ const AgreementPage = () => {
       age: nextChecked,
       service: nextChecked,
       privacy: nextChecked,
-      notification: nextChecked,
+      notification: false,
       marketing: nextChecked,
     });
   };

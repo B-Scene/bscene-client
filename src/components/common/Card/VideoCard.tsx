@@ -24,7 +24,7 @@ const VideoCard = ({
 }: VideoCardProps) => {
   const content = (
     <>
-      <div className="relative h-[62px] w-[88px] shrink-0 overflow-hidden rounded-[8px] bg-neutral-200">
+      <div className="relative h-[62px] w-[110px] shrink-0 overflow-hidden rounded-[8px] bg-neutral-200">
         {imageSrc ? (
           <img
             alt={imageAlt}
@@ -33,7 +33,7 @@ const VideoCard = ({
           />
         ) : null}
         {duration ? (
-          <span className="absolute right-[3px] bottom-[3px] rounded-[2px] bg-neutral-900 py-px pr-1 pl-[3px] font-body text-caption6 text-neutral-0">
+          <span className="absolute right-[7px] bottom-[5px] flex h-[10px] items-center justify-center rounded-[2px] bg-neutral-900 py-0 pr-0.5 pl-[3px] font-body text-caption5 text-neutral-0">
             {duration}
           </span>
         ) : null}

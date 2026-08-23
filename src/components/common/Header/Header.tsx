@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import ArrowLeftIcon from "@/assets/icons/arrow-left.svg";
+import { consumePushNotificationBackTarget } from "@/utils/pushNotificationBackNavigation";
 
 interface HeaderProps {
   title: string;
@@ -30,6 +31,17 @@ export const Header = ({
   const isMain = variant === "main" || isMainWithAction;
 
   const handleBack = () => {
+    const pushBackTarget = consumePushNotificationBackTarget();
+
+    if (pushBackTarget) {
+      if (window.history.length > 1) {
+        navigate(-1);
+      } else {
+        navigate(pushBackTarget, { replace: true });
+      }
+      return;
+    }
+
     if (onBack) {
       onBack();
       return;

@@ -15,6 +15,11 @@ import {
   isNotificationWithinRetention,
   isNotificationForMode,
 } from "@/utils/notificationDeepLink";
+import {
+  findNotificationForPendingPushRead,
+  getAllPendingPushNotificationReads,
+  removeAllPendingPushNotificationReads,
+} from "@/utils/pushNotificationReadTracking";
 import type { NotificationItem } from "@/types/notification";
 
 const NOTIFICATION_PAGE_SIZE = 20;
@@ -112,18 +117,21 @@ const NotificationPage = () => {
     isLoading,
     refetch,
   } = useNotificationsInfiniteQuery(NOTIFICATION_PAGE_SIZE);
+  const markPendingNotificationAsRead = useMarkNotificationAsReadMutation();
   const [retentionNow, setRetentionNow] = useState(() => Date.now());
+  const allNotifications = useMemo(
+    () => data?.pages.flatMap((page) => page.items) ?? [],
+    [data],
+  );
   const notifications = useMemo(
     () =>
-      data?.pages
-        .flatMap((page) => page.items)
+      allNotifications
         .filter(
           (notification) =>
             isNotificationWithinRetention(notification, retentionNow) &&
             isNotificationForMode(notification, "FAN"),
-        ) ??
-      [],
-    [data, retentionNow],
+        ),
+    [allNotifications, retentionNow],
   );
   const hasNotifications = notifications.length > 0;
   const sentinelRef = useInfiniteScrollObserver({
@@ -161,8 +169,68 @@ const NotificationPage = () => {
     isLoading,
   ]);
 
+  useEffect(() => {
+    if (isLoading || isError || markPendingNotificationAsRead.isPending) return;
+
+    let isCancelled = false;
+
+    void getAllPendingPushNotificationReads().then((pendingReads) => {
+      if (isCancelled) return;
+
+      const processedPendingKeys: string[] = [];
+      let hasUnmatchedPendingRead = false;
+
+      pendingReads.forEach((pendingRead) => {
+        const matchedNotification = findNotificationForPendingPushRead(
+          allNotifications,
+          pendingRead,
+        );
+
+        if (!matchedNotification) {
+          hasUnmatchedPendingRead = true;
+          return;
+        }
+
+        if (matchedNotification.isRead) {
+          processedPendingKeys.push(pendingRead.key);
+          return;
+        }
+
+        markPendingNotificationAsRead.mutate(
+          matchedNotification.notificationId,
+          {
+            onSuccess: () =>
+              removeAllPendingPushNotificationReads([pendingRead.key]),
+          },
+        );
+      });
+
+      removeAllPendingPushNotificationReads(processedPendingKeys);
+
+      if (
+        hasUnmatchedPendingRead &&
+        hasNextPage &&
+        !isFetchingNextPage
+      ) {
+        void fetchNextPage();
+      }
+    });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [
+    allNotifications,
+    fetchNextPage,
+    hasNextPage,
+    isError,
+    isFetchingNextPage,
+    isLoading,
+    markPendingNotificationAsRead,
+  ]);
+
   return (
-    <main className="mx-auto min-h-dvh w-full max-w-[393px] bg-primary-0">
+    <main className="min-h-dvh w-full bg-primary-0">
       <Header title="알림" align="betweenCompact" />
 
       {isLoading ? (

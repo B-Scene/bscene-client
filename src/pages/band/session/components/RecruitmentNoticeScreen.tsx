@@ -50,6 +50,8 @@ const SESSION_ACTIVE_TAB_STORAGE_KEY = "bscene:session:active-tab";
 const SESSION_RECRUITMENT_FILTER_STORAGE_KEY =
   "bscene:session:recruitment-filter";
 const SESSION_FIND_FILTER_STORAGE_KEY = "bscene:session:find-filter";
+const SESSION_FIND_FILTER_TOUCHED_STORAGE_KEY =
+  "bscene:session:find-filter-touched";
 
 const SESSION_TAB_IDS: SessionTabId[] = [
   "recruitment",
@@ -96,12 +98,39 @@ const readStoredFilterValues = (
   }
 };
 
+const readStoredFindFilterTouched = () => {
+  try {
+    return (
+      window.sessionStorage.getItem(SESSION_FIND_FILTER_TOUCHED_STORAGE_KEY) ===
+      "true"
+    );
+  } catch {
+    return false;
+  }
+};
+
 const writeStoredFilterValues = (
   storageKey: string,
   values: SessionFilterValues,
 ) => {
   try {
     window.sessionStorage.setItem(storageKey, JSON.stringify(values));
+  } catch {
+    // sessionStorage 접근이 제한된 환경에서는 저장하지 않음
+  }
+};
+
+const writeStoredFindFilterTouched = (isTouched: boolean) => {
+  try {
+    if (isTouched) {
+      window.sessionStorage.setItem(
+        SESSION_FIND_FILTER_TOUCHED_STORAGE_KEY,
+        "true",
+      );
+      return;
+    }
+
+    window.sessionStorage.removeItem(SESSION_FIND_FILTER_TOUCHED_STORAGE_KEY);
   } catch {
     // sessionStorage 접근이 제한된 환경에서는 저장하지 않음
   }
@@ -132,6 +161,7 @@ const mapRecruitmentToPost = (
     bandName: recruitment.bandName,
     genre: recruitment.bandGenre,
     location: recruitment.bandRegion,
+    postedAgo: recruitment.postedAgo,
     description: recruitment.summary,
     tags: [recruitment.part, recruitment.skillLevel].filter(Boolean),
     bookmarked: recruitment.isInterested,
@@ -210,6 +240,9 @@ export const RecruitmentNoticeScreen = () => {
     () => readStoredActiveTab(),
   );
 
+  const [isApplicationHistoryMode, setIsApplicationHistoryMode] =
+    useState(false);
+
   const [isFilterOpen, setIsFilterOpen] = useState(false);
 
   const [recruitmentFilterValues, setRecruitmentFilterValues] =
@@ -226,16 +259,16 @@ export const RecruitmentNoticeScreen = () => {
         INITIAL_SESSION_FILTERS,
     );
 
+  const [hasUserChangedFindFilters, setHasUserChangedFindFilters] = useState(
+    () => readStoredFindFilterTouched(),
+  );
+
   const [sort, setSort] = useState<SessionRecruitmentSort>("LATEST");
-
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-
   const [editingRecruitmentId, setEditingRecruitmentId] = useState<
     number | null
   >(null);
-
   const [isBasicProfileEditOpen, setIsBasicProfileEditOpen] = useState(false);
 
   const openPostId =
@@ -253,7 +286,6 @@ export const RecruitmentNoticeScreen = () => {
   >(null);
 
   const [deletedPostIds, setDeletedPostIds] = useState<number[]>([]);
-
   const [createdPostIds, setCreatedPostIds] = useState<number[]>([]);
 
   const [bookmarkOverrides, setBookmarkOverrides] = useState<
@@ -272,6 +304,7 @@ export const RecruitmentNoticeScreen = () => {
   });
 
   const handleTabChange = useCallback((nextTab: SessionTabId) => {
+    setIsApplicationHistoryMode(false);
     setActiveTab(nextTab);
     writeStoredActiveTab(nextTab);
   }, []);
@@ -289,18 +322,12 @@ export const RecruitmentNoticeScreen = () => {
 
   const handleApplyFindFilters = useCallback(
     (nextValues: SessionFilterValues) => {
-      const summary = myApplicationSummaryQuery.data;
-
-      const syncedValues = {
-        ...nextValues,
-        genre: summary?.genre || INITIAL_SESSION_FILTERS.genre,
-        region: summary?.region || INITIAL_SESSION_FILTERS.region,
-      };
-
-      setFindFilterValues(syncedValues);
-      writeStoredFilterValues(SESSION_FIND_FILTER_STORAGE_KEY, syncedValues);
+      setFindFilterValues(nextValues);
+      writeStoredFilterValues(SESSION_FIND_FILTER_STORAGE_KEY, nextValues);
+      setHasUserChangedFindFilters(true);
+      writeStoredFindFilterTouched(true);
     },
-    [myApplicationSummaryQuery.data],
+    [],
   );
 
   const handleRefreshPage = useCallback(async () => {
@@ -324,6 +351,7 @@ export const RecruitmentNoticeScreen = () => {
     isRefreshing: isRecruitmentRefreshing,
   } = usePullToRefresh<HTMLElement>({
     enabled:
+      !isApplicationHistoryMode &&
       (activeTab === "recruitment" ||
         activeTab === "find" ||
         activeTab === "applications") &&
@@ -355,7 +383,7 @@ export const RecruitmentNoticeScreen = () => {
   useEffect(() => {
     const summary = myApplicationSummaryQuery.data;
 
-    if (!summary) {
+    if (!summary || hasUserChangedFindFilters) {
       return;
     }
 
@@ -378,7 +406,7 @@ export const RecruitmentNoticeScreen = () => {
 
       return nextValues;
     });
-  }, [myApplicationSummaryQuery.data]);
+  }, [hasUserChangedFindFilters, myApplicationSummaryQuery.data]);
 
   const posts = useMemo(() => {
     const apiPosts =
@@ -592,6 +620,8 @@ export const RecruitmentNoticeScreen = () => {
       <SessionBasicProfileEditScreen
         onBack={() => {
           setIsBasicProfileEditOpen(false);
+          setHasUserChangedFindFilters(false);
+          writeStoredFindFilterTouched(false);
           void myApplicationSummaryQuery.refetch();
         }}
       />
@@ -599,11 +629,21 @@ export const RecruitmentNoticeScreen = () => {
   }
 
   if (isSearchOpen) {
+    const isFindSearch = activeTab === "find";
+
     return (
       <SessionSearchScreen
-        values={recruitmentFilterValues}
+        mode={isFindSearch ? "find" : "recruitment"}
+        values={isFindSearch ? findFilterValues : recruitmentFilterValues}
         onBack={() => setIsSearchOpen(false)}
-        onApplyFilters={handleApplyRecruitmentFilters}
+        onApplyFilters={
+          isFindSearch ? handleApplyFindFilters : handleApplyRecruitmentFilters
+        }
+        onSelectRecruitment={(post) => {
+          setIsSearchOpen(false);
+          setSelectedPostOverride(post);
+          setSelectedPostId(post.id);
+        }}
       />
     );
   }
@@ -640,33 +680,46 @@ export const RecruitmentNoticeScreen = () => {
   return (
     <main
       ref={recruitmentRefreshRef}
-      className="relative min-h-dvh overscroll-y-contain bg-neutral-0 pb-[calc(var(--bottom-nav-height)+24px)]"
+      className={`relative min-h-dvh overscroll-y-contain ${
+        isApplicationHistoryMode
+          ? "bg-neutral-50 pb-0"
+          : "bg-neutral-0 pb-[calc(var(--bottom-nav-height)+24px)]"
+      }`}
     >
-      {activeTab === "recruitment" ||
-      activeTab === "find" ||
-      activeTab === "applications" ? (
+      {!isApplicationHistoryMode &&
+      (activeTab === "recruitment" ||
+        activeTab === "find" ||
+        activeTab === "applications") ? (
         <PullToRefreshIndicator
           pullDistance={recruitmentPullDistance}
           isRefreshing={isRecruitmentRefreshing}
         />
       ) : null}
 
-      <SessionPageHeader
-        onSearch={() => setIsSearchOpen(true)}
-        onMessages={() => navigate("/band/session/messages")}
-      />
+      {!isApplicationHistoryMode ? (
+        <>
+          <SessionPageHeader
+            showSearch={activeTab !== "applications"}
+            onSearch={() => setIsSearchOpen(true)}
+            onMessages={() => navigate("/band/session/messages")}
+          />
 
-      <SessionTabs activeTab={activeTab} onTabChange={handleTabChange} />
+          <SessionTabs activeTab={activeTab} onTabChange={handleTabChange} />
+        </>
+      ) : null}
 
-      {activeTab !== "applications" ? (
+      {!isApplicationHistoryMode && activeTab !== "applications" ? (
         <SessionFilterBar
           values={
-            activeTab === "find"
-              ? findFilterValues
-              : recruitmentFilterValues
+            activeTab === "find" ? findFilterValues : recruitmentFilterValues
           }
-          sort={sort}
-          onSortChange={setSort}
+          sort={activeTab === "find" ? "LATEST" : sort}
+          sortOptions={
+            activeTab === "find" ? ["LATEST"] : ["LATEST", "IMMINENT"]
+          }
+          onSortChange={activeTab === "find" ? () => undefined : setSort}
+          showSort={activeTab === "recruitment" || activeTab === "find"}
+          showSelectedValues={false}
           showBottomBorder={activeTab !== "find"}
           compactHeight={activeTab === "find"}
           filterKeys={activeTab === "find" ? [...FIND_FILTER_KEYS] : undefined}
@@ -717,8 +770,15 @@ export const RecruitmentNoticeScreen = () => {
       ) : activeTab === "applications" ? (
         <SessionApplicationsScreen
           onEditBasicInfo={() => setIsBasicProfileEditOpen(true)}
-          onBrowseRecruitments={() => handleTabChange("recruitment")}
+          onViewApplicationHistory={() => setIsApplicationHistoryMode(true)}
+          onCloseApplicationHistory={() => setIsApplicationHistoryMode(false)}
+          onBrowseRecruitments={() => {
+            setIsApplicationHistoryMode(false);
+            handleTabChange("recruitment");
+          }}
           onViewHistoryApplication={(application) => {
+            setIsApplicationHistoryMode(false);
+
             if (!application.sessionApplicationId) {
               window.alert(
                 "지원서 정보를 확인할 수 없어요. 잠시 후 다시 시도해주세요.",
@@ -728,21 +788,25 @@ export const RecruitmentNoticeScreen = () => {
 
             setSelectedApplicationId(application.sessionApplicationId);
           }}
-          onMessage={handleMessageApplication}
-          onOpenRecruitment={handleOpenHistoryRecruitment}
+          onMessage={(application) => {
+            setIsApplicationHistoryMode(false);
+            void handleMessageApplication(application);
+          }}
+          onOpenRecruitment={(recruitment) => {
+            setIsApplicationHistoryMode(false);
+            handleOpenHistoryRecruitment(recruitment);
+          }}
         />
       ) : null}
 
-      {activeTab === "recruitment" ? (
+      {!isApplicationHistoryMode && activeTab === "recruitment" ? (
         <FloatingCreateButton onClick={() => setIsCreateOpen(true)} />
       ) : null}
 
-      {isFilterOpen ? (
+      {!isApplicationHistoryMode && isFilterOpen ? (
         <SessionFilterBottomSheet
           values={
-            activeTab === "find"
-              ? findFilterValues
-              : recruitmentFilterValues
+            activeTab === "find" ? findFilterValues : recruitmentFilterValues
           }
           onApply={
             activeTab === "find"
@@ -755,3 +819,5 @@ export const RecruitmentNoticeScreen = () => {
     </main>
   );
 };
+
+export default RecruitmentNoticeScreen;

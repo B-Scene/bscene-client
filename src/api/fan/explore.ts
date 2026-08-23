@@ -535,51 +535,6 @@ const normalizeExploreBand = (band: FanExploreBand): FanExploreBand => {
   };
 };
 
-const enrichBandsWithFollowerCounts = async (bands: FanExploreBand[]) => {
-  return Promise.all(
-    bands.map(async (band) => {
-      const normalizedBand = normalizeExploreBand(band);
-      const bandInfo = normalizedBand.band ?? normalizedBand;
-      const bandId = toNumericId(bandInfo.bandId) ?? toNumericId(bandInfo.id);
-      const followerCount = getBandFollowerCount(normalizedBand);
-
-      if (bandId == null || (followerCount != null && followerCount > 0)) {
-        return normalizedBand;
-      }
-
-      try {
-        const detail = normalizeBandDetail(
-          await assertSuccess(
-            await axiosInstance.get<FanExploreApiResponse<FanExploreBandDetail>>(
-              `/bands/${bandId}/detail`,
-            ),
-          ),
-        );
-        const detailFollowerCount = getBandFollowerCount(detail);
-
-        if (detailFollowerCount == null) {
-          return normalizedBand;
-        }
-
-        return normalizeExploreBand({
-          ...normalizedBand,
-          followerCount: detailFollowerCount,
-          followers: detailFollowerCount,
-          band: normalizedBand.band
-            ? {
-                ...normalizedBand.band,
-                followerCount: detailFollowerCount,
-                followers: detailFollowerCount,
-              }
-            : normalizedBand.band,
-        });
-      } catch {
-        return normalizedBand;
-      }
-    }),
-  );
-};
-
 const toNumericId = (value?: number | string | null) => {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value === "string") {
@@ -1045,8 +1000,7 @@ export const getRecommendedExploreBands = async ({
   });
 
   const normalizedPage = normalizeNumberCursorPage(assertSuccess(response), cursor);
-
-  const items = await enrichBandsWithFollowerCounts(normalizedPage.items);
+  const items = normalizedPage.items.map(normalizeExploreBand);
 
   return {
     ...normalizedPage,
@@ -1265,7 +1219,7 @@ export const searchFanExploreBands = async ({
     cursor,
     BAND_SECTION_KEYS,
   );
-  const items = await enrichBandsWithFollowerCounts(normalized.items);
+  const items = normalized.items.map(normalizeExploreBand);
 
   return {
     ...normalized,

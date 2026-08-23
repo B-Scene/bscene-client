@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import ArrowLeftIcon from "@/assets/icons/arrow-left.svg";
 import LocationIcon from "@/assets/icons/band/ic_location.svg";
 import ImagePlaceholderIcon from "@/assets/icons/fan/image-icon.svg";
 import TicketPerformIcon from "@/assets/icons/fan/ticket-perform.svg";
+import { Header } from "@/components/common/Header/Header";
 import { usePerformanceHistoryQuery } from "@/hooks/api/user/usePerformanceHistory";
 import { useInfiniteScrollObserver } from "@/hooks/useInfiniteScrollObserver";
 import type { PerformanceHistoryFilter } from "@/types/user/performanceHistory";
@@ -36,25 +36,10 @@ const AttendedConcertsPage = () => {
   });
 
   return (
-    <main className="min-h-dvh bg-neutral-0 px-5 pb-[calc(var(--bottom-nav-height)+24px)]">
-      <header className="-mx-5 flex h-15 items-center justify-between px-3.75">
-        <button
-          type="button"
-          aria-label="뒤로가기"
-          onClick={() => navigate(-1)}
-          className="flex size-6 items-center justify-center"
-        >
-          <img src={ArrowLeftIcon} alt="" className="size-6" />
-        </button>
+    <main className="min-h-dvh bg-neutral-0 pb-[calc(var(--bottom-nav-height)+24px)]">
+      <Header title="공연 참여 기록" />
 
-        <h1 className="m-0 font-body text-label2 text-neutral-900">
-          공연 참여 기록
-        </h1>
-
-        <span aria-hidden="true" className="size-6" />
-      </header>
-
-      <div className="mt-4 flex flex-col gap-5">
+      <div className="mt-4 flex flex-col gap-5 px-5">
         <div className="rounded-xl border border-primary-300 bg-primary-0 p-3 text-center">
           <p className="m-0 text-caption2 leading-5 text-neutral-600">
             공연 상세페이지에서 알림을 설정하면,

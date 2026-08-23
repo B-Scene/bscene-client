@@ -3,10 +3,7 @@ import { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import TimesCircleIcon from "@/assets/icons/ic_Times Circle.svg";
 import { Header } from "@/components/common/Header/Header";
-import {
-  useFanExploreContentSearchQuery,
-  useFanExploreSearchQuery,
-} from "@/hooks/api/fan/useFanExplore";
+import { useFanExploreContentSearchQuery } from "@/hooks/api/fan/useFanExplore";
 import { useInfiniteScrollObserver } from "@/hooks/useInfiniteScrollObserver";
 import {
   ExploreFilterBar,
@@ -14,18 +11,18 @@ import {
   type AppliedExploreFilters,
 } from "@/pages/fan/explore/FanExplorePage";
 import { FanExploreContentNewsList } from "@/pages/fan/explore/components/FanExploreContentNewsList";
-import type { FanExploreContent, FanExploreSort } from "@/types/fan/explore";
+import {
+  SEARCH_SORT_LABELS,
+  SEARCH_SORT_TO_API,
+  type SearchResultSortOption,
+} from "@/pages/fan/explore/components/fanExploreSearchSort";
+import { SearchResultSortSheet } from "@/pages/fan/explore/components/FanExploreSearchSortSheet";
+import type { FanExploreSort } from "@/types/fan/explore";
 import {
   BAND_GENRE_BY_LABEL,
   BAND_REGION_BY_LABEL,
 } from "@/utils/bandLabels";
 import { addRecentSearch } from "./recentSearches";
-
-const SORT_LABELS: Record<FanExploreSort, "정확도순" | "인기순"> = {
-  ACCURACY: "정확도순",
-  POPULAR: "인기순",
-  RECOMMEND: "정확도순",
-};
 
 const getSortParam = (value: string | null): FanExploreSort => {
   if (value === "POPULAR") return "POPULAR";
@@ -51,24 +48,6 @@ const getResultPathByContent = (content: string) => {
     return "/fan/explore/search/results/contents";
   }
   return "/fan/explore/search/results";
-};
-
-const getContentId = (content: FanExploreContent) =>
-  content.contentId ?? content.postId ?? content.id;
-
-const mergeContents = (
-  primaryContents: FanExploreContent[],
-  fallbackContents: FanExploreContent[],
-) => {
-  const seenIds = new Set<string>();
-
-  return [...primaryContents, ...fallbackContents].filter((content, index) => {
-    const key = String(getContentId(content) ?? `${content.content ?? ""}-${index}`);
-
-    if (seenIds.has(key)) return false;
-    seenIds.add(key);
-    return true;
-  });
 };
 
 const ContentMoreTopBar = ({ initialKeyword }: { initialKeyword: string }) => {
@@ -127,13 +106,14 @@ const FanExploreContentMorePage = () => {
   const [searchParams] = useSearchParams();
   const keyword = searchParams.get("q") || "WAVY";
   const sort = getSortParam(searchParams.get("sort"));
+  const [isSortSheetOpen, setIsSortSheetOpen] = useState(false);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
   const shouldHighlightSort =
     sort === "POPULAR" || searchParams.get("sortSelected") === "1";
   const appliedFilters: AppliedExploreFilters = {
     genre: getFilterLabelParam(searchParams.get("genre")),
     region: getFilterLabelParam(searchParams.get("region")),
-    content: "영상",
+    content: "콘텐츠",
   };
   const contentsQuery = useFanExploreContentSearchQuery({
     keyword,
@@ -141,13 +121,6 @@ const FanExploreContentMorePage = () => {
     genre: getGenreFilterParam(appliedFilters.genre),
     region: getRegionFilterParam(appliedFilters.region),
     size: 30,
-  });
-  const allSearchQuery = useFanExploreSearchQuery({
-    keyword,
-    type: "ALL",
-    sort,
-    genre: getGenreFilterParam(appliedFilters.genre),
-    region: getRegionFilterParam(appliedFilters.region),
   });
   const {
     data,
@@ -161,18 +134,32 @@ const FanExploreContentMorePage = () => {
     () => data?.pages.flatMap((page) => page.items) ?? [],
     [data],
   );
-  const contents = useMemo(
-    () => mergeContents(pagedContents, allSearchQuery.data?.contents ?? []),
-    [allSearchQuery.data?.contents, pagedContents],
-  );
-  const totalCount = contents.length;
+  const contents = pagedContents;
+  const totalCount = data?.pages[0]?.totalCount ?? contents.length;
   const sentinelRef = useInfiniteScrollObserver({
     enabled: Boolean(hasNextPage) && !isFetchingNextPage,
     onIntersect: fetchNextPage,
   });
-  const isInitialLoading =
-    isLoading && allSearchQuery.isLoading && contents.length === 0;
-  const isContentError = isError && allSearchQuery.isError && contents.length === 0;
+  const isInitialLoading = isLoading && contents.length === 0;
+  const isContentError = isError && contents.length === 0;
+
+  const applySort = (nextSortOption: SearchResultSortOption) => {
+    const nextSort = SEARCH_SORT_TO_API[nextSortOption];
+    const params = new URLSearchParams({
+      q: keyword,
+      sort: nextSort,
+    });
+
+    params.set("sortSelected", "1");
+    if (appliedFilters.genre !== "전체") params.set("genre", appliedFilters.genre);
+    if (appliedFilters.region !== "전체") {
+      params.set("region", appliedFilters.region);
+    }
+
+    navigate(`/fan/explore/search/results/contents?${params.toString()}`, {
+      replace: true,
+    });
+  };
 
   const applyFilters = (filters: AppliedExploreFilters) => {
     const params = new URLSearchParams({
@@ -194,8 +181,9 @@ const FanExploreContentMorePage = () => {
       <ContentMoreTopBar initialKeyword={keyword} />
       <ExploreFilterBar
         appliedFilters={appliedFilters}
-        appliedSort={SORT_LABELS[sort]}
+        appliedSort={SEARCH_SORT_LABELS[sort]}
         highlightSort={shouldHighlightSort}
+        onSortClick={() => setIsSortSheetOpen(true)}
         onFilterClick={() => setIsFilterSheetOpen(true)}
       />
 
@@ -216,12 +204,17 @@ const FanExploreContentMorePage = () => {
           isFetchingNextPage={isFetchingNextPage}
           onRetry={() => {
             void contentsQuery.refetch();
-            void allSearchQuery.refetch();
           }}
           loadMoreRef={sentinelRef}
         />
       </section>
 
+      <SearchResultSortSheet
+        open={isSortSheetOpen}
+        onClose={() => setIsSortSheetOpen(false)}
+        selectedSort={SEARCH_SORT_LABELS[sort]}
+        onSelect={applySort}
+      />
       <ExploreFilterSheet
         open={isFilterSheetOpen}
         onClose={() => setIsFilterSheetOpen(false)}

@@ -2,12 +2,11 @@
 
 import {
   ACTIVITY_OPTIONS,
-  GENRE_OPTIONS,
   INPUT_CLASS_NAME,
   PART_OPTIONS,
-  REGION_OPTIONS,
   SKILL_LEVEL_OPTIONS,
 } from "@/features/session/applicationForm/applicationForm.constants";
+import { Select } from "@/components/common/Select/Select";
 import type { SessionApplicationFormController } from "@/features/session/applicationForm/useSessionApplicationForm";
 import {
   MultipleChipGroup,
@@ -16,7 +15,10 @@ import {
 import { ApplicationExperienceSection } from "@/features/session/applicationForm/ApplicationExperienceSection";
 import { ApplicationFormField } from "@/features/session/applicationForm/ApplicationFormField";
 import { ApplicationPortfolioSection } from "@/features/session/applicationForm/ApplicationPortfolioSection";
-import { ApplicationSelectField } from "@/features/session/applicationForm/ApplicationSelectField";
+import {
+  BAND_REGION_LABEL_OPTIONS,
+  PERFORMANCE_GENRE_LABEL_OPTIONS,
+} from "@/utils/bandLabels";
 
 interface SessionApplicationFormProps {
   controller: SessionApplicationFormController;
@@ -28,6 +30,7 @@ export const SessionApplicationForm = ({
   const {
     form,
     isFormValid,
+    isApplicationTypeLocked,
     submitButtonLabel,
     updateField,
     handleActivityToggle,
@@ -43,7 +46,7 @@ export const SessionApplicationForm = ({
   return (
     <form
       onSubmit={handleSubmit}
-      className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-8 pt-3 pb-6"
+      className="px-8 pt-3 pb-8"
     >
       <div className="flex flex-col gap-3">
         <ApplicationFormField label="지원서 유형" required>
@@ -53,9 +56,15 @@ export const SessionApplicationForm = ({
             onChange={(event) =>
               updateField("applicationType", event.target.value)
             }
-            placeholder="ex) 기본"
+            readOnly={isApplicationTypeLocked}
+            aria-readonly={isApplicationTypeLocked}
+            placeholder="지원서 유형을 입력해 주세요"
             maxLength={20}
-            className={INPUT_CLASS_NAME}
+            className={`${INPUT_CLASS_NAME} ${
+              isApplicationTypeLocked
+                ? "cursor-not-allowed !bg-neutral-200 text-neutral-600"
+                : ""
+            }`}
           />
         </ApplicationFormField>
 
@@ -120,20 +129,22 @@ export const SessionApplicationForm = ({
         </ApplicationFormField>
 
         <ApplicationFormField label="선호 장르" required>
-          <ApplicationSelectField
+          <Select
             value={form.genre}
             placeholder="장르 선택"
-            options={GENRE_OPTIONS}
+            options={PERFORMANCE_GENRE_LABEL_OPTIONS}
             onChange={(genre) => updateField("genre", genre)}
+            className="w-full"
           />
         </ApplicationFormField>
 
         <ApplicationFormField label="활동 지역" required>
-          <ApplicationSelectField
+          <Select
             value={form.region}
             placeholder="지역 선택"
-            options={REGION_OPTIONS}
+            options={BAND_REGION_LABEL_OPTIONS}
             onChange={(region) => updateField("region", region)}
+            className="w-full"
           />
         </ApplicationFormField>
 
@@ -170,7 +181,7 @@ export const SessionApplicationForm = ({
       <button
         type="submit"
         disabled={!isFormValid}
-        className="mt-5 -mx-3 flex h-[52px] w-[calc(100%+24px)] items-center justify-center rounded-[12px] bg-secondary-500 text-body1 text-neutral-0 disabled:cursor-default disabled:bg-neutral-300 disabled:text-neutral-600"
+        className="mt-5 flex h-[52px] w-full items-center justify-center rounded-[12px] bg-secondary-500 text-body1 text-neutral-0 disabled:cursor-default disabled:bg-neutral-300 disabled:text-neutral-600"
       >
         {submitButtonLabel}
       </button>

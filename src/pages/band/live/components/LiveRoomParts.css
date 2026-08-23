@@ -28,3 +28,12 @@
     opacity: 0.75;
   }
 }
+
+.live-room-chat-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.live-room-chat-scroll::-webkit-scrollbar {
+  display: none;
+}

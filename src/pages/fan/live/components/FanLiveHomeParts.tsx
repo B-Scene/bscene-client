@@ -72,7 +72,11 @@ export function FanLiveFilterTabs({
   onChange: (value: FanLiveFilter) => void;
 }) {
   return (
-    <div className="flex h-12 border-b border-neutral-400 px-[15px]">
+    <div className="relative flex h-12 px-5">
+      <span
+        aria-hidden="true"
+        className="absolute inset-x-0 bottom-0 h-0.5 bg-neutral-400"
+      />
       {([
         ["followed", "팔로우한 밴드"],
         ["all", "전체 밴드"],
@@ -81,7 +85,7 @@ export function FanLiveFilterTabs({
           key={id}
           type="button"
           onClick={() => onChange(id)}
-          className={`relative flex flex-1 items-center justify-center font-body text-body1 ${
+          className={`relative z-10 flex flex-1 items-center justify-center font-body text-body1 ${
             value === id ? "text-primary-400" : "text-neutral-400"
           }`}
         >
@@ -140,27 +144,27 @@ export function ReplayPreviewCard({
     <button
       type="button"
       onClick={onClick}
-      className="w-[88px] shrink-0 text-left"
+      className="w-[110px] shrink-0 text-left"
     >
-      <div className="relative h-[62px] w-[88px] overflow-hidden rounded-[8px] bg-neutral-200">
+      <div className="relative h-[68px] w-[110px] overflow-hidden rounded-[12px] bg-neutral-200">
         <img src={imageSrc} alt="" className="h-full w-full object-cover" />
         {duration ? (
-          <span className="absolute right-[3px] bottom-[3px] rounded-[2px] bg-neutral-900 py-px pr-1 pl-[3px] font-body text-caption6 text-neutral-0">
+          <span className="absolute right-[7px] bottom-[5px] flex h-[13px] items-center justify-center rounded-[2px] bg-neutral-900 pt-0 pr-[3px] pb-px pl-1 font-body text-body5 text-neutral-0">
             {duration}
           </span>
         ) : null}
       </div>
-      <h3 className="mt-2 truncate font-body text-body4 text-neutral-900">
+      <h3 className="mt-2 truncate font-body text-body1 text-neutral-900">
         {title}
       </h3>
-      <p className="mt-0.5 truncate font-body text-caption4 text-neutral-600">
+      <p className="mt-0.5 truncate font-body text-caption2 text-neutral-500">
         {bandName}
       </p>
-      <p className="mt-1 flex items-center gap-0.5 font-body text-caption4 text-neutral-400">
+      <p className="mt-1 flex items-center gap-0.5 font-body text-body5 text-neutral-500">
         <img
           src={PlayIcon}
           alt=""
-          className="size-[9px] brightness-0 opacity-30"
+          className="size-[10px] brightness-0 opacity-30"
         />
         {viewCount}
       </p>

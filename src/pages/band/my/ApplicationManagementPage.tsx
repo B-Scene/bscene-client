@@ -6,6 +6,7 @@ import DefaultAvatar from "@/assets/icons/band/user-default-profile.svg";
 import { Header } from "@/components/common/Header/Header";
 import { NotificationBandBanner } from "@/components/band/my/NotificationBandBanner";
 import { EmptyState } from "@/components/common/EmptyState/EmptyState";
+import { Tabs } from "@/components/band/home/Tabs";
 import { useBandMyPageQuery } from "@/hooks/api/user/useBandMyPage";
 import { useMyProfilesQuery } from "@/hooks/api/user/useMyProfiles";
 import { useReceivedApplicationsQuery } from "@/hooks/api/user/useReceivedApplications";
@@ -80,22 +81,15 @@ const ApplicationManagementPage = () => {
           </span>
         </div>
 
-        <div className="flex rounded-md bg-[#FFF6E5] p-1">
-          {TABS.map((tab) => (
-            <button
-              key={tab.code}
-              type="button"
-              onClick={() => setActiveTab(tab.code)}
-              className={`flex flex-1 items-center justify-center gap-2.5 rounded-md border border-transparent px-10.75 py-1.25 text-center text-caption3 text-black ${
-                activeTab === tab.code
-                  ? "border-black/4 bg-neutral-0 shadow-[0_3px_8px_0_rgba(0,0,0,0.12),0_3px_1px_0_rgba(0,0,0,0.04)]"
-                  : ""
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        <Tabs
+          tabs={TABS.map((tab) => ({ id: tab.code, label: tab.label }))}
+          activeTabId={activeTab}
+          onChange={(tabId) => setActiveTab(tabId as RecruitmentStatusFilter)}
+          edgeClassName="-mx-6"
+          paddingClassName="px-6"
+          textClassName="text-body6"
+          inactiveTextClassName="text-body1"
+        />
 
         {postings.length === 0 ? (
           <EmptyState
@@ -135,7 +129,9 @@ const ApplicationManagementPage = () => {
                   className="flex cursor-pointer flex-col gap-3"
                 >
                   <span className="self-start rounded-full border border-secondary-500 px-3 py-0.5 text-center text-caption3 text-secondary-400">
-                    {formatDDayLabel(getDDay(posting.dueDate.split(" ")[0], today))}
+                    {formatDDayLabel(
+                      getDDay(posting.dueDate.split(" ")[0], today),
+                    )}
                   </span>
 
                   <div className="flex flex-col gap-1">
@@ -191,7 +187,16 @@ const ApplicationManagementPage = () => {
                         </div>
 
                         {applicant.status === "PENDING" ? (
-                          <button type="button" className="shrink-0">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              navigate(
+                                `/band/my/applications/${applicant.applySubmissionId}`,
+                                { state: { status: applicant.status } },
+                              )
+                            }
+                            className="shrink-0"
+                          >
                             <img src={ArrowRightIcon} alt="" />
                           </button>
                         ) : applicant.status === "REJECTED" ? (

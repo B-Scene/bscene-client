@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useMyProfilesQuery } from "@/hooks/api/user/useMyProfiles";
 import { useChangeUserMode, useToggleUserMode } from "@/hooks/api/user/useMode";
+import { useDragToCloseSheet } from "@/hooks/useDragToCloseSheet";
 import { useSlideUpSheet } from "@/hooks/useSlideUpSheet";
 import { Toast } from "@/components/common/Toast/Toast";
 import { useModeStore } from "@/stores/useModeStore";
@@ -176,6 +177,9 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
   const selectedMode = selectedId.startsWith("fan") ? "fan" : "band";
   const isSelectionUnchanged = selectedId === initialSelectedId;
 
+  const { dragPhase, translateY: sheetTranslateY, dragHandleProps } =
+    useDragToCloseSheet(isVisible, onClose);
+
   const bandModeSection = (
     <div className="flex w-82.5 flex-col gap-4">
       <span className="text-label2 text-secondary-500">밴드 모드</span>
@@ -252,24 +256,28 @@ export const ModeSwitchSheet = ({ open, onClose }: ModeSwitchSheetProps) => {
 
       <div
         onTransitionEnd={handleTransitionEnd}
-        className={`relative z-10 flex w-full flex-col items-center gap-2 rounded-t-3xl bg-neutral-0 px-3.75 pt-3 pb-8 transition-transform duration-300 ease-out ${
-          isVisible ? "translate-y-0" : "translate-y-full"
-        }`}
+        style={{
+          transform: `translateY(${sheetTranslateY})`,
+          transition: dragPhase === "dragging" ? "none" : undefined,
+        }}
+        className="relative z-10 flex max-h-[85dvh] w-full flex-col items-center gap-2 rounded-t-3xl bg-neutral-0 px-3.75 pt-3 pb-8 transition-transform duration-300 ease-out"
       >
-        <div className="pt-2 pb-3">
+        <div className="touch-none pt-2 pb-3" {...dragHandleProps}>
           <div className="h-1 w-11 shrink-0 rounded bg-[#DEDEDE]" />
         </div>
 
-        <div className="flex w-full flex-col items-center gap-4">
-          <h2 className="text-center text-label1 text-neutral-900">
+        <div className="flex min-h-0 w-full flex-1 flex-col items-center gap-4">
+          <h2 className="shrink-0 text-center text-label1 text-neutral-900">
             모드 전환
           </h2>
 
-          <div className="flex w-full flex-col items-center gap-6">
+          <div className="flex w-full min-h-0 flex-1 flex-col items-center gap-6 overflow-y-auto py-2">
             {fanModeSection}
 
             {bandModeSection}
+          </div>
 
+          <div className="flex w-full shrink-0 flex-col items-center gap-6">
             {!isFanMode ? (
               <div className="h-px w-90.75 shrink-0 bg-neutral-400" />
             ) : null}

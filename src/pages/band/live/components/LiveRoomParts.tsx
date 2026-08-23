@@ -12,6 +12,7 @@ import { useSlideUpSheet } from "@/hooks/useSlideUpSheet";
 import type { LiveMemberItem } from "@/types/live/live";
 import type { ActiveLive, ChatMessage, GoLiveScreen } from "../types";
 import { ProfileImage } from "./ProfileImage";
+import "./LiveRoomParts.css";
 
 export type LiveAudioStatus =
   | "idle"
@@ -41,7 +42,6 @@ const PART_LABELS: Record<string, string> = {
 
 const formatMemberParts = (parts: string[]) => {
   if (parts.length === 0) return "포지션 미정";
-
   return parts.map((part) => PART_LABELS[part] ?? part).join(", ");
 };
 
@@ -57,32 +57,63 @@ export function LiveRoomHeader({
   durationSeconds: number;
 }) {
   return (
-    <header className="flex h-[52px] shrink-0 items-center justify-between px-[25px]">
-      <div className="flex items-center gap-2 text-body3 text-neutral-900">
-        <span className="flex h-[22px] items-center rounded-full bg-secondary-500 px-2.5 text-caption3 text-neutral-0">
+    <header className="absolute inset-x-0 top-2.5 z-10 flex h-12 items-center justify-between pr-6 pl-[31px]">
+      <div className="flex items-center gap-2.5 text-neutral-900">
+        <span className="flex h-[22px] items-center rounded-lg bg-secondary-500 px-[9px] py-0.5 text-caption3 text-neutral-0">
           · LIVE
         </span>
 
-        <span>{formatDuration(durationSeconds)}</span>
+        <span className="text-caption2">{formatDuration(durationSeconds)}</span>
 
-        <span className="flex items-center gap-1">
+        <span className="flex items-center gap-1 text-caption2">
           <img
             src={LiveHeadIcon}
             alt=""
-            className="h-[13px] w-3 object-contain brightness-0"
+            className="size-4 object-contain brightness-0"
           />
-          {viewerCount}명 청취 중
+          {viewerCount.toLocaleString()}명 청취 중
         </span>
       </div>
 
       <button
         type="button"
         onClick={onClose}
-        className="flex h-[28px] w-[74px] items-center justify-center rounded-full bg-neutral-0 text-caption3 text-error shadow-[0_2px_8px_rgba(198,40,40,0.18)]"
+        className="flex items-center justify-center rounded-full bg-neutral-0 px-2 py-1 text-caption3 text-error shadow-[0_2px_8px_rgba(198,40,40,0.18)]"
       >
         {canCloseLive ? "라이브 종료" : "나가기"}
       </button>
     </header>
+  );
+}
+
+const waveHeights = [5, 5, 15, 35, 65, 100, 65, 35, 15, 5, 5];
+
+function Waveform({
+  isActive,
+  side,
+}: {
+  isActive: boolean;
+  side: "left" | "right";
+}) {
+  return (
+    <div
+      className="flex h-[100px] w-[103px] shrink-0 items-center gap-[7px]"
+      aria-hidden="true"
+    >
+      {waveHeights.map((height, index) => (
+        <span
+          key={`${side}-${height}-${index}`}
+          className={`live-audio-wave-bar w-[3px] shrink-0 rounded-full bg-gradient-to-b from-secondary-100 via-secondary-300 to-secondary-500 ${
+            isActive ? "is-active" : ""
+          }`}
+          style={{
+            height,
+            animationDelay: `-${(index * 113 + (side === "right" ? 170 : 0)) % 760}ms`,
+            animationDuration: `${620 + ((index * 137 + (side === "right" ? 90 : 0)) % 480)}ms`,
+          }}
+        />
+      ))}
+    </div>
   );
 }
 
@@ -94,73 +125,36 @@ export function LiveRoomHero({
   live: ActiveLive;
 }) {
   return (
-    <section className="relative h-[282px] shrink-0 text-center">
-      <Waveform isActive={isAudioActive} />
+    <section className="absolute inset-x-0 top-[90px] h-[272px] text-center">
+      <div className="flex h-[160px] items-center justify-center gap-2.5">
+        <Waveform isActive={isAudioActive} side="left" />
 
-      <div className="relative z-10 flex justify-center pt-[18px]">
-        <ProfileImage size="lg" src={live?.bandProfileImageUrl ?? undefined} />
+        <ProfileImage
+          size="lg"
+          src={live?.bandProfileImageUrl ?? undefined}
+        />
+
+        <Waveform isActive={isAudioActive} side="right" />
       </div>
 
-      <div className="mt-5 flex items-center justify-center gap-2">
-        <h2 className="text-h4 font-bold text-neutral-900">
-          {live?.bandName ?? "WAVY"}
+      <div className="mt-8 flex h-20 flex-col items-center gap-[5px]">
+        <div className="flex h-6 items-center justify-center gap-2.5">
+          <h1 className="text-label1 text-neutral-900">
+            {live?.bandName ?? "WAVY"}
+          </h1>
+          <img src={BadgeIcon} alt="인증된 밴드" className="size-6 object-contain" />
+        </div>
+
+        <h2 className="text-h4 text-neutral-900">
+          {live?.title ?? "라이브"}
         </h2>
-        <VerifiedBadge />
+
+        <p className="text-caption2 text-neutral-600">
+          {live?.description ?? ""}
+        </p>
       </div>
-
-      <h3 className="mt-1 text-h4 text-neutral-900">
-        {live?.title ?? "신곡 데모 첫 공개!"}
-      </h3>
-
-      <p className="mt-1 text-caption2 text-neutral-600">
-        {live?.description ?? "미공개 데모를 라이브로 들려드려요"}
-      </p>
     </section>
   );
-}
-
-function Waveform({ isActive }: { isActive: boolean }) {
-  const bars = [4, 7, 15, 34, 63, 92, 71, 46, 25, 12, 7, 4];
-
-  return (
-    <div className="absolute inset-x-0 top-[52px] flex items-center justify-between text-secondary-500">
-      <div className="flex w-[96px] items-center justify-between">
-        {bars.map((height, index) => (
-          <span
-            key={`left-${height}-${index}`}
-            className={`live-audio-wave-bar w-0.5 rounded-full bg-gradient-to-b from-secondary-200 via-secondary-500 to-secondary-500 ${
-              isActive ? "is-active" : ""
-            }`}
-            style={{
-              height,
-              animationDelay: `-${(index * 127) % 780}ms`,
-              animationDuration: `${640 + ((index * 149) % 460)}ms`,
-            }}
-          />
-        ))}
-      </div>
-
-      <div className="flex w-[96px] items-center justify-between">
-        {[...bars].reverse().map((height, index) => (
-          <span
-            key={`right-${height}-${index}`}
-            className={`live-audio-wave-bar w-0.5 rounded-full bg-gradient-to-b from-secondary-200 via-secondary-500 to-secondary-500 ${
-              isActive ? "is-active" : ""
-            }`}
-            style={{
-              height,
-              animationDelay: `-${(index * 109 + 190) % 780}ms`,
-              animationDuration: `${660 + ((index * 131 + 80) % 440)}ms`,
-            }}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function VerifiedBadge() {
-  return <img src={BadgeIcon} alt="인증됨" className="size-6 object-contain" />;
 }
 
 function ChatProfileImage({
@@ -195,7 +189,7 @@ function ChatProfileImage({
     </div>
   );
 
-  if (!onClick || chat.pending) {
+  if (!onClick || chat.pending || chat.highlighted) {
     return imageElement;
   }
 
@@ -227,76 +221,75 @@ function ChatBubble({
     if (!canOpenProfileAction) return;
     onProfileClick?.(chat);
   };
-if (chat.highlighted) {
-  return (
-    <article className="grid grid-cols-[40px_283px] items-start gap-[15px]">
-      <ChatProfileImage chat={chat} onClick={handleOpenProfileAction} />
 
-      <div
-        role={canOpenProfileAction ? "button" : undefined}
-        tabIndex={canOpenProfileAction ? 0 : undefined}
-        onClick={handleOpenProfileAction}
-        onKeyDown={(event) => {
-          if (!canOpenProfileAction) return;
+  if (chat.highlighted) {
+    return (
+      <article className="grid grid-cols-[40px_283px] items-start gap-[15px]">
+        <ChatProfileImage chat={chat} onClick={handleOpenProfileAction} />
 
-          if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            handleOpenProfileAction();
-          }
-        }}
-        className={`relative min-h-[73px] w-[283px] max-w-full rounded-2xl border border-secondary-300 bg-secondary-0/50 px-[11px] py-[7px] pr-11 ${
-          canOpenProfileAction ? "cursor-pointer" : ""
-        }`}
-      >
-        <strong className="block text-caption3 text-neutral-900">
-          {chat.sender}
-        </strong>
+        <div
+          role={canOpenProfileAction ? "button" : undefined}
+          tabIndex={canOpenProfileAction ? 0 : undefined}
+          onClick={handleOpenProfileAction}
+          onKeyDown={(event) => {
+            if (!canOpenProfileAction) return;
 
-        <p
-          className={`mt-1 break-words whitespace-pre-wrap text-body3 text-neutral-900 ${
-            chat.pending ? "opacity-60" : ""
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              handleOpenProfileAction();
+            }
+          }}
+          className={`relative min-h-[73px] w-[283px] max-w-full rounded-2xl border border-secondary-300 bg-secondary-100 px-[11px] py-[7px] pr-11 ${
+            canOpenProfileAction ? "cursor-pointer" : ""
           }`}
         >
-          {chat.message}
-        </p>
+          <strong className="block text-caption3 text-neutral-900">
+            {chat.sender}
+          </strong>
 
-        <time className="absolute right-[11px] top-1/2 -translate-y-1/2 text-caption4 text-neutral-600">
-          {chat.time}
-        </time>
-      </div>
-    </article>
-  );
-}
-
-  return (
-    <article className="grid grid-cols-[40px_283px] items-start gap-[15px]">
-      <div className="row-span-1">
-        <ChatProfileImage chat={chat} onClick={handleOpenProfileAction} />
-      </div>
-
-      <div className="w-[283px] max-w-full">
-        <button
-          type="button"
-          onClick={handleOpenProfileAction}
-          className="block max-w-full truncate text-left text-caption3 text-neutral-900"
-        >
-          {chat.sender}
-        </button>
-
-        <div className="mt-1 grid grid-cols-[minmax(0,1fr)_38px] items-start">
           <p
-            className={`min-h-7 max-w-[191px] break-words whitespace-pre-wrap rounded-xl bg-neutral-0 px-[11px] py-1 text-body3 text-neutral-900 ${
+            className={`mt-1 break-words whitespace-pre-wrap text-body3 text-neutral-900 ${
               chat.pending ? "opacity-60" : ""
             }`}
           >
             {chat.message}
           </p>
 
-          <time className="mr-[11px] mt-[8px] justify-self-end self-start text-caption4 text-neutral-600">
+          <time className="absolute right-[11px] top-1/2 -translate-y-1/2 text-caption4 text-neutral-600">
             {chat.time}
           </time>
         </div>
+      </article>
+    );
+  }
+
+  return (
+    <article className="grid grid-cols-[40px_minmax(0,1fr)_28px] items-start gap-x-[15px]">
+      <div className="row-span-2">
+        <ChatProfileImage chat={chat} onClick={handleOpenProfileAction} />
       </div>
+
+      <button
+        type="button"
+        onClick={handleOpenProfileAction}
+        className="max-w-full truncate text-left text-caption3 text-neutral-900"
+      >
+        {chat.sender}
+      </button>
+
+      <span />
+
+      <p
+        className={`mt-1 min-h-7 max-w-[191px] break-words whitespace-pre-wrap rounded-xl bg-neutral-0 px-[11px] py-1 text-body3 text-neutral-900 ${
+          chat.pending ? "opacity-60" : ""
+        }`}
+      >
+        {chat.message}
+      </p>
+
+      <time className="mt-[13px] mr-[11px] justify-self-end text-caption4 text-neutral-600">
+        {chat.time}
+      </time>
     </article>
   );
 }
@@ -315,19 +308,18 @@ export function RoomMessageArea({
   useEffect(() => {
     const scrollContainer = scrollRef.current;
     if (!scrollContainer) return;
-
     scrollContainer.scrollTop = scrollContainer.scrollHeight;
   }, [messages]);
 
   return (
-    <section className="min-h-0 flex-1 basis-0 overflow-hidden bg-secondary-0">
+    <section className="absolute inset-x-0 top-[386px] bottom-0 overflow-hidden bg-secondary-0/70">
       <div
         ref={scrollRef}
-        className={`h-full overflow-x-hidden overflow-y-auto px-6 pt-3.5 ${
-          composerOpen ? "pb-[150px]" : "pb-[90px]"
+        className={`live-room-chat-scroll mx-auto h-full w-[338px] max-w-[calc(100%-48px)] overflow-x-hidden overflow-y-auto pt-3 ${
+          composerOpen ? "pb-[190px]" : "pb-[110px]"
         }`}
       >
-        <div className="grid gap-3.5">
+        <div className="grid gap-3">
           {messages.map((chat) => (
             <ChatBubble
               key={chat.id}
@@ -352,7 +344,6 @@ export function ChatComposer({
     event.preventDefault();
 
     const trimmedMessage = message.trim();
-
     if (!trimmedMessage) return;
 
     onSendMessage(trimmedMessage);
@@ -362,7 +353,7 @@ export function ChatComposer({
   return (
     <form
       onSubmit={handleSubmit}
-      className="fixed bottom-[98px] left-1/2 z-30 flex w-[calc(100%-40px)] max-w-[353px] -translate-x-1/2 items-center gap-[17px]"
+      className="absolute bottom-[112px] left-1/2 z-30 flex w-[calc(100%-40px)] max-w-[353px] -translate-x-1/2 items-center gap-[17px]"
     >
       <input
         aria-label="메시지 입력"
@@ -415,12 +406,12 @@ export function LiveActionBar({
     ? "마이크 연결 중"
     : isBroadcasting
       ? isMicMuted
-        ? "마이크 음소거 해제"
-        : "마이크 음소거"
-      : "마이크 송출 시작";
+        ? "마이크 켜기"
+        : "마이크 끄기"
+      : "마이크 연결";
 
   return (
-    <div className="fixed bottom-3 left-1/2 z-30 h-[62px] w-[calc(100%-40px)] max-w-[353px] -translate-x-1/2 rounded-[24px] bg-neutral-0 shadow-[0_4px_15px_rgba(20,20,20,0.10)]">
+    <nav className="absolute bottom-6 left-1/2 z-30 h-[62px] w-[calc(100%-40px)] max-w-[353px] -translate-x-1/2 rounded-[24px] bg-neutral-0 shadow-[0_0_8px_rgba(20,20,20,0.10)]">
       <div className="relative flex h-full items-center justify-between px-10 py-3">
         <button
           type="button"
@@ -438,7 +429,7 @@ export function LiveActionBar({
           onClick={onToggleBroadcast}
           disabled={isAudioConnecting || audioStatus === "unsupported"}
           className={[
-            "absolute left-1/2 -top-4 flex size-[62px] -translate-x-1/2 items-center justify-center rounded-full bg-secondary-0 shadow-[0_0_30px_rgba(251,177,14,0.34)]",
+            "absolute left-1/2 -top-[18px] flex size-[66px] -translate-x-1/2 items-center justify-center rounded-full bg-secondary-0 shadow-[0_0_20px_rgba(251,177,14,0.50)]",
             isAudioConnecting ? "cursor-wait animate-pulse opacity-70" : "",
             audioStatus === "unsupported" ? "opacity-40" : "",
           ].join(" ")}
@@ -447,7 +438,7 @@ export function LiveActionBar({
             src={IcMicIcon}
             alt=""
             className={[
-              "size-10",
+              "size-[42px]",
               isBroadcasting && !isMicMuted ? "opacity-100" : "opacity-45",
               isMicMuted ? "grayscale" : "",
             ].join(" ")}
@@ -485,7 +476,7 @@ export function LiveActionBar({
           채팅
         </button>
       </div>
-    </div>
+    </nav>
   );
 }
 
@@ -500,67 +491,73 @@ export function MemberSheet({
 }) {
   return (
     <div
-      className="absolute inset-0 z-40 bg-black/70"
+      className="fixed inset-0 z-40 flex items-end justify-center bg-black/70"
       onClick={() => go("room")}
       role="presentation"
     >
       <section
-        className="absolute inset-x-0 bottom-0 rounded-t-[22px] bg-neutral-0 px-8 pt-2.5 pb-8"
+        className="flex max-h-[min(72dvh,560px)] min-h-[236px] w-full max-w-[393px] flex-col rounded-t-[22px] bg-neutral-0 px-8 pt-2.5 pb-[calc(env(safe-area-inset-bottom)+24px)]"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="mx-auto h-1 w-[42px] rounded-full bg-neutral-300" />
+        <div className="mx-auto h-1 w-[42px] shrink-0 rounded-full bg-neutral-300" />
 
-        <h2 className="mt-7 text-center text-h4 font-bold text-neutral-900">
+        <h2 className="mt-7 shrink-0 text-center text-h4 font-bold text-neutral-900">
           멤버
         </h2>
 
-        <div className="mt-4 grid gap-3">
-          {isLoading ? (
-            <p className="py-6 text-center text-caption2 text-neutral-500">
-              멤버를 불러오는 중이에요.
-            </p>
-          ) : null}
+        <div className="mt-4 min-h-0 flex-1 overflow-y-auto pr-1">
+          <div className="grid gap-3">
+            {isLoading ? (
+              <p className="py-6 text-center text-caption2 text-neutral-500">
+                멤버를 불러오는 중이에요.
+              </p>
+            ) : null}
 
-          {!isLoading && members.length === 0 ? (
-            <p className="py-6 text-center text-caption2 text-neutral-500">
-              표시할 멤버가 없어요.
-            </p>
-          ) : null}
+            {!isLoading && members.length === 0 ? (
+              <p className="py-6 text-center text-caption2 text-neutral-500">
+                표시할 멤버가 없어요.
+              </p>
+            ) : null}
 
-          {!isLoading
-            ? members.map((member, index) => (
-                <article
-                  key={`${member.nickname}-${member.bandName}-${index}`}
-                  className="flex h-[52px] items-center rounded-lg bg-neutral-0 px-4 shadow-[0_2px_8px_rgba(20,20,20,0.10)]"
-                >
-                  <ProfileImage
-                    size="sm"
-                    src={member.bandProfileImageUrl ?? undefined}
-                  />
+            {!isLoading
+              ? members.map((member, index) => (
+                  <article
+                    key={`${member.nickname}-${member.bandName}-${index}`}
+                    className="flex h-[52px] items-center rounded-lg bg-neutral-0 px-4 shadow-[0_2px_8px_rgba(20,20,20,0.10)]"
+                  >
+                    <ProfileImage
+                      size="sm"
+                      src={
+                        member.profileImageUrl ??
+                        member.bandProfileImageUrl ??
+                        undefined
+                      }
+                    />
 
-                  <div className="ml-3 min-w-0">
-                    <div className="flex items-center gap-1">
-                      <strong className="block truncate text-caption3 text-neutral-900">
-                        {member.nickname}
-                      </strong>
+                    <div className="ml-3 min-w-0">
+                      <div className="flex items-center gap-1">
+                        <strong className="block truncate text-caption3 text-neutral-900">
+                          {member.nickname}
+                        </strong>
 
-                      {member.isLeader ? (
-                        <span className="shrink-0 rounded-full bg-secondary-100 px-1.5 py-0.5 text-caption4 text-secondary-600">
-                          리더
-                        </span>
-                      ) : null}
+                        {member.isLeader ? (
+                          <span className="shrink-0 rounded-full bg-secondary-100 px-1.5 py-0.5 text-caption4 text-secondary-600">
+                            리더
+                          </span>
+                        ) : null}
+                      </div>
+
+                      <span className="block truncate text-caption2 text-neutral-600">
+                        {formatMemberParts(member.part)}
+                      </span>
                     </div>
-
-                    <span className="block truncate text-caption2 text-neutral-600">
-                      {formatMemberParts(member.part)}
-                    </span>
-                  </div>
-                </article>
-              ))
-            : null}
+                  </article>
+                ))
+              : null}
+          </div>
         </div>
 
-        <div className="mx-auto mt-5 h-1 w-[132px] rounded-full bg-neutral-300" />
+        <div className="mx-auto mt-5 h-1 w-[132px] shrink-0 rounded-full bg-neutral-300" />
       </section>
     </div>
   );
@@ -612,7 +609,7 @@ export function LiveChatProfileActionSheet({
         aria-modal="true"
         aria-label="사용자 관리"
         onTransitionEnd={handleTransitionEnd}
-        className={`relative z-10 h-[268px] w-full max-w-[393px] rounded-t-[24px] bg-neutral-0 px-5 pt-12 pb-12 shadow-[0_-8px_24px_rgba(20,20,20,0.16)] transition-transform duration-300 ease-out ${
+        className={`relative z-10 h-[268px] w-full rounded-t-[24px] bg-neutral-0 px-5 pt-12 pb-12 shadow-[0_-8px_24px_rgba(20,20,20,0.16)] transition-transform duration-300 ease-out ${
           isVisible ? "translate-y-0" : "translate-y-full"
         }`}
       >
@@ -644,7 +641,7 @@ export function LiveChatProfileActionSheet({
         <button
           type="button"
           onClick={onClose}
-          className="mt-2 flex h-[52px] w-full items-center justify-center rounded-xl bg-neutral-400 px-[159px] py-[14px] text-label2 text-neutral-700"
+          className="mt-2 flex h-[52px] w-full items-center justify-center rounded-xl bg-neutral-400 py-[14px] text-label2 text-neutral-700"
         >
           취소
         </button>

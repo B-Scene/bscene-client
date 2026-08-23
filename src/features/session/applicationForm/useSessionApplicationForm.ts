@@ -44,6 +44,8 @@ export const useSessionApplicationForm = ({
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
 
   const isEditMode = mode === "edit";
+  const isApplicationTypeLocked =
+    mode === "create" && initialValue?.applicationType.trim() === "기본";
 
   const headerTitle = isEditMode ? "지원서 수정" : "지원서 작성";
   const submitButtonLabel = isEditMode ? "지원서 저장" : "지원서 등록";
@@ -238,6 +240,7 @@ export const useSessionApplicationForm = ({
     form,
     isFormValid,
     isEditMode,
+    isApplicationTypeLocked,
     headerTitle,
     submitButtonLabel,
     isCancelModalOpen,

@@ -22,6 +22,7 @@ export interface ApplicationHistoryItem {
   canMessage?: boolean;
   canViewApplication?: boolean;
   canCancel?: boolean;
+  canFinalize?: boolean;
 }
 
 export interface RecruitmentHistoryItem {

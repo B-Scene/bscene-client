@@ -1,11 +1,12 @@
-import { useMemo, useState } from "react";
+// src/pages/band/session/components/SessionApplicationHistoryPage.tsx
+
+import { useEffect, useMemo, useState } from "react";
 import type { AxiosError } from "axios";
 import { useNavigate } from "react-router-dom";
 
 import EmptyApplicationHistoryIcon from "@/assets/icons/band/empty-application-history.svg";
-import EmptyScrapHistoryIcon from "@/assets/icons/band/empty-scrap-history.svg";
 import EmptyRecentHistoryIcon from "@/assets/icons/band/empty-recent-history.svg";
-
+import EmptyScrapHistoryIcon from "@/assets/icons/band/empty-scrap-history.svg";
 import { ApplicationHistoryCard } from "@/features/session/applicationHistory/ApplicationHistoryCard";
 import type {
   ApplicationHistoryItem,
@@ -19,10 +20,12 @@ import {
   ApplicationHistoryHeader,
   ApplicationHistoryTabs,
 } from "@/features/session/applicationHistory/SessionApplicationHistoryView";
-
+import { ModalOverlay } from "@/components/common/Modal/ModalOverlay";
+import Modal from "@/components/Modal/Modal";
 import {
   useApplicationSubmissionsQuery,
   useCancelApplicationSubmissionMutation,
+  useFinalizeApplicationSubmissionMutation,
 } from "@/hooks/api/session/useSessionApplication";
 import {
   useAddSessionRecruitmentInterest,
@@ -31,7 +34,6 @@ import {
   useRemoveSessionRecruitmentInterest,
 } from "@/hooks/api/session/useSessionRecruitment";
 import { useCreateSessionChatRoomMutation } from "@/hooks/api/session/useSessionChat";
-
 import type {
   ApplicationSubmissionItem,
   SessionApiResponse,
@@ -131,6 +133,7 @@ const mapSubmissionToApplication = (
     canMessage: status === "completed" || status === "accepted",
     canViewApplication: isCompleted,
     canCancel: isCompleted,
+    canFinalize: status === "accepted",
   };
 };
 
@@ -187,6 +190,9 @@ export const SessionApplicationHistoryPage = ({
     Set<number>
   >(() => new Set());
 
+  const [finalizeTarget, setFinalizeTarget] =
+    useState<ApplicationHistoryItem | null>(null);
+
   const applicationSubmissionsQuery = useApplicationSubmissionsQuery({
     size: HISTORY_QUERY_SIZE,
   });
@@ -204,6 +210,14 @@ export const SessionApplicationHistoryPage = ({
   const addInterestMutation = useAddSessionRecruitmentInterest();
   const removeInterestMutation = useRemoveSessionRecruitmentInterest();
   const createChatRoomMutation = useCreateSessionChatRoomMutation();
+  const finalizeApplicationMutation = useFinalizeApplicationSubmissionMutation();
+
+  useEffect(() => {
+    window.scrollTo({
+      top: 0,
+      behavior: "auto",
+    });
+  }, [activeTab]);
 
   const applications = useMemo(() => {
     const content = applicationSubmissionsQuery.data?.content ?? [];
@@ -274,6 +288,37 @@ export const SessionApplicationHistoryPage = ({
     }
   };
 
+  const handleFinalizeApplication = (application: ApplicationHistoryItem) => {
+    setFinalizeTarget(application);
+  };
+
+  const handleFinalizeDecision = async (isAccepted: boolean) => {
+    const target = finalizeTarget;
+
+    if (!target?.applicationSubmissionId || finalizeApplicationMutation.isPending) {
+      return;
+    }
+
+    try {
+      await finalizeApplicationMutation.mutateAsync({
+        applySubmissionId: target.applicationSubmissionId,
+        body: { isAccepted },
+      });
+
+      setFinalizeTarget(null);
+    } catch (error) {
+      const apiMessage = (error as AxiosError<SessionApiResponse<null>>)
+        .response?.data?.message;
+
+      window.alert(
+        apiMessage ??
+          (isAccepted
+            ? "최종 확정에 실패했어요. 잠시 후 다시 시도해주세요."
+            : "거절 처리에 실패했어요. 잠시 후 다시 시도해주세요."),
+      );
+    }
+  };
+
   const handleMessageApplication = async (
     application: ApplicationHistoryItem,
   ) => {
@@ -334,6 +379,9 @@ export const SessionApplicationHistoryPage = ({
       } else {
         await addInterestMutation.mutateAsync(sessionRecruitmentId);
       }
+
+      void interestedRecruitmentsQuery.refetch();
+      void recentlyViewedRecruitmentsQuery.refetch();
     } catch (error) {
       const apiMessage = (error as AxiosError<SessionApiResponse<null>>)
         .response?.data?.message;
@@ -359,6 +407,9 @@ export const SessionApplicationHistoryPage = ({
       } else {
         await addInterestMutation.mutateAsync(sessionRecruitmentId);
       }
+
+      void interestedRecruitmentsQuery.refetch();
+      void recentlyViewedRecruitmentsQuery.refetch();
     } catch (error) {
       const apiMessage = (error as AxiosError<SessionApiResponse<null>>)
         .response?.data?.message;
@@ -424,6 +475,7 @@ export const SessionApplicationHistoryPage = ({
             }
             onCancelApplication={handleCancelApplication}
             onMessage={handleMessageApplication}
+            onFinalizeApplication={handleFinalizeApplication}
           />
         ))}
       </div>
@@ -553,18 +605,41 @@ export const SessionApplicationHistoryPage = ({
   };
 
   return (
-    <div className="absolute inset-0 z-[99999] flex h-full w-full flex-col overflow-hidden bg-neutral-0">
-      <ApplicationHistoryHeader onBack={handleClose} onClose={handleClose} />
+  <section className="relative min-h-dvh overscroll-y-contain bg-neutral-50 pb-[calc(var(--bottom-nav-height)+24px)]">
+    <ApplicationHistoryHeader onBack={handleClose} onClose={handleClose} />
 
-      <ApplicationHistoryTabs activeTab={activeTab} onChange={setActiveTab} />
+    <ApplicationHistoryTabs activeTab={activeTab} onChange={setActiveTab} />
 
-      <section className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-5 py-5">
-        {activeTab === "application" ? renderApplicationTab() : null}
-        {activeTab === "scrap" ? renderScrapTab() : null}
-        {activeTab === "recent" ? renderRecentTab() : null}
-      </section>
-    </div>
-  );
+    <section className="bg-neutral-50 px-5 pt-5 pb-[calc(var(--bottom-nav-height)+80px)]">
+      {activeTab === "application" ? renderApplicationTab() : null}
+      {activeTab === "scrap" ? renderScrapTab() : null}
+      {activeTab === "recent" ? renderRecentTab() : null}
+    </section>
+
+    <ModalOverlay
+      open={finalizeTarget !== null}
+      onClose={() => setFinalizeTarget(null)}
+    >
+      <Modal
+        tone="orange"
+        title="세션 지원을 최종 확정할까요?"
+        description={
+          <>
+            {finalizeTarget?.bandName}의 &apos;{finalizeTarget?.title}&apos;
+            <br />
+            지원을 확정하면 밴드 멤버로 등록돼요
+          </>
+        }
+        cancelLabel="거절"
+        confirmLabel="수락"
+        cancelDisabled={finalizeApplicationMutation.isPending}
+        confirmDisabled={finalizeApplicationMutation.isPending}
+        onCancel={() => void handleFinalizeDecision(false)}
+        onConfirm={() => void handleFinalizeDecision(true)}
+      />
+    </ModalOverlay>
+  </section>
+);
 };
 
 export default SessionApplicationHistoryPage;

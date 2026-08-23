@@ -244,4 +244,6 @@ export interface FinalizeApplicationSubmissionRequest {
   part?: string;
 }
 
-export type FinalizeApplicationSubmissionResponse = null;
+export interface FinalizeApplicationSubmissionResponse {
+  bandMemberProfileId?: number | null;
+}

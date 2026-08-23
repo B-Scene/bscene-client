@@ -1,11 +1,11 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import ArrowLeftIcon from "@/assets/icons/arrow-left.svg";
 import LocationIcon from "@/assets/icons/band/ic_location.svg";
 import BellActiveIcon from "@/assets/icons/fan/bell-active-icon.svg";
 import BellIcon from "@/assets/icons/fan/bell-icon.svg";
 import ImagePlaceholderIcon from "@/assets/icons/fan/image-icon.svg";
 import LikedPerformIcon from "@/assets/icons/fan/liked-perform.svg";
+import { Header } from "@/components/common/Header/Header";
 import { Toast } from "@/components/common/Toast/Toast";
 import {
   useDeletePerformanceAlarm,
@@ -81,25 +81,10 @@ const InterestedConcertsPage = () => {
   };
 
   return (
-    <main className="min-h-dvh bg-neutral-0 px-5 pb-[calc(var(--bottom-nav-height)+24px)]">
-      <header className="-mx-5 flex h-15 items-center justify-between px-3.75">
-        <button
-          type="button"
-          aria-label="뒤로가기"
-          onClick={() => navigate(-1)}
-          className="flex size-6 items-center justify-center"
-        >
-          <img src={ArrowLeftIcon} alt="" className="size-6" />
-        </button>
+    <main className="min-h-dvh bg-neutral-0 pb-[calc(var(--bottom-nav-height)+24px)]">
+      <Header title="관심 공연 목록" />
 
-        <h1 className="m-0 font-body text-label2 text-neutral-900">
-          관심 공연 목록
-        </h1>
-
-        <span aria-hidden="true" className="size-6" />
-      </header>
-
-      <div className="mt-4 flex flex-col gap-5">
+      <div className="mt-4 flex flex-col gap-5 px-5">
         <div className="rounded-xl border border-primary-300 bg-primary-0 p-3 text-center">
           <p className="m-0 text-caption2 leading-5 text-neutral-600">
             공연 상세페이지에서 하트를 눌러 찜한 공연이 모여요

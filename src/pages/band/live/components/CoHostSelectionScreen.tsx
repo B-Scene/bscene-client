@@ -1,9 +1,7 @@
-import UserDefaultProfileIcon from "@/assets/icons/band/user-default-profile.svg";
-import type {
-  LiveReservationCoHostCandidate,
-  LiveReservationCoHostStatus,
-} from "@/types/live/live";
-import { TopBar } from "./TopBar";
+import CloseIcon from "@/assets/icons/close-header.svg";
+import type { LiveReservationCoHostCandidate } from "@/types/live/live";
+
+import { ProfileImage } from "./ProfileImage";
 
 interface CoHostSelectionScreenProps {
   onBack: () => void;
@@ -15,65 +13,99 @@ interface CoHostSelectionScreenProps {
   errorMessage?: string;
 }
 
-const STATUS_LABELS: Record<Exclude<LiveReservationCoHostStatus, null>, string> =
-  {
-    OWNER: "진행자",
-    APPROVED: "선택됨",
-    INVITED: "초대 중",
-    REJECTED: "재초대",
-  };
-
 const PART_LABELS: Record<string, string> = {
   VOCAL: "보컬",
   GUITAR: "기타",
   BASS: "베이스",
   DRUM: "드럼",
   KEYBOARD: "키보드",
-  ETC: "기타",
-  MEMBER: "멤버",
   SESSION: "세션",
+  MEMBER: "멤버",
+  ETC: "기타",
 };
 
-const getPartLabel = (part: string) => {
-  return PART_LABELS[part] ?? part;
+const getPartLabel = (part?: string | null) => {
+  if (!part) return "멤버";
+
+  return PART_LABELS[part.toUpperCase()] ?? part;
 };
 
-const getButtonLabel = ({
-  status,
-  isSelected,
+const isOwnerCandidate = (candidate: LiveReservationCoHostCandidate) => {
+  return candidate.status === "OWNER";
+};
+
+function HeaderBackButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="뒤로가기"
+      className="absolute top-0 left-5 z-20 flex h-[52px] w-10 items-center justify-center"
+    >
+      <span className="block h-[18px] w-[18px] rotate-45 border-b-[2.5px] border-l-[2.5px] border-[#1D1A1A]" />
+    </button>
+  );
+}
+
+function HeaderCloseButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="닫기"
+      className="absolute top-0 right-5 z-20 flex h-[52px] w-10 items-center justify-center"
+    >
+      <img src={CloseIcon} alt="" className="size-7" />
+    </button>
+  );
+}
+
+function CoHostCandidateCard({
+  candidate,
+  selected,
+  onToggle,
 }: {
-  status: LiveReservationCoHostStatus;
-  isSelected: boolean;
-}) => {
-  if (status === "OWNER") return STATUS_LABELS.OWNER;
-  if (isSelected && status === "INVITED") return STATUS_LABELS.INVITED;
-  if (isSelected) return "선택됨";
-  if (status === "REJECTED") return STATUS_LABELS.REJECTED;
+  candidate: LiveReservationCoHostCandidate;
+  selected: boolean;
+  onToggle: () => void;
+}) {
+  const isOwner = isOwnerCandidate(candidate);
 
-  return "초대";
-};
+  return (
+    <article className="flex h-[60px] items-center rounded-[8px] bg-neutral-0 px-3 shadow-[0_0_8px_rgba(20,20,20,0.08)]">
+      <ProfileImage
+        size="sm"
+        src={candidate.bandMemberProfileImageUrl ?? undefined}
+      />
 
-const getButtonClassName = ({
-  status,
-  isSelected,
-}: {
-  status: LiveReservationCoHostStatus;
-  isSelected: boolean;
-}) => {
-  if (status === "OWNER") {
-    return "shrink-0 text-body2 font-semibold text-neutral-900";
-  }
+      <div className="ml-3 min-w-0 flex-1">
+        <strong className="block truncate text-body3 font-semibold text-neutral-900">
+          {candidate.nickname}
+        </strong>
 
-  if (isSelected) {
-    return "shrink-0 rounded-full bg-secondary-0 px-3 py-1 text-body2 font-semibold text-secondary-600";
-  }
+        <span className="mt-0.5 block truncate text-caption2 text-neutral-600">
+          {getPartLabel(candidate.part)}
+        </span>
+      </div>
 
-  if (status === "REJECTED") {
-    return "shrink-0 text-body2 font-semibold text-error";
-  }
-
-  return "shrink-0 text-body2 font-semibold text-secondary-500";
-};
+      {isOwner ? (
+        <span className="shrink-0 text-body3 font-semibold text-neutral-900">
+          진행자
+        </span>
+      ) : (
+        <button
+          type="button"
+          onClick={onToggle}
+          className={`shrink-0 text-body3 font-semibold ${
+            selected ? "text-secondary-600" : "text-secondary-500"
+          }`}
+        >
+          {selected ? "초대됨" : "초대"}
+        </button>
+      )}
+    </article>
+  );
+}
 
 export function CoHostSelectionScreen({
   onBack,
@@ -84,80 +116,64 @@ export function CoHostSelectionScreen({
   isLoading = false,
   errorMessage = "",
 }: CoHostSelectionScreenProps) {
-  const shouldShowEmptyState =
-    isLoading || Boolean(errorMessage) || candidates.length === 0;
-
   return (
-    <main className="min-h-dvh bg-neutral-0 text-neutral-900">
-      <TopBar title="공동 진행" onBack={onBack} onClose={onClose} />
+    <main className="relative min-h-dvh bg-neutral-0 pb-[calc(env(safe-area-inset-bottom)+104px)] text-neutral-900">
+      <header className="relative flex h-[52px] items-center justify-center">
+        <HeaderBackButton onClick={onBack} />
 
-      <section className="px-9 pt-6 pb-8">
-        {shouldShowEmptyState ? (
-          <div className="rounded-[14px] bg-secondary-0 px-5 py-8 text-center shadow-[0_4px_15px_rgba(20,20,20,0.08)]">
-            <p className="text-body3 text-neutral-700">
-              {isLoading
-                ? "공동 진행 후보를 불러오는 중이에요."
-                : errorMessage ||
-                  "공동 진행자로 초대할 수 있는 멤버가 없어요."}
-            </p>
+        <h1 className="text-h4 font-bold text-neutral-900">공동 진행</h1>
 
-            {!isLoading && !errorMessage ? (
-              <p className="mt-2 text-caption2 text-neutral-500">
-                현재 선택된 밴드에 다른 멤버가 있는지 확인해주세요.
-              </p>
-            ) : null}
-          </div>
-        ) : (
+        <HeaderCloseButton onClick={onClose} />
+      </header>
+
+      <section className="px-7 pt-9">
+        {isLoading ? (
+          <p className="py-10 text-center text-caption2 text-neutral-500">
+            공동 진행자를 불러오는 중이에요.
+          </p>
+        ) : null}
+
+        {!isLoading && errorMessage ? (
+          <p className="py-10 text-center text-caption2 text-error">
+            {errorMessage}
+          </p>
+        ) : null}
+
+        {!isLoading && !errorMessage && candidates.length === 0 ? (
+          <p className="py-10 text-center text-caption2 text-neutral-500">
+            초대할 수 있는 공동 진행자가 없어요.
+          </p>
+        ) : null}
+
+        {!isLoading && !errorMessage && candidates.length > 0 ? (
           <div className="grid gap-4">
             {candidates.map((candidate) => {
-              const isHost = candidate.status === "OWNER";
-              const isSelected = selectedCoHostIds.includes(
+              const selected = selectedCoHostIds.includes(
                 candidate.bandMemberId,
               );
 
               return (
-                <article
-                  key={`${candidate.bandMemberId}-${candidate.bandMemberProfileId}`}
-                  className="flex items-center rounded-[14px] bg-neutral-0 px-5 py-4 shadow-[0_4px_15px_rgba(20,20,20,0.08)]"
-                >
-                  <img
-                    src={
-                      candidate.bandMemberProfileImageUrl ??
-                      UserDefaultProfileIcon
-                    }
-                    alt=""
-                    className="size-12 shrink-0 rounded-full object-cover"
-                  />
-
-                  <div className="ml-4 min-w-0 flex-1">
-                    <strong className="block truncate text-body1 font-semibold text-neutral-900">
-                      {candidate.nickname}
-                    </strong>
-                    <p className="mt-1 text-caption2 text-neutral-600">
-                      {getPartLabel(candidate.part)}
-                    </p>
-                  </div>
-
-                  <button
-                    type="button"
-                    disabled={isHost}
-                    onClick={() => onToggleCoHost(candidate.bandMemberId)}
-                    className={getButtonClassName({
-                      status: candidate.status,
-                      isSelected,
-                    })}
-                  >
-                    {getButtonLabel({
-                      status: candidate.status,
-                      isSelected,
-                    })}
-                  </button>
-                </article>
+                <CoHostCandidateCard
+                  key={candidate.bandMemberId}
+                  candidate={candidate}
+                  selected={selected}
+                  onToggle={() => onToggleCoHost(candidate.bandMemberId)}
+                />
               );
             })}
           </div>
-        )}
+        ) : null}
       </section>
+
+      <div className="fixed right-0 bottom-0 left-0 z-30 mx-auto w-full max-w-[393px] bg-neutral-0 px-5 pt-3 pb-[calc(env(safe-area-inset-bottom)+20px)]">
+        <button
+          type="button"
+          onClick={onClose}
+          className="flex h-[52px] w-full items-center justify-center rounded-[10px] bg-secondary-500 text-label1 font-semibold text-neutral-0 shadow-[0_4px_12px_rgba(251,177,14,0.24)]"
+        >
+          확인
+        </button>
+      </div>
     </main>
   );
 }

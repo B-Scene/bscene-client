@@ -63,10 +63,7 @@ export const MyApplicationSummary = ({
 
     <div className="mt-7 flex items-center gap-6">
       <img
-        src={
-          getRenderableProfileImageUrl(profileImageUrl) ||
-          UserDefaultProfileIcon
-        }
+        src={getRenderableProfileImageUrl(profileImageUrl) || UserDefaultProfileIcon}
         alt=""
         onError={(event) => {
           event.currentTarget.onerror = null;
@@ -108,11 +105,14 @@ export const MyApplicationDetailTabs = ({
           key={tab.id}
           type="button"
           onClick={() => onSelect(tab.id)}
-          className={`relative flex items-center justify-center text-body1 ${
-            isActive ? "text-secondary-500" : "text-neutral-400"
+          className={`relative flex items-center justify-center text-body1 transition ${
+            isActive
+              ? "font-bold text-secondary-500"
+              : "font-medium text-neutral-400"
           }`}
         >
           {tab.label}
+
           {isActive ? (
             <span className="absolute right-0 bottom-[-1px] left-0 h-0.5 bg-secondary-500" />
           ) : null}
@@ -138,9 +138,11 @@ export const MyApplicationIntroductionSection = ({
     className="scroll-mt-12 border-b border-neutral-300 py-6"
   >
     <h2 className="text-label1 text-neutral-900">세션 소개</h2>
+
     <p className="mt-4 whitespace-pre-line text-body1 text-secondary-500">
       “{shortIntroduction || "등록된 한줄 소개가 없어요"}”
     </p>
+
     <p className="mt-3 whitespace-pre-line text-caption2 text-neutral-800">
       {introduction || "등록된 소개글이 없어요"}
     </p>
@@ -161,6 +163,7 @@ export const MyApplicationInformationSection = ({
     className="scroll-mt-12 border-b border-neutral-300 py-6"
   >
     <h2 className="text-label1 text-neutral-900">세션 정보</h2>
+
     <dl className="mt-5 flex flex-col gap-5">
       <ApplicationInfoItem label="파트" values={[draft.part]} />
       <ApplicationInfoItem label="실력대" values={[draft.skillLevel]} />
@@ -185,6 +188,7 @@ const ApplicationInfoItem = ({
   return (
     <div>
       <dt className="text-body1 text-neutral-800">{label}</dt>
+
       <dd className="mt-2 flex flex-wrap gap-2">
         {visibleValues.length > 0 ? (
           visibleValues.map((value, index) => (
@@ -219,15 +223,19 @@ export const MyApplicationCareerSection = ({
     className="scroll-mt-12 border-b border-neutral-300 py-6"
   >
     <h2 className="text-label1 text-neutral-900">경력</h2>
+
     {experiences.length > 0 ? (
       <div className="mt-5 flex flex-col gap-5">
         {experiences.map((experience) => (
           <article key={experience.id} className="relative pl-7">
             <span className="absolute top-[2px] left-1 size-2.5 rounded-full bg-secondary-400" />
+
             <p className="text-body4 text-neutral-500">{experience.period}</p>
+
             <h3 className="mt-1 text-body6 text-neutral-800">
               {experience.title}
             </h3>
+
             {experience.description ? (
               <p className="mt-1 whitespace-pre-line text-caption2 text-neutral-700">
                 {experience.description}
@@ -270,8 +278,7 @@ export const MyApplicationPortfolioSection = ({
             id: String(link.sessionApplicationLinkId ?? index),
             url: link.url,
             title:
-              link.title?.trim() ||
-              getApplicationPortfolioTitle(link.url, index),
+              link.title?.trim() || getApplicationPortfolioTitle(link.url, index),
             thumbnailUrl: link.thumbnailUrl,
           }))
       : fallbackPortfolioLinks

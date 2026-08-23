@@ -87,8 +87,9 @@ const SignupPage = () => {
 
   const isPending = isSigningUp || isOAuthSigningUp;
 
-  const isPasswordValid =
-    /^(?=.*[A-Za-z])(?=.*\d)(?=.*[^\w\s]).{8,20}$/.test(form.password);
+  const isPasswordValid = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[^\w\s]).{8,20}$/.test(
+    form.password,
+  );
 
   const isPasswordSame =
     form.password.length > 0 &&
@@ -98,12 +99,12 @@ const SignupPage = () => {
   const isFormValid = useMemo(() => {
     return Boolean(
       form.email &&
-        (isSocialSignup || (isPasswordValid && isPasswordSame)) &&
-        form.name &&
-        form.phone &&
-        isPhoneVerified &&
-        form.birth.length === 6 &&
-        form.gender.length === 1,
+      (isSocialSignup || (isPasswordValid && isPasswordSame)) &&
+      form.name &&
+      form.phone &&
+      isPhoneVerified &&
+      form.birth.length === 6 &&
+      form.gender.length === 1,
     );
   }, [
     form.email,
@@ -274,7 +275,7 @@ const SignupPage = () => {
 
       <form className="mt-5 flex flex-col gap-4">
         <SignupField
-          label="아이디"
+          label="아이디(이메일)"
           required
           value={form.email}
           placeholder="로그인에 사용할 이메일을 입력해주세요"

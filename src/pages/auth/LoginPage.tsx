@@ -53,7 +53,7 @@ export default function Login() {
         },
         onError: (error) => {
           console.error(error);
-          alert("아이디 또는 비밀번호를 확인해주세요.");
+          alert("아이디(이메일) 또는 비밀번호를 확인해주세요.");
         },
       },
     );
@@ -71,11 +71,7 @@ export default function Login() {
     <main className="h-full w-full bg-neutral-0 px-[30px] pt-[104px]">
       <section className="w-full">
         <div className="flex justify-center">
-          <img
-            src={logoSignature}
-            alt="B:Scene"
-            className="h-auto w-[151px]"
-          />
+          <img src={logoSignature} alt="B:Scene" className="h-auto w-[151px]" />
         </div>
 
         <div className="mt-[43px] text-center">
@@ -97,7 +93,7 @@ export default function Login() {
             type="text"
             value={loginId}
             onChange={(e) => setLoginId(e.target.value)}
-            placeholder="아이디를 입력해주세요"
+            placeholder="아이디(이메일)를 입력해주세요"
             className="h-[52px] w-full rounded-xl border border-neutral-400 bg-neutral-0 px-[19px] text-label3 text-neutral-900 outline-none placeholder:text-neutral-400 focus:border-primary-400"
           />
 

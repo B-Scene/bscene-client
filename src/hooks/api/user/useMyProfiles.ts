@@ -16,8 +16,12 @@ export const useMyProfilesQuery = (params: GetMyProfilesParams = {}) => {
   });
 };
 
-export const useActiveBandId = () => {
+export const useActiveBandProfile = () => {
   const { data } = useMyProfilesQuery({ type: "band" });
 
-  return data?.bandProfiles.find((band) => band.isActive)?.bandId ?? null;
+  return data?.bandProfiles.find((band) => band.isActive) ?? null;
+};
+
+export const useActiveBandId = () => {
+  return useActiveBandProfile()?.bandId ?? null;
 };

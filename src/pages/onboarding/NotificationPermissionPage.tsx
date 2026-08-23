@@ -67,7 +67,7 @@ const NotificationPermissionPage = () => {
         </aside>
       </section>
 
-      <div className="mt-auto flex flex-col items-center">
+      <div className="mt-auto flex flex-col items-center pt-8">
         <Button
           size="large"
           tone={isRequesting ? "gray" : "pink"}

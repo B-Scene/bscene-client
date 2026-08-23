@@ -10,7 +10,6 @@ import { Toast } from "@/components/common/Toast/Toast";
 import Modal from "@/components/Modal/Modal";
 import {
   useFanExploreBandSearchQuery,
-  useFanExploreSearchQuery,
   useFollowExploreBand,
   useUnfollowExploreBand,
 } from "@/hooks/api/fan/useFanExplore";
@@ -20,6 +19,12 @@ import {
   ExploreFilterSheet,
   type AppliedExploreFilters,
 } from "@/pages/fan/explore/FanExplorePage";
+import {
+  SEARCH_SORT_LABELS,
+  SEARCH_SORT_TO_API,
+  type SearchResultSortOption,
+} from "@/pages/fan/explore/components/fanExploreSearchSort";
+import { SearchResultSortSheet } from "@/pages/fan/explore/components/FanExploreSearchSortSheet";
 import type { FanExploreBand, FanExploreSort } from "@/types/fan/explore";
 import {
   BAND_GENRE_BY_LABEL,
@@ -28,12 +33,6 @@ import {
   getRegionLabel,
 } from "@/utils/bandLabels";
 import { addRecentSearch } from "./recentSearches";
-
-const SORT_LABELS: Record<FanExploreSort, "정확도순" | "인기순"> = {
-  ACCURACY: "정확도순",
-  POPULAR: "인기순",
-  RECOMMEND: "정확도순",
-};
 
 const getSortParam = (value: string | null): FanExploreSort => {
   if (value === "POPULAR") return "POPULAR";
@@ -71,24 +70,6 @@ const getBandId = (band: FanExploreBand) => {
     : typeof bandInfo.id === "number"
       ? bandInfo.id
       : null;
-};
-
-const mergeBands = (
-  primaryBands: FanExploreBand[],
-  fallbackBands: FanExploreBand[],
-) => {
-  const seenIds = new Set<string>();
-
-  return [...primaryBands, ...fallbackBands].filter((band, index) => {
-    const bandInfo = getBandInfo(band);
-    const key = String(
-      getBandId(band) ?? `${bandInfo.name ?? bandInfo.bandName ?? ""}-${index}`,
-    );
-
-    if (seenIds.has(key)) return false;
-    seenIds.add(key);
-    return true;
-  });
 };
 
 const BandMoreTopBar = ({ initialKeyword }: { initialKeyword: string }) => {
@@ -145,6 +126,7 @@ const FanExploreBandMorePage = () => {
   const [searchParams] = useSearchParams();
   const keyword = searchParams.get("q") || "WAVY";
   const sort = getSortParam(searchParams.get("sort"));
+  const [isSortSheetOpen, setIsSortSheetOpen] = useState(false);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
   const shouldHighlightSort =
     sort === "POPULAR" || searchParams.get("sortSelected") === "1";
@@ -160,13 +142,6 @@ const FanExploreBandMorePage = () => {
     region: getRegionFilterParam(appliedFilters.region),
     size: 30,
   });
-  const allSearchQuery = useFanExploreSearchQuery({
-    keyword,
-    type: "ALL",
-    sort,
-    genre: getGenreFilterParam(appliedFilters.genre),
-    region: getRegionFilterParam(appliedFilters.region),
-  });
   const {
     data,
     fetchNextPage,
@@ -179,11 +154,8 @@ const FanExploreBandMorePage = () => {
     () => data?.pages.flatMap((page) => page.items) ?? [],
     [data],
   );
-  const bands = useMemo(
-    () => mergeBands(pagedBands, allSearchQuery.data?.bands ?? []),
-    [allSearchQuery.data?.bands, pagedBands],
-  );
-  const totalCount = bands.length;
+  const bands = pagedBands;
+  const totalCount = data?.pages[0]?.totalCount ?? bands.length;
   const [unfollowTargetBandId, setUnfollowTargetBandId] = useState<number | null>(
     null,
   );
@@ -197,9 +169,8 @@ const FanExploreBandMorePage = () => {
     enabled: Boolean(hasNextPage) && !isFetchingNextPage,
     onIntersect: fetchNextPage,
   });
-  const isInitialLoading =
-    isLoading && allSearchQuery.isLoading && bands.length === 0;
-  const isBandError = isError && allSearchQuery.isError && bands.length === 0;
+  const isInitialLoading = isLoading && bands.length === 0;
+  const isBandError = isError && bands.length === 0;
 
   useEffect(() => {
     if (!toastMessage) return;
@@ -208,6 +179,24 @@ const FanExploreBandMorePage = () => {
 
     return () => window.clearTimeout(timerId);
   }, [toastMessage]);
+
+  const applySort = (nextSortOption: SearchResultSortOption) => {
+    const nextSort = SEARCH_SORT_TO_API[nextSortOption];
+    const params = new URLSearchParams({
+      q: keyword,
+      sort: nextSort,
+    });
+
+    params.set("sortSelected", "1");
+    if (appliedFilters.genre !== "전체") params.set("genre", appliedFilters.genre);
+    if (appliedFilters.region !== "전체") {
+      params.set("region", appliedFilters.region);
+    }
+
+    navigate(`/fan/explore/search/results/bands?${params.toString()}`, {
+      replace: true,
+    });
+  };
 
   const applyFilters = (filters: AppliedExploreFilters) => {
     const params = new URLSearchParams({
@@ -271,8 +260,9 @@ const FanExploreBandMorePage = () => {
       <BandMoreTopBar initialKeyword={keyword} />
       <ExploreFilterBar
         appliedFilters={appliedFilters}
-        appliedSort={SORT_LABELS[sort]}
+        appliedSort={SEARCH_SORT_LABELS[sort]}
         highlightSort={shouldHighlightSort}
+        onSortClick={() => setIsSortSheetOpen(true)}
         onFilterClick={() => setIsFilterSheetOpen(true)}
       />
 
@@ -294,7 +284,6 @@ const FanExploreBandMorePage = () => {
               type="button"
               onClick={() => {
                 void bandsQuery.refetch();
-                void allSearchQuery.refetch();
               }}
               className="font-body text-caption2 text-primary-400"
             >
@@ -409,6 +398,12 @@ const FanExploreBandMorePage = () => {
         tone={toastMessage?.includes("실패") ? "error" : "success"}
       />
 
+      <SearchResultSortSheet
+        open={isSortSheetOpen}
+        onClose={() => setIsSortSheetOpen(false)}
+        selectedSort={SEARCH_SORT_LABELS[sort]}
+        onSelect={applySort}
+      />
       <ExploreFilterSheet
         open={isFilterSheetOpen}
         onClose={() => setIsFilterSheetOpen(false)}

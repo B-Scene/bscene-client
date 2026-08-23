@@ -96,9 +96,12 @@ export function FanLivePage() {
   const stateLive = (location.state as FanLiveLocationState | null)?.live;
   const liveId = Number(liveIdParam);
   const hasValidLiveId = Number.isInteger(liveId) && liveId > 0;
-  const matchingStateLive = stateLive?.liveId === liveId ? stateLive : undefined;
+  const matchingStateLive =
+    stateLive?.liveId === liveId ? stateLive : undefined;
+
   const enterLiveMutation = useEnterLiveMutation();
   const requestedLiveIdRef = useRef<number | null>(null);
+
   const requestEnterLive = useCallback(() => {
     if (!hasValidLiveId) return;
 
@@ -122,15 +125,19 @@ export function FanLivePage() {
     enterLiveMutation.variables === liveId
       ? enterLiveMutation.data
       : undefined;
+
   const live = matchingStateLive ?? matchingMutationLive;
   const isLoading = enterLiveMutation.isPending;
   const isError = enterLiveMutation.isError;
+
   const leaveLiveMutation = useLeaveLiveMutation();
   const reportLiveUserMutation = useReportLiveUserMutation();
   const blockLiveUserMutation = useBlockLiveUserMutation();
   const unblockLiveUserMutation = useUnblockLiveUserMutation();
+
   const audioRef = useRef<HTMLAudioElement>(null);
   const hlsRef = useRef<Hls | null>(null);
+
   const [view, setView] = useState<FanLiveView>("room");
   const [durationSeconds, setDurationSeconds] = useState(() =>
     live ? getDurationSeconds(live.startedAt) : 0,
@@ -153,11 +160,13 @@ export function FanLivePage() {
     () => new Set(),
   );
   const [chatMessages, setChatMessages] = useState<FanChatMessage[]>([]);
-  const [chatEnded, setChatEnded] = useState(false);
+
   const selectedUserId = reportTarget?.targetUserId;
+
   const isSelectedUserBlocked = selectedUserId
     ? blockedUserIds.has(selectedUserId)
     : false;
+
   const isBlockPending =
     blockLiveUserMutation.isPending || unblockLiveUserMutation.isPending;
 
@@ -166,8 +175,8 @@ export function FanLivePage() {
       if (blockedUserIds.has(message.senderId)) return;
 
       const isBandMember =
-        Boolean(live?.bandProfileImageUrl) &&
-        message.senderProfileImageUrl === live?.bandProfileImageUrl;
+        message.senderName === live?.bandName ||
+        liveMembers.some((member) => member.nickname === message.senderName);
 
       const confirmedMessage: FanChatMessage = {
         id: message.messageId,
@@ -197,7 +206,7 @@ export function FanLivePage() {
         );
       });
     },
-    [blockedUserIds, live?.bandProfileImageUrl],
+    [blockedUserIds, live?.bandName, liveMembers],
   );
 
   const {
@@ -209,8 +218,7 @@ export function FanLivePage() {
     enabled: Boolean(live?.isLive && live.liveId),
     onMessage: handleChatMessage,
     onLiveEnded: () => {
-      setChatEnded(true);
-      setAudioMessage("라이브가 종료됐어요.");
+      navigate("/fan/live", { replace: true });
     },
   });
 
@@ -244,7 +252,9 @@ export function FanLivePage() {
     try {
       audio.muted = false;
       audio.volume = 1;
+
       await audio.play();
+
       setIsMuted(false);
       setAudioMessage("");
     } catch {
@@ -273,9 +283,7 @@ export function FanLivePage() {
       watchOnly: false,
       onViewerCount: setViewerCount,
       signal: controller.signal,
-    }).catch(() => {
-      // SSE 연결 종료 및 화면 이탈에 따른 취소는 조용히 처리합니다.
-    });
+    }).catch(() => {});
 
     return () => controller.abort();
   }, [live?.liveId]);
@@ -284,8 +292,10 @@ export function FanLivePage() {
     if (!live?.liveId) return;
 
     let isMounted = true;
+
     const loadMembers = async () => {
       await Promise.resolve();
+
       if (!isMounted) return;
 
       setLiveMembers([]);
@@ -294,16 +304,31 @@ export function FanLivePage() {
 
       try {
         const response = await getLiveMembers(live.liveId);
+
         if (!isMounted) return;
 
+        const memberNames = new Set(
+          response.members.map((member) => member.nickname),
+        );
+
         setLiveMembers(response.members);
+
+        setChatMessages((current) =>
+          current.map((chat) => ({
+            ...chat,
+            band:
+              chat.sender === live.bandName || memberNames.has(chat.sender),
+          })),
+        );
       } catch {
         if (!isMounted) return;
 
         setLiveMembers([]);
         setHasMembersError(true);
       } finally {
-        if (isMounted) setIsMembersLoading(false);
+        if (isMounted) {
+          setIsMembersLoading(false);
+        }
       }
     };
 
@@ -312,96 +337,134 @@ export function FanLivePage() {
     return () => {
       isMounted = false;
     };
-  }, [live?.liveId]);
+  }, [live?.bandName, live?.liveId]);
 
   useEffect(() => {
     const audio = audioRef.current;
     const playback = live?.playback;
 
-  if (
-    !audio ||
-    !live?.isLive ||
-    !playback ||
-    playback.protocol !== "HLS" ||
-    !playback.playbackUrl
-  ) {
-    return;
-  }
+    if (
+      !audio ||
+      !live?.isLive ||
+      !playback ||
+      playback.protocol !== "HLS" ||
+      !playback.playbackUrl
+    ) {
+      return;
+    }
 
-  if (playback.role !== "LISTENER") {
-    window.setTimeout(() => {
-      setAudioMessage("청취자 재생 정보가 올바르지 않아요.");
-    }, 0);
-    return;
-  }
+    if (playback.role !== "LISTENER") {
+      window.setTimeout(() => {
+        setAudioMessage("청취자 재생 정보가 올바르지 않아요.");
+      }, 0);
 
-  if (!Hls.isSupported()) {
-    window.setTimeout(() => {
-      setAudioMessage("이 브라우저에서는 인증된 HLS 재생을 지원하지 않아요.");
-    }, 0);
-    return;
-  }
+      return;
+    }
 
-  const playbackUrl = resolveLiveApiUrl(playback.playbackUrl);
+    const playbackUrl = resolveLiveApiUrl(playback.playbackUrl);
 
-  const hls = new Hls({
-    lowLatencyMode: true,
-    backBufferLength: 30,
-    xhrSetup: setupLivePlaybackXhr,
-  });
+    if (!Hls.isSupported()) {
+      if (audio.canPlayType("application/vnd.apple.mpegurl")) {
+        audio.src = playbackUrl;
+        audio.load();
 
-  hlsRef.current = hls;
-  hls.attachMedia(audio);
+        const handleCanPlay = () => {
+          void startPlayback();
+        };
 
-  hls.on(Hls.Events.MEDIA_ATTACHED, () => {
-    hls.loadSource(playbackUrl);
-  });
+        const handleLoadedMetadata = () => {
+          setAudioMessage("");
+        };
 
-  hls.on(Hls.Events.MANIFEST_PARSED, () => {
-    setAudioMessage("");
-    void startPlayback();
-  });
+        const handleNativeError = () => {
+          console.error("[Fan Live native HLS error]", {
+            code: audio.error?.code,
+            message: audio.error?.message,
+            playbackUrl,
+          });
+        };
 
-  hls.on(Hls.Events.FRAG_LOADED, () => {
-    setAudioMessage("");
-  });
+        audio.addEventListener("canplay", handleCanPlay);
+        audio.addEventListener("loadedmetadata", handleLoadedMetadata);
+        audio.addEventListener("error", handleNativeError);
 
-  hls.on(Hls.Events.ERROR, (_, data) => {
-    console.error("[Fan Live HLS error]", {
-      type: data.type,
-      details: data.details,
-      reason: data.reason,
-      fatal: data.fatal,
-      response: data.response,
+        return () => {
+          audio.removeEventListener("canplay", handleCanPlay);
+          audio.removeEventListener("loadedmetadata", handleLoadedMetadata);
+          audio.removeEventListener("error", handleNativeError);
+          audio.pause();
+          audio.removeAttribute("src");
+          audio.load();
+        };
+      }
+
+      window.setTimeout(() => {
+        setAudioMessage("이 브라우저에서는 HLS 재생을 지원하지 않아요.");
+      }, 0);
+
+      return;
+    }
+
+    const hls = new Hls({
+      lowLatencyMode: true,
+      backBufferLength: 30,
+      xhrSetup: setupLivePlaybackXhr,
     });
 
-    if (!data.fatal) return;
+    hlsRef.current = hls;
+    hls.attachMedia(audio);
 
-    if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-      setAudioMessage("라이브 오디오 데이터를 다시 연결하고 있어요.");
-      hls.startLoad();
-      return;
-    }
+    hls.on(Hls.Events.MEDIA_ATTACHED, () => {
+      hls.loadSource(playbackUrl);
+    });
 
-    if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-      setAudioMessage("라이브 오디오 재생을 복구하고 있어요.");
-      hls.recoverMediaError();
-      return;
-    }
+    hls.on(Hls.Events.MANIFEST_PARSED, () => {
+      setAudioMessage("");
+      void startPlayback();
+    });
 
-    setAudioMessage("라이브 오디오 연결이 종료됐어요.");
-    hls.destroy();
-    hlsRef.current = null;
-  });
+    hls.on(Hls.Events.FRAG_LOADED, () => {
+      if (audio.paused) return;
 
-  return () => {
-    hls.destroy();
-    hlsRef.current = null;
-    audio.pause();
-    audio.removeAttribute("src");
-    audio.load();
-  };
-}, [live?.isLive, live?.playback, startPlayback]);
+      setAudioMessage("");
+    });
+
+    hls.on(Hls.Events.ERROR, (_, data) => {
+      console.error("[Fan Live HLS error]", {
+        type: data.type,
+        details: data.details,
+        reason: data.reason,
+        fatal: data.fatal,
+        response: data.response,
+      });
+
+      if (!data.fatal) return;
+
+      if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+        setAudioMessage("라이브 오디오 데이터를 다시 연결하고 있어요.");
+        hls.startLoad();
+        return;
+      }
+
+      if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+        setAudioMessage("라이브 오디오 재생을 복구하고 있어요.");
+        hls.recoverMediaError();
+        return;
+      }
+
+      setAudioMessage("라이브 오디오 연결이 종료됐어요.");
+      hls.destroy();
+      hlsRef.current = null;
+    });
+
+    return () => {
+      hls.destroy();
+      hlsRef.current = null;
+      audio.pause();
+      audio.removeAttribute("src");
+      audio.load();
+    };
+  }, [live?.isLive, live?.playback, startPlayback]);
 
   const handleToggleMute = () => {
     const audio = audioRef.current;
@@ -453,6 +516,7 @@ export function FanLivePage() {
           chatMessage: reportTarget.chatMessage,
         },
       });
+
       setView("reportComplete");
     } catch (error) {
       const apiMessage = (error as AxiosError<LiveApiResponse<null>>).response
@@ -472,14 +536,17 @@ export function FanLivePage() {
         liveId: live.liveId,
         targetUserId: selectedUserId,
       });
+
       setBlockedUserIds((current) => {
         const next = new Set(current);
         next.add(selectedUserId);
         return next;
       });
+
       setChatMessages((current) =>
         current.filter((chat) => chat.senderId !== selectedUserId),
       );
+
       setIsBlockConfirmOpen(false);
     } catch (error) {
       const apiMessage = (error as AxiosError<LiveApiResponse<null>>).response
@@ -499,6 +566,7 @@ export function FanLivePage() {
         liveId: live.liveId,
         targetUserId: selectedUserId,
       });
+
       setBlockedUserIds((current) => {
         const next = new Set(current);
         next.delete(selectedUserId);
@@ -545,6 +613,7 @@ export function FanLivePage() {
             ? "라이브 방에 입장하지 못했어요."
             : "라이브 입장 정보가 없어요."}
         </p>
+
         <div className="mt-4 flex gap-2">
           {isError ? (
             <button
@@ -555,6 +624,7 @@ export function FanLivePage() {
               다시 시도
             </button>
           ) : null}
+
           <button
             type="button"
             onClick={() => navigate("/fan/live", { replace: true })}
@@ -578,51 +648,61 @@ export function FanLivePage() {
   }
 
   if (view === "reportComplete") {
-    return <FanLiveReportCompletePage onBackToLive={() => setView("room")} />;
+    return (
+      <FanLiveReportCompletePage onBackToLive={() => setView("room")} />
+    );
   }
 
   return (
     <main className="relative h-full min-h-full overflow-hidden bg-neutral-0 text-neutral-900">
       <FanLiveHeader
         durationSeconds={durationSeconds}
-        viewerCount={
-          viewerCount ?? live.viewerCount ?? live.viewCount ?? 0
-        }
+        viewerCount={viewerCount ?? live.viewerCount ?? live.viewCount ?? 0}
         onExit={() => setIsExitModalOpen(true)}
       />
-      <FanLiveHero isAudioActive={Boolean(live?.isLive && !isMuted)} live={live} />
+
+      <FanLiveHero
+        isAudioActive={Boolean(live.isLive && !isMuted)}
+        live={live}
+      />
 
       <audio
         ref={audioRef}
         autoPlay
+        preload="auto"
         className="sr-only"
         onCanPlay={() => {
-          if (audioRef.current?.paused) void startPlayback();
+          if (audioRef.current?.paused) {
+            void startPlayback();
+          }
         }}
-        onError={() => setAudioMessage("라이브 오디오를 재생하지 못했어요.")}
+        onError={() =>
+          setAudioMessage("라이브 오디오를 재생하지 못했어요.")
+        }
       />
 
       {audioMessage ? (
-        <p className="absolute inset-x-5 top-[56px] z-20 rounded-lg bg-primary-400 px-3 py-2 text-center font-body text-caption3 text-neutral-0">
+        <button
+          type="button"
+          onClick={() => void startPlayback()}
+          className="absolute inset-x-5 top-[56px] z-20 rounded-lg bg-primary-400 px-3 py-2 text-center font-body text-caption3 text-neutral-0"
+        >
           {audioMessage}
-        </p>
+        </button>
       ) : null}
 
       {hasOpenedChat ? (
         <FanLiveChatArea
           composerOpen={isChatComposerOpen}
-          connectionMessage={
-            chatEnded
-              ? "라이브가 종료되어 채팅을 보낼 수 없어요."
-              : chatErrorMessage
-          }
-          isConnected={isChatConnected && !chatEnded}
+          connectionMessage={chatErrorMessage}
+          isConnected={isChatConnected}
           messages={chatMessages}
           onProfileClick={(chat: FanChatMessage) => {
             setReportTarget({
               targetUserId: chat.senderId,
               chatMessage: chat.message,
             });
+
             setIsProfileActionSheetOpen(true);
           }}
           onSendMessage={handleSendChatMessage}
@@ -630,6 +710,7 @@ export function FanLivePage() {
       ) : (
         <EmptyChatArea />
       )}
+
       <FanLiveActionBar
         chatOpen={isChatComposerOpen}
         isMuted={isMuted}
@@ -637,6 +718,7 @@ export function FanLivePage() {
         onToggleMute={handleToggleMute}
         onToggleChat={handleToggleChat}
       />
+
       <FanLiveMemberSheet
         hasError={hasMembersError}
         isLoading={isMembersLoading}
@@ -644,6 +726,7 @@ export function FanLivePage() {
         open={isMemberSheetOpen}
         onClose={() => setIsMemberSheetOpen(false)}
       />
+
       <FanLiveProfileActionSheet
         isBlocked={isSelectedUserBlocked}
         isBlockPending={isBlockPending}
@@ -662,10 +745,13 @@ export function FanLivePage() {
           setView("report");
         }}
       />
+
       <ModalOverlay
         open={isBlockConfirmOpen}
         onClose={() => {
-          if (!blockLiveUserMutation.isPending) setIsBlockConfirmOpen(false);
+          if (!blockLiveUserMutation.isPending) {
+            setIsBlockConfirmOpen(false);
+          }
         }}
         panelClassName="rounded-[24px]"
       >
@@ -687,10 +773,13 @@ export function FanLivePage() {
           onConfirm={() => void handleConfirmBlock()}
         />
       </ModalOverlay>
+
       <ModalOverlay
         open={isExitModalOpen}
         onClose={() => {
-          if (!leaveLiveMutation.isPending) setIsExitModalOpen(false);
+          if (!leaveLiveMutation.isPending) {
+            setIsExitModalOpen(false);
+          }
         }}
         panelClassName="rounded-[24px]"
       >

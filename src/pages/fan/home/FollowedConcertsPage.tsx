@@ -442,7 +442,7 @@ const FollowedConcertsPage = () => {
 
           <section
             aria-label="공연 정렬 옵션"
-            className="relative z-10 flex w-full max-w-[393px] flex-col items-start gap-2.5 rounded-t-[24px] bg-neutral-0 px-[15px] pb-12 pt-8"
+            className="relative z-10 flex w-full flex-col items-start gap-2.5 rounded-t-[24px] bg-neutral-0 px-[15px] pb-12 pt-8"
           >
             <div className="flex w-full flex-col items-start gap-6 px-[15px]">
               {availableSortOptions.map((option) => {

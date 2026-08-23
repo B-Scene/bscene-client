@@ -332,7 +332,7 @@ const mapNewsItem = (
     meta:
       compactMeta([item.genre, item.region, postedAgo]) ||
       "장르 · 지역",
-    title: item.title ?? item.content ?? "새로운 소식이 도착했어요",
+    title: item.content ?? item.title ?? "새로운 소식이 도착했어요",
     tags: item.tags ?? [],
     createdAt: item.createdAt,
   };
@@ -604,7 +604,7 @@ const BandRecommendationStrip = ({ bands }: { bands: HomeBandItem[] }) => {
 
   return (
     <>
-      <div className="flex gap-3 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="-mx-5 flex w-[calc(100%+40px)] snap-x snap-mandatory gap-3 overflow-x-auto scroll-px-5 px-5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {bands.map((band) => {
           const isFollowing = followOverrides[band.id] ?? band.isFollowing;
           const isBandPending = isFollowPending && pendingBandId === band.bandId;
@@ -612,7 +612,7 @@ const BandRecommendationStrip = ({ bands }: { bands: HomeBandItem[] }) => {
           return (
             <article
               key={band.id}
-              className="flex w-[calc((100%-36px)/4)] shrink-0 flex-col items-center text-center"
+              className="flex w-[calc((100%-36px)/4)] shrink-0 snap-start flex-col items-center text-center"
             >
               <button
                 type="button"
@@ -642,12 +642,12 @@ const BandRecommendationStrip = ({ bands }: { bands: HomeBandItem[] }) => {
                 <img
                   src={band.profileImageSrc}
                   alt=""
-                  className="size-[clamp(56px,16vw,64px)] rounded-full object-cover"
+                  className="size-[52px] rounded-full object-cover"
                 />
                 <strong className="mt-2 max-w-full truncate font-body text-body1 text-neutral-900">
                   {band.name}
                 </strong>
-                <span className="mt-[5px] max-w-full truncate font-body text-body5 text-neutral-600">
+                <span className="max-w-full truncate font-body text-caption2 text-neutral-600">
                   {band.meta}
                 </span>
               </button>
@@ -680,7 +680,7 @@ const BandRecommendationStrip = ({ bands }: { bands: HomeBandItem[] }) => {
                     onSettled: () => setPendingBandId(null),
                   });
                 }}
-                className="mt-2 h-[20px] w-full rounded-full border-[1px] border-primary-400 font-body text-caption3 text-primary-400 disabled:opacity-60"
+                className="mt-2 flex self-stretch items-center justify-center gap-2 rounded-full border-[1px] border-primary-400 px-[15px] py-1 font-body text-caption3 text-primary-400 disabled:opacity-60"
               >
                 {isFollowing ? "팔로잉" : "팔로우"}
               </button>
@@ -751,32 +751,33 @@ const NewsCarousel = ({ items }: { items: HomeNewsCardItem[] }) => {
   return (
     <section>
       <div
-        className="flex gap-3 overflow-x-auto px-1 pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="-mx-5 flex w-[calc(100%+40px)] snap-x snap-mandatory gap-3 overflow-x-auto scroll-px-5 px-5 pb-3 pt-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         onScroll={handleScroll}
       >
         {items.map((item) => (
-          <NewsCard
-            key={item.id}
-            profileImageSrc={item.profileImageSrc}
-            contentImageSrc={item.contentImageSrc}
-            bandName={item.bandName}
-            meta={item.meta}
-            title={item.title}
-            tags={item.tags}
-            onClick={
-              item.detailId == null
-                ? undefined
-                : () =>
-                    navigate(
-                      `/fan/explore/contents/${item.detailId}${
-                        item.createdAt
-                          ? `?createdAt=${encodeURIComponent(item.createdAt)}`
-                          : ""
-                      }`,
-                    )
-            }
-            ariaLabel={`${item.title} 상세보기`}
-          />
+          <div key={item.id} className="shrink-0 snap-start">
+            <NewsCard
+              profileImageSrc={item.profileImageSrc}
+              contentImageSrc={item.contentImageSrc}
+              bandName={item.bandName}
+              meta={item.meta}
+              title={item.title}
+              tags={item.tags}
+              onClick={
+                item.detailId == null
+                  ? undefined
+                  : () =>
+                      navigate(
+                        `/fan/explore/contents/${item.detailId}${
+                          item.createdAt
+                            ? `?createdAt=${encodeURIComponent(item.createdAt)}`
+                            : ""
+                        }`,
+                      )
+              }
+              ariaLabel={`${item.title} 상세보기`}
+            />
+          </div>
         ))}
       </div>
 
@@ -1112,15 +1113,23 @@ const FanHomePage = () => {
         leftAction={
           <button
             type="button"
-            aria-label="공연 캘린더"
-            onClick={() => navigate("/fan/home/concerts/calendar")}
-            className="flex size-6 items-center justify-center text-neutral-900"
+            aria-label="모드 전환"
+            onClick={() => setIsModeSwitchOpen(true)}
           >
-            <CalendarIcon />
+            <img src={SwapIcon} alt="" className="size-6" />
           </button>
         }
         rightAction={
           <>
+            <button
+              type="button"
+              aria-label="공연 캘린더"
+              onClick={() => navigate("/fan/home/concerts/calendar")}
+              className="flex size-6 items-center justify-center text-neutral-900"
+            >
+              <CalendarIcon />
+            </button>
+
             <button
               type="button"
               aria-label="알림"
@@ -1134,14 +1143,6 @@ const FanHomePage = () => {
               className="flex size-6 items-center justify-center text-neutral-900"
             >
               <NotificationBellIcon hasUnread={hasUnreadNotification} />
-            </button>
-
-            <button
-              type="button"
-              aria-label="모드 전환"
-              onClick={() => setIsModeSwitchOpen(true)}
-            >
-              <img src={SwapIcon} alt="" className="size-6" />
             </button>
           </>
         }

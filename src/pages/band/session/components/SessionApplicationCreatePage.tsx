@@ -60,14 +60,16 @@ const SessionApplicationCreatePageContent = ({
   });
 
   return createPortal(
-    <main className="fixed inset-0 z-[99999] mx-auto flex h-dvh w-full max-w-[393px] flex-col overflow-hidden bg-neutral-0">
+    <main className="frame-width fixed inset-0 z-[100] mx-auto flex h-dvh flex-col overflow-hidden bg-neutral-0">
       <SessionApplicationFormHeader
         title={controller.headerTitle}
         onBack={controller.handleRequestClose}
         onClose={controller.handleRequestClose}
       />
 
-      <SessionApplicationForm controller={controller} />
+      <section className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
+        <SessionApplicationForm controller={controller} />
+      </section>
 
       <SessionApplicationFormModals controller={controller} />
     </main>,
