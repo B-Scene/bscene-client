@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import SearchIcon from "@/assets/icons/band/search.svg";
 import ArrowDownIcon from "@/assets/icons/band/arrow-down-gray.svg";
 import CheckActiveIcon from "@/assets/icons/check-active.svg";
+import CheckCircleIcon from "@/assets/icons/check-circle.svg";
+import CheckCircleActiveIcon from "@/assets/icons/check-circle-active.svg";
 import BandImage from "@/assets/icons/band/band-default-profile.svg";
 import Modal from "@/components/Modal/Modal";
 import BandCard from "@/components/common/Card/BandCard";
@@ -320,6 +322,8 @@ export const ExploreFilterBar = ({
   highlightSort = true,
   disabledFilterIds = [],
   requireFilterForSort = false,
+  registeredOnly,
+  onRegisteredOnlyChange,
   onSortClick,
   onFilterClick,
 }: {
@@ -328,6 +332,8 @@ export const ExploreFilterBar = ({
   highlightSort?: boolean;
   disabledFilterIds?: string[];
   requireFilterForSort?: boolean;
+  registeredOnly?: boolean;
+  onRegisteredOnlyChange?: (value: boolean) => void;
   onSortClick?: () => void;
   onFilterClick?: () => void;
 }) => {
@@ -403,14 +409,37 @@ export const ExploreFilterBar = ({
         })}
       </div>
 
-      <button
-        type="button"
-        aria-label="필터"
-        onClick={onFilterClick}
-        className="flex h-[18.333px] w-[18.29px] shrink-0 items-center justify-center"
-      >
-        <FilterControlIcon />
-      </button>
+      {onRegisteredOnlyChange ? (
+        <button
+          type="button"
+          aria-pressed={registeredOnly}
+          onClick={() => onRegisteredOnlyChange(!registeredOnly)}
+          className="flex shrink-0 items-center gap-1 whitespace-nowrap pl-2"
+        >
+          <img
+            src={registeredOnly ? CheckCircleActiveIcon : CheckCircleIcon}
+            alt=""
+            className="h-4 w-4 shrink-0"
+          />
+          <span
+            className={[
+              "font-body text-caption3",
+              registeredOnly ? "text-primary-400" : "text-neutral-600",
+            ].join(" ")}
+          >
+            등록 밴드만 보기
+          </span>
+        </button>
+      ) : (
+        <button
+          type="button"
+          aria-label="필터"
+          onClick={onFilterClick}
+          className="flex h-[18.333px] w-[18.29px] shrink-0 items-center justify-center"
+        >
+          <FilterControlIcon />
+        </button>
+      )}
     </div>
   );
 };
@@ -771,6 +800,7 @@ const FanExplorePage = () => {
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
   const [selectedSort, setSelectedSort] =
     useState<ExploreSortOption>("추천순");
+  const [registeredOnly, setRegisteredOnly] = useState(false);
   const [appliedFilters, setAppliedFilters] = useState(
     DEFAULT_APPLIED_FILTERS,
   );
@@ -780,6 +810,7 @@ const FanExplorePage = () => {
   const appliedSort = selectedSort === "추천순" ? null : selectedSort;
   const recommendedBandsQuery = useRecommendedExploreBandsInfiniteQuery({
     size: 10,
+    isDummy: registeredOnly ? false : undefined,
   });
   const {
     data,
@@ -828,6 +859,8 @@ const FanExplorePage = () => {
         highlightSort={selectedSort !== "추천순"}
         disabledFilterIds={["content"]}
         requireFilterForSort
+        registeredOnly={registeredOnly}
+        onRegisteredOnlyChange={setRegisteredOnly}
         onSortClick={() => setIsSortSheetOpen(true)}
         onFilterClick={() => setIsFilterSheetOpen(true)}
       />
