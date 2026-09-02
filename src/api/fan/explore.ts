@@ -989,7 +989,7 @@ const removeEmptyParams = <T extends Record<string, unknown>>(params: T) => {
 export const getRecommendedExploreBands = async ({
   size = 20,
   cursor,
-  isDummy,
+  withDummy,
 }: FanExploreRecommendationParams = {}): Promise<NormalizedFanExploreBandsResponse> => {
   const response = await axiosInstance.get<
     FanExploreApiResponse<FanExplorePageResponse<FanExploreBand> | FanExploreBand[]>
@@ -997,7 +997,7 @@ export const getRecommendedExploreBands = async ({
     params: removeEmptyParams({
       cursor,
       size,
-      isDummy,
+      withDummy,
     }),
   });
 

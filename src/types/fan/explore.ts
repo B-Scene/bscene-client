@@ -23,7 +23,7 @@ export interface FanExploreListParams {
 export interface FanExploreRecommendationParams {
   cursor?: number;
   size?: number;
-  isDummy?: boolean;
+  withDummy?: boolean;
 }
 
 export interface FanExploreSearchParams {

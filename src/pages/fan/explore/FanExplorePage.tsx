@@ -193,7 +193,11 @@ const mapBandToItem = (band: FanExploreBand): RecommendedBandItem => {
       band.imageUrl ??
       BandImage,
     isFollowing:
-      bandInfo.isFollowing ?? bandInfo.following ?? band.isFollowing ?? band.following ?? false,
+      bandInfo.isFollowing ??
+      bandInfo.following ??
+      band.isFollowing ??
+      band.following ??
+      false,
   };
 };
 
@@ -342,17 +346,20 @@ export const ExploreFilterBar = ({
     { id: "region", defaultLabel: "지역", value: appliedFilters.region },
     { id: "content", defaultLabel: "유형", value: appliedFilters.content },
   ];
-  const hasAppliedFilter = filterChips.some((filter) => filter.value !== "전체");
+  const hasAppliedFilter = filterChips.some(
+    (filter) => filter.value !== "전체",
+  );
   const visibleFilterChips = hasAppliedFilter
     ? filterChips.filter((filter) => filter.value !== "전체")
     : filterChips;
   const isSortApplied = Boolean(appliedSort);
   const shouldHighlightSort = isSortApplied && highlightSort;
   const isSortDisabled = requireFilterForSort && !hasAppliedFilter;
-  const sortChipWidthClass = appliedSort === "정확도순" ? "w-[73px]" : "w-[62px]";
+  const sortChipWidthClass =
+    appliedSort === "정확도순" ? "w-[73px]" : "w-[62px]";
 
   return (
-    <div className="sticky top-0 z-10 flex h-[48px] w-full items-center justify-between border-b border-neutral-400 bg-neutral-0 py-[11px] pl-[22px] pr-[26px]">
+    <div className="sticky top-0 z-10 flex h-[48px] w-full items-center justify-between border-b border-neutral-400 bg-neutral-0 py-[11px] p-[22px]">
       <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto pr-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <button
           type="button"
@@ -388,23 +395,23 @@ export const ExploreFilterBar = ({
           const isDisabled = disabledFilterIds.includes(filter.id);
 
           return (
-          <button
-            key={filter.id}
-            type="button"
-            disabled={isDisabled}
-            onClick={isDisabled ? undefined : onFilterClick}
-            className={[
-              "flex h-[22px] shrink-0 items-center justify-center whitespace-nowrap rounded-full border py-[7px] font-body text-caption3",
-              isApplied ? "px-[15px]" : "w-[48px] px-[15px]",
-              isDisabled
-                ? "cursor-not-allowed border-neutral-300 bg-neutral-200 text-neutral-500"
-                : isApplied
-                ? "border-primary-400 bg-primary-0 text-primary-400"
-                : "border-neutral-400 bg-neutral-0 text-neutral-600",
-            ].join(" ")}
-          >
-            {isApplied ? filter.value : filter.defaultLabel}
-          </button>
+            <button
+              key={filter.id}
+              type="button"
+              disabled={isDisabled}
+              onClick={isDisabled ? undefined : onFilterClick}
+              className={[
+                "flex h-[22px] shrink-0 items-center justify-center whitespace-nowrap rounded-full border py-[7px] font-body text-caption3",
+                isApplied ? "px-[15px]" : "w-[48px] px-[15px]",
+                isDisabled
+                  ? "cursor-not-allowed border-neutral-300 bg-neutral-200 text-neutral-500"
+                  : isApplied
+                    ? "border-primary-400 bg-primary-0 text-primary-400"
+                    : "border-neutral-400 bg-neutral-0 text-neutral-600",
+              ].join(" ")}
+            >
+              {isApplied ? filter.value : filter.defaultLabel}
+            </button>
           );
         })}
       </div>
@@ -467,8 +474,8 @@ const FilterOptionButton = ({
         disabled
           ? "cursor-not-allowed bg-neutral-200 text-neutral-500 opacity-60"
           : selected
-          ? "bg-primary-400 text-neutral-0"
-          : "bg-neutral-300 text-neutral-600",
+            ? "bg-primary-400 text-neutral-0"
+            : "bg-neutral-300 text-neutral-600",
       ].join(" ")}
     >
       {label}
@@ -526,7 +533,9 @@ export const ExploreFilterSheet = ({
 }) => {
   const [selectedGenre, setSelectedGenre] = useState(appliedFilters.genre);
   const [selectedRegion, setSelectedRegion] = useState(appliedFilters.region);
-  const [selectedContent, setSelectedContent] = useState(appliedFilters.content);
+  const [selectedContent, setSelectedContent] = useState(
+    appliedFilters.content,
+  );
   const { rendered, isVisible, handleTransitionEnd } = useSlideUpSheet(
     open,
     () => {
@@ -686,10 +695,7 @@ const RecommendationSection = ({
   };
 
   return (
-    <section
-      className="px-[22px]"
-      style={{ paddingTop: showIntro ? 24 : 16 }}
-    >
+    <section className="px-[22px]" style={{ paddingTop: showIntro ? 24 : 16 }}>
       {showIntro ? (
         <>
           <h2 className="m-0 font-body text-label1 text-neutral-900">
@@ -718,45 +724,45 @@ const RecommendationSection = ({
           className={`flex flex-col gap-[12px] ${showIntro ? "mt-[16px]" : ""}`}
         >
           {bands.map((band) => (
-          <BandCard
-            key={band.id}
-            imageSrc={band.imageSrc}
-            imageAlt={`${band.name} 프로필`}
-            title={band.name}
-            subtitle={`${band.genre} · ${band.region}`}
-            description={band.description}
-            following={band.isFollowing}
-            onClick={() =>
-              navigate(`/fan/bands/${band.bandId ?? band.id}`, {
-                state: {
-                  bandPreview: {
-                    bandId: band.bandId,
-                    name: band.name,
-                    genre: band.genre,
-                    region: band.region,
-                    profileImageUrl: band.imageSrc,
-                    description: band.description,
-                    followerCount: band.followers,
-                    isFollowing: band.isFollowing,
+            <BandCard
+              key={band.id}
+              imageSrc={band.imageSrc}
+              imageAlt={`${band.name} 프로필`}
+              title={band.name}
+              subtitle={`${band.genre} · ${band.region}`}
+              description={band.description}
+              following={band.isFollowing}
+              onClick={() =>
+                navigate(`/fan/bands/${band.bandId ?? band.id}`, {
+                  state: {
+                    bandPreview: {
+                      bandId: band.bandId,
+                      name: band.name,
+                      genre: band.genre,
+                      region: band.region,
+                      profileImageUrl: band.imageSrc,
+                      description: band.description,
+                      followerCount: band.followers,
+                      isFollowing: band.isFollowing,
+                    },
                   },
-                },
-              })
-            }
-            onToggleFollow={() => {
-              if (band.bandId == null || isFollowPending) return;
-
-              if (band.isFollowing) {
-                setUnfollowTargetId(band.id);
-                return;
+                })
               }
+              onToggleFollow={() => {
+                if (band.bandId == null || isFollowPending) return;
 
-              void followBand(band);
-            }}
-            className="!h-[86px] !gap-[16px]"
-            contentClassName="!h-auto flex-1 shrink !w-auto"
-            descriptionClassName="line-clamp-2 text-primary-300"
-            descriptionMultiline
-          />
+                if (band.isFollowing) {
+                  setUnfollowTargetId(band.id);
+                  return;
+                }
+
+                void followBand(band);
+              }}
+              className="!h-[86px] !gap-[16px]"
+              contentClassName="!h-auto flex-1 shrink !w-auto"
+              descriptionClassName="line-clamp-2 text-primary-300"
+              descriptionMultiline
+            />
           ))}
         </div>
       ) : (
@@ -798,53 +804,43 @@ const RecommendationSection = ({
 const FanExplorePage = () => {
   const [isSortSheetOpen, setIsSortSheetOpen] = useState(false);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
-  const [selectedSort, setSelectedSort] =
-    useState<ExploreSortOption>("추천순");
+  const [selectedSort, setSelectedSort] = useState<ExploreSortOption>("추천순");
   const [registeredOnly, setRegisteredOnly] = useState(false);
-  const [appliedFilters, setAppliedFilters] = useState(
-    DEFAULT_APPLIED_FILTERS,
-  );
+  const [appliedFilters, setAppliedFilters] = useState(DEFAULT_APPLIED_FILTERS);
   const hasAppliedFilter = Object.values(appliedFilters).some(
     (value) => value !== "전체",
   );
   const appliedSort = selectedSort === "추천순" ? null : selectedSort;
   const recommendedBandsQuery = useRecommendedExploreBandsInfiniteQuery({
     size: 10,
-    isDummy: registeredOnly ? false : undefined,
+    withDummy: registeredOnly ? false : undefined,
   });
-  const {
-    data,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-  } = recommendedBandsQuery;
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    recommendedBandsQuery;
   const fetchedBands = useMemo(
     () => data?.pages.flatMap((page) => page.items).map(mapBandToItem) ?? [],
     [data],
   );
-  const recommendedBands = useMemo(
-    () => {
-      const nextBands = fetchedBands.filter((band) => {
-        const matchesGenre =
-          appliedFilters.genre === "전체" || band.genre === appliedFilters.genre;
-        const matchesRegion =
-          appliedFilters.region === "전체" ||
-          band.region === appliedFilters.region;
-        return matchesGenre && matchesRegion;
-      });
+  const recommendedBands = useMemo(() => {
+    const nextBands = fetchedBands.filter((band) => {
+      const matchesGenre =
+        appliedFilters.genre === "전체" || band.genre === appliedFilters.genre;
+      const matchesRegion =
+        appliedFilters.region === "전체" ||
+        band.region === appliedFilters.region;
+      return matchesGenre && matchesRegion;
+    });
 
-      if (selectedSort === "인기순") {
-        return [...nextBands].sort((a, b) => b.followers - a.followers);
-      }
+    if (selectedSort === "인기순") {
+      return [...nextBands].sort((a, b) => b.followers - a.followers);
+    }
 
-      if (selectedSort === "정확도순") {
-        return nextBands;
-      }
+    if (selectedSort === "정확도순") {
+      return nextBands;
+    }
 
-      return [...nextBands].sort((a, b) => b.score - a.score);
-    },
-    [appliedFilters, fetchedBands, selectedSort],
-  );
+    return [...nextBands].sort((a, b) => b.score - a.score);
+  }, [appliedFilters, fetchedBands, selectedSort]);
   const sentinelRef = useInfiniteScrollObserver({
     enabled: Boolean(hasNextPage) && !isFetchingNextPage,
     onIntersect: fetchNextPage,
